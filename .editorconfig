@@ -1,0 +1,361 @@
+# EditorConfig: https://editorconfig.org
+# DagEdit 프로젝트 코딩 규칙 정의
+
+root = true
+
+# ─── 전체 파일 공통 ───────────────────────────────────────────
+[*]
+indent_style             = space
+indent_size              = 4
+end_of_line              = lf
+charset                  = utf-8
+trim_trailing_whitespace = true
+insert_final_newline     = true
+
+# ─── XML / 프로젝트 파일 ──────────────────────────────────────
+[*.{csproj,props,targets,axaml,xml,config}]
+indent_size = 2
+
+# ─── JSON ────────────────────────────────────────────────────
+[*.json]
+indent_size = 2
+
+# ─── YAML (GitHub Actions) ───────────────────────────────────
+[*.{yml,yaml}]
+indent_size = 2
+
+# ─── Markdown ────────────────────────────────────────────────
+[*.md]
+trim_trailing_whitespace = false
+
+# ═══════════════════════════════════════════════════════════════
+# C# 언어 규칙
+# ═══════════════════════════════════════════════════════════════
+[*.cs]
+
+# ── 들여쓰기 & 공백 ──────────────────────────────────────────
+indent_size                                                      = 4
+tab_width                                                        = 4
+csharp_indent_case_contents                                      = true
+csharp_indent_switch_labels                                      = true
+csharp_indent_labels                                             = flush_left
+csharp_indent_block_contents                                     = true
+csharp_indent_braces                                             = false
+csharp_indent_case_contents_when_block                           = true
+
+# ── 줄 바꿈 & 중괄호 ─────────────────────────────────────────
+csharp_new_line_before_open_brace                                = all
+csharp_new_line_before_else                                      = true
+csharp_new_line_before_catch                                     = true
+csharp_new_line_before_finally                                   = true
+csharp_new_line_before_members_in_object_initializers            = true
+csharp_new_line_before_members_in_anonymous_types                = true
+csharp_new_line_between_query_expression_clauses                 = true
+
+# ── 공백 ──────────────────────────────────────────────────────
+csharp_space_after_cast                                          = false
+csharp_space_after_keywords_in_control_flow_statements           = true
+csharp_space_between_method_call_parameter_list_parentheses      = false
+csharp_space_between_method_declaration_parameter_list_parentheses = false
+csharp_space_between_parentheses                                 = false
+csharp_space_before_colon_in_inheritance_clause                  = true
+csharp_space_after_colon_in_inheritance_clause                   = true
+csharp_space_around_binary_operators                             = before_and_after
+csharp_space_between_method_declaration_empty_parameter_list_parentheses = false
+csharp_space_between_method_call_name_and_opening_parenthesis    = false
+csharp_space_between_method_call_empty_parameter_list_parentheses = false
+
+# ── var 사용 ──────────────────────────────────────────────────
+csharp_style_var_for_built_in_types                              = false:suggestion
+csharp_style_var_when_type_is_apparent                           = true:suggestion
+csharp_style_var_elsewhere                                       = false:suggestion
+
+# ── this. 한정자 ──────────────────────────────────────────────
+dotnet_style_qualification_for_field                             = false:suggestion
+dotnet_style_qualification_for_property                          = false:suggestion
+dotnet_style_qualification_for_method                            = false:suggestion
+dotnet_style_qualification_for_event                             = false:suggestion
+
+# ── 언어 키워드 vs 타입 ───────────────────────────────────────
+dotnet_style_predefined_type_for_locals_parameters_members       = true:warning
+dotnet_style_predefined_type_for_member_access                   = true:warning
+
+# ── Null 처리 ─────────────────────────────────────────────────
+csharp_style_throw_expression                                    = true:suggestion
+csharp_style_conditional_delegate_call                           = true:suggestion
+dotnet_style_null_propagation                                    = true:suggestion
+dotnet_style_coalesce_expression                                 = true:suggestion
+
+# ── 표현식 본문 멤버 ──────────────────────────────────────────
+csharp_style_expression_bodied_methods                           = false:silent
+csharp_style_expression_bodied_constructors                      = false:silent
+csharp_style_expression_bodied_operators                         = false:silent
+csharp_style_expression_bodied_properties                        = true:silent
+csharp_style_expression_bodied_indexers                          = true:silent
+csharp_style_expression_bodied_accessors                         = true:silent
+
+# ── 패턴 매칭 ─────────────────────────────────────────────────
+csharp_style_pattern_matching_over_is_with_cast_check            = true:suggestion
+csharp_style_pattern_matching_over_as_with_null_check            = true:suggestion
+
+# ── using 정렬 ────────────────────────────────────────────────
+dotnet_sort_system_directives_first                              = true
+dotnet_separate_import_directive_groups                          = false
+
+# ── 네이밍 규칙 ───────────────────────────────────────────────
+# private 필드: _camelCase
+dotnet_naming_rule.private_fields_should_be_camel_case.severity  = warning
+dotnet_naming_rule.private_fields_should_be_camel_case.symbols   = private_fields
+dotnet_naming_rule.private_fields_should_be_camel_case.style     = camel_case_underscore_style
+
+dotnet_naming_symbols.private_fields.applicable_kinds            = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities  = private
+
+dotnet_naming_style.camel_case_underscore_style.required_prefix  = _
+dotnet_naming_style.camel_case_underscore_style.capitalization   = camel_case
+
+# 상수: UPPER_CASE (선택)
+dotnet_naming_rule.constants_should_be_upper_case.severity       = suggestion
+dotnet_naming_rule.constants_should_be_upper_case.symbols        = constants
+dotnet_naming_rule.constants_should_be_upper_case.style          = upper_case_style
+
+dotnet_naming_symbols.constants.applicable_kinds                 = field
+dotnet_naming_symbols.constants.required_modifiers               = const
+
+dotnet_naming_style.upper_case_style.capitalization              = all_upper
+dotnet_naming_style.upper_case_style.word_separator              = _
+
+# ═══════════════════════════════════════════════════════════════
+# StyleCop Analyzer 규칙 (severity = warning, 점진적으로 강화 예정)
+# ═══════════════════════════════════════════════════════════════
+
+# SA0001: XML 문서 파일이 없을 때 StyleCop이 발생시키는 메타 경고 — 비활성화
+dotnet_diagnostic.SA0001.severity = none
+
+# SA1000-SA1027: 공백 규칙
+dotnet_diagnostic.SA1000.severity = warning
+dotnet_diagnostic.SA1001.severity = warning
+dotnet_diagnostic.SA1002.severity = warning
+dotnet_diagnostic.SA1003.severity = warning
+dotnet_diagnostic.SA1004.severity = warning
+dotnet_diagnostic.SA1005.severity = warning
+dotnet_diagnostic.SA1006.severity = warning
+dotnet_diagnostic.SA1007.severity = warning
+dotnet_diagnostic.SA1008.severity = warning
+dotnet_diagnostic.SA1009.severity = warning
+dotnet_diagnostic.SA1010.severity = warning
+dotnet_diagnostic.SA1011.severity = warning
+dotnet_diagnostic.SA1012.severity = warning
+dotnet_diagnostic.SA1013.severity = warning
+dotnet_diagnostic.SA1014.severity = warning
+dotnet_diagnostic.SA1015.severity = warning
+dotnet_diagnostic.SA1016.severity = warning
+dotnet_diagnostic.SA1017.severity = warning
+dotnet_diagnostic.SA1018.severity = warning
+dotnet_diagnostic.SA1019.severity = warning
+dotnet_diagnostic.SA1020.severity = warning
+dotnet_diagnostic.SA1021.severity = warning
+dotnet_diagnostic.SA1022.severity = warning
+dotnet_diagnostic.SA1023.severity = warning
+dotnet_diagnostic.SA1024.severity = warning
+dotnet_diagnostic.SA1025.severity = warning
+dotnet_diagnostic.SA1026.severity = warning
+dotnet_diagnostic.SA1027.severity = warning
+dotnet_diagnostic.SA1028.severity = warning
+
+# SA1100-SA1150: 가독성 규칙
+dotnet_diagnostic.SA1100.severity = warning
+dotnet_diagnostic.SA1101.severity = none      # this. 강제 — 프로젝트 스타일과 맞지 않아 비활성화
+dotnet_diagnostic.SA1102.severity = warning
+dotnet_diagnostic.SA1103.severity = warning
+dotnet_diagnostic.SA1104.severity = warning
+dotnet_diagnostic.SA1105.severity = warning
+dotnet_diagnostic.SA1106.severity = warning
+dotnet_diagnostic.SA1107.severity = warning
+dotnet_diagnostic.SA1108.severity = warning
+dotnet_diagnostic.SA1110.severity = warning
+dotnet_diagnostic.SA1111.severity = warning
+dotnet_diagnostic.SA1112.severity = warning
+dotnet_diagnostic.SA1113.severity = warning
+dotnet_diagnostic.SA1114.severity = warning
+dotnet_diagnostic.SA1115.severity = warning
+dotnet_diagnostic.SA1116.severity = warning
+dotnet_diagnostic.SA1117.severity = warning
+dotnet_diagnostic.SA1118.severity = warning
+dotnet_diagnostic.SA1119.severity = warning
+dotnet_diagnostic.SA1120.severity = warning
+dotnet_diagnostic.SA1121.severity = warning
+dotnet_diagnostic.SA1122.severity = warning
+dotnet_diagnostic.SA1123.severity = warning
+dotnet_diagnostic.SA1124.severity = none      # #region — 기존 코드에서 사용 중
+dotnet_diagnostic.SA1125.severity = warning
+dotnet_diagnostic.SA1127.severity = warning
+dotnet_diagnostic.SA1128.severity = warning
+dotnet_diagnostic.SA1129.severity = warning
+dotnet_diagnostic.SA1130.severity = warning
+dotnet_diagnostic.SA1131.severity = warning
+dotnet_diagnostic.SA1132.severity = warning
+dotnet_diagnostic.SA1133.severity = warning
+dotnet_diagnostic.SA1134.severity = warning
+dotnet_diagnostic.SA1135.severity = warning
+dotnet_diagnostic.SA1136.severity = warning
+dotnet_diagnostic.SA1137.severity = warning
+dotnet_diagnostic.SA1139.severity = warning
+
+# SA1200-SA1214: 순서 규칙
+dotnet_diagnostic.SA1200.severity = none      # using 위치 — namespace 내부 허용
+dotnet_diagnostic.SA1201.severity = warning
+dotnet_diagnostic.SA1202.severity = warning
+dotnet_diagnostic.SA1203.severity = warning
+dotnet_diagnostic.SA1204.severity = warning
+dotnet_diagnostic.SA1205.severity = warning
+dotnet_diagnostic.SA1206.severity = warning
+dotnet_diagnostic.SA1207.severity = warning
+dotnet_diagnostic.SA1208.severity = warning
+dotnet_diagnostic.SA1209.severity = warning
+dotnet_diagnostic.SA1210.severity = warning
+dotnet_diagnostic.SA1211.severity = warning
+dotnet_diagnostic.SA1212.severity = warning
+dotnet_diagnostic.SA1213.severity = warning
+dotnet_diagnostic.SA1214.severity = warning
+
+# SA1300-SA1316: 네이밍 규칙
+dotnet_diagnostic.SA1300.severity = warning
+dotnet_diagnostic.SA1301.severity = warning
+dotnet_diagnostic.SA1302.severity = warning
+dotnet_diagnostic.SA1303.severity = warning
+dotnet_diagnostic.SA1304.severity = warning
+dotnet_diagnostic.SA1306.severity = warning
+dotnet_diagnostic.SA1307.severity = warning
+dotnet_diagnostic.SA1308.severity = warning
+dotnet_diagnostic.SA1309.severity = none      # _prefix 필드 — 프로젝트 컨벤션 허용
+dotnet_diagnostic.SA1310.severity = none      # UPPER_CASE 상수 언더스코어 허용
+dotnet_diagnostic.SA1311.severity = warning
+dotnet_diagnostic.SA1312.severity = warning
+dotnet_diagnostic.SA1313.severity = warning
+dotnet_diagnostic.SA1314.severity = warning
+dotnet_diagnostic.SA1316.severity = warning
+
+# SA1400-SA1414: 접근성 규칙
+dotnet_diagnostic.SA1400.severity = warning
+dotnet_diagnostic.SA1401.severity = warning
+dotnet_diagnostic.SA1402.severity = warning
+dotnet_diagnostic.SA1403.severity = warning
+dotnet_diagnostic.SA1404.severity = warning
+dotnet_diagnostic.SA1405.severity = warning
+dotnet_diagnostic.SA1406.severity = warning
+dotnet_diagnostic.SA1407.severity = warning
+dotnet_diagnostic.SA1408.severity = warning
+dotnet_diagnostic.SA1410.severity = warning
+dotnet_diagnostic.SA1411.severity = warning
+dotnet_diagnostic.SA1413.severity = warning
+
+# SA1500-SA1519: 레이아웃 규칙
+dotnet_diagnostic.SA1500.severity = warning
+dotnet_diagnostic.SA1501.severity = warning
+dotnet_diagnostic.SA1502.severity = warning
+dotnet_diagnostic.SA1503.severity = warning
+dotnet_diagnostic.SA1504.severity = warning
+dotnet_diagnostic.SA1505.severity = warning
+dotnet_diagnostic.SA1506.severity = warning
+dotnet_diagnostic.SA1507.severity = warning
+dotnet_diagnostic.SA1508.severity = warning
+dotnet_diagnostic.SA1509.severity = warning
+dotnet_diagnostic.SA1510.severity = warning
+dotnet_diagnostic.SA1511.severity = warning
+dotnet_diagnostic.SA1512.severity = warning
+dotnet_diagnostic.SA1513.severity = warning
+dotnet_diagnostic.SA1514.severity = warning
+dotnet_diagnostic.SA1515.severity = warning
+dotnet_diagnostic.SA1516.severity = warning
+dotnet_diagnostic.SA1517.severity = warning
+dotnet_diagnostic.SA1518.severity = warning
+dotnet_diagnostic.SA1519.severity = warning
+dotnet_diagnostic.SA1520.severity = warning
+
+# SA1600-SA1652: 문서화 규칙 (초기에는 suggestion — 공개 API 문서화는 추후 강화)
+dotnet_diagnostic.SA1600.severity = suggestion  # public 멤버 XML 문서화
+dotnet_diagnostic.SA1601.severity = suggestion
+dotnet_diagnostic.SA1602.severity = suggestion
+dotnet_diagnostic.SA1604.severity = suggestion
+dotnet_diagnostic.SA1605.severity = suggestion
+dotnet_diagnostic.SA1606.severity = suggestion
+dotnet_diagnostic.SA1607.severity = suggestion
+dotnet_diagnostic.SA1608.severity = suggestion
+dotnet_diagnostic.SA1610.severity = suggestion
+dotnet_diagnostic.SA1611.severity = suggestion
+dotnet_diagnostic.SA1612.severity = suggestion
+dotnet_diagnostic.SA1613.severity = suggestion
+dotnet_diagnostic.SA1614.severity = suggestion
+dotnet_diagnostic.SA1615.severity = suggestion
+dotnet_diagnostic.SA1616.severity = suggestion
+dotnet_diagnostic.SA1617.severity = suggestion
+dotnet_diagnostic.SA1618.severity = suggestion
+dotnet_diagnostic.SA1619.severity = suggestion
+dotnet_diagnostic.SA1620.severity = suggestion
+dotnet_diagnostic.SA1621.severity = suggestion
+dotnet_diagnostic.SA1622.severity = suggestion
+dotnet_diagnostic.SA1623.severity = suggestion
+dotnet_diagnostic.SA1624.severity = suggestion
+dotnet_diagnostic.SA1625.severity = suggestion
+dotnet_diagnostic.SA1626.severity = suggestion
+dotnet_diagnostic.SA1627.severity = suggestion
+dotnet_diagnostic.SA1628.severity = suggestion
+dotnet_diagnostic.SA1629.severity = suggestion
+dotnet_diagnostic.SA1633.severity = none        # 파일 헤더 — 요구하지 않음
+dotnet_diagnostic.SA1634.severity = none
+dotnet_diagnostic.SA1635.severity = none
+dotnet_diagnostic.SA1636.severity = none
+dotnet_diagnostic.SA1637.severity = none
+dotnet_diagnostic.SA1638.severity = none
+dotnet_diagnostic.SA1639.severity = none
+dotnet_diagnostic.SA1640.severity = none
+dotnet_diagnostic.SA1641.severity = none
+dotnet_diagnostic.SA1642.severity = suggestion
+dotnet_diagnostic.SA1643.severity = suggestion
+dotnet_diagnostic.SA1648.severity = suggestion
+dotnet_diagnostic.SA1649.severity = warning
+dotnet_diagnostic.SA1651.severity = suggestion
+dotnet_diagnostic.SA1652.severity = none        # XML 문서 경고 비활성화
+
+# ═══════════════════════════════════════════════════════════════
+# 🚨 ERROR 격상 규칙 — Go처럼 타협 없는 환경
+#
+# 원칙: 현재 코드베이스가 이미 준수하는 규칙 + 버그를 직접 유발하는 규칙만 Error로.
+# 337개 SA* 경고는 점진적 감소 목표 (DEC-005) — 일괄 Error 지양.
+# ═══════════════════════════════════════════════════════════════
+
+# ── Go 핵심 원칙 1: 미사용 코드 금지 ─────────────────────────
+# Go는 미사용 변수/임포트를 컴파일 에러로 처리한다.
+dotnet_diagnostic.IDE0059.severity = error   # 불필요한 할당 (값이 사용되지 않음)
+dotnet_diagnostic.IDE0060.severity = error   # 사용되지 않는 매개변수
+dotnet_diagnostic.CS0168.severity  = error   # 변수가 선언됐지만 사용되지 않음
+dotnet_diagnostic.CS0219.severity  = error   # 값이 할당됐지만 사용되지 않음
+
+# ── Go 핵심 원칙 2: 명시적 Null 안전성 ──────────────────────
+# Go는 nil 역참조를 런타임 패닉으로 처리한다. C#은 컴파일 타임에 잡아야 한다.
+dotnet_diagnostic.CS8600.severity  = error   # null을 non-nullable에 할당
+dotnet_diagnostic.CS8601.severity  = error   # null 가능한 값을 참조 타입에 할당
+dotnet_diagnostic.CS8602.severity  = error   # null 가능한 참조 역참조
+dotnet_diagnostic.CS8603.severity  = error   # null 가능한 값 반환
+dotnet_diagnostic.CS8604.severity  = error   # null 가능한 값을 인수로 전달
+dotnet_diagnostic.CS8618.severity  = error   # non-nullable 필드가 초기화되지 않음
+dotnet_diagnostic.CS8625.severity  = error   # null 리터럴을 non-nullable에 전달
+
+# ── Go 핵심 원칙 3: 명시적 접근 한정자 ──────────────────────
+# Go는 대소문자로 가시성을 명시한다. C#도 명시적이어야 한다.
+dotnet_diagnostic.SA1400.severity  = error   # 접근 한정자 반드시 명시
+
+# ── 안전 코딩: 중괄호 생략 금지 ─────────────────────────────
+# 중괄호 생략은 Heartbleed 같은 버그의 원인이다.
+dotnet_diagnostic.SA1503.severity  = error   # if/for/while 중괄호 생략 금지
+
+# ── 코드 위생: 빈 구문 금지 ─────────────────────────────────
+dotnet_diagnostic.SA1106.severity  = error   # 빈 구문(;) 금지
+
+# ── 네이밍: private 필드 _camelCase 강제 (Error) ─────────────
+dotnet_naming_rule.private_fields_should_be_camel_case.severity = error
+
+# ── 타입 키워드: int/string 사용 강제 (Int32/String 금지) ────
+dotnet_style_predefined_type_for_locals_parameters_members = true:error
+dotnet_style_predefined_type_for_member_access             = true:error

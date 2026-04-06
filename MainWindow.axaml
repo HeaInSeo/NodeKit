@@ -1,0 +1,31 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:NodeKit"
+        x:Class="NodeKit.MainWindow"
+        x:CompileBindings="True"
+        Title="NodeKit — Pipeline Node Prototype"
+        Width="1100" Height="700"
+        Background="#12111f">
+
+  <Grid RowDefinitions="Auto,*">
+
+    <!-- 툴바 -->
+    <Border Grid.Row="0" Background="#1c1b2b" Padding="8,6">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <Button x:Name="AddBwaButton" Content="+ BWA-MEM2" />
+        <Button x:Name="AddGatkButton" Content="+ GATK HC" />
+        <Button x:Name="AddTrimButton" Content="+ Trimmomatic" />
+        <Separator Width="1" Background="#444" Margin="4,0" />
+        <Button x:Name="ConnectButton" Content="Connect Selected" />
+        <Button x:Name="ClearButton" Content="Clear All" />
+      </StackPanel>
+    </Border>
+
+    <!-- 캔버스 영역 -->
+    <Border Grid.Row="1" Background="#12111f" ClipToBounds="True">
+      <local:PipelineCanvas x:Name="Canvas" />
+    </Border>
+
+  </Grid>
+
+</Window>
