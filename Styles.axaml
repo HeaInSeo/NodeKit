@@ -1,4 +1,4 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-  <StyleInclude Source="/PipelineNodeControl.axaml" />
+  <!-- 프로젝트 전역 스타일. Phase 1에서 컨트롤 스타일 추가 예정. -->
 </Styles>

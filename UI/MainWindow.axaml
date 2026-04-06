@@ -1,0 +1,151 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="NodeKit.UI.MainWindow"
+        Title="NodeKit — Tool Authoring Console"
+        Width="1200" Height="800"
+        WindowStartupLocation="CenterScreen">
+
+  <DockPanel>
+
+    <!-- 상단 타이틀바 -->
+    <Border DockPanel.Dock="Top" Background="#1c1b2b" Padding="16,10">
+      <TextBlock Text="NodeKit — Tool Authoring Console"
+                 FontSize="15" FontWeight="SemiBold" Foreground="White"/>
+    </Border>
+
+    <!-- 좌측 네비게이션 -->
+    <Border DockPanel.Dock="Left" Width="180" Background="#16151f" Padding="8">
+      <StackPanel Spacing="4">
+        <TextBlock Text="MENU" FontSize="10" Foreground="#888" Margin="8,0,0,8"/>
+        <Button Name="NavAuthoringButton" HorizontalAlignment="Stretch"
+                Background="Transparent" Foreground="White" Padding="10,8">
+          Tool 정의
+        </Button>
+        <Button Name="NavToolListButton" HorizontalAlignment="Stretch"
+                Background="Transparent" Foreground="White" Padding="10,8">
+          등록된 Tools
+        </Button>
+        <Button Name="NavPolicyButton" HorizontalAlignment="Stretch"
+                Background="Transparent" Foreground="White" Padding="10,8">
+          정책 관리
+        </Button>
+      </StackPanel>
+    </Border>
+
+    <!-- 메인 컨텐츠 -->
+    <Grid>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="*"/>
+        <RowDefinition Height="Auto"/>
+      </Grid.RowDefinitions>
+
+      <!-- 컨텐츠 패널 -->
+      <Border Grid.Row="0" Padding="20" Background="#12111a">
+
+        <!-- Tool 정의 패널 (기본 표시) -->
+        <ScrollViewer Name="AuthoringPanel">
+          <StackPanel Spacing="16" MaxWidth="720">
+
+            <TextBlock Text="Tool 정의" FontSize="18" FontWeight="SemiBold" Foreground="White"/>
+
+            <!-- 이름 -->
+            <StackPanel Spacing="4">
+              <TextBlock Text="Tool 이름" Foreground="#aaa" FontSize="12"/>
+              <TextBox Name="ToolNameBox" Watermark="예: BWA-MEM2" Background="#1e1d2e" Foreground="White"
+                       BorderBrush="#333" Padding="8"/>
+            </StackPanel>
+
+            <!-- 이미지 URI -->
+            <StackPanel Spacing="4">
+              <TextBlock Text="컨테이너 이미지 URI (digest 포함 필수)" Foreground="#aaa" FontSize="12"/>
+              <TextBox Name="ImageUriBox"
+                       Watermark="예: registry.example.com/bwa-mem2:2.2.1@sha256:abc123..."
+                       Background="#1e1d2e" Foreground="White" BorderBrush="#333" Padding="8"/>
+            </StackPanel>
+
+            <!-- Dockerfile -->
+            <StackPanel Spacing="4">
+              <TextBlock Text="Dockerfile" Foreground="#aaa" FontSize="12"/>
+              <TextBox Name="DockerfileBox" AcceptsReturn="True" Height="120"
+                       Watermark="FROM ubuntu:22.04 AS builder&#10;RUN apt-get install -y ..."
+                       Background="#1e1d2e" Foreground="White" BorderBrush="#333"
+                       Padding="8" FontFamily="Monospace"/>
+            </StackPanel>
+
+            <!-- Script -->
+            <StackPanel Spacing="4">
+              <TextBlock Text="실행 스크립트" Foreground="#aaa" FontSize="12"/>
+              <TextBox Name="ScriptBox" AcceptsReturn="True" Height="80"
+                       Background="#1e1d2e" Foreground="White" BorderBrush="#333"
+                       Padding="8" FontFamily="Monospace"/>
+            </StackPanel>
+
+            <!-- I/O 선언 -->
+            <Grid ColumnDefinitions="*,16,*">
+              <StackPanel Grid.Column="0" Spacing="4">
+                <TextBlock Text="Inputs (이름, 한 줄에 하나)" Foreground="#aaa" FontSize="12"/>
+                <TextBox Name="InputsBox" AcceptsReturn="True" Height="80"
+                         Watermark="input.fastq.R1&#10;input.fastq.R2"
+                         Background="#1e1d2e" Foreground="White" BorderBrush="#333" Padding="8"/>
+              </StackPanel>
+              <StackPanel Grid.Column="2" Spacing="4">
+                <TextBlock Text="Outputs (이름, 한 줄에 하나)" Foreground="#aaa" FontSize="12"/>
+                <TextBox Name="OutputsBox" AcceptsReturn="True" Height="80"
+                         Watermark="output.bam"
+                         Background="#1e1d2e" Foreground="White" BorderBrush="#333" Padding="8"/>
+              </StackPanel>
+            </Grid>
+
+            <!-- 환경 스펙 -->
+            <StackPanel Spacing="4">
+              <TextBlock Text="환경 스펙 파일 (conda yml / requirements.txt, 선택)" Foreground="#aaa" FontSize="12"/>
+              <TextBox Name="EnvSpecBox" AcceptsReturn="True" Height="80"
+                       Background="#1e1d2e" Foreground="White" BorderBrush="#333"
+                       Padding="8" FontFamily="Monospace"/>
+            </StackPanel>
+
+            <!-- L1 검증 결과 -->
+            <Border Name="ValidationResultPanel" IsVisible="False"
+                    Background="#1a1228" BorderBrush="#c0392b" BorderThickness="1" CornerRadius="4" Padding="12">
+              <StackPanel Spacing="4">
+                <TextBlock Text="L1 검증 결과" FontWeight="SemiBold" Foreground="#e74c3c" FontSize="13"/>
+                <ItemsControl Name="ViolationsList">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="x:String">
+                      <TextBlock Text="{Binding}" Foreground="#e74c3c" FontSize="12" TextWrapping="Wrap"/>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+
+            <Border Name="ValidationPassPanel" IsVisible="False"
+                    Background="#0d1f12" BorderBrush="#27ae60" BorderThickness="1" CornerRadius="4" Padding="12">
+              <TextBlock Text="✓ L1 검증 통과" Foreground="#2ecc71" FontSize="13" FontWeight="SemiBold"/>
+            </Border>
+
+            <!-- 버튼 행 -->
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Name="ValidateButton" Padding="16,8" Background="#2c3e88" Foreground="White">
+                L1 검증
+              </Button>
+              <Button Name="SendBuildButton" Padding="16,8" Background="#27ae60" Foreground="White" IsEnabled="False">
+                빌드 요청 전송 (NodeForge)
+              </Button>
+            </StackPanel>
+
+          </StackPanel>
+        </ScrollViewer>
+
+      </Border>
+
+      <!-- 하단 상태바 -->
+      <Border Grid.Row="1" Background="#0d0c18" Padding="16,6">
+        <TextBlock Name="StatusBar" Text="준비" Foreground="#666" FontSize="11"/>
+      </Border>
+
+    </Grid>
+
+  </DockPanel>
+
+</Window>

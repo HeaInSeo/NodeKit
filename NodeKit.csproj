@@ -6,13 +6,11 @@
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-    <CopyFilesToOutputDirectoryDependsOn>CompileAvaloniaXaml;$(CopyFilesToOutputDirectoryDependsOn)</CopyFilesToOutputDirectoryDependsOn>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <AnalysisLevel>latest</AnalysisLevel>
     <AnalysisMode>All</AnalysisMode>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.0.0" />
     <PackageReference Include="Avalonia.Desktop" Version="11.0.0" />
@@ -21,8 +19,6 @@
     <PackageReference Condition="'$(Configuration)' == 'Debug'" Include="Avalonia.Diagnostics" Version="11.0.0">
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="ReactiveUI" Version="19.6.1" />
-    <PackageReference Include="System.Reactive" Version="6.0.0" />
     <PackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.507">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -38,4 +34,5 @@
   <ItemGroup>
     <Compile Remove="tests/**/*.cs" />
   </ItemGroup>
+
 </Project>
