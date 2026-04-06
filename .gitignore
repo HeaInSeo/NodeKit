@@ -1,0 +1,43 @@
+## .NET / C# / Avalonia
+
+# 빌드 출력
+bin/
+obj/
+out/
+
+# Visual Studio 파일
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# JetBrains Rider
+.idea/
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+*.lock.json
+!packages.lock.json
+
+# 테스트 결과
+test-results/
+TestResults/
+*.trx
+coverage.out
+coverage.cobertura.xml
+
+# 환경
+.env
+.env.*
+
+# 런타임 생성
+*.log
+*.tmp
+/tmp/
+
+# OS
+.DS_Store
+Thumbs.db
