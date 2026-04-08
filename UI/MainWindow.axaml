@@ -39,11 +39,12 @@
         <RowDefinition Height="Auto"/>
       </Grid.RowDefinitions>
 
-      <!-- 컨텐츠 패널 -->
-      <Border Grid.Row="0" Padding="20" Background="#12111a">
+      <!-- 컨텐츠 패널 (3개 패널 중 하나만 표시) -->
+      <Border Grid.Row="0" Background="#12111a">
+        <Grid>
 
         <!-- Tool 정의 패널 (기본 표시) -->
-        <ScrollViewer Name="AuthoringPanel">
+        <ScrollViewer Name="AuthoringPanel" Padding="20">
           <StackPanel Spacing="16" MaxWidth="720">
 
             <TextBlock Text="Tool 정의" FontSize="18" FontWeight="SemiBold" Foreground="White"/>
@@ -182,6 +183,79 @@
           </StackPanel>
         </ScrollViewer>
 
+        <!-- 등록된 Tools 패널 -->
+        <ScrollViewer Name="ToolListPanel" IsVisible="False" Padding="20">
+          <StackPanel Spacing="16" MaxWidth="900">
+
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Text="등록된 Tools" FontSize="18" FontWeight="SemiBold" Foreground="White"/>
+              <Button Name="RefreshToolListButton" Grid.Column="1"
+                      Background="#2c3e88" Foreground="White" Padding="12,6">
+                새로 고침
+              </Button>
+            </Grid>
+
+            <Border Name="ToolListEmptyPanel" IsVisible="True"
+                    Background="#1e1d2e" BorderBrush="#333" BorderThickness="1" CornerRadius="4" Padding="16">
+              <TextBlock Text="등록된 툴이 없습니다." Foreground="#666" FontSize="13"/>
+            </Border>
+
+            <ItemsControl Name="ToolListItems">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                  <Border Background="#1e1d2e" BorderBrush="#333" BorderThickness="1"
+                          CornerRadius="4" Padding="12" Margin="0,0,0,6">
+                    <TextBlock Text="{Binding}" Foreground="#c0c8d8" FontFamily="Monospace"
+                               FontSize="12" TextWrapping="Wrap"/>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+          </StackPanel>
+        </ScrollViewer>
+
+        <!-- 정책 관리 패널 -->
+        <ScrollViewer Name="PolicyPanel" IsVisible="False" Padding="20">
+          <StackPanel Spacing="16" MaxWidth="720">
+
+            <TextBlock Text="정책 관리" FontSize="18" FontWeight="SemiBold" Foreground="White"/>
+
+            <!-- 번들 버전 -->
+            <Border Background="#1e1d2e" BorderBrush="#333" BorderThickness="1" CornerRadius="4" Padding="12">
+              <StackPanel Spacing="4">
+                <TextBlock Text="현재 번들 버전" Foreground="#aaa" FontSize="11"/>
+                <TextBlock Name="PolicyBundleVersionLabel" Foreground="White" FontFamily="Monospace" FontSize="12"
+                           Text="(조회 전)"/>
+              </StackPanel>
+            </Border>
+
+            <!-- 정책 목록 -->
+            <ItemsControl Name="PolicyListItems">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                  <Border Background="#1e1d2e" BorderBrush="#333" BorderThickness="1"
+                          CornerRadius="4" Padding="12" Margin="0,0,0,6">
+                    <TextBlock Text="{Binding}" Foreground="#c0c8d8" FontSize="12" TextWrapping="Wrap"/>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- 버튼 행 -->
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Name="RefreshPolicyListButton" Background="#2c3e88" Foreground="White" Padding="12,8">
+                목록 새로 고침
+              </Button>
+              <Button Name="ReloadBundleButton" Background="#7d3c98" Foreground="White" Padding="12,8">
+                번들 갱신 (WasmPolicyChecker 재로드)
+              </Button>
+            </StackPanel>
+
+          </StackPanel>
+        </ScrollViewer>
+
+        </Grid>
       </Border>
 
       <!-- 하단 상태바 -->

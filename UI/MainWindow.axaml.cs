@@ -19,10 +19,12 @@ namespace NodeKit.UI
     {
         private readonly ImageUriValidator _imageUriValidator = new();
         private readonly PackageVersionValidator _packageVersionValidator = new();
-        private readonly WasmPolicyChecker? _policyChecker;
 
 #pragma warning disable CA1001 // Disposed in OnWindowClosed (Window has no IDisposable)
+        private WasmPolicyChecker? _policyChecker;
         private GrpcBuildClient? _buildClient;
+        private GrpcToolRegistryClient? _toolRegistryClient;
+        private GrpcPolicyBundleProvider? _policyProvider;
         private CancellationTokenSource? _buildCts;
 #pragma warning restore CA1001
         private bool _l1Passed;
@@ -39,9 +41,23 @@ namespace NodeKit.UI
             SendBuildButton.Click += OnSendBuildClicked;
             Closed += OnWindowClosed;
 
+            NavAuthoringButton.Click += (_, _) => ShowPanel(AuthoringPanel);
+            NavToolListButton.Click += (_, _) => { ShowPanel(ToolListPanel); _ = LoadToolListAsync(); };
+            NavPolicyButton.Click += (_, _) => { ShowPanel(PolicyPanel); _ = LoadPolicyListAsync(); };
+            RefreshToolListButton.Click += (_, _) => _ = LoadToolListAsync();
+            RefreshPolicyListButton.Click += (_, _) => _ = LoadPolicyListAsync();
+            ReloadBundleButton.Click += OnReloadBundleClicked;
+
             // 초기 행 1개씩
             AddIoRow(InputRowsPanel);
             AddIoRow(OutputRowsPanel);
+        }
+
+        private void ShowPanel(Avalonia.Controls.Control target)
+        {
+            AuthoringPanel.IsVisible = target == AuthoringPanel;
+            ToolListPanel.IsVisible = target == ToolListPanel;
+            PolicyPanel.IsVisible = target == PolicyPanel;
         }
 
         private static WasmPolicyChecker? TryLoadPolicyChecker()
@@ -287,11 +303,119 @@ namespace NodeKit.UI
             BuildLogScroll.ScrollToEnd();
         }
 
+        private async System.Threading.Tasks.Task LoadToolListAsync()
+        {
+            var address = NodeForgeAddressBox.Text?.Trim();
+            if (string.IsNullOrEmpty(address))
+            {
+                StatusBar.Text = "오류: NodeForge 주소를 입력하세요.";
+                return;
+            }
+
+            StatusBar.Text = "툴 목록 조회 중...";
+            _toolRegistryClient ??= new GrpcToolRegistryClient(address);
+
+            try
+            {
+                var tools = await _toolRegistryClient.ListToolsAsync().ConfigureAwait(false);
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (tools.Count == 0)
+                    {
+                        ToolListEmptyPanel.IsVisible = true;
+                        ToolListItems.ItemsSource = null;
+                    }
+                    else
+                    {
+                        ToolListEmptyPanel.IsVisible = false;
+                        ToolListItems.ItemsSource = tools
+                            .Select(t => $"{t.ToolName}  [{t.ImageUri}]  digest:{t.Digest}  등록:{t.RegisteredAt:yyyy-MM-dd HH:mm}")
+                            .ToList();
+                    }
+
+                    StatusBar.Text = $"툴 목록: {tools.Count}개";
+                });
+            }
+#pragma warning disable CA1031
+            catch (Exception ex)
+            {
+                Dispatcher.UIThread.Post(() => StatusBar.Text = $"목록 조회 오류: {ex.Message}");
+            }
+#pragma warning restore CA1031
+        }
+
+        private async System.Threading.Tasks.Task LoadPolicyListAsync()
+        {
+            var address = NodeForgeAddressBox.Text?.Trim();
+            if (string.IsNullOrEmpty(address))
+            {
+                StatusBar.Text = "오류: NodeForge 주소를 입력하세요.";
+                return;
+            }
+
+            StatusBar.Text = "정책 목록 조회 중...";
+            _policyProvider ??= new GrpcPolicyBundleProvider(address);
+
+            try
+            {
+                var result = await _policyProvider.ListPoliciesAsync().ConfigureAwait(false);
+                Dispatcher.UIThread.Post(() =>
+                {
+                    PolicyBundleVersionLabel.Text = result.BundleVersion;
+                    PolicyListItems.ItemsSource = result.Policies
+                        .Select(p => $"[{p.RuleId}] {p.Name} — {p.Description}")
+                        .ToList();
+                    StatusBar.Text = $"정책 목록: {result.Policies.Count}개";
+                });
+            }
+#pragma warning disable CA1031
+            catch (Exception ex)
+            {
+                Dispatcher.UIThread.Post(() => StatusBar.Text = $"정책 조회 오류: {ex.Message}");
+            }
+#pragma warning restore CA1031
+        }
+
+        private async void OnReloadBundleClicked(object? sender, RoutedEventArgs e)
+        {
+            var address = NodeForgeAddressBox.Text?.Trim();
+            if (string.IsNullOrEmpty(address))
+            {
+                StatusBar.Text = "오류: NodeForge 주소를 입력하세요.";
+                return;
+            }
+
+            StatusBar.Text = "번들 갱신 중...";
+            _policyProvider ??= new GrpcPolicyBundleProvider(address);
+
+            try
+            {
+                var bundle = await _policyProvider.GetLatestBundleAsync().ConfigureAwait(false);
+                var newChecker = new WasmPolicyChecker(bundle);
+                _policyChecker?.Dispose();
+                _policyChecker = newChecker;
+                Dispatcher.UIThread.Post(() =>
+                {
+                    PolicyBundleVersionLabel.Text = bundle.Version;
+                    StatusBar.Text = $"번들 갱신 완료: {bundle.Version}";
+                });
+            }
+#pragma warning disable CA1031
+            catch (Exception ex)
+            {
+                Dispatcher.UIThread.Post(() => StatusBar.Text = $"번들 갱신 오류: {ex.Message}");
+            }
+#pragma warning restore CA1031
+        }
+
         private void OnWindowClosed(object? sender, EventArgs e)
         {
             _buildCts?.Cancel();
             _buildCts?.Dispose();
             _buildClient?.Dispose();
+            _toolRegistryClient?.Dispose();
+            _policyProvider?.Dispose();
+            _policyChecker?.Dispose();
         }
 
         private ToolDefinition BuildDefinitionFromForm()

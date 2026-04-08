@@ -1,0 +1,74 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Grpc.Net.Client;
+using Nodeforge.V1;
+
+namespace NodeKit.Grpc
+{
+    /// <summary>NodeKit 내부 표현의 등록된 툴 정보.</summary>
+    public sealed class RegisteredTool
+    {
+        public string CasHash { get; init; } = string.Empty;
+        public string ToolName { get; init; } = string.Empty;
+        public string ImageUri { get; init; } = string.Empty;
+        public string Digest { get; init; } = string.Empty;
+        public IReadOnlyList<string> InputNames { get; init; } = Array.Empty<string>();
+        public IReadOnlyList<string> OutputNames { get; init; } = Array.Empty<string>();
+        public DateTimeOffset RegisteredAt { get; init; }
+    }
+
+    /// <summary>NodeForge ToolRegistryService 클라이언트 추상화.</summary>
+    public interface IToolRegistryClient
+    {
+        Task<IReadOnlyList<RegisteredTool>> ListToolsAsync(CancellationToken ct = default);
+    }
+
+    /// <summary>NodeForge ToolRegistryService gRPC 클라이언트 구현.</summary>
+    public sealed class GrpcToolRegistryClient : IToolRegistryClient, IDisposable
+    {
+        private readonly GrpcChannel _channel;
+        private readonly ToolRegistryService.ToolRegistryServiceClient _client;
+        private bool _disposed;
+
+        public GrpcToolRegistryClient(string nodeForgeAddress)
+        {
+            _channel = GrpcChannel.ForAddress(nodeForgeAddress);
+            _client = new ToolRegistryService.ToolRegistryServiceClient(_channel);
+        }
+
+        public void Dispose()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _channel.Dispose();
+            _disposed = true;
+        }
+
+        public async Task<IReadOnlyList<RegisteredTool>> ListToolsAsync(CancellationToken ct = default)
+        {
+            var resp = await _client.ListToolsAsync(new ListToolsRequest(), cancellationToken: ct)
+                .ConfigureAwait(false);
+            return resp.Tools.Select(ToRegisteredTool).ToList();
+        }
+
+        private static RegisteredTool ToRegisteredTool(RegisteredToolDefinition t)
+        {
+            return new RegisteredTool
+            {
+                CasHash = t.CasHash,
+                ToolName = t.ToolName,
+                ImageUri = t.ImageUri,
+                Digest = t.Digest,
+                InputNames = t.InputNames.ToList(),
+                OutputNames = t.OutputNames.ToList(),
+                RegisteredAt = DateTimeOffset.FromUnixTimeSeconds(t.RegisteredAt),
+            };
+        }
+    }
+}
