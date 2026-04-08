@@ -137,12 +137,12 @@ Week 3  04-20 ~ 04-22   축 C 처리 + 문서/회귀 테스트 정리
 
 | ID | 항목 | 분류 | 우선순위 | 상태 |
 |----|------|------|----------|------|
-| BF-01 | 검증 후 폼 변경 시 전송 가능 버그 수정 | 축 A | P0 | 진행 예정 |
-| BF-02 | `EnvironmentSpec` 전송 유실 수정 | 축 A | P0 | 진행 예정 |
-| BF-03 | 이미지 URI 포트/태그 판별 수정 | 축 A | P0 | 진행 예정 |
-| BF-04 | L1 필수 필드 검증 보강 | 축 B | P1 | 대기 |
-| BF-05 | Dockerfile install 버전 고정 검증 추가 | 축 B | P1 | 대기 |
-| BF-06 | conda `pip:` subsection 해석 보강 | 축 B | P1 | 대기 |
+| BF-01 | 검증 후 폼 변경 시 전송 가능 버그 수정 | 축 A | P0 | 완료 |
+| BF-02 | `EnvironmentSpec` 전송 유실 수정 | 축 A | P0 | 완료 |
+| BF-03 | 이미지 URI 포트/태그 판별 수정 | 축 A | P0 | 완료 |
+| BF-04 | L1 필수 필드 검증 보강 | 축 B | P1 | 완료 |
+| BF-05 | Dockerfile install 버전 고정 검증 추가 | 축 B | P1 | 완료 |
+| BF-06 | conda `pip:` subsection 해석 보강 | 축 B | P1 | 완료 |
 | BF-07 | NodeForge 주소 변경 시 클라이언트 재생성 | 축 C | P2 | 완료 |
 | BF-08 | 외부 절대 경로 의존성 정리 또는 bootstrap 문서화 | 축 C | P2 | 완료 |
 
@@ -158,7 +158,7 @@ Week 3  04-20 ~ 04-22   축 C 처리 + 문서/회귀 테스트 정리
 
 ### 현재 잔여 리스크
 
-* `EnvironmentSpec`은 NodeKit 내부에서는 보존되지만, 외부 `api-protos`의 `nodeforge.proto`에 아직 필드가 없어 gRPC 전송은 완결되지 않았다.
+* 외부 저장소 `api-protos`, `NodeForge`까지 `EnvironmentSpec` 전파는 완료됐다. 현재 잔여 리스크는 저장소 간 버전 드리프트이며, NodeKit 빌드 시 `ApiProtosRoot`가 실제 배포 대상 proto 버전을 가리키도록 유지해야 한다.
 
 ---
 

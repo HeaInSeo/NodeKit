@@ -57,12 +57,12 @@ make policy DOCKGUARD=/path/to/DockGuard/policy/dockerfile
 
 ## 3. 현재 한계
 
-`EnvironmentSpec`은 현재 NodeKit 내부 DTO와 테스트에서는 보존된다. 다만 외부 `api-protos` 저장소의 `nodeforge.proto`에는 아직 이 필드가 없어서, gRPC 전송 단계까지는 완전히 연결되지 않는다.
+`EnvironmentSpec` 전파는 이제 NodeKit, `api-protos`, `NodeForge`까지 연결되어 있다. 남아 있는 제약은 저장소 간 버전 정합성이다.
 
-즉, 아래 두 저장소 변경이 함께 필요하다.
+즉, 아래 조건을 함께 유지해야 한다.
 
-* NodeKit: 로컬 DTO 및 UI/validator 정합성 유지
-* api-protos / NodeForge: `BuildRequest` proto에 `EnvironmentSpec` 추가
+* NodeKit: 로컬 DTO, UI, validator, gRPC factory가 최신 proto와 일치해야 한다.
+* api-protos / NodeForge: `BuildRequest`, `RegisterToolRequest`, `RegisteredToolDefinition` 스키마가 같은 필드 집합을 유지해야 한다.
 
 ---
 
