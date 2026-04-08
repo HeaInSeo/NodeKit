@@ -24,6 +24,17 @@ namespace NodeKit.Grpc
             _client = new BuildService.BuildServiceClient(_channel);
         }
 
+        public void Dispose()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _channel.Dispose();
+            _disposed = true;
+        }
+
         public async IAsyncEnumerable<BuildEvent> BuildAndRegisterAsync(
             BuildRequest request,
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -31,7 +42,9 @@ namespace NodeKit.Grpc
             var grpcRequest = ToProto(request);
             using var call = _client.BuildAndRegister(grpcRequest, cancellationToken: cancellationToken);
 
+#pragma warning disable CA2007 // IAsyncEnumerable does not support ConfigureAwait directly
             await foreach (var ev in call.ResponseStream.ReadAllAsync(cancellationToken))
+#pragma warning restore CA2007
             {
                 yield return FromProto(ev);
             }
@@ -66,25 +79,14 @@ namespace NodeKit.Grpc
 
         private static BuildEventKind MapKind(Nodeforge.V1.BuildEventKind kind) => kind switch
         {
-            Nodeforge.V1.BuildEventKind.BuildEventKindLog => BuildEventKind.Log,
-            Nodeforge.V1.BuildEventKind.BuildEventKindJobCreated => BuildEventKind.JobCreated,
-            Nodeforge.V1.BuildEventKind.BuildEventKindJobRunning => BuildEventKind.JobRunning,
-            Nodeforge.V1.BuildEventKind.BuildEventKindPushSucceeded => BuildEventKind.RegistryPushSucceeded,
-            Nodeforge.V1.BuildEventKind.BuildEventKindDigestAcquired => BuildEventKind.DigestAcquired,
-            Nodeforge.V1.BuildEventKind.BuildEventKindSucceeded => BuildEventKind.Succeeded,
-            Nodeforge.V1.BuildEventKind.BuildEventKindFailed => BuildEventKind.Failed,
+            Nodeforge.V1.BuildEventKind.Log => BuildEventKind.Log,
+            Nodeforge.V1.BuildEventKind.JobCreated => BuildEventKind.JobCreated,
+            Nodeforge.V1.BuildEventKind.JobRunning => BuildEventKind.JobRunning,
+            Nodeforge.V1.BuildEventKind.PushSucceeded => BuildEventKind.RegistryPushSucceeded,
+            Nodeforge.V1.BuildEventKind.DigestAcquired => BuildEventKind.DigestAcquired,
+            Nodeforge.V1.BuildEventKind.Succeeded => BuildEventKind.Succeeded,
+            Nodeforge.V1.BuildEventKind.Failed => BuildEventKind.Failed,
             _ => BuildEventKind.Log,
         };
-
-        public void Dispose()
-        {
-            if (_disposed)
-            {
-                return;
-            }
-
-            _channel.Dispose();
-            _disposed = true;
-        }
     }
 }

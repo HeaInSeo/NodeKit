@@ -2,11 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Threading;
 using NodeKit.Authoring;
+using NodeKit.Grpc;
 using NodeKit.Policy;
 using NodeKit.Validation;
 
@@ -18,6 +21,10 @@ namespace NodeKit.UI
         private readonly PackageVersionValidator _packageVersionValidator = new();
         private readonly WasmPolicyChecker? _policyChecker;
 
+#pragma warning disable CA1001 // Disposed in OnWindowClosed (Window has no IDisposable)
+        private GrpcBuildClient? _buildClient;
+        private CancellationTokenSource? _buildCts;
+#pragma warning restore CA1001
         private bool _l1Passed;
 
         public MainWindow()
@@ -30,6 +37,7 @@ namespace NodeKit.UI
             AddOutputButton.Click += (_, _) => AddIoRow(OutputRowsPanel);
             ValidateButton.Click += OnValidateClicked;
             SendBuildButton.Click += OnSendBuildClicked;
+            Closed += OnWindowClosed;
 
             // 초기 행 1개씩
             AddIoRow(InputRowsPanel);
@@ -195,15 +203,95 @@ namespace NodeKit.UI
             }
         }
 
-        private void OnSendBuildClicked(object? sender, RoutedEventArgs e)
+        private async void OnSendBuildClicked(object? sender, RoutedEventArgs e)
         {
             if (!_l1Passed)
             {
                 return;
             }
 
-            // Phase 0: 연결 대상(NodeForge)이 아직 없으므로 placeholder
-            StatusBar.Text = "BuildRequest 생성 완료 — NodeForge gRPC 연결은 Phase 2에서 구성됩니다.";
+            var address = NodeForgeAddressBox.Text?.Trim();
+            if (string.IsNullOrEmpty(address))
+            {
+                StatusBar.Text = "오류: NodeForge 주소를 입력하세요.";
+                return;
+            }
+
+            _buildClient ??= new GrpcBuildClient(address);
+
+            var definition = BuildDefinitionFromForm();
+            var request = BuildRequestFactory.FromToolDefinition(definition);
+
+            // UI 초기화
+            BuildLogPanel.IsVisible = true;
+            BuildLogBox.Text = string.Empty;
+            BuildSuccessPanel.IsVisible = false;
+            SendBuildButton.IsEnabled = false;
+            StatusBar.Text = "빌드 요청 전송 중...";
+
+            _buildCts?.Cancel();
+            _buildCts = new CancellationTokenSource();
+            var cts = _buildCts;
+
+            try
+            {
+#pragma warning disable CA2007 // IAsyncEnumerable does not support ConfigureAwait directly
+                await foreach (var ev in _buildClient.BuildAndRegisterAsync(request, cts.Token))
+#pragma warning restore CA2007
+                {
+                    var captured = ev;
+                    Dispatcher.UIThread.Post(() => HandleBuildEvent(captured));
+                }
+            }
+#pragma warning disable CA1031
+            catch (Exception ex) when (!cts.IsCancellationRequested)
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    StatusBar.Text = $"gRPC 오류: {ex.Message}";
+                    AppendLog($"[ERROR] {ex.Message}");
+                });
+            }
+#pragma warning restore CA1031
+            finally
+            {
+                Dispatcher.UIThread.Post(() => SendBuildButton.IsEnabled = _l1Passed);
+            }
+        }
+
+        private void HandleBuildEvent(BuildEvent ev)
+        {
+            var line = $"[{ev.Timestamp:HH:mm:ss}] [{ev.Kind}] {ev.Message}";
+            AppendLog(line);
+
+            switch (ev.Kind)
+            {
+                case BuildEventKind.DigestAcquired:
+                    BuildDigestLabel.Text = $"digest: {ev.Digest}";
+                    break;
+
+                case BuildEventKind.Succeeded:
+                    BuildSuccessPanel.IsVisible = true;
+                    StatusBar.Text = "빌드 및 등록 완료";
+                    break;
+
+                case BuildEventKind.Failed:
+                    StatusBar.Text = $"빌드 실패: {ev.Message}";
+                    break;
+            }
+        }
+
+        private void AppendLog(string line)
+        {
+            BuildLogBox.Text += line + "\n";
+            BuildLogScroll.ScrollToEnd();
+        }
+
+        private void OnWindowClosed(object? sender, EventArgs e)
+        {
+            _buildCts?.Cancel();
+            _buildCts?.Dispose();
+            _buildClient?.Dispose();
         }
 
         private ToolDefinition BuildDefinitionFromForm()

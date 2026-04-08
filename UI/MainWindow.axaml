@@ -138,6 +138,13 @@
               <TextBlock Text="✓ L1 검증 통과" Foreground="#2ecc71" FontSize="13" FontWeight="SemiBold"/>
             </Border>
 
+            <!-- NodeForge 주소 -->
+            <StackPanel Spacing="4">
+              <TextBlock Text="NodeForge 주소" Foreground="#aaa" FontSize="12"/>
+              <TextBox Name="NodeForgeAddressBox" Text="http://localhost:50051"
+                       Background="#1e1d2e" Foreground="White" BorderBrush="#333" Padding="8"/>
+            </StackPanel>
+
             <!-- 버튼 행 -->
             <StackPanel Orientation="Horizontal" Spacing="8">
               <Button Name="ValidateButton" Padding="16,8" Background="#2c3e88" Foreground="White">
@@ -147,6 +154,30 @@
                 빌드 요청 전송 (NodeForge)
               </Button>
             </StackPanel>
+
+            <!-- 빌드 로그 패널 -->
+            <Border Name="BuildLogPanel" IsVisible="False"
+                    Background="#0d1018" BorderBrush="#2c3e88" BorderThickness="1" CornerRadius="4" Padding="12">
+              <StackPanel Spacing="6">
+                <TextBlock Text="빌드 로그" FontWeight="SemiBold" Foreground="#4a9eff" FontSize="13"/>
+                <ScrollViewer Name="BuildLogScroll" Height="200">
+                  <TextBox Name="BuildLogBox" AcceptsReturn="True" IsReadOnly="True"
+                           Background="Transparent" Foreground="#c0c8d8"
+                           BorderThickness="0" FontFamily="Monospace" FontSize="11"
+                           TextWrapping="Wrap"/>
+                </ScrollViewer>
+              </StackPanel>
+            </Border>
+
+            <!-- 빌드 성공 표시 -->
+            <Border Name="BuildSuccessPanel" IsVisible="False"
+                    Background="#0d1f12" BorderBrush="#27ae60" BorderThickness="1" CornerRadius="4" Padding="12">
+              <StackPanel Spacing="4">
+                <TextBlock Text="✓ 빌드 및 등록 완료" Foreground="#2ecc71" FontSize="13" FontWeight="SemiBold"/>
+                <TextBlock Name="BuildDigestLabel" Foreground="#aaa" FontSize="11" FontFamily="Monospace"
+                           TextWrapping="Wrap"/>
+              </StackPanel>
+            </Border>
 
           </StackPanel>
         </ScrollViewer>
