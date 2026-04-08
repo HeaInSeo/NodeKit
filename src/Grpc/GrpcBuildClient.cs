@@ -61,6 +61,11 @@ namespace NodeKit.Grpc
                 DockerfileContent = r.DockerfileContent,
                 Script = r.Script,
             };
+
+            // NOTE:
+            // Current nodeforge.proto does not yet carry EnvironmentSpec.
+            // Keep the local DTO field to avoid silent loss inside NodeKit, but the transport
+            // schema must be updated in the api-protos repository for full end-to-end support.
             proto.InputNames.AddRange(r.InputNames);
             proto.OutputNames.AddRange(r.OutputNames);
             return proto;

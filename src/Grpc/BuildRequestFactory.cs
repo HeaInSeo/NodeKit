@@ -18,6 +18,7 @@ namespace NodeKit.Grpc
                 ImageUri = def.ImageUri,
                 DockerfileContent = def.DockerfileContent,
                 Script = def.Script,
+                EnvironmentSpec = def.EnvironmentSpec,
                 InputNames = def.Inputs.Select(i => i.Name).ToList(),
                 OutputNames = def.Outputs.Select(o => o.Name).ToList(),
             };

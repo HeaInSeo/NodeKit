@@ -38,7 +38,10 @@ namespace NodeKit.Validation
                 ? uri[..uri.IndexOf('@', StringComparison.Ordinal)]
                 : uri;
 
-            if (!imagePart.Contains(':', StringComparison.Ordinal))
+            var lastSlashIndex = imagePart.LastIndexOf('/');
+            var tagSeparatorIndex = imagePart.LastIndexOf(':');
+
+            if (tagSeparatorIndex <= lastSlashIndex)
             {
                 return ValidationResult.Fail(
                     "L1-IMG-003",

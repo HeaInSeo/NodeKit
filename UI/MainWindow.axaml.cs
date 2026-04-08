@@ -19,6 +19,8 @@ namespace NodeKit.UI
     {
         private readonly ImageUriValidator _imageUriValidator = new();
         private readonly PackageVersionValidator _packageVersionValidator = new();
+        private readonly RequiredFieldsValidator _requiredFieldsValidator = new();
+        private readonly ValidatedDefinitionState _validatedDefinitionState = new();
 
 #pragma warning disable CA1001 // Disposed in OnWindowClosed (Window has no IDisposable)
         private WasmPolicyChecker? _policyChecker;
@@ -27,7 +29,9 @@ namespace NodeKit.UI
         private GrpcPolicyBundleProvider? _policyProvider;
         private CancellationTokenSource? _buildCts;
 #pragma warning restore CA1001
-        private bool _l1Passed;
+        private string? _buildClientAddress;
+        private string? _toolRegistryClientAddress;
+        private string? _policyProviderAddress;
 
         public MainWindow()
         {
@@ -47,6 +51,7 @@ namespace NodeKit.UI
             RefreshToolListButton.Click += (_, _) => _ = LoadToolListAsync();
             RefreshPolicyListButton.Click += (_, _) => _ = LoadPolicyListAsync();
             ReloadBundleButton.Click += OnReloadBundleClicked;
+            RegisterValidationInvalidationHandlers();
 
             // 초기 행 1개씩
             AddIoRow(InputRowsPanel);
@@ -91,7 +96,7 @@ namespace NodeKit.UI
         /// <summary>
         /// 이름 입력 TextBox + 삭제 버튼으로 구성된 I/O 행을 panel에 추가한다.
         /// </summary>
-        private static void AddIoRow(StackPanel panel)
+        private void AddIoRow(StackPanel panel)
         {
             var row = new Grid
             {
@@ -107,6 +112,7 @@ namespace NodeKit.UI
                 Padding = new Avalonia.Thickness(8, 4),
             };
             Grid.SetColumn(nameBox, 0);
+            nameBox.TextChanged += (_, _) => InvalidateValidationState();
 
             var removeButton = new Button
             {
@@ -130,11 +136,14 @@ namespace NodeKit.UI
                 {
                     nameBox.Text = string.Empty;
                 }
+
+                InvalidateValidationState();
             };
 
             row.Children.Add(nameBox);
             row.Children.Add(removeButton);
             panel.Children.Add(row);
+            InvalidateValidationState();
         }
 
         /// <summary>
@@ -165,8 +174,7 @@ namespace NodeKit.UI
 
         private void OnValidateClicked(object? sender, RoutedEventArgs e)
         {
-            _l1Passed = false;
-            SendBuildButton.IsEnabled = false;
+            InvalidateValidationState();
             StatusBar.Text = "검증 중...";
 
             var definition = BuildDefinitionFromForm();
@@ -174,6 +182,7 @@ namespace NodeKit.UI
             // L1-Static: 이미지 URI + 패키지 버전 검증
             var staticResults = new[]
             {
+                _requiredFieldsValidator.Validate(definition),
                 _imageUriValidator.Validate(definition),
                 _packageVersionValidator.Validate(definition),
             };
@@ -204,7 +213,7 @@ namespace NodeKit.UI
             {
                 ValidationResultPanel.IsVisible = false;
                 ValidationPassPanel.IsVisible = true;
-                _l1Passed = true;
+                _validatedDefinitionState.MarkValidated(definition);
                 SendBuildButton.IsEnabled = true;
                 StatusBar.Text = "L1 검증 통과 — 빌드 요청 준비 완료";
             }
@@ -221,7 +230,7 @@ namespace NodeKit.UI
 
         private async void OnSendBuildClicked(object? sender, RoutedEventArgs e)
         {
-            if (!_l1Passed)
+            if (!_validatedDefinitionState.HasValidatedDefinition)
             {
                 return;
             }
@@ -233,9 +242,16 @@ namespace NodeKit.UI
                 return;
             }
 
-            _buildClient ??= new GrpcBuildClient(address);
-
             var definition = BuildDefinitionFromForm();
+            if (!_validatedDefinitionState.Matches(definition))
+            {
+                InvalidateValidationState();
+                ValidationPassPanel.IsVisible = false;
+                StatusBar.Text = "입력값이 검증 이후 변경되었습니다. 다시 L1 검증을 실행하세요.";
+                return;
+            }
+
+            var buildClient = GetBuildClient(address);
             var request = BuildRequestFactory.FromToolDefinition(definition);
 
             // UI 초기화
@@ -252,7 +268,7 @@ namespace NodeKit.UI
             try
             {
 #pragma warning disable CA2007 // IAsyncEnumerable does not support ConfigureAwait directly
-                await foreach (var ev in _buildClient.BuildAndRegisterAsync(request, cts.Token))
+                await foreach (var ev in buildClient.BuildAndRegisterAsync(request, cts.Token))
 #pragma warning restore CA2007
                 {
                     var captured = ev;
@@ -271,7 +287,7 @@ namespace NodeKit.UI
 #pragma warning restore CA1031
             finally
             {
-                Dispatcher.UIThread.Post(() => SendBuildButton.IsEnabled = _l1Passed);
+                Dispatcher.UIThread.Post(() => SendBuildButton.IsEnabled = _validatedDefinitionState.HasValidatedDefinition);
             }
         }
 
@@ -313,11 +329,11 @@ namespace NodeKit.UI
             }
 
             StatusBar.Text = "툴 목록 조회 중...";
-            _toolRegistryClient ??= new GrpcToolRegistryClient(address);
+            var toolRegistryClient = GetToolRegistryClient(address);
 
             try
             {
-                var tools = await _toolRegistryClient.ListToolsAsync().ConfigureAwait(false);
+                var tools = await toolRegistryClient.ListToolsAsync().ConfigureAwait(false);
                 Dispatcher.UIThread.Post(() =>
                 {
                     if (tools.Count == 0)
@@ -354,11 +370,11 @@ namespace NodeKit.UI
             }
 
             StatusBar.Text = "정책 목록 조회 중...";
-            _policyProvider ??= new GrpcPolicyBundleProvider(address);
+            var policyProvider = GetPolicyProvider(address);
 
             try
             {
-                var result = await _policyProvider.ListPoliciesAsync().ConfigureAwait(false);
+                var result = await policyProvider.ListPoliciesAsync().ConfigureAwait(false);
                 Dispatcher.UIThread.Post(() =>
                 {
                     PolicyBundleVersionLabel.Text = result.BundleVersion;
@@ -386,11 +402,11 @@ namespace NodeKit.UI
             }
 
             StatusBar.Text = "번들 갱신 중...";
-            _policyProvider ??= new GrpcPolicyBundleProvider(address);
+            var policyProvider = GetPolicyProvider(address);
 
             try
             {
-                var bundle = await _policyProvider.GetLatestBundleAsync().ConfigureAwait(false);
+                var bundle = await policyProvider.GetLatestBundleAsync().ConfigureAwait(false);
                 var newChecker = new WasmPolicyChecker(bundle);
                 _policyChecker?.Dispose();
                 _policyChecker = newChecker;
@@ -432,6 +448,58 @@ namespace NodeKit.UI
                 Outputs = CollectIoNames(OutputRowsPanel)
                     .Select(n => new ToolOutput { Name = n }).ToList(),
             };
+        }
+
+        private void RegisterValidationInvalidationHandlers()
+        {
+            ToolNameBox.TextChanged += (_, _) => InvalidateValidationState();
+            ImageUriBox.TextChanged += (_, _) => InvalidateValidationState();
+            DockerfileBox.TextChanged += (_, _) => InvalidateValidationState();
+            ScriptBox.TextChanged += (_, _) => InvalidateValidationState();
+            EnvSpecBox.TextChanged += (_, _) => InvalidateValidationState();
+            NodeForgeAddressBox.TextChanged += (_, _) => InvalidateValidationState();
+        }
+
+        private void InvalidateValidationState()
+        {
+            _validatedDefinitionState.Invalidate();
+            SendBuildButton.IsEnabled = false;
+        }
+
+        private GrpcBuildClient GetBuildClient(string address)
+        {
+            if (_buildClient == null || !string.Equals(_buildClientAddress, address, StringComparison.Ordinal))
+            {
+                _buildClient?.Dispose();
+                _buildClient = new GrpcBuildClient(address);
+                _buildClientAddress = address;
+            }
+
+            return _buildClient;
+        }
+
+        private GrpcToolRegistryClient GetToolRegistryClient(string address)
+        {
+            if (_toolRegistryClient == null || !string.Equals(_toolRegistryClientAddress, address, StringComparison.Ordinal))
+            {
+                _toolRegistryClient?.Dispose();
+                _toolRegistryClient = new GrpcToolRegistryClient(address);
+                _toolRegistryClientAddress = address;
+            }
+
+            return _toolRegistryClient;
+        }
+
+        private GrpcPolicyBundleProvider GetPolicyProvider(string address)
+        {
+            if (_policyProvider == null || !string.Equals(_policyProviderAddress, address, StringComparison.Ordinal))
+            {
+                _policyProvider?.Dispose();
+                _policyProvider = new GrpcPolicyBundleProvider(address);
+                _policyProviderAddress = address;
+            }
+
+            return _policyProvider;
         }
     }
 }

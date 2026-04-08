@@ -27,6 +27,9 @@ namespace NodeKit.Grpc
         /// <summary>실행 스크립트.</summary>
         public string Script { get; set; } = string.Empty;
 
+        /// <summary>환경 스펙 파일 내용.</summary>
+        public string EnvironmentSpec { get; set; } = string.Empty;
+
         /// <summary>Named input 이름 목록.</summary>
         public List<string> InputNames { get; set; } = new();
 

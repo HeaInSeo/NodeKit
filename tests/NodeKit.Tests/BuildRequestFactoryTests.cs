@@ -31,6 +31,21 @@ namespace NodeKit.Tests
             Assert.Equal("registry.example.com/bwa:2.2.1@sha256:abc", req.ImageUri);
             Assert.Equal("FROM ubuntu:22.04 AS builder", req.DockerfileContent);
             Assert.Equal("bwa mem ref.fa reads.fq > out.sam", req.Script);
+            Assert.Equal(string.Empty, req.EnvironmentSpec);
+        }
+
+        [Fact]
+        public void FromToolDefinition_MapsEnvironmentSpec()
+        {
+            var def = new ToolDefinition
+            {
+                ImageUri = "reg/img:1.0@sha256:abc",
+                EnvironmentSpec = "name: test\ndependencies:\n  - bwa=0.7.17=h5bf99c6_8\n",
+            };
+
+            var req = BuildRequestFactory.FromToolDefinition(def);
+
+            Assert.Equal(def.EnvironmentSpec, req.EnvironmentSpec);
         }
 
         [Fact]

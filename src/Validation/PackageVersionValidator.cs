@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
 using NodeKit.Authoring;
+using NodeKit.Policy;
 
 namespace NodeKit.Validation
 {
@@ -15,10 +17,7 @@ namespace NodeKit.Validation
     /// </summary>
     public class PackageVersionValidator : IValidator
     {
-        // conda: 패키지 이름만 있거나 버전만 있는 행 (빌드 문자열 없음)
-        private static readonly Regex CondaLine = new(
-            @"^\s*-\s+(?<pkg>[a-zA-Z0-9_\-\.]+)(?:=(?<ver>[^=\n]+))?$",
-            RegexOptions.Multiline);
+        private static readonly char[] DockerfileTokenSeparators = { ' ', '\t' };
 
         public ValidationResult Validate(ToolDefinition definition)
         {
@@ -27,12 +26,27 @@ namespace NodeKit.Validation
                 throw new ArgumentNullException(nameof(definition));
             }
 
-            if (string.IsNullOrWhiteSpace(definition.EnvironmentSpec))
+            var violations = new List<ValidationViolation>();
+
+            if (!string.IsNullOrWhiteSpace(definition.EnvironmentSpec))
+            {
+                violations.AddRange(ValidateEnvironmentSpec(definition.EnvironmentSpec).Violations);
+            }
+
+            if (!string.IsNullOrWhiteSpace(definition.DockerfileContent))
+            {
+                violations.AddRange(ValidateDockerfile(definition.DockerfileContent).Violations);
+            }
+
+            return new ValidationResult(violations);
+        }
+
+        private static ValidationResult ValidateEnvironmentSpec(string spec)
+        {
+            if (string.IsNullOrWhiteSpace(spec))
             {
                 return ValidationResult.Pass;
             }
-
-            var spec = definition.EnvironmentSpec;
 
             // conda yml 형식 감지
             if (spec.TrimStart().StartsWith("name:", StringComparison.Ordinal) ||
@@ -48,37 +62,50 @@ namespace NodeKit.Validation
         private static ValidationResult ValidateConda(string spec)
         {
             var violations = new List<ValidationViolation>();
+            var lines = spec.Split('\n', StringSplitOptions.None);
+            var inPipSubsection = false;
+            var pipSectionIndent = -1;
 
-            foreach (Match m in CondaLine.Matches(spec))
+            foreach (var rawLine in lines)
             {
-                var pkg = m.Groups["pkg"].Value;
-                var ver = m.Groups["ver"].Value;
-                var line = m.Value.Trim();
-
-                // = 개수로 고정 수준 판단
-                var eqCount = 0;
-                foreach (var c in line)
+                var trimmed = rawLine.Trim();
+                if (string.IsNullOrWhiteSpace(trimmed) || trimmed.StartsWith('#'))
                 {
-                    if (c == '=')
+                    continue;
+                }
+
+                var indent = GetIndent(rawLine);
+                if (inPipSubsection)
+                {
+                    if (indent > pipSectionIndent && trimmed.StartsWith("- ", StringComparison.Ordinal))
                     {
-                        eqCount++;
+                        ValidatePipPackage(trimmed[2..].Trim(), violations);
+                        continue;
                     }
+
+                    inPipSubsection = false;
+                    pipSectionIndent = -1;
                 }
 
-                if (eqCount == 0)
+                if (!trimmed.StartsWith("- ", StringComparison.Ordinal))
                 {
-                    violations.Add(new ValidationViolation(
-                        "L1-PKG-001",
-                        $"패키지 '{pkg}'에 버전이 지정되지 않았습니다. conda 형식: name=version=build_string",
-                        "EnvironmentSpec"));
+                    continue;
                 }
-                else if (eqCount == 1 && !string.IsNullOrEmpty(ver))
+
+                var entry = trimmed[2..].Trim();
+                if (entry.Equals("pip", StringComparison.Ordinal))
                 {
-                    violations.Add(new ValidationViolation(
-                        "L1-PKG-002",
-                        $"패키지 '{pkg}={ver}'에 빌드 문자열이 없습니다. conda 형식: name=version=build_string",
-                        "EnvironmentSpec"));
+                    continue;
                 }
+
+                if (entry.Equals("pip:", StringComparison.Ordinal))
+                {
+                    inPipSubsection = true;
+                    pipSectionIndent = indent;
+                    continue;
+                }
+
+                ValidateCondaPackage(entry, violations);
             }
 
             return new ValidationResult(violations);
@@ -99,16 +126,136 @@ namespace NodeKit.Validation
                     continue;
                 }
 
-                if (!line.Contains("==", StringComparison.Ordinal))
+                ValidatePipPackage(line, violations);
+            }
+
+            return new ValidationResult(violations);
+        }
+
+        private static ValidationResult ValidateDockerfile(string dockerfile)
+        {
+            var violations = new List<ValidationViolation>();
+
+            foreach (var instruction in DockerfileParser.Parse(dockerfile))
+            {
+                if (!string.Equals(instruction.Cmd, "RUN", StringComparison.Ordinal))
                 {
-                    violations.Add(new ValidationViolation(
-                        "L1-PKG-003",
-                        $"패키지 '{line}'에 정확한 버전이 없습니다. pip 형식: name==version (예: numpy==1.26.4)",
-                        "EnvironmentSpec"));
+                    continue;
+                }
+
+                foreach (var package in ExtractInstalledPackages(instruction.Raw))
+                {
+                    ValidateCondaPackage(package, violations, "DockerfileContent");
                 }
             }
 
             return new ValidationResult(violations);
+        }
+
+        private static IEnumerable<string> ExtractInstalledPackages(string rawInstruction)
+        {
+            var runBody = rawInstruction.Length > 3
+                ? rawInstruction[3..].Trim()
+                : string.Empty;
+
+            foreach (var command in runBody.Split(new[] { "&&", ";" }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                var tokens = command
+                    .Split(DockerfileTokenSeparators, StringSplitOptions.RemoveEmptyEntries)
+                    .ToList();
+
+                if (tokens.Count < 2)
+                {
+                    continue;
+                }
+
+                if (!IsCondaInstallCommand(tokens))
+                {
+                    continue;
+                }
+
+                for (var index = 2; index < tokens.Count; index++)
+                {
+                    var token = tokens[index];
+                    if (token.StartsWith("-", StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    yield return token.Trim().Trim('"', '\'');
+                }
+            }
+        }
+
+        private static bool IsCondaInstallCommand(IReadOnlyList<string> tokens)
+        {
+            return tokens.Count >= 2 &&
+                (string.Equals(tokens[0], "micromamba", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(tokens[0], "conda", StringComparison.OrdinalIgnoreCase)) &&
+                string.Equals(tokens[1], "install", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static void ValidateCondaPackage(
+            string packageExpression,
+            List<ValidationViolation> violations,
+            string field = "EnvironmentSpec")
+        {
+            if (string.IsNullOrWhiteSpace(packageExpression))
+            {
+                return;
+            }
+
+            var expression = packageExpression.Trim();
+            var segments = expression.Split('=', StringSplitOptions.None);
+
+            if (segments.Length <= 1)
+            {
+                violations.Add(new ValidationViolation(
+                    "L1-PKG-001",
+                    $"패키지 '{expression}'에 버전이 지정되지 않았습니다. conda 형식: name=version=build_string",
+                    field));
+                return;
+            }
+
+            if (segments.Length == 2)
+            {
+                violations.Add(new ValidationViolation(
+                    "L1-PKG-002",
+                    $"패키지 '{expression}'에 빌드 문자열이 없습니다. conda 형식: name=version=build_string",
+                    field));
+            }
+        }
+
+        private static void ValidatePipPackage(string packageExpression, List<ValidationViolation> violations)
+        {
+            if (string.IsNullOrWhiteSpace(packageExpression))
+            {
+                return;
+            }
+
+            if (!packageExpression.Contains("==", StringComparison.Ordinal))
+            {
+                violations.Add(new ValidationViolation(
+                    "L1-PKG-003",
+                    $"패키지 '{packageExpression}'에 정확한 버전이 없습니다. pip 형식: name==version (예: numpy==1.26.4)",
+                    "EnvironmentSpec"));
+            }
+        }
+
+        private static int GetIndent(string line)
+        {
+            var indent = 0;
+            foreach (var c in line)
+            {
+                if (!char.IsWhiteSpace(c))
+                {
+                    break;
+                }
+
+                indent++;
+            }
+
+            return indent;
         }
     }
 }
