@@ -19,6 +19,12 @@
     <PackageReference Condition="'$(Configuration)' == 'Debug'" Include="Avalonia.Diagnostics" Version="11.0.0">
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="Google.Protobuf" Version="3.34.1" />
+    <PackageReference Include="Grpc.Net.Client" Version="2.76.0" />
+    <PackageReference Include="Grpc.Tools" Version="2.80.0">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
     <PackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.507">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -41,6 +47,14 @@
     <Content Include="assets/policy/dockguard.wasm">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+  </ItemGroup>
+
+  <!-- NodeForge gRPC proto: Grpc.Tools로 C# 클라이언트 스텁 생성 -->
+  <ItemGroup>
+    <Protobuf Include="../../../../../../../opt/go/src/github.com/HeaInSeo/api-protos/protos/nodeforge/v1/nodeforge.proto"
+              GrpcServices="Client"
+              Access="Internal"
+              ProtoRoot="../../../../../../../opt/go/src/github.com/HeaInSeo/api-protos/protos" />
   </ItemGroup>
 
 </Project>
