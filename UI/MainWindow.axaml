@@ -80,20 +80,34 @@
                        Padding="8" FontFamily="Monospace"/>
             </StackPanel>
 
-            <!-- I/O 선언 -->
+            <!-- I/O 선언 — 동적 행 -->
             <Grid ColumnDefinitions="*,16,*">
+
+              <!-- Inputs -->
               <StackPanel Grid.Column="0" Spacing="4">
-                <TextBlock Text="Inputs (이름, 한 줄에 하나)" Foreground="#aaa" FontSize="12"/>
-                <TextBox Name="InputsBox" AcceptsReturn="True" Height="80"
-                         Watermark="input.fastq.R1&#10;input.fastq.R2"
-                         Background="#1e1d2e" Foreground="White" BorderBrush="#333" Padding="8"/>
+                <TextBlock Text="Inputs" Foreground="#aaa" FontSize="12"/>
+                <!-- 행들은 코드 비하인드에서 동적으로 추가 -->
+                <StackPanel Name="InputRowsPanel" Spacing="4"/>
+                <Button Name="AddInputButton"
+                        Background="#1e1d2e" Foreground="#4a9eff"
+                        BorderBrush="#333" Padding="6,4"
+                        HorizontalAlignment="Left">
+                  + Input 추가
+                </Button>
               </StackPanel>
+
+              <!-- Outputs -->
               <StackPanel Grid.Column="2" Spacing="4">
-                <TextBlock Text="Outputs (이름, 한 줄에 하나)" Foreground="#aaa" FontSize="12"/>
-                <TextBox Name="OutputsBox" AcceptsReturn="True" Height="80"
-                         Watermark="output.bam"
-                         Background="#1e1d2e" Foreground="White" BorderBrush="#333" Padding="8"/>
+                <TextBlock Text="Outputs" Foreground="#aaa" FontSize="12"/>
+                <StackPanel Name="OutputRowsPanel" Spacing="4"/>
+                <Button Name="AddOutputButton"
+                        Background="#1e1d2e" Foreground="#4a9eff"
+                        BorderBrush="#333" Padding="6,4"
+                        HorizontalAlignment="Left">
+                  + Output 추가
+                </Button>
               </StackPanel>
+
             </Grid>
 
             <!-- 환경 스펙 -->

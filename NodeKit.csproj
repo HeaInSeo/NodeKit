@@ -23,6 +23,7 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="Wasmtime" Version="*" />
   </ItemGroup>
 
   <ItemGroup>
@@ -33,6 +34,13 @@
 
   <ItemGroup>
     <Compile Remove="tests/**/*.cs" />
+  </ItemGroup>
+
+  <!-- DockGuard 정책 wasm 번들: 빌드 출력 디렉토리에 복사 -->
+  <ItemGroup>
+    <Content Include="assets/policy/dockguard.wasm">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>
