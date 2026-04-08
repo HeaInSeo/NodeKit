@@ -11,6 +11,18 @@
     <AnalysisMode>All</AnalysisMode>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(ApiProtosRoot)' == '' and Exists('/opt/go/src/github.com/HeaInSeo/api-protos/protos')">
+    <ApiProtosRoot>/opt/go/src/github.com/HeaInSeo/api-protos/protos</ApiProtosRoot>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(ApiProtosRoot)' == '' and Exists('$(MSBuildProjectDirectory)/../api-protos/protos')">
+    <ApiProtosRoot>$(MSBuildProjectDirectory)/../api-protos/protos</ApiProtosRoot>
+  </PropertyGroup>
+  <Target Name="ValidateApiProtosRoot" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(ApiProtosRoot)' == ''"
+           Text="ApiProtosRoot is not set. Set /p:ApiProtosRoot=/path/to/api-protos/protos or place api-protos beside NodeKit." />
+    <Error Condition="!Exists('$(ApiProtosRoot)/nodeforge/v1/nodeforge.proto')"
+           Text="nodeforge.proto not found under ApiProtosRoot='$(ApiProtosRoot)'. Expected '$(ApiProtosRoot)/nodeforge/v1/nodeforge.proto'." />
+  </Target>
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.0.0" />
     <PackageReference Include="Avalonia.Desktop" Version="11.0.0" />
@@ -51,10 +63,10 @@
 
   <!-- NodeForge gRPC proto: Grpc.Tools로 C# 클라이언트 스텁 생성 -->
   <ItemGroup>
-    <Protobuf Include="../../../../../../../opt/go/src/github.com/HeaInSeo/api-protos/protos/nodeforge/v1/nodeforge.proto"
+    <Protobuf Include="$(ApiProtosRoot)/nodeforge/v1/nodeforge.proto"
               GrpcServices="Client"
               Access="Internal"
-              ProtoRoot="../../../../../../../opt/go/src/github.com/HeaInSeo/api-protos/protos" />
+              ProtoRoot="$(ApiProtosRoot)" />
   </ItemGroup>
 
 </Project>

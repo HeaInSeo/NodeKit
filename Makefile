@@ -1,11 +1,13 @@
 .PHONY: policy build test all
 
 OPA       ?= $(HOME)/bin/opa
-DOCKGUARD := ../DockGuard/policy/dockerfile
+DOCKGUARD ?= $(CURDIR)/../DockGuard/policy/dockerfile
 ASSETS    := assets/policy
 
 # DockGuard .rego → dockguard.wasm
 policy:
+	@test -d "$(DOCKGUARD)" || (echo "DockGuard policy directory not found: $(DOCKGUARD)"; \
+	  echo "Set DOCKGUARD=/path/to/DockGuard/policy/dockerfile and retry."; exit 1)
 	@echo "==> opa build $(DOCKGUARD)"
 	@mkdir -p $(ASSETS)
 	@cd /tmp && \
