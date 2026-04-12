@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using Grpc.Core;
 using Grpc.Net.Client;
 using Nodeforge.V1;
+using NodeKit.Authoring;
 
 namespace NodeKit.Grpc
 {
@@ -57,19 +59,42 @@ namespace NodeKit.Grpc
                 RequestId = r.RequestId,
                 ToolDefinitionId = r.ToolDefinitionId.ToString(),
                 ToolName = r.ToolName,
+                Version = r.Version,
                 ImageUri = r.ImageUri,
                 DockerfileContent = r.DockerfileContent,
                 Script = r.Script,
+                EnvironmentSpec = r.EnvironmentSpec,
+                Display = new DisplaySpec
+                {
+                    Label = r.DisplayLabel,
+                    Description = r.DisplayDescription,
+                    Category = r.DisplayCategory,
+                },
             };
 
-            // NOTE:
-            // Current nodeforge.proto does not yet carry EnvironmentSpec.
-            // Keep the local DTO field to avoid silent loss inside NodeKit, but the transport
-            // schema must be updated in the api-protos repository for full end-to-end support.
-            proto.InputNames.AddRange(r.InputNames);
-            proto.OutputNames.AddRange(r.OutputNames);
+            proto.Display.Tags.AddRange(r.DisplayTags);
+            proto.Inputs.AddRange(r.Inputs.Select(ToPortSpec));
+            proto.Outputs.AddRange(r.Outputs.Select(ToPortSpec));
             return proto;
         }
+
+        private static PortSpec ToPortSpec(ToolInput i) => new()
+        {
+            Name = i.Name,
+            Role = i.Role,
+            Format = i.Format,
+            Shape = i.Shape,
+            Required = i.Required,
+        };
+
+        private static PortSpec ToPortSpec(ToolOutput o) => new()
+        {
+            Name = o.Name,
+            Role = o.Role,
+            Format = o.Format,
+            Shape = o.Shape,
+            Class = o.Class,
+        };
 
         private static BuildEvent FromProto(Nodeforge.V1.BuildEvent ev)
         {

@@ -67,8 +67,11 @@ namespace NodeKit.Tests
 
             var req = BuildRequestFactory.FromToolDefinition(def);
 
-            Assert.Equal(new[] { "input.fastq", "ref.fa" }, req.InputNames);
-            Assert.Equal(new[] { "out.bam" }, req.OutputNames);
+            Assert.Equal(2, req.Inputs.Count);
+            Assert.Equal("input.fastq", req.Inputs[0].Name);
+            Assert.Equal("ref.fa", req.Inputs[1].Name);
+            Assert.Single(req.Outputs);
+            Assert.Equal("out.bam", req.Outputs[0].Name);
         }
 
         [Fact]
@@ -88,8 +91,8 @@ namespace NodeKit.Tests
 
             var req = BuildRequestFactory.FromToolDefinition(def);
 
-            Assert.Empty(req.InputNames);
-            Assert.Empty(req.OutputNames);
+            Assert.Empty(req.Inputs);
+            Assert.Empty(req.Outputs);
         }
     }
 }

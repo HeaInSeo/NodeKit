@@ -44,10 +44,12 @@ namespace NodeKit.Tests
 
             Assert.Equal(string.Empty, tool.CasHash);
             Assert.Equal(string.Empty, tool.ToolName);
+            Assert.Equal(string.Empty, tool.Version);
+            Assert.Equal(string.Empty, tool.StableRef);
             Assert.Equal(string.Empty, tool.ImageUri);
             Assert.Equal(string.Empty, tool.Digest);
-            Assert.Empty(tool.InputNames);
-            Assert.Empty(tool.OutputNames);
+            Assert.Equal(string.Empty, tool.DisplayLabel);
+            Assert.Equal(string.Empty, tool.Phase);
             Assert.Equal(default, tool.RegisteredAt);
         }
 
@@ -59,19 +61,24 @@ namespace NodeKit.Tests
             {
                 CasHash = "abc123",
                 ToolName = "bwa-mem2",
+                Version = "2.2.1",
+                StableRef = "bwa-mem2@2.2.1",
                 ImageUri = "registry.example.com/bwa-mem2:2.2.1@sha256:abc",
                 Digest = "sha256:abc",
-                InputNames = new[] { "ref.fa", "reads.fastq" },
-                OutputNames = new[] { "out.sam" },
+                DisplayLabel = "BWA-MEM2 2.2.1",
+                DisplayCategory = "Alignment",
+                Phase = "Active",
                 RegisteredAt = at,
             };
 
             Assert.Equal("abc123", tool.CasHash);
             Assert.Equal("bwa-mem2", tool.ToolName);
+            Assert.Equal("2.2.1", tool.Version);
+            Assert.Equal("bwa-mem2@2.2.1", tool.StableRef);
             Assert.Equal("sha256:abc", tool.Digest);
-            Assert.Equal(2, tool.InputNames.Count);
-            Assert.Equal("ref.fa", tool.InputNames[0]);
-            Assert.Equal("out.sam", tool.OutputNames[0]);
+            Assert.Equal("BWA-MEM2 2.2.1", tool.DisplayLabel);
+            Assert.Equal("Alignment", tool.DisplayCategory);
+            Assert.Equal("Active", tool.Phase);
             Assert.Equal(at, tool.RegisteredAt);
         }
 

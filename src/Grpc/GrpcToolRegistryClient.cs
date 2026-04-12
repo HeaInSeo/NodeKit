@@ -13,10 +13,13 @@ namespace NodeKit.Grpc
     {
         public string CasHash { get; init; } = string.Empty;
         public string ToolName { get; init; } = string.Empty;
+        public string Version { get; init; } = string.Empty;
+        public string StableRef { get; init; } = string.Empty;
         public string ImageUri { get; init; } = string.Empty;
         public string Digest { get; init; } = string.Empty;
-        public IReadOnlyList<string> InputNames { get; init; } = Array.Empty<string>();
-        public IReadOnlyList<string> OutputNames { get; init; } = Array.Empty<string>();
+        public string DisplayLabel { get; init; } = string.Empty;
+        public string DisplayCategory { get; init; } = string.Empty;
+        public string Phase { get; init; } = string.Empty;
         public DateTimeOffset RegisteredAt { get; init; }
     }
 
@@ -59,14 +62,25 @@ namespace NodeKit.Grpc
 
         private static RegisteredTool ToRegisteredTool(RegisteredToolDefinition t)
         {
+            var label = t.Display?.Label;
+            if (string.IsNullOrEmpty(label))
+            {
+                label = string.IsNullOrEmpty(t.Version)
+                    ? t.ToolName
+                    : $"{t.ToolName} {t.Version}";
+            }
+
             return new RegisteredTool
             {
                 CasHash = t.CasHash,
                 ToolName = t.ToolName,
+                Version = t.Version,
+                StableRef = t.StableRef,
                 ImageUri = t.ImageUri,
                 Digest = t.Digest,
-                InputNames = t.InputNames.ToList(),
-                OutputNames = t.OutputNames.ToList(),
+                DisplayLabel = label,
+                DisplayCategory = t.Display?.Category ?? string.Empty,
+                Phase = t.Phase,
                 RegisteredAt = DateTimeOffset.FromUnixTimeSeconds(t.RegisteredAt),
             };
         }

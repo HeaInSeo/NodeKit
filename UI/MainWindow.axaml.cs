@@ -39,8 +39,8 @@ namespace NodeKit.UI
 
             _policyChecker = TryLoadPolicyChecker();
 
-            AddInputButton.Click += (_, _) => AddIoRow(InputRowsPanel);
-            AddOutputButton.Click += (_, _) => AddIoRow(OutputRowsPanel);
+            AddInputButton.Click += (_, _) => AddInputRow(InputRowsPanel);
+            AddOutputButton.Click += (_, _) => AddOutputRow(OutputRowsPanel);
             ValidateButton.Click += OnValidateClicked;
             SendBuildButton.Click += OnSendBuildClicked;
             Closed += OnWindowClosed;
@@ -54,8 +54,8 @@ namespace NodeKit.UI
             RegisterValidationInvalidationHandlers();
 
             // 초기 행 1개씩
-            AddIoRow(InputRowsPanel);
-            AddIoRow(OutputRowsPanel);
+            AddInputRow(InputRowsPanel);
+            AddOutputRow(OutputRowsPanel);
         }
 
         private void ShowPanel(Avalonia.Controls.Control target)
@@ -93,28 +93,96 @@ namespace NodeKit.UI
 
         // ─── I/O 동적 행 관리 ─────────────────────────────────────────────────
 
-        /// <summary>
-        /// 이름 입력 TextBox + 삭제 버튼으로 구성된 I/O 행을 panel에 추가한다.
-        /// </summary>
-        private void AddIoRow(StackPanel panel)
+        /// <summary>Input 포트 행 추가: name / role / format / shape / required / ×</summary>
+        private void AddInputRow(StackPanel panel)
         {
+            // columns: name(2*) gap role(1.5*) gap format(1.2*) gap shape(60) gap ×
             var row = new Grid
             {
-                ColumnDefinitions = new ColumnDefinitions("*,4,Auto"),
+                ColumnDefinitions = new ColumnDefinitions("2*,4,1.5*,4,1.2*,4,60,4,Auto"),
             };
 
-            var nameBox = new TextBox
+            var nameBox   = MakePortTextBox("이름 (예: reads)", 0, row);
+            var roleBox   = MakePortTextBox("역할 (예: sample-fastq)", 2, row);
+            var formatBox = MakePortTextBox("형식 (예: fastq)", 4, row);
+
+            var shapeBox = new ComboBox
             {
-                Watermark = "파일 이름 (예: input.fastq.gz)",
+                ItemsSource = new[] { "single", "pair" },
+                SelectedIndex = 0,
                 Background = new SolidColorBrush(Color.Parse("#1e1d2e")),
                 Foreground = Brushes.White,
                 BorderBrush = new SolidColorBrush(Color.Parse("#333")),
-                Padding = new Avalonia.Thickness(8, 4),
             };
-            Grid.SetColumn(nameBox, 0);
-            nameBox.TextChanged += (_, _) => InvalidateValidationState();
+            Grid.SetColumn(shapeBox, 6);
+            row.Children.Add(shapeBox);
 
-            var removeButton = new Button
+            AddRemoveButton(row, 8, panel, () => nameBox.Text = string.Empty);
+
+            panel.Children.Add(row);
+            InvalidateValidationState();
+        }
+
+        /// <summary>Output 포트 행 추가: name / role / format / shape / class / ×</summary>
+        private void AddOutputRow(StackPanel panel)
+        {
+            // columns: name(2*) gap role(1.5*) gap format(1.2*) gap shape(60) gap class(60) gap ×
+            var row = new Grid
+            {
+                ColumnDefinitions = new ColumnDefinitions("2*,4,1.5*,4,1.2*,4,60,4,60,4,Auto"),
+            };
+
+            var nameBox   = MakePortTextBox("이름 (예: aligned_bam)", 0, row);
+            var roleBox   = MakePortTextBox("역할 (예: aligned-bam)", 2, row);
+            var formatBox = MakePortTextBox("형식 (예: bam)", 4, row);
+
+            var shapeBox = new ComboBox
+            {
+                ItemsSource = new[] { "single", "pair" },
+                SelectedIndex = 0,
+                Background = new SolidColorBrush(Color.Parse("#1e1d2e")),
+                Foreground = Brushes.White,
+                BorderBrush = new SolidColorBrush(Color.Parse("#333")),
+            };
+            Grid.SetColumn(shapeBox, 6);
+            row.Children.Add(shapeBox);
+
+            var classBox = new ComboBox
+            {
+                ItemsSource = new[] { "primary", "secondary" },
+                SelectedIndex = 0,
+                Background = new SolidColorBrush(Color.Parse("#1e1d2e")),
+                Foreground = Brushes.White,
+                BorderBrush = new SolidColorBrush(Color.Parse("#333")),
+            };
+            Grid.SetColumn(classBox, 8);
+            row.Children.Add(classBox);
+
+            AddRemoveButton(row, 10, panel, () => nameBox.Text = string.Empty);
+
+            panel.Children.Add(row);
+            InvalidateValidationState();
+        }
+
+        private TextBox MakePortTextBox(string watermark, int column, Grid parent)
+        {
+            var box = new TextBox
+            {
+                Watermark = watermark,
+                Background = new SolidColorBrush(Color.Parse("#1e1d2e")),
+                Foreground = Brushes.White,
+                BorderBrush = new SolidColorBrush(Color.Parse("#333")),
+                Padding = new Avalonia.Thickness(6, 4),
+            };
+            Grid.SetColumn(box, column);
+            box.TextChanged += (_, _) => InvalidateValidationState();
+            parent.Children.Add(box);
+            return box;
+        }
+
+        private void AddRemoveButton(Grid row, int column, StackPanel panel, Action clearFirst)
+        {
+            var btn = new Button
             {
                 Content = "×",
                 Background = new SolidColorBrush(Color.Parse("#2a1a1a")),
@@ -123,35 +191,27 @@ namespace NodeKit.UI
                 Padding = new Avalonia.Thickness(8, 4),
                 VerticalAlignment = VerticalAlignment.Center,
             };
-            Grid.SetColumn(removeButton, 2);
-
-            removeButton.Click += (_, _) =>
+            Grid.SetColumn(btn, column);
+            btn.Click += (_, _) =>
             {
-                // 마지막 1개는 삭제하지 않음 (최소 1행 유지)
                 if (panel.Children.Count > 1)
                 {
                     panel.Children.Remove(row);
                 }
                 else
                 {
-                    nameBox.Text = string.Empty;
+                    clearFirst();
                 }
 
                 InvalidateValidationState();
             };
-
-            row.Children.Add(nameBox);
-            row.Children.Add(removeButton);
-            panel.Children.Add(row);
-            InvalidateValidationState();
+            row.Children.Add(btn);
         }
 
-        /// <summary>
-        /// panel에 있는 모든 I/O 행에서 비어 있지 않은 이름을 수집한다.
-        /// </summary>
-        private static List<string> CollectIoNames(StackPanel panel)
+        /// <summary>Input 행에서 ToolInput 목록을 수집한다.</summary>
+        private static List<ToolInput> CollectInputSpecs(StackPanel panel)
         {
-            var names = new List<string>();
+            var result = new List<ToolInput>();
             foreach (var child in panel.Children)
             {
                 if (child is not Grid row)
@@ -159,15 +219,57 @@ namespace NodeKit.UI
                     continue;
                 }
 
-                var textBox = row.Children.OfType<TextBox>().FirstOrDefault();
-                var name = textBox?.Text?.Trim();
-                if (!string.IsNullOrEmpty(name))
+                var boxes = row.Children.OfType<TextBox>().ToList();
+                var combos = row.Children.OfType<ComboBox>().ToList();
+                var name = boxes.ElementAtOrDefault(0)?.Text?.Trim() ?? string.Empty;
+                if (string.IsNullOrEmpty(name))
                 {
-                    names.Add(name);
+                    continue;
                 }
+
+                result.Add(new ToolInput
+                {
+                    Name = name,
+                    Role = boxes.ElementAtOrDefault(1)?.Text?.Trim() ?? string.Empty,
+                    Format = boxes.ElementAtOrDefault(2)?.Text?.Trim() ?? string.Empty,
+                    Shape = combos.ElementAtOrDefault(0)?.SelectedItem?.ToString() ?? "single",
+                    Required = true,
+                });
             }
 
-            return names;
+            return result;
+        }
+
+        /// <summary>Output 행에서 ToolOutput 목록을 수집한다.</summary>
+        private static List<ToolOutput> CollectOutputSpecs(StackPanel panel)
+        {
+            var result = new List<ToolOutput>();
+            foreach (var child in panel.Children)
+            {
+                if (child is not Grid row)
+                {
+                    continue;
+                }
+
+                var boxes = row.Children.OfType<TextBox>().ToList();
+                var combos = row.Children.OfType<ComboBox>().ToList();
+                var name = boxes.ElementAtOrDefault(0)?.Text?.Trim() ?? string.Empty;
+                if (string.IsNullOrEmpty(name))
+                {
+                    continue;
+                }
+
+                result.Add(new ToolOutput
+                {
+                    Name = name,
+                    Role = boxes.ElementAtOrDefault(1)?.Text?.Trim() ?? string.Empty,
+                    Format = boxes.ElementAtOrDefault(2)?.Text?.Trim() ?? string.Empty,
+                    Shape = combos.ElementAtOrDefault(0)?.SelectedItem?.ToString() ?? "single",
+                    Class = combos.ElementAtOrDefault(1)?.SelectedItem?.ToString() ?? "primary",
+                });
+            }
+
+            return result;
         }
 
         // ─── 검증 및 빌드 ─────────────────────────────────────────────────────
@@ -345,7 +447,12 @@ namespace NodeKit.UI
                     {
                         ToolListEmptyPanel.IsVisible = false;
                         ToolListItems.ItemsSource = tools
-                            .Select(t => $"{t.ToolName}  [{t.ImageUri}]  digest:{t.Digest}  등록:{t.RegisteredAt:yyyy-MM-dd HH:mm}")
+                            .Select(t =>
+                            {
+                                var label = string.IsNullOrEmpty(t.DisplayLabel) ? t.ToolName : t.DisplayLabel;
+                                var cat = string.IsNullOrEmpty(t.DisplayCategory) ? string.Empty : $"  [{t.DisplayCategory}]";
+                                return $"{label}{cat}  phase:{t.Phase}  cas:{t.CasHash[..Math.Min(12, t.CasHash.Length)]}  등록:{t.RegisteredAt:yyyy-MM-dd HH:mm}";
+                            })
                             .ToList();
                     }
 
@@ -436,23 +543,34 @@ namespace NodeKit.UI
 
         private ToolDefinition BuildDefinitionFromForm()
         {
+            var tagsRaw = DisplayTagsBox.Text ?? string.Empty;
+            var tags = tagsRaw
+                .Split(',', System.StringSplitOptions.RemoveEmptyEntries)
+                .Select(t => t.Trim())
+                .Where(t => !string.IsNullOrEmpty(t))
+                .ToList();
+
             return new ToolDefinition
             {
                 Name = ToolNameBox.Text ?? string.Empty,
+                Version = ToolVersionBox.Text?.Trim() ?? string.Empty,
                 ImageUri = ImageUriBox.Text ?? string.Empty,
                 DockerfileContent = DockerfileBox.Text ?? string.Empty,
                 Script = ScriptBox.Text ?? string.Empty,
                 EnvironmentSpec = EnvSpecBox.Text ?? string.Empty,
-                Inputs = CollectIoNames(InputRowsPanel)
-                    .Select(n => new ToolInput { Name = n }).ToList(),
-                Outputs = CollectIoNames(OutputRowsPanel)
-                    .Select(n => new ToolOutput { Name = n }).ToList(),
+                Inputs = CollectInputSpecs(InputRowsPanel),
+                Outputs = CollectOutputSpecs(OutputRowsPanel),
+                DisplayLabel = DisplayLabelBox.Text?.Trim() ?? string.Empty,
+                DisplayDescription = DisplayDescriptionBox.Text?.Trim() ?? string.Empty,
+                DisplayCategory = DisplayCategoryBox.Text?.Trim() ?? string.Empty,
+                DisplayTags = tags,
             };
         }
 
         private void RegisterValidationInvalidationHandlers()
         {
             ToolNameBox.TextChanged += (_, _) => InvalidateValidationState();
+            ToolVersionBox.TextChanged += (_, _) => InvalidateValidationState();
             ImageUriBox.TextChanged += (_, _) => InvalidateValidationState();
             DockerfileBox.TextChanged += (_, _) => InvalidateValidationState();
             ScriptBox.TextChanged += (_, _) => InvalidateValidationState();

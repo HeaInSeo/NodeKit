@@ -1,4 +1,3 @@
-using System.Linq;
 using NodeKit.Authoring;
 
 namespace NodeKit.Grpc
@@ -15,12 +14,17 @@ namespace NodeKit.Grpc
             {
                 ToolDefinitionId = def.Id,
                 ToolName = def.Name,
+                Version = def.Version,
                 ImageUri = def.ImageUri,
                 DockerfileContent = def.DockerfileContent,
                 Script = def.Script,
                 EnvironmentSpec = def.EnvironmentSpec,
-                InputNames = def.Inputs.Select(i => i.Name).ToList(),
-                OutputNames = def.Outputs.Select(o => o.Name).ToList(),
+                Inputs = def.Inputs,
+                Outputs = def.Outputs,
+                DisplayLabel = def.DisplayLabel,
+                DisplayDescription = def.DisplayDescription,
+                DisplayCategory = def.DisplayCategory,
+                DisplayTags = def.DisplayTags,
             };
         }
     }
