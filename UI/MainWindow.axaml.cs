@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Threading;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
@@ -557,6 +558,7 @@ namespace NodeKit.UI
                 ImageUri = ImageUriBox.Text ?? string.Empty,
                 DockerfileContent = DockerfileBox.Text ?? string.Empty,
                 Script = ScriptBox.Text ?? string.Empty,
+                Command = ParseCommandJson(CommandBox.Text),
                 EnvironmentSpec = EnvSpecBox.Text ?? string.Empty,
                 Inputs = CollectInputSpecs(InputRowsPanel),
                 Outputs = CollectOutputSpecs(OutputRowsPanel),
@@ -567,6 +569,30 @@ namespace NodeKit.UI
             };
         }
 
+        /// <summary>
+        /// 사용자 입력 문자열을 JSON 배열로 파싱해 커맨드 목록을 반환한다.
+        /// 빈 입력이거나 파싱 실패 시 빈 목록을 반환한다.
+        /// </summary>
+        private static List<string> ParseCommandJson(string? raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                return new List<string>();
+            }
+
+            try
+            {
+                var parsed = JsonSerializer.Deserialize<List<string>>(raw.Trim());
+                return parsed ?? new List<string>();
+            }
+#pragma warning disable CA1031
+            catch
+            {
+                return new List<string>();
+            }
+#pragma warning restore CA1031
+        }
+
         private void RegisterValidationInvalidationHandlers()
         {
             ToolNameBox.TextChanged += (_, _) => InvalidateValidationState();
@@ -574,6 +600,7 @@ namespace NodeKit.UI
             ImageUriBox.TextChanged += (_, _) => InvalidateValidationState();
             DockerfileBox.TextChanged += (_, _) => InvalidateValidationState();
             ScriptBox.TextChanged += (_, _) => InvalidateValidationState();
+            CommandBox.TextChanged += (_, _) => InvalidateValidationState();
             EnvSpecBox.TextChanged += (_, _) => InvalidateValidationState();
             NodeForgeAddressBox.TextChanged += (_, _) => InvalidateValidationState();
         }

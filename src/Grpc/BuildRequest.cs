@@ -29,6 +29,12 @@ namespace NodeKit.Grpc
         /// <summary>실행 스크립트.</summary>
         public string Script { get; set; } = string.Empty;
 
+        /// <summary>
+        /// K8s 런타임 커맨드 오버라이드 (선택).
+        /// Dockerfile CMD를 대체한다. ENTRYPOINT가 아님.
+        /// </summary>
+        public List<string> Command { get; set; } = new();
+
         /// <summary>환경 스펙 파일 내용.</summary>
         public string EnvironmentSpec { get; set; } = string.Empty;
 

@@ -32,6 +32,14 @@ namespace NodeKit.Authoring
         /// <summary>실행할 쉘 스크립트.</summary>
         public string Script { get; set; } = string.Empty;
 
+        /// <summary>
+        /// K8s 런타임 커맨드 오버라이드 (선택).
+        /// Dockerfile CMD를 대체한다. ENTRYPOINT가 아님.
+        /// 예: ["/bin/sh", "-c", "/app/executor.sh"]
+        /// podbridge5는 CMD 방식을 사용하므로 K8s Job 제출 시 이 값이 주입된다.
+        /// </summary>
+        public List<string> Command { get; set; } = new();
+
         /// <summary>Named input 포트 목록.</summary>
         public List<ToolInput> Inputs { get; set; } = new();
 

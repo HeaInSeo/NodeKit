@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using System.Threading;
 using Grpc.Core;
 using Grpc.Net.Client;
@@ -75,6 +76,11 @@ namespace NodeKit.Grpc
             proto.Display.Tags.AddRange(r.DisplayTags);
             proto.Inputs.AddRange(r.Inputs.Select(ToPortSpec));
             proto.Outputs.AddRange(r.Outputs.Select(ToPortSpec));
+            if (r.Command.Count > 0)
+            {
+                proto.Command = JsonSerializer.Serialize(r.Command);
+            }
+
             return proto;
         }
 

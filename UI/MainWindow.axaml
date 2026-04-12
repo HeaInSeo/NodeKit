@@ -88,6 +88,16 @@
                        Padding="8" FontFamily="Monospace"/>
             </StackPanel>
 
+            <!-- 런타임 커맨드 (CMD 오버라이드) -->
+            <StackPanel Spacing="4">
+              <TextBlock Text="런타임 커맨드 오버라이드 (선택, Dockerfile CMD 대체)" Foreground="#aaa" FontSize="12"/>
+              <TextBlock TextWrapping="Wrap" FontSize="10" Foreground="#666"
+                         Text="Dockerfile ENTRYPOINT가 아닌 CMD를 K8s Job 제출 시 교체합니다. podbridge5 executor 패턴 기준. JSON 배열 형식 입력."/>
+              <TextBox Name="CommandBox" FontFamily="Monospace"
+                       Watermark='예: ["/bin/sh", "-c", "/app/executor.sh"]'
+                       Background="#1e1d2e" Foreground="White" BorderBrush="#333" Padding="8"/>
+            </StackPanel>
+
             <!-- I/O 포트 선언 -->
             <Grid ColumnDefinitions="*,16,*">
 

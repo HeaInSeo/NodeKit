@@ -21,6 +21,7 @@ namespace NodeKit.Grpc
                 EnvironmentSpec = def.EnvironmentSpec,
                 Inputs = def.Inputs,
                 Outputs = def.Outputs,
+                Command = def.Command,
                 DisplayLabel = def.DisplayLabel,
                 DisplayDescription = def.DisplayDescription,
                 DisplayCategory = def.DisplayCategory,
