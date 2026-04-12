@@ -142,7 +142,7 @@
             <!-- NodeForge 주소 -->
             <StackPanel Spacing="4">
               <TextBlock Text="NodeForge 주소" Foreground="#aaa" FontSize="12"/>
-              <TextBox Name="NodeForgeAddressBox" Text="http://localhost:50051"
+              <TextBox Name="NodeForgeAddressBox" Text="http://nodeforge.10.113.24.96.nip.io:80"
                        Background="#1e1d2e" Foreground="White" BorderBrush="#333" Padding="8"/>
             </StackPanel>
 
