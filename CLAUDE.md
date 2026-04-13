@@ -2,14 +2,19 @@
 
 ## 1. Responsibility boundary (immutable)
 
-**NodeKit owns**: ToolDefinition authoring (UI forms, field validation), L1 static validation
-(image URI checks, package version pinning), DockGuard policy execution via `WasmPolicyChecker`,
-BuildRequest generation and gRPC transmission to NodeForge, AdminToolList display,
+**NodeKit owns**: ToolDefinition authoring (UI forms, field validation), DataDefinition authoring
+(reference data metadata forms), L1 static validation (image URI checks, package version pinning),
+DockGuard policy execution via `WasmPolicyChecker`, BuildRequest / DataRegisterRequest generation
+and gRPC transmission to NodeVault, AdminToolList / AdminDataList display (via Catalog 서비스 REST API),
 and all admin UX semantics (status feedback, error display, policy management UI).
 
-**NodeForge owns**: BuildRequest reception, builder Job orchestration, DockGuard policy bundle
-management (`PolicyService`), internal registry integration, `RegisteredToolDefinition` creation
-and CAS storage, L3 kind dry-run, L4 smoke run, and `ToolRegistryService`.
+**NodeVault owns**: BuildRequest / DataRegisterRequest reception, tool image build orchestration
+(L2/L3/L4), reference data packaging (sori), OCI referrer push, artifact index management (SoT),
+DockGuard policy bundle management (`PolicyService`), Harbor lifecycle control, and Harbor webhook
+reconciliation. NodeVault replaces NodeForge.
+
+**Catalog 서비스 owns**: Read-only artifact palette (tools + reference data) for pipeline builders.
+NodeKit queries Catalog 서비스 REST API for AdminToolList and AdminDataList.
 
 Do not implement image building, Job scheduling, or K8s API calls in NodeKit.
 Do not implement editor UX, selection policy, or undo/redo in NodeKit — those belong to DagEdit.
@@ -18,10 +23,14 @@ Do not implement editor UX, selection policy, or undo/redo in NodeKit — those 
 
 | Term | Owner | Meaning |
 |------|-------|---------|
-| `ToolDefinition` | NodeKit | Authoring draft model. Not the final registered object. |
-| `BuildRequest` | NodeKit→NodeForge | What NodeKit sends over gRPC after L1 passes. |
-| `RegisteredToolDefinition` | NodeForge | Post-L4 confirmed object. CAS-stored by NodeForge. |
-| `AdminToolList` | NodeKit | Admin-only view of registered tools. Not `PipelineToolPalette`. |
+| `ToolDefinition` | NodeKit | Tool authoring draft model. Not the final registered object. |
+| `DataDefinition` | NodeKit | Reference data authoring draft model. Not the final registered object. |
+| `BuildRequest` | NodeKit→NodeVault | What NodeKit sends over gRPC after L1 passes (tool). |
+| `DataRegisterRequest` | NodeKit→NodeVault | What NodeKit sends over gRPC for reference data registration. |
+| `RegisteredToolDefinition` | NodeVault | Post-L4 confirmed tool object. Harbor referrer + index. |
+| `RegisteredDataDefinition` | NodeVault | Confirmed reference data object. Harbor referrer + index. |
+| `AdminToolList` | NodeKit | Admin-only view of registered tools. Queries Catalog 서비스. |
+| `AdminDataList` | NodeKit | Admin-only view of registered reference datasets. Queries Catalog 서비스. |
 | `PipelineToolPalette` | DagEdit etc. | Pipeline app's view. Separate concept, separate app. |
 
 Do not conflate `ToolDefinition` with `RegisteredToolDefinition`. Do not call `AdminToolList`
@@ -52,17 +61,19 @@ Interface must be finalized before implementation to minimize swap cost.
 
 ## 5. gRPC client responsibility
 
-NodeKit is a **gRPC client only**. It sends `BuildRequest` and receives status/results.
+NodeKit is a **gRPC client only**. It sends `BuildRequest` / `DataRegisterRequest` and receives
+status/results. AdminToolList / AdminDataList display uses Catalog 서비스 REST API (not gRPC).
 Do not implement gRPC server logic in NodeKit. The proto contract is the boundary —
-any change to `.proto` definitions requires coordination with NodeForge.
+any change to `.proto` definitions requires coordination with NodeVault.
 
 ## 6. Decision checklist before every change
 
 - Does it add K8s API calls, Job scheduling, or image build logic to NodeKit? **Block.**
-- Does it add `RegisteredToolDefinition` creation logic to NodeKit? **Block.**
+- Does it add `RegisteredToolDefinition` / `RegisteredDataDefinition` creation logic to NodeKit? **Block.**
 - Does it relax a reproducibility rule (latest tag, digest, version pinning)? **Block.**
 - Does it hardcode a policy bundle file path bypassing `IPolicyBundleProvider`? **Block.**
 - Does it couple NodeKit to DagEdit internals? **Block.**
+- Does it bypass Catalog 서비스 and query NodeVault index directly from NodeKit? **Block.**
 
 ## 7. Small diffs; no unrelated refactors
 
@@ -104,4 +115,5 @@ Before marking a change complete, explicitly check for:
 - `IPolicyBundleProvider` swap leaving stale bundle in memory
 - gRPC send failure not surfaced in UI (fire-and-forget without error propagation)
 - `BuildRequest` missing required fields after serialization round-trip
-- `AdminToolList` displaying stale data after successful registration
+- `AdminToolList` / `AdminDataList` displaying stale data after successful registration
+- `DataRegisterRequest` missing required metadata fields after serialization round-trip
