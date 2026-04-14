@@ -19,7 +19,7 @@ namespace NodeKit.Grpc
         public string Digest { get; init; } = string.Empty;
         public string DisplayLabel { get; init; } = string.Empty;
         public string DisplayCategory { get; init; } = string.Empty;
-        public string Phase { get; init; } = string.Empty;
+        public string LifecyclePhase { get; init; } = string.Empty;
         public DateTimeOffset RegisteredAt { get; init; }
     }
 
@@ -80,7 +80,7 @@ namespace NodeKit.Grpc
                 Digest = t.Digest,
                 DisplayLabel = label,
                 DisplayCategory = t.Display?.Category ?? string.Empty,
-                Phase = t.Phase,
+                LifecyclePhase = t.LifecyclePhase,
                 RegisteredAt = DateTimeOffset.FromUnixTimeSeconds(t.RegisteredAt),
             };
         }

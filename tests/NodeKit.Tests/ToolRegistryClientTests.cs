@@ -49,7 +49,7 @@ namespace NodeKit.Tests
             Assert.Equal(string.Empty, tool.ImageUri);
             Assert.Equal(string.Empty, tool.Digest);
             Assert.Equal(string.Empty, tool.DisplayLabel);
-            Assert.Equal(string.Empty, tool.Phase);
+            Assert.Equal(string.Empty, tool.LifecyclePhase);
             Assert.Equal(default, tool.RegisteredAt);
         }
 
@@ -67,7 +67,7 @@ namespace NodeKit.Tests
                 Digest = "sha256:abc",
                 DisplayLabel = "BWA-MEM2 2.2.1",
                 DisplayCategory = "Alignment",
-                Phase = "Active",
+                LifecyclePhase = "Active",
                 RegisteredAt = at,
             };
 
@@ -78,7 +78,7 @@ namespace NodeKit.Tests
             Assert.Equal("sha256:abc", tool.Digest);
             Assert.Equal("BWA-MEM2 2.2.1", tool.DisplayLabel);
             Assert.Equal("Alignment", tool.DisplayCategory);
-            Assert.Equal("Active", tool.Phase);
+            Assert.Equal("Active", tool.LifecyclePhase);
             Assert.Equal(at, tool.RegisteredAt);
         }
 

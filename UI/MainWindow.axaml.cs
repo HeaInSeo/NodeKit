@@ -452,7 +452,7 @@ namespace NodeKit.UI
                             {
                                 var label = string.IsNullOrEmpty(t.DisplayLabel) ? t.ToolName : t.DisplayLabel;
                                 var cat = string.IsNullOrEmpty(t.DisplayCategory) ? string.Empty : $"  [{t.DisplayCategory}]";
-                                return $"{label}{cat}  phase:{t.Phase}  cas:{t.CasHash[..Math.Min(12, t.CasHash.Length)]}  등록:{t.RegisteredAt:yyyy-MM-dd HH:mm}";
+                                return $"{label}{cat}  phase:{t.LifecyclePhase}  cas:{t.CasHash[..Math.Min(12, t.CasHash.Length)]}  등록:{t.RegisteredAt:yyyy-MM-dd HH:mm}";
                             })
                             .ToList();
                     }
