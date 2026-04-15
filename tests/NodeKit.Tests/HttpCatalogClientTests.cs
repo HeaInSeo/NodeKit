@@ -196,6 +196,156 @@ namespace NodeKit.Tests
                 () => client.ListToolsAsync());
         }
 
+        // ── IntegrityHealth 매핑 ─────────────────────────────────────────────
+
+        [Fact]
+        public async Task ListToolsAsync_IntegrityHealth_Mapped()
+        {
+            const string json = """
+                {
+                    "tools": [
+                        {
+                            "cas_hash": "h1",
+                            "tool_name": "bwa",
+                            "lifecycle_phase": "Active",
+                            "integrity_health": "Partial",
+                            "registered_at": 0
+                        }
+                    ]
+                }
+                """;
+            using var client = MakeClient(HttpStatusCode.OK, json);
+            var result = await client.ListToolsAsync();
+
+            Assert.Single(result);
+            Assert.Equal("Partial", result[0].IntegrityHealth);
+        }
+
+        [Fact]
+        public async Task ListToolsAsync_IntegrityHealth_DefaultsToEmpty()
+        {
+            // integrity_health 필드 없을 때 빈 문자열
+            const string json = """
+                {
+                    "tools": [
+                        {"cas_hash":"h1","tool_name":"bwa","lifecycle_phase":"Active","registered_at":0}
+                    ]
+                }
+                """;
+            using var client = MakeClient(HttpStatusCode.OK, json);
+            var result = await client.ListToolsAsync();
+
+            Assert.Single(result);
+            Assert.Equal(string.Empty, result[0].IntegrityHealth);
+        }
+
+        // ── ListDataAsync ─────────────────────────────────────────────────────
+
+        [Fact]
+        public async Task ListDataAsync_ParsesDataListResponse()
+        {
+            const string json = """
+                {
+                    "data": [
+                        {
+                            "cas_hash": "d1",
+                            "data_name": "hg38-reference",
+                            "version": "2024-01",
+                            "stable_ref": "hg38-reference@2024-01",
+                            "description": "Human GRCh38 reference genome",
+                            "format": "FASTA",
+                            "source_uri": "https://ftp.ncbi.nlm.nih.gov/hg38.fa.gz",
+                            "checksum": "sha256:abc",
+                            "storage_uri": "registry.example.com/data/hg38:2024-01",
+                            "lifecycle_phase": "Active",
+                            "integrity_health": "Healthy",
+                            "registered_at": 1775000000,
+                            "display_label": "Human GRCh38 Reference",
+                            "display_category": "Reference Genome"
+                        }
+                    ]
+                }
+                """;
+            using var client = MakeClient(HttpStatusCode.OK, json);
+            var result = await client.ListDataAsync();
+
+            Assert.Single(result);
+            var d = result[0];
+            Assert.Equal("d1", d.CasHash);
+            Assert.Equal("hg38-reference", d.DataName);
+            Assert.Equal("2024-01", d.Version);
+            Assert.Equal("hg38-reference@2024-01", d.StableRef);
+            Assert.Equal("Human GRCh38 reference genome", d.Description);
+            Assert.Equal("FASTA", d.Format);
+            Assert.Equal("sha256:abc", d.Checksum);
+            Assert.Equal("Active", d.LifecyclePhase);
+            Assert.Equal("Healthy", d.IntegrityHealth);
+            Assert.Equal("Human GRCh38 Reference", d.DisplayLabel);
+            Assert.Equal("Reference Genome", d.DisplayCategory);
+            Assert.Equal(DateTimeOffset.FromUnixTimeSeconds(1775000000), d.RegisteredAt);
+        }
+
+        [Fact]
+        public async Task ListDataAsync_EmptyList_ReturnsEmpty()
+        {
+            using var client = MakeClient(HttpStatusCode.OK, """{"data":[]}""");
+            var result = await client.ListDataAsync();
+            Assert.Empty(result);
+        }
+
+        [Fact]
+        public async Task ListDataAsync_DisplayLabel_FallsBackToDataNameVersion()
+        {
+            const string json = """
+                {
+                    "data": [
+                        {
+                            "cas_hash": "d1",
+                            "data_name": "hg38-reference",
+                            "version": "2024-01",
+                            "lifecycle_phase": "Active",
+                            "registered_at": 0
+                        }
+                    ]
+                }
+                """;
+            using var client = MakeClient(HttpStatusCode.OK, json);
+            var result = await client.ListDataAsync();
+
+            Assert.Single(result);
+            Assert.Equal("hg38-reference 2024-01", result[0].DisplayLabel);
+        }
+
+        [Fact]
+        public async Task ListDataAsync_DisplayLabel_FallsBackToDataNameOnly_WhenNoVersion()
+        {
+            const string json = """
+                {
+                    "data": [
+                        {
+                            "cas_hash": "d1",
+                            "data_name": "hg38-reference",
+                            "lifecycle_phase": "Active",
+                            "registered_at": 0
+                        }
+                    ]
+                }
+                """;
+            using var client = MakeClient(HttpStatusCode.OK, json);
+            var result = await client.ListDataAsync();
+
+            Assert.Single(result);
+            Assert.Equal("hg38-reference", result[0].DisplayLabel);
+        }
+
+        [Fact]
+        public async Task ListDataAsync_ServerError_ThrowsHttpRequestException()
+        {
+            using var client = MakeClient(HttpStatusCode.InternalServerError, "error");
+            await Assert.ThrowsAsync<HttpRequestException>(
+                () => client.ListDataAsync());
+        }
+
         // ── Dispose ───────────────────────────────────────────────────────────
 
         [Fact]

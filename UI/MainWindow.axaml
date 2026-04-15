@@ -25,6 +25,10 @@
                 Background="Transparent" Foreground="White" Padding="10,8">
           등록된 Tools
         </Button>
+        <Button Name="NavDataListButton" HorizontalAlignment="Stretch"
+                Background="Transparent" Foreground="White" Padding="10,8">
+          등록된 Data
+        </Button>
         <Button Name="NavPolicyButton" HorizontalAlignment="Stretch"
                 Background="Transparent" Foreground="White" Padding="10,8">
           정책 관리
@@ -275,6 +279,38 @@
             </Border>
 
             <ItemsControl Name="ToolListItems">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                  <Border Background="#1e1d2e" BorderBrush="#333" BorderThickness="1"
+                          CornerRadius="4" Padding="12" Margin="0,0,0,6">
+                    <TextBlock Text="{Binding}" Foreground="#c0c8d8" FontFamily="Monospace"
+                               FontSize="12" TextWrapping="Wrap"/>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+          </StackPanel>
+        </ScrollViewer>
+
+        <!-- 등록된 Data 패널 -->
+        <ScrollViewer Name="DataListPanel" IsVisible="False" Padding="20">
+          <StackPanel Spacing="16" MaxWidth="900">
+
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Text="등록된 Data" FontSize="18" FontWeight="SemiBold" Foreground="White"/>
+              <Button Name="RefreshDataListButton" Grid.Column="1"
+                      Background="#2c3e88" Foreground="White" Padding="12,6">
+                새로 고침
+              </Button>
+            </Grid>
+
+            <Border Name="DataListEmptyPanel" IsVisible="True"
+                    Background="#1e1d2e" BorderBrush="#333" BorderThickness="1" CornerRadius="4" Padding="16">
+              <TextBlock Text="등록된 참조 데이터가 없습니다." Foreground="#666" FontSize="13"/>
+            </Border>
+
+            <ItemsControl Name="DataListItems">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="x:String">
                   <Border Background="#1e1d2e" BorderBrush="#333" BorderThickness="1"

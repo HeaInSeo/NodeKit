@@ -48,8 +48,10 @@ namespace NodeKit.UI
 
             NavAuthoringButton.Click += (_, _) => ShowPanel(AuthoringPanel);
             NavToolListButton.Click += (_, _) => { ShowPanel(ToolListPanel); _ = LoadToolListAsync(); };
+            NavDataListButton.Click += (_, _) => { ShowPanel(DataListPanel); _ = LoadDataListAsync(); };
             NavPolicyButton.Click += (_, _) => { ShowPanel(PolicyPanel); _ = LoadPolicyListAsync(); };
             RefreshToolListButton.Click += (_, _) => _ = LoadToolListAsync();
+            RefreshDataListButton.Click += (_, _) => _ = LoadDataListAsync();
             RefreshPolicyListButton.Click += (_, _) => _ = LoadPolicyListAsync();
             ReloadBundleButton.Click += OnReloadBundleClicked;
             RegisterValidationInvalidationHandlers();
@@ -62,8 +64,9 @@ namespace NodeKit.UI
         private void ShowPanel(Avalonia.Controls.Control target)
         {
             AuthoringPanel.IsVisible = target == AuthoringPanel;
-            ToolListPanel.IsVisible = target == ToolListPanel;
-            PolicyPanel.IsVisible = target == PolicyPanel;
+            ToolListPanel.IsVisible  = target == ToolListPanel;
+            DataListPanel.IsVisible  = target == DataListPanel;
+            PolicyPanel.IsVisible    = target == PolicyPanel;
         }
 
         private static WasmPolicyChecker? TryLoadPolicyChecker()
@@ -464,6 +467,54 @@ namespace NodeKit.UI
             catch (Exception ex)
             {
                 Dispatcher.UIThread.Post(() => StatusBar.Text = $"목록 조회 오류: {ex.Message}");
+            }
+#pragma warning restore CA1031
+        }
+
+        private async System.Threading.Tasks.Task LoadDataListAsync()
+        {
+            var address = CatalogAddressBox.Text?.Trim();
+            if (string.IsNullOrEmpty(address))
+            {
+                StatusBar.Text = "오류: Catalog 주소를 입력하세요.";
+                return;
+            }
+
+            StatusBar.Text = "데이터 목록 조회 중...";
+            var catalogClient = GetCatalogClient(address);
+
+            try
+            {
+                var dataList = await catalogClient.ListDataAsync().ConfigureAwait(false);
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (dataList.Count == 0)
+                    {
+                        DataListEmptyPanel.IsVisible = true;
+                        DataListItems.ItemsSource = null;
+                    }
+                    else
+                    {
+                        DataListEmptyPanel.IsVisible = false;
+                        DataListItems.ItemsSource = dataList
+                            .Select(d =>
+                            {
+                                var label = string.IsNullOrEmpty(d.DisplayLabel) ? d.DataName : d.DisplayLabel;
+                                var fmt = string.IsNullOrEmpty(d.Format) ? string.Empty : $"  [{d.Format}]";
+                                var cat = string.IsNullOrEmpty(d.DisplayCategory) ? string.Empty : $"  [{d.DisplayCategory}]";
+                                var health = d.IntegrityHealth;
+                                return $"{label}{fmt}{cat}  phase:{d.LifecyclePhase}  health:{health}  cas:{d.CasHash[..Math.Min(12, d.CasHash.Length)]}  등록:{d.RegisteredAt:yyyy-MM-dd HH:mm}";
+                            })
+                            .ToList();
+                    }
+
+                    StatusBar.Text = $"데이터 목록: {dataList.Count}개";
+                });
+            }
+#pragma warning disable CA1031
+            catch (Exception ex)
+            {
+                Dispatcher.UIThread.Post(() => StatusBar.Text = $"데이터 목록 조회 오류: {ex.Message}");
             }
 #pragma warning restore CA1031
         }
