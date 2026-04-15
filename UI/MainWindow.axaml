@@ -57,12 +57,12 @@
             <Grid ColumnDefinitions="*,12,160">
               <StackPanel Grid.Column="0" Spacing="4">
                 <TextBlock Text="Tool 이름" Foreground="#aaa" FontSize="12"/>
-                <TextBox Name="ToolNameBox" Watermark="예: bwa-mem" Background="#1e1d2e" Foreground="White"
+                <TextBox Name="ToolNameBox" PlaceholderText="예: bwa-mem" Background="#1e1d2e" Foreground="White"
                          BorderBrush="#333" Padding="8"/>
               </StackPanel>
               <StackPanel Grid.Column="2" Spacing="4">
                 <TextBlock Text="버전" Foreground="#aaa" FontSize="12"/>
-                <TextBox Name="ToolVersionBox" Watermark="예: 0.7.17" Background="#1e1d2e" Foreground="White"
+                <TextBox Name="ToolVersionBox" PlaceholderText="예: 0.7.17" Background="#1e1d2e" Foreground="White"
                          BorderBrush="#333" Padding="8"/>
               </StackPanel>
             </Grid>
@@ -71,7 +71,7 @@
             <StackPanel Spacing="4">
               <TextBlock Text="컨테이너 이미지 URI (digest 포함 필수)" Foreground="#aaa" FontSize="12"/>
               <TextBox Name="ImageUriBox"
-                       Watermark="예: registry.example.com/bwa-mem:0.7.17@sha256:abc123..."
+                       PlaceholderText="예: registry.example.com/bwa-mem:0.7.17@sha256:abc123..."
                        Background="#1e1d2e" Foreground="White" BorderBrush="#333" Padding="8"/>
             </StackPanel>
 
@@ -79,7 +79,7 @@
             <StackPanel Spacing="4">
               <TextBlock Text="Dockerfile" Foreground="#aaa" FontSize="12"/>
               <TextBox Name="DockerfileBox" AcceptsReturn="True" Height="120"
-                       Watermark="FROM ubuntu:22.04 AS builder&#10;RUN apt-get install -y ..."
+                       PlaceholderText="FROM ubuntu:22.04 AS builder&#10;RUN apt-get install -y ..."
                        Background="#1e1d2e" Foreground="White" BorderBrush="#333"
                        Padding="8" FontFamily="Monospace"/>
             </StackPanel>
@@ -98,7 +98,7 @@
               <TextBlock TextWrapping="Wrap" FontSize="10" Foreground="#666"
                          Text="Dockerfile ENTRYPOINT가 아닌 CMD를 K8s Job 제출 시 교체합니다. podbridge5 executor 패턴 기준. JSON 배열 형식 입력."/>
               <TextBox Name="CommandBox" FontFamily="Monospace"
-                       Watermark='예: ["/bin/sh", "-c", "/app/executor.sh"]'
+                       PlaceholderText='예: ["/bin/sh", "-c", "/app/executor.sh"]'
                        Background="#1e1d2e" Foreground="White" BorderBrush="#333" Padding="8"/>
             </StackPanel>
 
@@ -163,12 +163,12 @@
                 <Grid ColumnDefinitions="*,12,160">
                   <StackPanel Grid.Column="0" Spacing="4">
                     <TextBlock Text="레이블 (UI 카드 제목)" Foreground="#aaa" FontSize="11"/>
-                    <TextBox Name="DisplayLabelBox" Watermark="예: BWA-MEM 0.7.17"
+                    <TextBox Name="DisplayLabelBox" PlaceholderText="예: BWA-MEM 0.7.17"
                              Background="#1e1d2e" Foreground="White" BorderBrush="#2a2a40" Padding="7"/>
                   </StackPanel>
                   <StackPanel Grid.Column="2" Spacing="4">
                     <TextBlock Text="카테고리" Foreground="#aaa" FontSize="11"/>
-                    <TextBox Name="DisplayCategoryBox" Watermark="예: Alignment"
+                    <TextBox Name="DisplayCategoryBox" PlaceholderText="예: Alignment"
                              Background="#1e1d2e" Foreground="White" BorderBrush="#2a2a40" Padding="7"/>
                   </StackPanel>
                 </Grid>
@@ -177,14 +177,14 @@
                 <StackPanel Spacing="4">
                   <TextBlock Text="설명 (툴팁)" Foreground="#aaa" FontSize="11"/>
                   <TextBox Name="DisplayDescriptionBox"
-                           Watermark="예: paired-end FASTQ → coordinate-sorted BAM"
+                           PlaceholderText="예: paired-end FASTQ → coordinate-sorted BAM"
                            Background="#1e1d2e" Foreground="White" BorderBrush="#2a2a40" Padding="7"/>
                 </StackPanel>
 
                 <!-- 태그 -->
                 <StackPanel Spacing="4">
                   <TextBlock Text="태그 (쉼표 구분)" Foreground="#aaa" FontSize="11"/>
-                  <TextBox Name="DisplayTagsBox" Watermark="예: dna, alignment, bwa, short-read"
+                  <TextBox Name="DisplayTagsBox" PlaceholderText="예: dna, alignment, bwa, short-read"
                            Background="#1e1d2e" Foreground="White" BorderBrush="#2a2a40" Padding="7"/>
                 </StackPanel>
               </StackPanel>
