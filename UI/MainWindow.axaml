@@ -206,10 +206,17 @@
               <TextBlock Text="✓ L1 검증 통과" Foreground="#2ecc71" FontSize="13" FontWeight="SemiBold"/>
             </Border>
 
-            <!-- NodeForge 주소 -->
+            <!-- NodeForge 주소 (gRPC — Build / Policy) -->
             <StackPanel Spacing="4">
-              <TextBlock Text="NodeForge 주소" Foreground="#aaa" FontSize="12"/>
+              <TextBlock Text="NodeForge 주소 (gRPC)" Foreground="#aaa" FontSize="12"/>
               <TextBox Name="NodeForgeAddressBox" Text="http://100.123.80.48:50051"
+                       Background="#1e1d2e" Foreground="White" BorderBrush="#333" Padding="8"/>
+            </StackPanel>
+
+            <!-- Catalog 주소 (REST — 툴 목록 조회) -->
+            <StackPanel Spacing="4">
+              <TextBlock Text="Catalog 주소 (REST)" Foreground="#aaa" FontSize="12"/>
+              <TextBox Name="CatalogAddressBox" Text="http://100.123.80.48:8080"
                        Background="#1e1d2e" Foreground="White" BorderBrush="#333" Padding="8"/>
             </StackPanel>
 

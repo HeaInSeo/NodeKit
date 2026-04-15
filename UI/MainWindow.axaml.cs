@@ -26,12 +26,12 @@ namespace NodeKit.UI
 #pragma warning disable CA1001 // Disposed in OnWindowClosed (Window has no IDisposable)
         private WasmPolicyChecker? _policyChecker;
         private GrpcBuildClient? _buildClient;
-        private GrpcToolRegistryClient? _toolRegistryClient;
+        private HttpCatalogClient? _catalogClient;
         private GrpcPolicyBundleProvider? _policyProvider;
         private CancellationTokenSource? _buildCts;
 #pragma warning restore CA1001
         private string? _buildClientAddress;
-        private string? _toolRegistryClientAddress;
+        private string? _catalogClientAddress;
         private string? _policyProviderAddress;
 
         public MainWindow()
@@ -424,15 +424,15 @@ namespace NodeKit.UI
 
         private async System.Threading.Tasks.Task LoadToolListAsync()
         {
-            var address = NodeForgeAddressBox.Text?.Trim();
+            var address = CatalogAddressBox.Text?.Trim();
             if (string.IsNullOrEmpty(address))
             {
-                StatusBar.Text = "오류: NodeForge 주소를 입력하세요.";
+                StatusBar.Text = "오류: Catalog 주소를 입력하세요.";
                 return;
             }
 
             StatusBar.Text = "툴 목록 조회 중...";
-            var toolRegistryClient = GetToolRegistryClient(address);
+            var toolRegistryClient = GetCatalogClient(address);
 
             try
             {
@@ -537,7 +537,7 @@ namespace NodeKit.UI
             _buildCts?.Cancel();
             _buildCts?.Dispose();
             _buildClient?.Dispose();
-            _toolRegistryClient?.Dispose();
+            _catalogClient?.Dispose();
             _policyProvider?.Dispose();
             _policyChecker?.Dispose();
         }
@@ -623,16 +623,16 @@ namespace NodeKit.UI
             return _buildClient;
         }
 
-        private GrpcToolRegistryClient GetToolRegistryClient(string address)
+        private HttpCatalogClient GetCatalogClient(string address)
         {
-            if (_toolRegistryClient == null || !string.Equals(_toolRegistryClientAddress, address, StringComparison.Ordinal))
+            if (_catalogClient == null || !string.Equals(_catalogClientAddress, address, StringComparison.Ordinal))
             {
-                _toolRegistryClient?.Dispose();
-                _toolRegistryClient = new GrpcToolRegistryClient(address);
-                _toolRegistryClientAddress = address;
+                _catalogClient?.Dispose();
+                _catalogClient = new HttpCatalogClient(address);
+                _catalogClientAddress = address;
             }
 
-            return _toolRegistryClient;
+            return _catalogClient;
         }
 
         private GrpcPolicyBundleProvider GetPolicyProvider(string address)
