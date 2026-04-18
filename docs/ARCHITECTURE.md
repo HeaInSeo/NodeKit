@@ -5,6 +5,8 @@
 상태: 현재 구현 기준
 
 관련 문서:
+- **[PLATFORM_MAP.md](../../NodeForge/docs/PLATFORM_MAP.md)** — 전체 플랫폼 구성, end-to-end 흐름, 현재 상태 (개발 세션 시작 시 먼저 읽을 것)
+  - 절대 경로: `/opt/go/src/github.com/HeaInSeo/NodeForge/docs/PLATFORM_MAP.md`
 - [CLAUDE.md](../CLAUDE.md) — 책임 경계, 재현성 규칙, 결정 체크리스트 (규범 문서)
 - [NODEKIT_UI_STRUCTURE.md](NODEKIT_UI_STRUCTURE.md) — UI 패널 상세 구조 및 흐름
 - [NODEKIT_BUILD_BOOTSTRAP.md](NODEKIT_BUILD_BOOTSTRAP.md) — 빌드 환경 설정
