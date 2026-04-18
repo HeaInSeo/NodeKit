@@ -1,7 +1,7 @@
 # NodeKit UI 구조 및 흐름
 
-버전: 1.0.0
-작성일: 2026-04-15
+버전: 1.0.1
+작성일: 2026-04-15 / 갱신: 2026-04-18
 상태: **확정**
 
 ---
@@ -102,8 +102,8 @@ ValidateButton click
     → violations.Count > 0: ValidationResultPanel 표시
     → violations.Count == 0: ValidationPassPanel 표시, SendBuildButton 활성화
     → SendBuildButton click
-    → BuildRequestFactory.Create(toolDef)
-    → GrpcToolRegistryClient.SendBuildRequestAsync(req)
+    → BuildRequestFactory.FromToolDefinition(toolDef)
+    → GrpcBuildClient.BuildAndRegisterAsync(req)
     → 스트림 수신 → BuildLogBox append
     → 완료 → BuildSuccessPanel 표시
 ```
@@ -211,8 +211,10 @@ ReloadBundleButton 클릭
 | 의존 대상 | 방향 | 용도 |
 |-----------|------|------|
 | `WasmPolicyChecker` | NodeKit → DockGuard .wasm | L1 정책 실행 |
-| `GrpcToolRegistryClient` | NodeKit → NodeForge gRPC | BuildRequest 전송 |
+| `GrpcBuildClient` | NodeKit → NodeForge BuildService gRPC | BuildRequest 전송 + 빌드 이벤트 수신 |
+| `GrpcPolicyBundleProvider` | NodeKit → NodeForge PolicyService gRPC | 정책 번들 동적 로드 및 목록 조회 |
 | `HttpCatalogClient` | NodeKit → Catalog REST | Tool/Data 목록 조회 (read-only) |
+| `GrpcToolRegistryClient` | — | **레거시 — MainWindow에서 미사용**. `HttpCatalogClient`로 대체됨 |
 
 **금지**: NodeKit은 NodeVault 내부 저장 구조(index, CAS 파일)를 직접 알지 않는다.
 **금지**: NodeKit은 K8s API / Job 스케줄링 / 이미지 빌드 로직을 가지지 않는다.
@@ -229,7 +231,9 @@ ReloadBundleButton 클릭
 | `DataRegisterRequest` | `src/Grpc/DataRegisterRequest.cs` | Data gRPC 전송 모델 |
 | `RegisteredTool` | `src/Grpc/GrpcToolRegistryClient.cs` | Catalog 조회 결과 |
 | `RegisteredData` | `src/Grpc/HttpCatalogClient.cs` | Catalog 조회 결과 |
-| `IToolRegistryClient` | `src/Grpc/IToolRegistryClient.cs` | Catalog 클라이언트 인터페이스 |
-| `HttpCatalogClient` | `src/Grpc/HttpCatalogClient.cs` | Catalog REST 클라이언트 |
+| `IToolRegistryClient` | `src/Grpc/GrpcToolRegistryClient.cs` | Catalog 클라이언트 인터페이스 (별도 파일 없음) |
+| `HttpCatalogClient` | `src/Grpc/HttpCatalogClient.cs` | Catalog REST 클라이언트 (`IToolRegistryClient` 구현) |
+| `GrpcBuildClient` | `src/Grpc/GrpcBuildClient.cs` | BuildService gRPC 클라이언트 |
+| `IBuildClient` | `src/Grpc/IBuildClient.cs` | Build 클라이언트 인터페이스 |
 | `WasmPolicyChecker` | `src/Policy/WasmPolicyChecker.cs` | L1 정책 실행기 |
 | `MainWindow` | `UI/MainWindow.axaml(.cs)` | 메인 윈도우 code-behind |
