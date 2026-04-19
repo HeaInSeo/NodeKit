@@ -13,6 +13,7 @@ namespace NodeKit.Grpc
         /// </summary>
         public static DataRegisterRequest FromDataDefinition(DataDefinition def)
         {
+            ArgumentNullException.ThrowIfNull(def);
             return new DataRegisterRequest
             {
                 DataDefinitionId  = def.Id,

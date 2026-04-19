@@ -42,6 +42,7 @@ namespace NodeKit.Grpc
             BuildRequest request,
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
+            ArgumentNullException.ThrowIfNull(request);
             var grpcRequest = ToProto(request);
             using var call = _client.BuildAndRegister(grpcRequest, cancellationToken: cancellationToken);
 

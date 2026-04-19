@@ -97,6 +97,7 @@ namespace NodeKit.Grpc
 
         public HttpCatalogClient(string catalogBaseUrl)
         {
+            ArgumentNullException.ThrowIfNull(catalogBaseUrl);
             _baseUrl = catalogBaseUrl.TrimEnd('/');
             _http = new HttpClient
             {
