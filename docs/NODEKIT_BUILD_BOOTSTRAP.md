@@ -1,7 +1,7 @@
 # NodeKit Build Bootstrap
 
 작성일: 2026-04-08  
-최종 수정: 2026-04-18
+최종 수정: 2026-04-19
 
 ---
 
@@ -11,36 +11,30 @@
 
 현재 NodeKit은 두 가지 외부 입력을 전제한다.
 
-* `api-protos` 저장소의 `nodeforge.proto` (proto 컴파일 용도)
+* `NodeForge/protos/` 의 `nodeforge.proto` (proto 컴파일 용도) ← api-protos Sprint 1-4 완료, canonical 이관
 * `DockGuard` 저장소의 Dockerfile 정책 디렉터리 (dockguard.wasm 생성 용도)
 
 ---
 
-## 1. api-protos 설정
+## 1. proto 소스 경로 설정
 
-### 현재 상태 (2026-04-18)
+### 현재 상태 (2026-04-19)
 
-**api-protos는 freeze 상태다.** `nodeforge.proto`를 포함한 proto 파일들이 NodeForge 저장소로 이관 작업 중이며, 이관 완료 전까지 `api-protos` 경로를 계속 사용한다.
-
-- 이관 계획: NodeForge `docs/PROTO_OWNERSHIP_SPRINT_PLAN.md` Sprint 3/4
-- 이관 후: `NodeForge/protos/nodeforge/v1/nodeforge.proto` 경로 사용
-- 이관 전까지: 아래 `api-protos` 경로 그대로 사용
+**api-protos Sprint 1-4 완료.** `nodeforge.proto` canonical 경로는 `NodeForge/protos/nodeforge/v1/`이다.
+`NodeKit.csproj`는 이제 `NodeForge/protos/`를 자동 탐지 기준으로 사용한다.
 
 ### 경로 설정
 
 `NodeKit.csproj`는 `ApiProtosRoot` MSBuild 속성 아래에서 `nodeforge/v1/nodeforge.proto`를 찾는다.
 
-허용되는 방식은 두 가지다.
-
-1. 기본 탐지 경로 사용 (아래 중 하나가 있으면 자동 감지)
-   * `/opt/go/src/github.com/HeaInSeo/api-protos/protos`
-   * `../api-protos/protos` (NodeKit 저장소 옆에 `api-protos`를 둔 경우)
+1. 기본 탐지 경로 사용 (자동 감지)
+   * `/opt/go/src/github.com/HeaInSeo/NodeForge/protos` ← canonical
 
 2. 명시적으로 경로 지정
 
 ```bash
-dotnet test NodeKit.sln /p:ApiProtosRoot=/path/to/api-protos/protos
-dotnet build NodeKit.sln /p:ApiProtosRoot=/path/to/api-protos/protos
+dotnet test NodeKit.sln /p:ApiProtosRoot=/opt/go/src/github.com/HeaInSeo/NodeForge/protos
+dotnet build NodeKit.sln /p:ApiProtosRoot=/opt/go/src/github.com/HeaInSeo/NodeForge/protos
 ```
 
 `ApiProtosRoot`가 비어 있거나 `nodeforge.proto`가 없으면 빌드가 명확한 에러 메시지와 함께 중단된다.
@@ -71,9 +65,9 @@ make policy DOCKGUARD=/path/to/DockGuard/policy/dockerfile
 
 ### 버전 정합성
 
-NodeKit, `api-protos`, NodeForge의 proto 스키마가 일치해야 한다:
-- `BuildRequest`, `RegisterToolRequest`, `RegisteredToolDefinition` 필드가 세 저장소 모두 같아야 함
-- api-protos freeze 기간 중에는 proto 변경 없이 현 상태를 유지
+NodeKit과 NodeForge의 proto 스키마가 일치해야 한다:
+- `BuildRequest`, `RegisterToolRequest`, `RegisteredToolDefinition` 필드가 두 저장소 모두 같아야 함
+- proto 변경 시 NodeForge `protos/nodeforge/v1/nodeforge.proto` 수정 후 NodeKit 재빌드 필요
 
 ### compiler warning
 
@@ -85,16 +79,16 @@ CLAUDE.md §8 기준 위반 — 다음 작업 전 해소 필요.
 ## 4. 권장 부트스트랩 순서
 
 ```bash
-# 1. proto 빌드 (api-protos 경로 지정)
-dotnet test NodeKit.sln /p:ApiProtosRoot=/opt/go/src/github.com/HeaInSeo/api-protos/protos
+# 1. 빌드 (NodeForge/protos/ 자동 탐지됨 — 경로 지정 불필요)
+dotnet build NodeKit.sln
 
 # 2. DockGuard .wasm 번들 생성 (DockGuard 저장소 경로 지정)
 make policy DOCKGUARD=/opt/dotnet/src/github.com/HeaInSeo/DockGuard/policy/dockerfile
 
-# 3. 최종 빌드
-dotnet build NodeKit.sln /p:ApiProtosRoot=/opt/go/src/github.com/HeaInSeo/api-protos/protos
+# 3. 테스트
+dotnet test NodeKit.sln
 ```
 
 현재 개발 환경 경로:
-- api-protos: `/opt/go/src/github.com/HeaInSeo/api-protos`
+- NodeForge protos: `/opt/go/src/github.com/HeaInSeo/NodeForge/protos` (canonical)
 - DockGuard: `/opt/dotnet/src/github.com/HeaInSeo/DockGuard`

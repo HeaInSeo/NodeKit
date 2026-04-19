@@ -11,15 +11,13 @@
     <AnalysisMode>All</AnalysisMode>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(ApiProtosRoot)' == '' and Exists('/opt/go/src/github.com/HeaInSeo/api-protos/protos')">
-    <ApiProtosRoot>/opt/go/src/github.com/HeaInSeo/api-protos/protos</ApiProtosRoot>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(ApiProtosRoot)' == '' and Exists('$(MSBuildProjectDirectory)/../api-protos/protos')">
-    <ApiProtosRoot>$(MSBuildProjectDirectory)/../api-protos/protos</ApiProtosRoot>
+  <!-- NodeForge/protos/ が canonical source (api-protos Sprint 1-4 완료) -->
+  <PropertyGroup Condition="'$(ApiProtosRoot)' == '' and Exists('/opt/go/src/github.com/HeaInSeo/NodeForge/protos')">
+    <ApiProtosRoot>/opt/go/src/github.com/HeaInSeo/NodeForge/protos</ApiProtosRoot>
   </PropertyGroup>
   <Target Name="ValidateApiProtosRoot" BeforeTargets="PrepareForBuild">
     <Error Condition="'$(ApiProtosRoot)' == ''"
-           Text="ApiProtosRoot is not set. Set /p:ApiProtosRoot=/path/to/api-protos/protos or place api-protos beside NodeKit." />
+           Text="ApiProtosRoot is not set. Set /p:ApiProtosRoot=/opt/go/src/github.com/HeaInSeo/NodeForge/protos or equivalent." />
     <Error Condition="!Exists('$(ApiProtosRoot)/nodeforge/v1/nodeforge.proto')"
            Text="nodeforge.proto not found under ApiProtosRoot='$(ApiProtosRoot)'. Expected '$(ApiProtosRoot)/nodeforge/v1/nodeforge.proto'." />
   </Target>

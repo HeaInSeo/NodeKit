@@ -181,7 +181,7 @@ NavToolListButton / NavDataListButton 클릭
 
 | 외부 의존성 | 용도 | 경로 |
 |-------------|------|------|
-| `api-protos` 저장소 | `nodeforge.proto` 빌드 시 proto 컴파일 | `ApiProtosRoot` MSBuild 속성 |
+| `NodeForge/protos/` | `nodeforge.proto` 빌드 시 proto 컴파일 | `ApiProtosRoot` MSBuild 속성 (자동 탐지) |
 | `DockGuard` 저장소 | `dockguard.wasm` 번들 생성 | `make policy DOCKGUARD=...` |
 
-api-protos는 현재 freeze 상태. 정리 완료 후 NodeForge/protos/ 경로로 전환.
+api-protos Sprint 1-4 완료. canonical source는 `NodeForge/protos/nodeforge/v1/`.
