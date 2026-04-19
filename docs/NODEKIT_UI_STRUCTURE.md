@@ -211,8 +211,8 @@ ReloadBundleButton 클릭
 | 의존 대상 | 방향 | 용도 |
 |-----------|------|------|
 | `WasmPolicyChecker` | NodeKit → DockGuard .wasm | L1 정책 실행 |
-| `GrpcBuildClient` | NodeKit → NodeForge BuildService gRPC | BuildRequest 전송 + 빌드 이벤트 수신 |
-| `GrpcPolicyBundleProvider` | NodeKit → NodeForge PolicyService gRPC | 정책 번들 동적 로드 및 목록 조회 |
+| `GrpcBuildClient` | NodeKit → NodeVault BuildService gRPC | BuildRequest 전송 + 빌드 이벤트 수신 |
+| `GrpcPolicyBundleProvider` | NodeKit → NodeVault PolicyService gRPC | 정책 번들 동적 로드 및 목록 조회 |
 | `HttpCatalogClient` | NodeKit → Catalog REST | Tool/Data 목록 조회 (read-only) |
 | `GrpcToolRegistryClient` | — | **레거시 — MainWindow에서 미사용**. `HttpCatalogClient`로 대체됨 |
 

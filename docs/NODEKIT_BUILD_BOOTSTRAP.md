@@ -11,7 +11,7 @@
 
 현재 NodeKit은 두 가지 외부 입력을 전제한다.
 
-* `NodeForge/protos/` 의 `nodeforge.proto` (proto 컴파일 용도) ← api-protos Sprint 1-4 완료, canonical 이관
+* `NodeVault/protos/` 의 `nodeforge.proto` (proto 컴파일 용도) ← api-protos Sprint 1-4 완료, canonical 이관
 * `DockGuard` 저장소의 Dockerfile 정책 디렉터리 (dockguard.wasm 생성 용도)
 
 ---
@@ -20,8 +20,8 @@
 
 ### 현재 상태 (2026-04-19)
 
-**api-protos Sprint 1-4 완료.** `nodeforge.proto` canonical 경로는 `NodeForge/protos/nodeforge/v1/`이다.
-`NodeKit.csproj`는 이제 `NodeForge/protos/`를 자동 탐지 기준으로 사용한다.
+**api-protos Sprint 1-4 완료.** `nodeforge.proto` canonical 경로는 `NodeVault/protos/nodeforge/v1/`이다.
+`NodeKit.csproj`는 이제 `NodeVault/protos/`를 자동 탐지 기준으로 사용한다.
 
 ### 경로 설정
 
@@ -79,7 +79,7 @@ CLAUDE.md §8 기준 위반 — 다음 작업 전 해소 필요.
 ## 4. 권장 부트스트랩 순서
 
 ```bash
-# 1. 빌드 (NodeForge/protos/ 자동 탐지됨 — 경로 지정 불필요)
+# 1. 빌드 (NodeVault/protos/ 자동 탐지됨 — 경로 지정 불필요)
 dotnet build NodeKit.sln
 
 # 2. DockGuard .wasm 번들 생성 (DockGuard 저장소 경로 지정)

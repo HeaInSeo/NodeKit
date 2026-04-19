@@ -11,13 +11,17 @@
     <AnalysisMode>All</AnalysisMode>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
-  <!-- NodeForge/protos/ が canonical source (api-protos Sprint 1-4 완료) -->
+  <!-- NodeVault/protos/ が canonical source (api-protos Sprint 1-4 완료, repo renamed NodeForge→NodeVault) -->
+  <PropertyGroup Condition="'$(ApiProtosRoot)' == '' and Exists('/opt/go/src/github.com/HeaInSeo/NodeVault/protos')">
+    <ApiProtosRoot>/opt/go/src/github.com/HeaInSeo/NodeVault/protos</ApiProtosRoot>
+  </PropertyGroup>
+  <!-- 로컬 디렉토리가 아직 NodeForge인 경우 (GitHub repo rename 전) -->
   <PropertyGroup Condition="'$(ApiProtosRoot)' == '' and Exists('/opt/go/src/github.com/HeaInSeo/NodeForge/protos')">
     <ApiProtosRoot>/opt/go/src/github.com/HeaInSeo/NodeForge/protos</ApiProtosRoot>
   </PropertyGroup>
   <Target Name="ValidateApiProtosRoot" BeforeTargets="PrepareForBuild">
     <Error Condition="'$(ApiProtosRoot)' == ''"
-           Text="ApiProtosRoot is not set. Set /p:ApiProtosRoot=/opt/go/src/github.com/HeaInSeo/NodeForge/protos or equivalent." />
+           Text="ApiProtosRoot is not set. Set /p:ApiProtosRoot=/opt/go/src/github.com/HeaInSeo/NodeVault/protos or equivalent." />
     <Error Condition="!Exists('$(ApiProtosRoot)/nodeforge/v1/nodeforge.proto')"
            Text="nodeforge.proto not found under ApiProtosRoot='$(ApiProtosRoot)'. Expected '$(ApiProtosRoot)/nodeforge/v1/nodeforge.proto'." />
   </Target>

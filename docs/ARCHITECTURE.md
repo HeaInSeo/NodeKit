@@ -5,8 +5,8 @@
 상태: 현재 구현 기준
 
 관련 문서:
-- **[PLATFORM_MAP.md](../../NodeForge/docs/PLATFORM_MAP.md)** — 전체 플랫폼 구성, end-to-end 흐름, 현재 상태 (개발 세션 시작 시 먼저 읽을 것)
-  - 절대 경로: `/opt/go/src/github.com/HeaInSeo/NodeForge/docs/PLATFORM_MAP.md`
+- **[PLATFORM_MAP.md](../../NodeVault/docs/PLATFORM_MAP.md)** — 전체 플랫폼 구성, end-to-end 흐름, 현재 상태 (개발 세션 시작 시 먼저 읽을 것)
+  - 절대 경로: `/opt/go/src/github.com/HeaInSeo/NodeVault/docs/PLATFORM_MAP.md`
 - [CLAUDE.md](../CLAUDE.md) — 책임 경계, 재현성 규칙, 결정 체크리스트 (규범 문서)
 - [NODEKIT_UI_STRUCTURE.md](NODEKIT_UI_STRUCTURE.md) — UI 패널 상세 구조 및 흐름
 - [NODEKIT_BUILD_BOOTSTRAP.md](NODEKIT_BUILD_BOOTSTRAP.md) — 빌드 환경 설정
@@ -15,7 +15,7 @@
 
 ## 역할 한 줄 정의
 
-관리자가 Tool/Data를 정의하고 L1 검증을 수행한 뒤 NodeForge(NodeVault)로 빌드 요청을 전송하는 **관리자 전용 데스크톱 클라이언트**.
+관리자가 Tool/Data를 정의하고 L1 검증을 수행한 뒤 NodeVault로 빌드 요청을 전송하는 **관리자 전용 데스크톱 클라이언트**.
 
 ---
 
@@ -61,8 +61,8 @@
 
 | 연결 대상 | 프로토콜 | UI 기본값 | 운영 주소 |
 |-----------|---------|-----------|-----------|
-| NodeForge BuildService | gRPC | `http://100.123.80.48:50051` | `http://nodeforge.10.113.24.96.nip.io:80` |
-| NodeForge PolicyService | gRPC | 위와 동일 (`NodeForgeAddressBox`) | 위와 동일 |
+| NodeVault BuildService | gRPC | `http://100.123.80.48:50051` | `http://nodevault.10.113.24.96.nip.io:80` |
+| NodeVault PolicyService | gRPC | 위와 동일 (`NodeForgeAddressBox`) | 위와 동일 |
 | Catalog REST API | HTTP | `http://100.123.80.48:8080` | `http://100.123.80.48:8080` |
 
 > UI에 직접 입력하는 방식이므로 기본값이 달라도 사용자가 변경 가능하다.
@@ -93,7 +93,7 @@ ToolDefinition (초안 모델)
 BuildRequest (proto)
   │ gRPC stream
   ▼
-[NodeForge BuildService]
+[NodeVault BuildService]
   → L2(podbridge5) → L3(dry-run) → L4(smoke) → index 등록
   → BuildEvent stream →
   ▼
@@ -109,7 +109,7 @@ BuildRequest (proto)
   LocalFilePolicyBundleProvider → assets/policy/dockguard.wasm → WasmPolicyChecker
 
 런타임 갱신 (PolicyPanel):
-  GrpcPolicyBundleProvider.GetBundleAsync() → NodeForge PolicyService
+  GrpcPolicyBundleProvider.GetBundleAsync() → NodeVault PolicyService
     → 새 .wasm 번들 수신 → WasmPolicyChecker.ReloadAsync()
 
 IPolicyBundleProvider 인터페이스가 두 Provider를 추상화.
@@ -127,7 +127,7 @@ NavToolListButton / NavDataListButton 클릭
   → UI 카드 표시
 ```
 
-`lifecycle_phase = Active` 항목만 반환됨 (NodeForge 서버 측 필터).
+`lifecycle_phase = Active` 항목만 반환됨 (NodeVault 서버 측 필터).
 
 ---
 
@@ -160,7 +160,6 @@ NavToolListButton / NavDataListButton 클릭
 |------|------|-----------|
 | DataRegisterRequest UI 연결 | DataPanel에 입력 폼 없음 | NodeVault P3 TODO-12 |
 | DataRegisterRequest gRPC 전송 | Factory 존재하나 UI 미연결 | NodeVault P3 TODO-12 |
-| api-protos 경로 → NodeForge/protos/ 전환 | api-protos freeze 해제 후 | PROTO_OWNERSHIP_SPRINT_PLAN |
 
 ---
 
@@ -181,7 +180,7 @@ NavToolListButton / NavDataListButton 클릭
 
 | 외부 의존성 | 용도 | 경로 |
 |-------------|------|------|
-| `NodeForge/protos/` | `nodeforge.proto` 빌드 시 proto 컴파일 | `ApiProtosRoot` MSBuild 속성 (자동 탐지) |
+| `NodeVault/protos/` | `nodeforge.proto` 빌드 시 proto 컴파일 | `ApiProtosRoot` MSBuild 속성 (자동 탐지) |
 | `DockGuard` 저장소 | `dockguard.wasm` 번들 생성 | `make policy DOCKGUARD=...` |
 
-api-protos Sprint 1-4 완료. canonical source는 `NodeForge/protos/nodeforge/v1/`.
+api-protos Sprint 1-4 완료. canonical source는 `NodeVault/protos/nodeforge/v1/`.
