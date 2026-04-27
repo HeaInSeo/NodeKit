@@ -11,13 +11,13 @@
     <AnalysisMode>All</AnalysisMode>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
-  <!-- NodeVault/protos/ が canonical source (api-protos Sprint 1-4 완료, repo renamed NodeForge→NodeVault) -->
+  <!-- 1순위: NodeKit 저장소 내 벤더링된 proto (독립 빌드 — NodeVault 불필요) -->
+  <PropertyGroup Condition="'$(ApiProtosRoot)' == '' and Exists('$(MSBuildProjectDirectory)/protos')">
+    <ApiProtosRoot>$(MSBuildProjectDirectory)/protos</ApiProtosRoot>
+  </PropertyGroup>
+  <!-- 2순위: 개발 장비에 NodeVault 저장소가 함께 있는 경우 -->
   <PropertyGroup Condition="'$(ApiProtosRoot)' == '' and Exists('/opt/go/src/github.com/HeaInSeo/NodeVault/protos')">
     <ApiProtosRoot>/opt/go/src/github.com/HeaInSeo/NodeVault/protos</ApiProtosRoot>
-  </PropertyGroup>
-  <!-- 로컬 디렉토리가 아직 NodeForge인 경우 (GitHub repo rename 전) -->
-  <PropertyGroup Condition="'$(ApiProtosRoot)' == '' and Exists('/opt/go/src/github.com/HeaInSeo/NodeForge/protos')">
-    <ApiProtosRoot>/opt/go/src/github.com/HeaInSeo/NodeForge/protos</ApiProtosRoot>
   </PropertyGroup>
   <Target Name="ValidateApiProtosRoot" BeforeTargets="PrepareForBuild">
     <Error Condition="'$(ApiProtosRoot)' == ''"
