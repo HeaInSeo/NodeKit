@@ -6,7 +6,7 @@ using System.Text.Json;
 using System.Threading;
 using Grpc.Core;
 using Grpc.Net.Client;
-using Nodeforge.V1;
+using Nodevault.V1;
 using NodeKit.Authoring;
 
 namespace NodeKit.Grpc
@@ -54,9 +54,9 @@ namespace NodeKit.Grpc
             }
         }
 
-        private static Nodeforge.V1.BuildRequest ToProto(BuildRequest r)
+        private static Nodevault.V1.BuildRequest ToProto(BuildRequest r)
         {
-            var proto = new Nodeforge.V1.BuildRequest
+            var proto = new Nodevault.V1.BuildRequest
             {
                 RequestId = r.RequestId,
                 ToolDefinitionId = r.ToolDefinitionId.ToString(),
@@ -103,7 +103,7 @@ namespace NodeKit.Grpc
             Class = o.Class,
         };
 
-        private static BuildEvent FromProto(Nodeforge.V1.BuildEvent ev)
+        private static BuildEvent FromProto(Nodevault.V1.BuildEvent ev)
         {
             return new BuildEvent
             {
@@ -114,15 +114,15 @@ namespace NodeKit.Grpc
             };
         }
 
-        private static BuildEventKind MapKind(Nodeforge.V1.BuildEventKind kind) => kind switch
+        private static BuildEventKind MapKind(Nodevault.V1.BuildEventKind kind) => kind switch
         {
-            Nodeforge.V1.BuildEventKind.Log => BuildEventKind.Log,
-            Nodeforge.V1.BuildEventKind.JobCreated => BuildEventKind.JobCreated,
-            Nodeforge.V1.BuildEventKind.JobRunning => BuildEventKind.JobRunning,
-            Nodeforge.V1.BuildEventKind.PushSucceeded => BuildEventKind.RegistryPushSucceeded,
-            Nodeforge.V1.BuildEventKind.DigestAcquired => BuildEventKind.DigestAcquired,
-            Nodeforge.V1.BuildEventKind.Succeeded => BuildEventKind.Succeeded,
-            Nodeforge.V1.BuildEventKind.Failed => BuildEventKind.Failed,
+            Nodevault.V1.BuildEventKind.Log => BuildEventKind.Log,
+            Nodevault.V1.BuildEventKind.JobCreated => BuildEventKind.JobCreated,
+            Nodevault.V1.BuildEventKind.JobRunning => BuildEventKind.JobRunning,
+            Nodevault.V1.BuildEventKind.PushSucceeded => BuildEventKind.RegistryPushSucceeded,
+            Nodevault.V1.BuildEventKind.DigestAcquired => BuildEventKind.DigestAcquired,
+            Nodevault.V1.BuildEventKind.Succeeded => BuildEventKind.Succeeded,
+            Nodevault.V1.BuildEventKind.Failed => BuildEventKind.Failed,
             _ => BuildEventKind.Log,
         };
     }
