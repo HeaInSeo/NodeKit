@@ -22,8 +22,8 @@
   <Target Name="ValidateApiProtosRoot" BeforeTargets="PrepareForBuild">
     <Error Condition="'$(ApiProtosRoot)' == ''"
            Text="ApiProtosRoot is not set. Set /p:ApiProtosRoot=/opt/go/src/github.com/HeaInSeo/NodeVault/protos or equivalent." />
-    <Error Condition="!Exists('$(ApiProtosRoot)/nodeforge/v1/nodeforge.proto')"
-           Text="nodeforge.proto not found under ApiProtosRoot='$(ApiProtosRoot)'. Expected '$(ApiProtosRoot)/nodeforge/v1/nodeforge.proto'." />
+    <Error Condition="!Exists('$(ApiProtosRoot)/nodevault/v1/nodevault.proto')"
+           Text="nodevault.proto not found under ApiProtosRoot='$(ApiProtosRoot)'. Expected '$(ApiProtosRoot)/nodevault/v1/nodevault.proto'." />
   </Target>
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="12.0.1" />
@@ -61,9 +61,9 @@
     </Content>
   </ItemGroup>
 
-  <!-- NodeForge gRPC proto: Grpc.Tools로 C# 클라이언트 스텁 생성 -->
+  <!-- NodeVault gRPC proto: Grpc.Tools로 C# 클라이언트 스텁 생성 -->
   <ItemGroup>
-    <Protobuf Include="$(ApiProtosRoot)/nodeforge/v1/nodeforge.proto"
+    <Protobuf Include="$(ApiProtosRoot)/nodevault/v1/nodevault.proto"
               GrpcServices="Client"
               Access="Internal"
               ProtoRoot="$(ApiProtosRoot)" />
