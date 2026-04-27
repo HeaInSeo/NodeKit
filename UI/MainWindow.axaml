@@ -33,6 +33,11 @@
                 Background="Transparent" Foreground="White" Padding="10,8">
           정책 관리
         </Button>
+        <Separator Background="#333" Height="1" Margin="8,4"/>
+        <Button Name="NavSettingsButton" HorizontalAlignment="Stretch"
+                Background="Transparent" Foreground="#aaa" Padding="10,8">
+          ⚙ 서버 설정
+        </Button>
       </StackPanel>
     </Border>
 
@@ -210,27 +215,13 @@
               <TextBlock Text="✓ L1 검증 통과" Foreground="#2ecc71" FontSize="13" FontWeight="SemiBold"/>
             </Border>
 
-            <!-- NodeForge 주소 (gRPC — Build / Policy) -->
-            <StackPanel Spacing="4">
-              <TextBlock Text="NodeForge 주소 (gRPC)" Foreground="#aaa" FontSize="12"/>
-              <TextBox Name="NodeForgeAddressBox" Text="http://100.123.80.48:50051"
-                       Background="#1e1d2e" Foreground="White" BorderBrush="#333" Padding="8"/>
-            </StackPanel>
-
-            <!-- Catalog 주소 (REST — 툴 목록 조회) -->
-            <StackPanel Spacing="4">
-              <TextBlock Text="Catalog 주소 (REST)" Foreground="#aaa" FontSize="12"/>
-              <TextBox Name="CatalogAddressBox" Text="http://100.123.80.48:8080"
-                       Background="#1e1d2e" Foreground="White" BorderBrush="#333" Padding="8"/>
-            </StackPanel>
-
             <!-- 버튼 행 -->
             <StackPanel Orientation="Horizontal" Spacing="8">
               <Button Name="ValidateButton" Padding="16,8" Background="#2c3e88" Foreground="White">
                 L1 검증
               </Button>
               <Button Name="SendBuildButton" Padding="16,8" Background="#27ae60" Foreground="White" IsEnabled="False">
-                빌드 요청 전송 (NodeForge)
+                빌드 요청 전송 (NodeVault)
               </Button>
             </StackPanel>
 
@@ -358,6 +349,61 @@
                 번들 갱신 (WasmPolicyChecker 재로드)
               </Button>
             </StackPanel>
+
+          </StackPanel>
+        </ScrollViewer>
+
+        <!-- 서버 설정 패널 -->
+        <ScrollViewer Name="SettingsPanel" IsVisible="False" Padding="20">
+          <StackPanel Spacing="16" MaxWidth="620">
+
+            <TextBlock Text="서버 연결 설정" FontSize="18" FontWeight="SemiBold" Foreground="White"/>
+
+            <!-- 주소 입력 -->
+            <Border Background="#1e1d2e" BorderBrush="#444" BorderThickness="1" CornerRadius="6" Padding="16">
+              <StackPanel Spacing="12">
+                <TextBlock Text="연결 주소" FontSize="13" FontWeight="SemiBold" Foreground="#4a9eff"/>
+
+                <StackPanel Spacing="4">
+                  <TextBlock Text="NodeVault 주소 (gRPC — 빌드 / 정책 서비스)" Foreground="#aaa" FontSize="12"/>
+                  <TextBox Name="SettingsNodeVaultAddressBox"
+                           PlaceholderText="http://host:50051"
+                           Background="#12111a" Foreground="White" BorderBrush="#555" Padding="8"/>
+                </StackPanel>
+
+                <StackPanel Spacing="4">
+                  <TextBlock Text="Catalog 주소 (REST — Tool / Data 목록 조회)" Foreground="#aaa" FontSize="12"/>
+                  <TextBox Name="SettingsCatalogAddressBox"
+                           PlaceholderText="http://host:8080"
+                           Background="#12111a" Foreground="White" BorderBrush="#555" Padding="8"/>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <!-- 저장 버튼 -->
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Name="SaveSettingsButton" Padding="16,8" Background="#27ae60" Foreground="White">
+                저장
+              </Button>
+              <Button Name="ResetSettingsButton" Padding="16,8" Background="#555" Foreground="#ccc">
+                기본값으로 초기화
+              </Button>
+            </StackPanel>
+
+            <!-- 저장 완료 알림 -->
+            <Border Name="SettingsSavedPanel" IsVisible="False"
+                    Background="#0d1f12" BorderBrush="#27ae60" BorderThickness="1" CornerRadius="4" Padding="12">
+              <TextBlock Text="✓ 설정이 저장되었습니다." Foreground="#2ecc71" FontSize="13"/>
+            </Border>
+
+            <!-- 설정 파일 경로 -->
+            <Border Background="#0d0c18" BorderBrush="#2a2a3a" BorderThickness="1" CornerRadius="4" Padding="12">
+              <StackPanel Spacing="4">
+                <TextBlock Text="설정 파일 경로" Foreground="#666" FontSize="11"/>
+                <TextBlock Name="SettingsFilePathLabel" Foreground="#555" FontSize="11"
+                           FontFamily="Monospace" TextWrapping="Wrap"/>
+              </StackPanel>
+            </Border>
 
           </StackPanel>
         </ScrollViewer>

@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="580" style="font-family: 'Segoe UI', sans-serif;">
+  <!-- Window background -->
+  <rect width="1200" height="580" fill="#12111a"/>
+  <!-- Title bar -->
+  <rect width="1200" height="42" fill="#1c1b2b"/>
+  <text x="16" y="27" fill="white" font-size="15" font-weight="600">NodeKit — Tool Authoring Console</text>
+
+  <!-- Left nav -->
+  <rect x="0" y="42" width="180" height="538" fill="#16151f"/>
+  <text x="16" y="68" fill="#888" font-size="10">MENU</text>
+  <text x="18" y="96" fill="#ccc" font-size="13">Tool 정의</text>
+  <text x="18" y="130" fill="#ccc" font-size="13">등록된 Tools</text>
+  <text x="18" y="164" fill="#ccc" font-size="13">등록된 Data</text>
+  <text x="18" y="198" fill="#ccc" font-size="13">정책 관리</text>
+  <rect x="8" y="212" width="164" height="1" fill="#333"/>
+  <!-- 서버 설정 (active) -->
+  <rect x="0" y="216" width="180" height="34" fill="#2a2844"/>
+  <text x="18" y="238" fill="white" font-size="13" font-weight="600">⚙ 서버 설정</text>
+
+  <!-- Main content -->
+  <rect x="180" y="42" width="1020" height="538" fill="#12111a"/>
+  <g transform="translate(200, 62)">
+
+    <text x="0" y="28" fill="white" font-size="18" font-weight="600">서버 설정</text>
+    <text x="0" y="48" fill="#888" font-size="12">NodeVault 및 Catalog 서비스 주소를 설정합니다. 변경 후 저장 버튼을 누르세요.</text>
+
+    <!-- NodeVault address -->
+    <text x="0" y="86" fill="#aaa" font-size="12">NodeVault 주소 (gRPC — 빌드 / 정책 서비스)</text>
+    <rect x="0" y="92" width="600" height="38" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
+    <text x="12" y="116" fill="white" font-size="14" font-family="monospace">100.123.80.48:50051</text>
+
+    <!-- Catalog address -->
+    <text x="0" y="152" fill="#aaa" font-size="12">Catalog 주소 (REST — Tool / Data 목록 조회)</text>
+    <rect x="0" y="158" width="600" height="38" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
+    <text x="12" y="182" fill="white" font-size="14" font-family="monospace">100.123.80.48:8080</text>
+
+    <!-- Settings file path -->
+    <text x="0" y="222" fill="#666" font-size="11">설정 파일 경로: ~/.config/NodeKit/settings.json</text>
+
+    <!-- Buttons -->
+    <rect x="0" y="244" width="80" height="36" rx="4" fill="#27ae60"/>
+    <text x="18" y="267" fill="white" font-size="13">저장</text>
+    <rect x="96" y="244" width="80" height="36" rx="4" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
+    <text x="112" y="267" fill="#ccc" font-size="13">초기화</text>
+
+    <!-- Save confirmation -->
+    <rect x="0" y="296" width="600" height="36" rx="4" fill="#0d1f12" stroke="#27ae60" stroke-width="1"/>
+    <text x="12" y="319" fill="#2ecc71" font-size="13">✓ 설정이 저장되었습니다.</text>
+
+    <!-- Tips -->
+    <text x="0" y="364" fill="#666" font-size="12">※ 로컬 개발 환경: localhost:50051 / localhost:8080</text>
+    <text x="0" y="382" fill="#666" font-size="12">※ seoy 원격 서버: 100.123.80.48:50051 / 100.123.80.48:8080</text>
+    <text x="0" y="400" fill="#666" font-size="12">※ 설정 변경은 다음 gRPC / REST 요청부터 즉시 반영됩니다.</text>
+
+  </g>
+
+  <!-- Status bar -->
+  <rect x="0" y="538" width="1200" height="42" fill="#0d0c18"/>
+  <text x="16" y="563" fill="#2ecc71" font-size="11">설정 저장 완료</text>
+</svg>

@@ -1,7 +1,7 @@
 # NodeKit 아키텍처 개요
 
-버전: 1.0  
-작성일: 2026-04-18  
+버전: 1.1  
+작성일: 2026-04-18 / 갱신: 2026-04-20  
 상태: 현재 구현 기준
 
 관련 문서:
@@ -28,7 +28,8 @@
 │  ├── AuthoringPanel     ToolDefinition 작성 + L1 검증   │
 │  ├── ToolListPanel      등록된 Tool 목록 (Catalog REST)  │
 │  ├── DataListPanel      등록된 Data 목록 (Catalog REST)  │
-│  └── PolicyPanel        DockGuard 번들 관리              │
+│  ├── PolicyPanel        DockGuard 번들 관리              │
+│  └── SettingsPanel      서버 주소 설정 + JSON 영속화     │
 ├──────────────────────────────────────────────────────────┤
 │  Domain Layer (src/Authoring/)                           │
 │  ├── ToolDefinition     Tool 초안 모델 (빌드 전 상태)   │
@@ -59,13 +60,16 @@
 
 ## 외부 연결 엔드포인트
 
-| 연결 대상 | 프로토콜 | UI 기본값 | 운영 주소 |
-|-----------|---------|-----------|-----------|
-| NodeVault BuildService | gRPC | `http://100.123.80.48:50051` | `http://nodevault.10.113.24.96.nip.io:80` |
-| NodeVault PolicyService | gRPC | 위와 동일 (`NodeForgeAddressBox`) | 위와 동일 |
-| Catalog REST API | HTTP | `http://100.123.80.48:8080` | `http://100.123.80.48:8080` |
+| 연결 대상 | 프로토콜 | 기본값 | 설정 위치 |
+|-----------|---------|--------|-----------|
+| NodeVault BuildService | gRPC | `http://100.123.80.48:50051` | ⚙ 서버 설정 → NodeVault 주소 |
+| NodeVault PolicyService | gRPC | 위와 동일 | 위와 동일 |
+| Catalog REST API | HTTP | `http://100.123.80.48:8080` | ⚙ 서버 설정 → Catalog 주소 |
 
-> UI에 직접 입력하는 방식이므로 기본값이 달라도 사용자가 변경 가능하다.
+주소는 `AppSettings` (`src/Settings/AppSettings.cs`)에 저장되며 앱 시작 시 로드된다.
+설정 파일: Linux `~/.config/NodeKit/settings.json`, Windows `%AppData%\NodeKit\settings.json`
+
+> 설정 패널(`SettingsPanel`)에서 변경 후 저장하면 즉시 반영되며 캐시된 클라이언트가 폐기된다.
 
 ---
 
@@ -147,12 +151,6 @@ NavToolListButton / NavDataListButton 클릭
 ---
 
 ## 알려진 미완료 항목
-
-### 즉시 수정 필요
-
-**compiler warning 276개** — CLAUDE.md §8 위반
-- 원인: `HttpCatalogClient.cs` CA1062 (null 검증 누락), `DataRegisterRequestFactory.cs` CA1062
-- 수정 필요: 다음 작업 시작 전 해소
 
 ### 구현 대기
 

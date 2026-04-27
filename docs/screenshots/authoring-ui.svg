@@ -1,34 +1,40 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" style="font-family: 'Segoe UI', sans-serif;">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="860" style="font-family: 'Segoe UI', sans-serif;">
   <!-- Window background -->
-  <rect width="1200" height="800" fill="#12111a"/>
-
-  <!-- Top title bar -->
+  <rect width="1200" height="860" fill="#12111a"/>
+  <!-- Title bar -->
   <rect width="1200" height="42" fill="#1c1b2b"/>
   <text x="16" y="27" fill="white" font-size="15" font-weight="600">NodeKit — Tool Authoring Console</text>
 
-  <!-- Left nav panel -->
-  <rect x="0" y="42" width="180" height="758" fill="#16151f"/>
+  <!-- Left nav -->
+  <rect x="0" y="42" width="180" height="818" fill="#16151f"/>
   <text x="16" y="68" fill="#888" font-size="10">MENU</text>
-  <rect x="8" y="74" width="164" height="34" fill="transparent"/>
-  <text x="18" y="96" fill="white" font-size="13">Tool 정의</text>
-  <rect x="8" y="112" width="164" height="34" fill="transparent"/>
-  <text x="18" y="134" fill="white" font-size="13">등록된 Tools</text>
-  <rect x="8" y="150" width="164" height="34" fill="transparent"/>
-  <text x="18" y="172" fill="white" font-size="13">정책 관리</text>
+  <!-- Tool 정의 (active) -->
+  <rect x="0" y="74" width="180" height="34" fill="#2a2844"/>
+  <text x="18" y="96" fill="white" font-size="13" font-weight="600">Tool 정의</text>
+  <!-- 등록된 Tools -->
+  <text x="18" y="130" fill="#ccc" font-size="13">등록된 Tools</text>
+  <!-- 등록된 Data -->
+  <text x="18" y="164" fill="#ccc" font-size="13">등록된 Data</text>
+  <!-- 정책 관리 -->
+  <text x="18" y="198" fill="#ccc" font-size="13">정책 관리</text>
+  <!-- separator -->
+  <rect x="8" y="212" width="164" height="1" fill="#333"/>
+  <!-- 서버 설정 -->
+  <text x="18" y="232" fill="#888" font-size="13">⚙ 서버 설정</text>
 
-  <!-- Main content area -->
-  <rect x="180" y="42" width="1020" height="728" fill="#12111a"/>
-
-  <!-- Content panel -->
+  <!-- Main content -->
+  <rect x="180" y="42" width="1020" height="818" fill="#12111a"/>
   <g transform="translate(200, 62)">
 
-    <!-- Tool 정의 heading -->
     <text x="0" y="28" fill="white" font-size="18" font-weight="600">Tool 정의</text>
 
-    <!-- Tool 이름 -->
+    <!-- Tool 이름 / 버전 -->
     <text x="0" y="62" fill="#aaa" font-size="12">Tool 이름</text>
-    <rect x="0" y="68" width="720" height="34" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
+    <rect x="0" y="68" width="500" height="34" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
     <text x="10" y="89" fill="#555" font-size="13">예: BWA-MEM2</text>
+    <text x="516" y="62" fill="#aaa" font-size="12">버전</text>
+    <rect x="516" y="68" width="200" height="34" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
+    <text x="526" y="89" fill="#555" font-size="13">예: 2.2.1</text>
 
     <!-- 이미지 URI -->
     <text x="0" y="122" fill="#aaa" font-size="12">컨테이너 이미지 URI (digest 포함 필수)</text>
@@ -37,50 +43,52 @@
 
     <!-- Dockerfile -->
     <text x="0" y="182" fill="#aaa" font-size="12">Dockerfile</text>
-    <rect x="0" y="188" width="720" height="120" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
+    <rect x="0" y="188" width="720" height="100" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
     <text x="10" y="208" fill="#555" font-size="12" font-family="monospace">FROM ubuntu:22.04 AS builder</text>
-    <text x="10" y="224" fill="#555" font-size="12" font-family="monospace">RUN apt-get install -y ...</text>
+    <text x="10" y="224" fill="#555" font-size="12" font-family="monospace">RUN apt-get install -y bwa-mem2=2.2.1</text>
 
-    <!-- Script -->
-    <text x="0" y="328" fill="#aaa" font-size="12">실행 스크립트</text>
-    <rect x="0" y="334" width="720" height="80" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
+    <!-- 실행 스크립트 -->
+    <text x="0" y="308" fill="#aaa" font-size="12">실행 스크립트</text>
+    <rect x="0" y="314" width="720" height="60" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
 
-    <!-- I/O Section -->
-    <!-- Inputs -->
-    <text x="0" y="436" fill="#aaa" font-size="12">Inputs</text>
-    <!-- Row 1 -->
-    <rect x="0" y="442" width="308" height="30" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
-    <text x="10" y="462" fill="#555" font-size="12">파일 이름 (예: input.fastq.gz)</text>
-    <rect x="316" y="442" width="36" height="30" rx="3" fill="#2a1a1a" stroke="#c0392b" stroke-width="1"/>
-    <text x="329" y="462" fill="#c0392b" font-size="14">×</text>
-    <!-- + Input 추가 -->
-    <rect x="0" y="480" width="100" height="26" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
-    <text x="8" y="497" fill="#4a9eff" font-size="12">+ Input 추가</text>
+    <!-- 런타임 커맨드 오버라이드 -->
+    <text x="0" y="394" fill="#aaa" font-size="12">런타임 커맨드 오버라이드 (선택)</text>
+    <rect x="0" y="400" width="720" height="34" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
+    <text x="10" y="421" fill="#555" font-size="12" font-family="monospace">예: ["/bin/sh", "-c", "/app/executor.sh"]</text>
 
-    <!-- Outputs -->
-    <text x="368" y="436" fill="#aaa" font-size="12">Outputs</text>
-    <!-- Row 1 -->
-    <rect x="368" y="442" width="308" height="30" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
-    <text x="378" y="462" fill="#555" font-size="12">파일 이름 (예: output.bam)</text>
-    <rect x="684" y="442" width="36" height="30" rx="3" fill="#2a1a1a" stroke="#c0392b" stroke-width="1"/>
-    <text x="697" y="462" fill="#c0392b" font-size="14">×</text>
-    <!-- + Output 추가 -->
-    <rect x="368" y="480" width="108" height="26" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
-    <text x="376" y="497" fill="#4a9eff" font-size="12">+ Output 추가</text>
+    <!-- Inputs / Outputs -->
+    <text x="0" y="456" fill="#aaa" font-size="12">Inputs</text>
+    <text x="12" y="474" fill="#666" font-size="10">이름</text>
+    <text x="220" y="474" fill="#666" font-size="10">역할(role)</text>
+    <text x="380" y="474" fill="#666" font-size="10">형식(format)</text>
+    <rect x="0" y="480" width="308" height="30" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
+    <text x="10" y="500" fill="#555" font-size="12">파일 이름</text>
+    <rect x="316" y="480" width="36" height="30" rx="3" fill="#2a1a1a" stroke="#c0392b" stroke-width="1"/>
+    <text x="329" y="500" fill="#c0392b" font-size="14">×</text>
+    <rect x="0" y="518" width="100" height="26" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
+    <text x="8" y="535" fill="#4a9eff" font-size="12">+ Input 추가</text>
+
+    <text x="368" y="456" fill="#aaa" font-size="12">Outputs</text>
+    <rect x="368" y="480" width="308" height="30" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
+    <text x="378" y="500" fill="#555" font-size="12">파일 이름</text>
+    <rect x="684" y="480" width="36" height="30" rx="3" fill="#2a1a1a" stroke="#c0392b" stroke-width="1"/>
+    <text x="697" y="500" fill="#c0392b" font-size="14">×</text>
+    <rect x="368" y="518" width="108" height="26" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
+    <text x="376" y="535" fill="#4a9eff" font-size="12">+ Output 추가</text>
 
     <!-- 환경 스펙 -->
-    <text x="0" y="530" fill="#aaa" font-size="12">환경 스펙 파일 (conda yml / requirements.txt, 선택)</text>
-    <rect x="0" y="536" width="720" height="80" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
+    <text x="0" y="566" fill="#aaa" font-size="12">환경 스펙 파일 (conda yml / requirements.txt, 선택)</text>
+    <rect x="0" y="572" width="720" height="60" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
 
-    <!-- Buttons -->
-    <rect x="0" y="630" width="100" height="36" rx="4" fill="#2c3e88"/>
-    <text x="18" y="653" fill="white" font-size="13">L1 검증</text>
-    <rect x="116" y="630" width="220" height="36" rx="4" fill="#555"/>
-    <text x="130" y="653" fill="#999" font-size="13">빌드 요청 전송 (NodeForge)</text>
+    <!-- 버튼 -->
+    <rect x="0" y="648" width="100" height="36" rx="4" fill="#2c3e88"/>
+    <text x="18" y="671" fill="white" font-size="13">L1 검증</text>
+    <rect x="116" y="648" width="220" height="36" rx="4" fill="#555"/>
+    <text x="126" y="671" fill="#999" font-size="13">빌드 요청 전송 (NodeVault)</text>
 
   </g>
 
   <!-- Status bar -->
-  <rect x="0" y="758" width="1200" height="42" fill="#0d0c18"/>
-  <text x="16" y="783" fill="#666" font-size="11">준비</text>
+  <rect x="0" y="818" width="1200" height="42" fill="#0d0c18"/>
+  <text x="16" y="843" fill="#666" font-size="11">준비</text>
 </svg>

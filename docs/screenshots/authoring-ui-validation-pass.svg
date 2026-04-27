@@ -1,28 +1,34 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="840" style="font-family: 'Segoe UI', sans-serif;">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" style="font-family: 'Segoe UI', sans-serif;">
   <!-- Window background -->
-  <rect width="1200" height="840" fill="#12111a"/>
-
-  <!-- Top title bar -->
+  <rect width="1200" height="900" fill="#12111a"/>
+  <!-- Title bar -->
   <rect width="1200" height="42" fill="#1c1b2b"/>
   <text x="16" y="27" fill="white" font-size="15" font-weight="600">NodeKit — Tool Authoring Console</text>
 
-  <!-- Left nav panel -->
-  <rect x="0" y="42" width="180" height="798" fill="#16151f"/>
+  <!-- Left nav -->
+  <rect x="0" y="42" width="180" height="858" fill="#16151f"/>
   <text x="16" y="68" fill="#888" font-size="10">MENU</text>
-  <text x="18" y="96" fill="white" font-size="13">Tool 정의</text>
-  <text x="18" y="134" fill="white" font-size="13">등록된 Tools</text>
-  <text x="18" y="172" fill="white" font-size="13">정책 관리</text>
+  <rect x="0" y="74" width="180" height="34" fill="#2a2844"/>
+  <text x="18" y="96" fill="white" font-size="13" font-weight="600">Tool 정의</text>
+  <text x="18" y="130" fill="#ccc" font-size="13">등록된 Tools</text>
+  <text x="18" y="164" fill="#ccc" font-size="13">등록된 Data</text>
+  <text x="18" y="198" fill="#ccc" font-size="13">정책 관리</text>
+  <rect x="8" y="212" width="164" height="1" fill="#333"/>
+  <text x="18" y="232" fill="#888" font-size="13">⚙ 서버 설정</text>
 
-  <!-- Main content area -->
-  <rect x="180" y="42" width="1020" height="798" fill="#12111a"/>
-
+  <!-- Main content -->
+  <rect x="180" y="42" width="1020" height="858" fill="#12111a"/>
   <g transform="translate(200, 62)">
+
     <text x="0" y="28" fill="white" font-size="18" font-weight="600">Tool 정의</text>
 
-    <!-- Tool 이름 -->
+    <!-- Tool 이름 / 버전 -->
     <text x="0" y="62" fill="#aaa" font-size="12">Tool 이름</text>
-    <rect x="0" y="68" width="720" height="34" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
+    <rect x="0" y="68" width="500" height="34" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
     <text x="10" y="89" fill="white" font-size="13">BWA-MEM2</text>
+    <text x="516" y="62" fill="#aaa" font-size="12">버전</text>
+    <rect x="516" y="68" width="200" height="34" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
+    <text x="526" y="89" fill="white" font-size="13">2.2.1</text>
 
     <!-- 이미지 URI (valid) -->
     <text x="0" y="122" fill="#aaa" font-size="12">컨테이너 이미지 URI (digest 포함 필수)</text>
@@ -31,54 +37,54 @@
 
     <!-- Dockerfile (valid) -->
     <text x="0" y="182" fill="#aaa" font-size="12">Dockerfile</text>
-    <rect x="0" y="188" width="720" height="120" rx="3" fill="#1e1d2e" stroke="#27ae60" stroke-width="1"/>
+    <rect x="0" y="188" width="720" height="100" rx="3" fill="#1e1d2e" stroke="#27ae60" stroke-width="1"/>
     <text x="10" y="208" fill="white" font-size="12" font-family="monospace">FROM ubuntu:22.04 AS builder</text>
-    <text x="10" y="224" fill="white" font-size="12" font-family="monospace">RUN apt-get update &amp;&amp; apt-get install -y bwa-mem2</text>
+    <text x="10" y="224" fill="white" font-size="12" font-family="monospace">RUN apt-get update &amp;&amp; apt-get install -y bwa-mem2=2.2.1</text>
     <text x="10" y="240" fill="white" font-size="12" font-family="monospace">COPY ./scripts /app/scripts</text>
 
-    <!-- Script -->
-    <text x="0" y="328" fill="#aaa" font-size="12">실행 스크립트</text>
-    <rect x="0" y="334" width="720" height="80" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
-    <text x="10" y="354" fill="white" font-size="12" font-family="monospace">bwa-mem2 mem /ref/genome.fa $INPUT_R1 $INPUT_R2 | samtools sort -o $OUTPUT_BAM</text>
+    <!-- 실행 스크립트 -->
+    <text x="0" y="308" fill="#aaa" font-size="12">실행 스크립트</text>
+    <rect x="0" y="314" width="720" height="60" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
+    <text x="10" y="334" fill="white" font-size="12" font-family="monospace">bwa-mem2 mem /ref/genome.fa $INPUT_R1 $INPUT_R2 | samtools sort -o $OUTPUT_BAM</text>
+
+    <!-- 런타임 커맨드 오버라이드 -->
+    <text x="0" y="394" fill="#aaa" font-size="12">런타임 커맨드 오버라이드 (선택)</text>
+    <rect x="0" y="400" width="720" height="34" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
 
     <!-- I/O rows -->
-    <text x="0" y="436" fill="#aaa" font-size="12">Inputs</text>
-    <rect x="0" y="442" width="308" height="30" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
-    <text x="10" y="462" fill="white" font-size="12">input.fastq.R1</text>
-    <rect x="316" y="442" width="36" height="30" rx="3" fill="#2a1a1a" stroke="#c0392b" stroke-width="1"/>
-    <text x="329" y="462" fill="#c0392b" font-size="14">×</text>
-    <rect x="0" y="478" width="308" height="30" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
-    <text x="10" y="498" fill="white" font-size="12">input.fastq.R2</text>
-    <rect x="316" y="478" width="36" height="30" rx="3" fill="#2a1a1a" stroke="#c0392b" stroke-width="1"/>
-    <text x="329" y="498" fill="#c0392b" font-size="14">×</text>
-    <rect x="0" y="516" width="100" height="26" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
-    <text x="8" y="533" fill="#4a9eff" font-size="12">+ Input 추가</text>
+    <text x="0" y="456" fill="#aaa" font-size="12">Inputs</text>
+    <rect x="0" y="462" width="308" height="30" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
+    <text x="10" y="482" fill="white" font-size="12">input.fastq.R1</text>
+    <rect x="316" y="462" width="36" height="30" rx="3" fill="#2a1a1a" stroke="#c0392b" stroke-width="1"/>
+    <text x="329" y="482" fill="#c0392b" font-size="14">×</text>
+    <rect x="0" y="498" width="308" height="30" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
+    <text x="10" y="518" fill="white" font-size="12">input.fastq.R2</text>
+    <rect x="316" y="498" width="36" height="30" rx="3" fill="#2a1a1a" stroke="#c0392b" stroke-width="1"/>
+    <text x="329" y="518" fill="#c0392b" font-size="14">×</text>
+    <rect x="0" y="536" width="100" height="26" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
+    <text x="8" y="553" fill="#4a9eff" font-size="12">+ Input 추가</text>
 
-    <text x="368" y="436" fill="#aaa" font-size="12">Outputs</text>
-    <rect x="368" y="442" width="308" height="30" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
-    <text x="378" y="462" fill="white" font-size="12">output.bam</text>
-    <rect x="684" y="442" width="36" height="30" rx="3" fill="#2a1a1a" stroke="#c0392b" stroke-width="1"/>
-    <text x="697" y="462" fill="#c0392b" font-size="14">×</text>
-    <rect x="368" y="516" width="108" height="26" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
-    <text x="376" y="533" fill="#4a9eff" font-size="12">+ Output 추가</text>
+    <text x="368" y="456" fill="#aaa" font-size="12">Outputs</text>
+    <rect x="368" y="462" width="308" height="30" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
+    <text x="378" y="482" fill="white" font-size="12">output.bam</text>
+    <rect x="684" y="462" width="36" height="30" rx="3" fill="#2a1a1a" stroke="#c0392b" stroke-width="1"/>
+    <text x="697" y="482" fill="#c0392b" font-size="14">×</text>
+    <rect x="368" y="536" width="108" height="26" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
+    <text x="376" y="553" fill="#4a9eff" font-size="12">+ Output 추가</text>
 
-    <!-- 환경 스펙 -->
-    <text x="0" y="562" fill="#aaa" font-size="12">환경 스펙 파일 (conda yml / requirements.txt, 선택)</text>
-    <rect x="0" y="568" width="720" height="60" rx="3" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
-
-    <!-- L1 pass panel -->
-    <rect x="0" y="642" width="720" height="40" rx="4" fill="#0d1f12" stroke="#27ae60" stroke-width="1"/>
-    <text x="12" y="667" fill="#2ecc71" font-size="13" font-weight="600">✓ L1 검증 통과</text>
+    <!-- L1 pass -->
+    <rect x="0" y="578" width="720" height="40" rx="4" fill="#0d1f12" stroke="#27ae60" stroke-width="1"/>
+    <text x="12" y="603" fill="#2ecc71" font-size="13" font-weight="600">✓ L1 검증 통과</text>
 
     <!-- Buttons -->
-    <rect x="0" y="696" width="100" height="36" rx="4" fill="#2c3e88"/>
-    <text x="18" y="719" fill="white" font-size="13">L1 검증</text>
-    <rect x="116" y="696" width="220" height="36" rx="4" fill="#27ae60"/>
-    <text x="130" y="719" fill="white" font-size="13">빌드 요청 전송 (NodeForge)</text>
+    <rect x="0" y="634" width="100" height="36" rx="4" fill="#2c3e88"/>
+    <text x="18" y="657" fill="white" font-size="13">L1 검증</text>
+    <rect x="116" y="634" width="220" height="36" rx="4" fill="#27ae60"/>
+    <text x="126" y="657" fill="white" font-size="13">빌드 요청 전송 (NodeVault)</text>
 
   </g>
 
   <!-- Status bar -->
-  <rect x="0" y="798" width="1200" height="42" fill="#0d0c18"/>
-  <text x="16" y="823" fill="#2ecc71" font-size="11">L1 검증 통과 — 빌드 요청 준비 완료</text>
+  <rect x="0" y="858" width="1200" height="42" fill="#0d0c18"/>
+  <text x="16" y="883" fill="#2ecc71" font-size="11">L1 검증 통과 — 빌드 요청 준비 완료</text>
 </svg>

@@ -12,6 +12,7 @@ using Avalonia.Threading;
 using NodeKit.Authoring;
 using NodeKit.Grpc;
 using NodeKit.Policy;
+using NodeKit.Settings;
 using NodeKit.Validation;
 
 namespace NodeKit.UI
@@ -34,10 +35,13 @@ namespace NodeKit.UI
         private string? _catalogClientAddress;
         private string? _policyProviderAddress;
 
+        private AppSettings _settings = new();
+
         public MainWindow()
         {
             InitializeComponent();
 
+            _settings = SettingsService.Load();
             _policyChecker = TryLoadPolicyChecker();
 
             AddInputButton.Click += (_, _) => AddInputRow(InputRowsPanel);
@@ -50,15 +54,21 @@ namespace NodeKit.UI
             NavToolListButton.Click += (_, _) => { ShowPanel(ToolListPanel); _ = LoadToolListAsync(); };
             NavDataListButton.Click += (_, _) => { ShowPanel(DataListPanel); _ = LoadDataListAsync(); };
             NavPolicyButton.Click += (_, _) => { ShowPanel(PolicyPanel); _ = LoadPolicyListAsync(); };
+            NavSettingsButton.Click += (_, _) => ShowPanel(SettingsPanel);
             RefreshToolListButton.Click += (_, _) => _ = LoadToolListAsync();
             RefreshDataListButton.Click += (_, _) => _ = LoadDataListAsync();
             RefreshPolicyListButton.Click += (_, _) => _ = LoadPolicyListAsync();
             ReloadBundleButton.Click += OnReloadBundleClicked;
+            SaveSettingsButton.Click += OnSaveSettingsClicked;
+            ResetSettingsButton.Click += OnResetSettingsClicked;
             RegisterValidationInvalidationHandlers();
 
             // 초기 행 1개씩
             AddInputRow(InputRowsPanel);
             AddOutputRow(OutputRowsPanel);
+
+            // 저장된 설정을 Settings 패널 TextBox에 반영
+            ApplySettingsToUI();
         }
 
         private void ShowPanel(Avalonia.Controls.Control target)
@@ -67,6 +77,50 @@ namespace NodeKit.UI
             ToolListPanel.IsVisible  = target == ToolListPanel;
             DataListPanel.IsVisible  = target == DataListPanel;
             PolicyPanel.IsVisible    = target == PolicyPanel;
+            SettingsPanel.IsVisible  = target == SettingsPanel;
+        }
+
+        private void ApplySettingsToUI()
+        {
+            SettingsNodeVaultAddressBox.Text = _settings.NodeVaultAddress;
+            SettingsCatalogAddressBox.Text   = _settings.CatalogAddress;
+            SettingsFilePathLabel.Text       = SettingsService.FilePath;
+            SettingsSavedPanel.IsVisible     = false;
+        }
+
+        private void OnSaveSettingsClicked(object? sender, RoutedEventArgs e)
+        {
+            var nodeVaultAddr = SettingsNodeVaultAddressBox.Text?.Trim() ?? string.Empty;
+            var catalogAddr   = SettingsCatalogAddressBox.Text?.Trim()   ?? string.Empty;
+
+            _settings.NodeVaultAddress = string.IsNullOrEmpty(nodeVaultAddr)
+                ? new AppSettings().NodeVaultAddress
+                : nodeVaultAddr;
+            _settings.CatalogAddress = string.IsNullOrEmpty(catalogAddr)
+                ? new AppSettings().CatalogAddress
+                : catalogAddr;
+
+            SettingsService.Save(_settings);
+
+            // 캐시된 클라이언트 폐기 — 다음 요청 시 새 주소로 재생성
+            _buildClientAddress    = null;
+            _catalogClientAddress  = null;
+            _policyProviderAddress = null;
+
+            SettingsSavedPanel.IsVisible = true;
+            InvalidateValidationState();
+            StatusBar.Text = $"설정 저장됨 — NodeVault: {_settings.NodeVaultAddress}  Catalog: {_settings.CatalogAddress}";
+        }
+
+        private void OnResetSettingsClicked(object? sender, RoutedEventArgs e)
+        {
+            _settings = new AppSettings();
+            SettingsService.Save(_settings);
+            ApplySettingsToUI();
+            _buildClientAddress    = null;
+            _catalogClientAddress  = null;
+            _policyProviderAddress = null;
+            StatusBar.Text = "기본값으로 초기화되었습니다.";
         }
 
         private static WasmPolicyChecker? TryLoadPolicyChecker()
@@ -341,10 +395,10 @@ namespace NodeKit.UI
                 return;
             }
 
-            var address = NodeForgeAddressBox.Text?.Trim();
+            var address = _settings.NodeVaultAddress;
             if (string.IsNullOrEmpty(address))
             {
-                StatusBar.Text = "오류: NodeForge 주소를 입력하세요.";
+                StatusBar.Text = "오류: NodeVault 주소가 설정되지 않았습니다. ⚙ 서버 설정에서 확인하세요.";
                 return;
             }
 
@@ -427,10 +481,10 @@ namespace NodeKit.UI
 
         private async System.Threading.Tasks.Task LoadToolListAsync()
         {
-            var address = CatalogAddressBox.Text?.Trim();
+            var address = _settings.CatalogAddress;
             if (string.IsNullOrEmpty(address))
             {
-                StatusBar.Text = "오류: Catalog 주소를 입력하세요.";
+                StatusBar.Text = "오류: Catalog 주소가 설정되지 않았습니다. ⚙ 서버 설정에서 확인하세요.";
                 return;
             }
 
@@ -473,10 +527,10 @@ namespace NodeKit.UI
 
         private async System.Threading.Tasks.Task LoadDataListAsync()
         {
-            var address = CatalogAddressBox.Text?.Trim();
+            var address = _settings.CatalogAddress;
             if (string.IsNullOrEmpty(address))
             {
-                StatusBar.Text = "오류: Catalog 주소를 입력하세요.";
+                StatusBar.Text = "오류: Catalog 주소가 설정되지 않았습니다. ⚙ 서버 설정에서 확인하세요.";
                 return;
             }
 
@@ -521,10 +575,10 @@ namespace NodeKit.UI
 
         private async System.Threading.Tasks.Task LoadPolicyListAsync()
         {
-            var address = NodeForgeAddressBox.Text?.Trim();
+            var address = _settings.NodeVaultAddress;
             if (string.IsNullOrEmpty(address))
             {
-                StatusBar.Text = "오류: NodeForge 주소를 입력하세요.";
+                StatusBar.Text = "오류: NodeVault 주소가 설정되지 않았습니다. ⚙ 서버 설정에서 확인하세요.";
                 return;
             }
 
@@ -553,10 +607,10 @@ namespace NodeKit.UI
 
         private async void OnReloadBundleClicked(object? sender, RoutedEventArgs e)
         {
-            var address = NodeForgeAddressBox.Text?.Trim();
+            var address = _settings.NodeVaultAddress;
             if (string.IsNullOrEmpty(address))
             {
-                StatusBar.Text = "오류: NodeForge 주소를 입력하세요.";
+                StatusBar.Text = "오류: NodeVault 주소가 설정되지 않았습니다. ⚙ 서버 설정에서 확인하세요.";
                 return;
             }
 
@@ -653,7 +707,6 @@ namespace NodeKit.UI
             ScriptBox.TextChanged += (_, _) => InvalidateValidationState();
             CommandBox.TextChanged += (_, _) => InvalidateValidationState();
             EnvSpecBox.TextChanged += (_, _) => InvalidateValidationState();
-            NodeForgeAddressBox.TextChanged += (_, _) => InvalidateValidationState();
         }
 
         private void InvalidateValidationState()

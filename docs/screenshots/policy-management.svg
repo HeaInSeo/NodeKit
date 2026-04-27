@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="680" style="font-family: 'Segoe UI', sans-serif;">
+  <!-- Window background -->
+  <rect width="1200" height="680" fill="#12111a"/>
+  <!-- Title bar -->
+  <rect width="1200" height="42" fill="#1c1b2b"/>
+  <text x="16" y="27" fill="white" font-size="15" font-weight="600">NodeKit — Tool Authoring Console</text>
+
+  <!-- Left nav -->
+  <rect x="0" y="42" width="180" height="638" fill="#16151f"/>
+  <text x="16" y="68" fill="#888" font-size="10">MENU</text>
+  <text x="18" y="96" fill="#ccc" font-size="13">Tool 정의</text>
+  <text x="18" y="130" fill="#ccc" font-size="13">등록된 Tools</text>
+  <text x="18" y="164" fill="#ccc" font-size="13">등록된 Data</text>
+  <!-- 정책 관리 (active) -->
+  <rect x="0" y="176" width="180" height="34" fill="#2a2844"/>
+  <text x="18" y="198" fill="white" font-size="13" font-weight="600">정책 관리</text>
+  <rect x="8" y="212" width="164" height="1" fill="#333"/>
+  <text x="18" y="232" fill="#888" font-size="13">⚙ 서버 설정</text>
+
+  <!-- Main content -->
+  <rect x="180" y="42" width="1020" height="638" fill="#12111a"/>
+  <g transform="translate(200, 62)">
+
+    <text x="0" y="28" fill="white" font-size="18" font-weight="600">정책 관리</text>
+
+    <!-- Bundle info -->
+    <rect x="0" y="44" width="720" height="54" rx="4" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
+    <text x="12" y="66" fill="#aaa" font-size="12">번들 버전</text>
+    <text x="12" y="85" fill="white" font-size="14" font-weight="600">dockguard-v0.3.1-20260427</text>
+    <text x="400" y="66" fill="#aaa" font-size="12">빌드 시각</text>
+    <text x="400" y="85" fill="#ccc" font-size="13">2026-04-27 09:12:33</text>
+
+    <!-- Buttons -->
+    <rect x="0" y="114" width="160" height="34" rx="4" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
+    <text x="14" y="136" fill="#4a9eff" font-size="13">↻ 정책 목록 새로고침</text>
+    <rect x="176" y="114" width="200" height="34" rx="4" fill="#1e1d2e" stroke="#333" stroke-width="1"/>
+    <text x="190" y="136" fill="#4a9eff" font-size="13">⟳ DockGuard 다시 로드</text>
+
+    <!-- Policy list header -->
+    <text x="0" y="178" fill="#aaa" font-size="12">적용 중인 정책 (9개)</text>
+    <rect x="0" y="186" width="720" height="28" rx="2" fill="#1e1d2e"/>
+    <text x="10" y="204" fill="#888" font-size="11">Rule ID</text>
+    <text x="110" y="204" fill="#888" font-size="11">이름</text>
+    <text x="400" y="204" fill="#888" font-size="11">설명</text>
+
+    <!-- Rules -->
+    <!-- DFM001 -->
+    <rect x="0" y="216" width="720" height="30" fill="#131220"/>
+    <text x="10" y="235" fill="#4a9eff" font-size="12" font-family="monospace">DFM001</text>
+    <text x="110" y="235" fill="white" font-size="12">Pinned base image</text>
+    <text x="400" y="235" fill="#999" font-size="11">FROM 이미지에 digest 또는 tag 고정 필수</text>
+    <!-- DFM002 -->
+    <rect x="0" y="248" width="720" height="30" fill="#12111a"/>
+    <text x="10" y="267" fill="#4a9eff" font-size="12" font-family="monospace">DFM002</text>
+    <text x="110" y="267" fill="white" font-size="12">Builder stage alias</text>
+    <text x="400" y="267" fill="#999" font-size="11">멀티스테이지 FROM에 AS builder 별칭 필수</text>
+    <!-- DFM003 -->
+    <rect x="0" y="280" width="720" height="30" fill="#131220"/>
+    <text x="10" y="299" fill="#4a9eff" font-size="12" font-family="monospace">DFM003</text>
+    <text x="110" y="299" fill="white" font-size="12">No latest tag</text>
+    <text x="400" y="299" fill="#999" font-size="11">:latest 태그 사용 금지</text>
+    <!-- DFM004 -->
+    <rect x="0" y="312" width="720" height="30" fill="#12111a"/>
+    <text x="10" y="331" fill="#4a9eff" font-size="12" font-family="monospace">DFM004</text>
+    <text x="110" y="331" fill="white" font-size="12">Pinned apt packages</text>
+    <text x="400" y="331" fill="#999" font-size="11">apt install 시 버전 고정 필수</text>
+    <!-- DSF001 -->
+    <rect x="0" y="344" width="720" height="30" fill="#131220"/>
+    <text x="10" y="363" fill="#f39c12" font-size="12" font-family="monospace">DSF001</text>
+    <text x="110" y="363" fill="white" font-size="12">No ADD URL</text>
+    <text x="400" y="363" fill="#999" font-size="11">ADD로 원격 URL 다운로드 금지</text>
+    <!-- DSF002 -->
+    <rect x="0" y="376" width="720" height="30" fill="#12111a"/>
+    <text x="10" y="395" fill="#f39c12" font-size="12" font-family="monospace">DSF002</text>
+    <text x="110" y="395" fill="white" font-size="12">No curl/wget</text>
+    <text x="400" y="395" fill="#999" font-size="11">RUN curl / wget 사용 금지</text>
+    <!-- DSF003 -->
+    <rect x="0" y="408" width="720" height="30" fill="#131220"/>
+    <text x="10" y="427" fill="#f39c12" font-size="12" font-family="monospace">DSF003</text>
+    <text x="110" y="427" fill="white" font-size="12">No root user</text>
+    <text x="400" y="427" fill="#999" font-size="11">USER root 지정 금지</text>
+    <!-- DGF001 -->
+    <rect x="0" y="440" width="720" height="30" fill="#12111a"/>
+    <text x="10" y="459" fill="#e74c3c" font-size="12" font-family="monospace">DGF001</text>
+    <text x="110" y="459" fill="white" font-size="12">No secrets in ENV</text>
+    <text x="400" y="459" fill="#999" font-size="11">ENV에 비밀 값(TOKEN/SECRET/KEY) 금지</text>
+    <!-- DGF002 -->
+    <rect x="0" y="472" width="720" height="30" fill="#131220"/>
+    <text x="10" y="491" fill="#e74c3c" font-size="12" font-family="monospace">DGF002</text>
+    <text x="110" y="491" fill="white" font-size="12">No privileged flag</text>
+    <text x="400" y="491" fill="#999" font-size="11">--privileged 또는 --cap-add 금지</text>
+
+  </g>
+
+  <!-- Status bar -->
+  <rect x="0" y="638" width="1200" height="42" fill="#0d0c18"/>
+  <text x="16" y="663" fill="#666" font-size="11">NodeVault 연결됨 — 100.123.80.48:50051 | 정책 번들 로드 완료 (9개 규칙)</text>
+</svg>
