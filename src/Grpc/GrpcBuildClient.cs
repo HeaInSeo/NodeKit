@@ -12,7 +12,7 @@ using NodeKit.Authoring;
 namespace NodeKit.Grpc
 {
     /// <summary>
-    /// NodeForge BuildService gRPC 클라이언트 구현.
+    /// NodeVault BuildService gRPC 클라이언트 구현.
     /// BuildRequest를 전송하고 빌드 이벤트 스트림을 IAsyncEnumerable로 노출한다.
     /// </summary>
     public sealed class GrpcBuildClient : IBuildClient, IDisposable

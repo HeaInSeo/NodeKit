@@ -2,7 +2,7 @@ namespace NodeKit.Policy
 {
     /// <summary>
     /// OPA/DockGuard 정책 번들.
-    /// NodeForge PolicyService에서 gRPC로 수신하거나 로컬 파일에서 로드한다.
+    /// NodeVault PolicyService에서 gRPC로 수신하거나 로컬 파일에서 로드한다.
     /// </summary>
     public class PolicyBundle
     {

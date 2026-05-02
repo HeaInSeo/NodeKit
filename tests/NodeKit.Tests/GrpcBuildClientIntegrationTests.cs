@@ -10,15 +10,15 @@ namespace NodeKit.Tests
     /// <summary>
     /// GrpcBuildClient 실연동 테스트.
     ///
-    /// 전제: NodeForge가 100.123.80.48:50051 에서 실행 중이어야 한다.
-    /// NODEFORGE_INTEGRATION=1 환경변수가 설정된 경우에만 실행된다.
+    /// 전제: NodeVault가 100.123.80.48:50051 에서 실행 중이어야 한다.
+    /// NODEVAULT_INTEGRATION=1 환경변수가 설정된 경우에만 실행된다.
     /// </summary>
     public sealed class GrpcBuildClientIntegrationTests
     {
-        private const string NodeForgeAddress = "http://100.123.80.48:50051";
+        private const string NodeVaultAddress = "http://100.123.80.48:50051";
 
         private static bool ShouldRun =>
-            Environment.GetEnvironmentVariable("NODEFORGE_INTEGRATION") == "1";
+            Environment.GetEnvironmentVariable("NODEVAULT_INTEGRATION") == "1";
 
         /// <summary>
         /// L2 build → Harbor push → L3 dry-run → L4 smoke → 등록 전 구간 성공 확인.
@@ -44,7 +44,7 @@ namespace NodeKit.Tests
                 DisplayCategory = "Test",
             };
 
-            using var client = new GrpcBuildClient(NodeForgeAddress);
+            using var client = new GrpcBuildClient(NodeVaultAddress);
             var events = new List<BuildEvent>();
             using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(10));
 

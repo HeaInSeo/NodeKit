@@ -4,7 +4,7 @@ namespace NodeKit.Grpc
 {
     /// <summary>
     /// ToolDefinition → BuildRequest 변환 팩토리.
-    /// L1 검증 통과 후 NodeForge gRPC 전송 직전에 호출된다.
+    /// L1 검증 통과 후 NodeVault gRPC 전송 직전에 호출된다.
     /// </summary>
     internal static class BuildRequestFactory
     {

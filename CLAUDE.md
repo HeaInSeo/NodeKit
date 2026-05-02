@@ -11,7 +11,7 @@ and all admin UX semantics (status feedback, error display, policy management UI
 **NodeVault owns**: BuildRequest / DataRegisterRequest reception, tool image build orchestration
 (L2/L3/L4), reference data packaging (sori), OCI referrer push, artifact index management (SoT),
 DockGuard policy bundle management (`PolicyService`), Harbor lifecycle control, and Harbor webhook
-reconciliation. NodeVault replaces NodeForge.
+reconciliation. NodeVault replaces NodeVault.
 
 **Catalog 서비스 owns**: Read-only artifact palette (tools + reference data) for pipeline builders.
 NodeKit queries Catalog 서비스 REST API for AdminToolList and AdminDataList.
@@ -53,7 +53,7 @@ The project's core philosophy is: **same data + same method = same result.**
 ```
 LocalFilePolicyBundleProvider  (sprint start — local .wasm file)
     ↓ swap at runtime
-GrpcPolicyBundleProvider       (after NodeForge PolicyService is ready)
+GrpcPolicyBundleProvider       (after NodeVault PolicyService is ready)
 ```
 
 Do not hardcode file paths into `WasmPolicyChecker`. Provider must be injectable.

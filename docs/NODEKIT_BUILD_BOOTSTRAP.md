@@ -11,7 +11,7 @@
 
 현재 NodeKit은 두 가지 외부 입력을 전제한다.
 
-* `NodeVault/protos/` 의 `nodeforge.proto` (proto 컴파일 용도) ← api-protos Sprint 1-4 완료, canonical 이관
+* `NodeVault/protos/` 의 `nodevault.proto` (proto 컴파일 용도) ← api-protos Sprint 1-4 완료, canonical 이관
 * `DockGuard` 저장소의 Dockerfile 정책 디렉터리 (dockguard.wasm 생성 용도)
 
 ---
@@ -20,24 +20,24 @@
 
 ### 현재 상태 (2026-04-19)
 
-**api-protos Sprint 1-4 완료.** `nodeforge.proto` canonical 경로는 `NodeVault/protos/nodeforge/v1/`이다.
+**api-protos Sprint 1-4 완료.** `nodevault.proto` canonical 경로는 `NodeVault/protos/nodevault/v1/`이다.
 `NodeKit.csproj`는 이제 `NodeVault/protos/`를 자동 탐지 기준으로 사용한다.
 
 ### 경로 설정
 
-`NodeKit.csproj`는 `ApiProtosRoot` MSBuild 속성 아래에서 `nodeforge/v1/nodeforge.proto`를 찾는다.
+`NodeKit.csproj`는 `ApiProtosRoot` MSBuild 속성 아래에서 `nodevault/v1/nodevault.proto`를 찾는다.
 
 1. 기본 탐지 경로 사용 (자동 감지)
-   * `/opt/go/src/github.com/HeaInSeo/NodeForge/protos` ← canonical
+   * `/opt/go/src/github.com/HeaInSeo/NodeVault/protos` ← canonical
 
 2. 명시적으로 경로 지정
 
 ```bash
-dotnet test NodeKit.sln /p:ApiProtosRoot=/opt/go/src/github.com/HeaInSeo/NodeForge/protos
-dotnet build NodeKit.sln /p:ApiProtosRoot=/opt/go/src/github.com/HeaInSeo/NodeForge/protos
+dotnet test NodeKit.sln /p:ApiProtosRoot=/opt/go/src/github.com/HeaInSeo/NodeVault/protos
+dotnet build NodeKit.sln /p:ApiProtosRoot=/opt/go/src/github.com/HeaInSeo/NodeVault/protos
 ```
 
-`ApiProtosRoot`가 비어 있거나 `nodeforge.proto`가 없으면 빌드가 명확한 에러 메시지와 함께 중단된다.
+`ApiProtosRoot`가 비어 있거나 `nodevault.proto`가 없으면 빌드가 명확한 에러 메시지와 함께 중단된다.
 
 ---
 
@@ -65,9 +65,9 @@ make policy DOCKGUARD=/path/to/DockGuard/policy/dockerfile
 
 ### 버전 정합성
 
-NodeKit과 NodeForge의 proto 스키마가 일치해야 한다:
+NodeKit과 NodeVault의 proto 스키마가 일치해야 한다:
 - `BuildRequest`, `RegisterToolRequest`, `RegisteredToolDefinition` 필드가 두 저장소 모두 같아야 함
-- proto 변경 시 NodeForge `protos/nodeforge/v1/nodeforge.proto` 수정 후 NodeKit 재빌드 필요
+- proto 변경 시 NodeVault `protos/nodevault/v1/nodevault.proto` 수정 후 NodeKit 재빌드 필요
 
 ### compiler warning
 
@@ -90,5 +90,5 @@ dotnet test NodeKit.sln
 ```
 
 현재 개발 환경 경로:
-- NodeForge protos: `/opt/go/src/github.com/HeaInSeo/NodeForge/protos` (canonical)
+- NodeVault protos: `/opt/go/src/github.com/HeaInSeo/NodeVault/protos` (canonical)
 - DockGuard: `/opt/dotnet/src/github.com/HeaInSeo/DockGuard`

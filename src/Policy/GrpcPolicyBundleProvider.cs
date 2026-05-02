@@ -23,7 +23,7 @@ namespace NodeKit.Policy
     }
 
     /// <summary>
-    /// NodeForge PolicyService gRPC로부터 DockGuard 번들을 가져온다.
+    /// NodeVault PolicyService gRPC로부터 DockGuard 번들을 가져온다.
     /// LocalFilePolicyBundleProvider의 런타임 교체 대상.
     /// </summary>
     public sealed class GrpcPolicyBundleProvider : IPolicyBundleProvider, IDisposable
@@ -58,7 +58,7 @@ namespace NodeKit.Policy
             return new PolicyBundle(response.WasmBytes.ToByteArray(), version);
         }
 
-        /// <summary>NodeForge PolicyService에서 현재 정책 목록과 버전을 조회한다.</summary>
+        /// <summary>NodeVault PolicyService에서 현재 정책 목록과 버전을 조회한다.</summary>
         public async Task<PolicyListResult> ListPoliciesAsync()
         {
             var resp = await _client.ListPoliciesAsync(new ListPoliciesRequest()).ConfigureAwait(false);

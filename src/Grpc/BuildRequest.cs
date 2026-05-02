@@ -5,7 +5,7 @@ using NodeKit.Authoring;
 namespace NodeKit.Grpc
 {
     /// <summary>
-    /// NodeKit → NodeForge gRPC 전송 단위.
+    /// NodeKit → NodeVault gRPC 전송 단위.
     /// L1 검증 통과 후 BuildRequestFactory.FromToolDefinition()으로 생성된다.
     /// </summary>
     public class BuildRequest

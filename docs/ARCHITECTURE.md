@@ -178,7 +178,7 @@ NavToolListButton / NavDataListButton 클릭
 
 | 외부 의존성 | 용도 | 경로 |
 |-------------|------|------|
-| `NodeVault/protos/` | `nodeforge.proto` 빌드 시 proto 컴파일 | `ApiProtosRoot` MSBuild 속성 (자동 탐지) |
+| `NodeVault/protos/` | `nodevault.proto` 빌드 시 proto 컴파일 | `ApiProtosRoot` MSBuild 속성 (자동 탐지) |
 | `DockGuard` 저장소 | `dockguard.wasm` 번들 생성 | `make policy DOCKGUARD=...` |
 
-api-protos Sprint 1-4 완료. canonical source는 `NodeVault/protos/nodeforge/v1/`.
+api-protos Sprint 1-4 완료. canonical source는 `NodeVault/protos/nodevault/v1/`.

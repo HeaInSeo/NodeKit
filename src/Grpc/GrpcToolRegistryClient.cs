@@ -32,13 +32,13 @@ namespace NodeKit.Grpc
         public DateTimeOffset RegisteredAt { get; init; }
     }
 
-    /// <summary>NodeForge ToolRegistryService 클라이언트 추상화.</summary>
+    /// <summary>NodeVault ToolRegistryService 클라이언트 추상화.</summary>
     public interface IToolRegistryClient
     {
         Task<IReadOnlyList<RegisteredTool>> ListToolsAsync(CancellationToken ct = default);
     }
 
-    /// <summary>NodeForge ToolRegistryService gRPC 클라이언트 구현.</summary>
+    /// <summary>NodeVault ToolRegistryService gRPC 클라이언트 구현.</summary>
     public sealed class GrpcToolRegistryClient : IToolRegistryClient, IDisposable
     {
         private readonly GrpcChannel _channel;

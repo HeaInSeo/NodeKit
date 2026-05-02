@@ -83,7 +83,7 @@ namespace NodeKit.Tests
         }
 
         // ── Unix timestamp → DateTimeOffset 변환 검증 ─────────────────────────
-        // NodeForge는 RegisteredAt을 Unix seconds(time.Now().Unix())로 전송한다.
+        // NodeVault는 RegisteredAt을 Unix seconds(time.Now().Unix())로 전송한다.
         // GrpcToolRegistryClient는 DateTimeOffset.FromUnixTimeSeconds()로 변환한다.
 
         [Fact]
