@@ -94,6 +94,7 @@ namespace NodeKit.Tests
 
             Assert.Contains("dotnet restore NodeKit.sln --locked-mode", workflow, StringComparison.Ordinal);
             Assert.Contains("./scripts/ci-audit-packages.sh", workflow, StringComparison.Ordinal);
+            Assert.Contains("./scripts/ci-check-coverage.sh", workflow, StringComparison.Ordinal);
             Assert.Contains("/p:TreatWarningsAsErrors=true", workflow, StringComparison.Ordinal);
             Assert.Contains("/p:EnforceCodeStyleInBuild=true", workflow, StringComparison.Ordinal);
         }

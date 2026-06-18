@@ -89,6 +89,7 @@ No warning regression is allowed.
 NuGet dependency graph must be locked and reproducible.
 Known vulnerable packages fail CI.
 Security workflows must cover dependency review and CodeQL.
+Coverage must not fall below the committed baseline gate.
 ```
 
 Coverage policy for this phase:
@@ -369,6 +370,7 @@ dotnet restore NodeKit.sln --locked-mode
 dotnet format NodeKit.sln --no-restore --verify-no-changes --verbosity minimal
 dotnet build NodeKit.sln --no-restore --configuration Release /p:TreatWarningsAsErrors=true /p:EnforceCodeStyleInBuild=true
 dotnet test NodeKit.sln --no-build --configuration Release --collect:"XPlat Code Coverage" --results-directory TestResults
+./scripts/ci-check-coverage.sh
 ```
 
 Latest local result:
@@ -379,6 +381,7 @@ Latest local result:
 - Format: pass
 - Build: pass, 0 warnings, 0 errors
 - Tests: pass, 82 passed, 0 failed, 0 skipped
+- Coverage threshold: pass, line >= 0.1400 and branch >= 0.0900
 - Coverage artifact generated under TestResults/<run-id>/coverage.cobertura.xml
 ```
 
@@ -386,7 +389,8 @@ CI workflow:
 
 ```text
 .github/workflows/verify.yml runs locked restore, NuGet package audit, format,
-warnings-as-errors build, and coverage test on main branch pushes / pull requests.
+warnings-as-errors build, coverage test, and coverage threshold on main branch
+pushes / pull requests.
 .github/workflows/dependency-review.yml blocks vulnerable or denied-license
 dependency changes on pull requests.
 .github/workflows/codeql.yml runs CodeQL C# security-and-quality analysis on

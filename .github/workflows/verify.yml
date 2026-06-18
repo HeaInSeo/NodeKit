@@ -50,6 +50,9 @@ jobs:
       - name: Test with coverage
         run: dotnet test NodeKit.sln --no-build --configuration Release --collect:"XPlat Code Coverage" --results-directory TestResults
 
+      - name: Coverage threshold
+        run: ./scripts/ci-check-coverage.sh
+
       - name: Upload coverage artifacts
         uses: actions/upload-artifact@v4
         with:
