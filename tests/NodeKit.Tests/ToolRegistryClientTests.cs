@@ -115,7 +115,7 @@ namespace NodeKit.Tests
             };
             IToolRegistryClient client = new FakeToolRegistryClient(tools);
 
-            var result = await client.ListToolsAsync();
+            var result = await client.ListToolsAsync(TestContext.Current.CancellationToken);
 
             Assert.Equal(2, result.Count);
             Assert.Equal("bwa-mem2", result[0].ToolName);
@@ -127,7 +127,7 @@ namespace NodeKit.Tests
         {
             IToolRegistryClient client = new FakeToolRegistryClient(Array.Empty<RegisteredTool>());
 
-            var result = await client.ListToolsAsync();
+            var result = await client.ListToolsAsync(TestContext.Current.CancellationToken);
 
             Assert.Empty(result);
         }
@@ -139,7 +139,7 @@ namespace NodeKit.Tests
             IToolRegistryClient client = new FakeToolRegistryClient(ex);
 
             await Assert.ThrowsAsync<InvalidOperationException>(
-                () => client.ListToolsAsync());
+                () => client.ListToolsAsync(TestContext.Current.CancellationToken));
         }
 
         [Fact]

@@ -101,10 +101,10 @@ Coverage policy for this phase:
 - Coverage must not decrease for the touched validation/mapping/client areas after the baseline is established.
 ```
 
-Use .NET coverage through the existing coverlet collector:
+Use Microsoft.Testing.Platform coverage through the xUnit v3 test project:
 
 ```bash
-dotnet test --collect:"XPlat Code Coverage"
+dotnet test --solution NodeKit.sln --coverage --coverage-output coverage.cobertura.xml --coverage-output-format cobertura
 ```
 
 ## 4. Sprint Schedule
@@ -369,7 +369,7 @@ dotnet restore NodeKit.sln --locked-mode
 ./scripts/ci-audit-packages.sh
 dotnet format NodeKit.sln --no-restore --verify-no-changes --verbosity minimal
 dotnet build NodeKit.sln --no-restore --configuration Release /p:TreatWarningsAsErrors=true /p:EnforceCodeStyleInBuild=true
-dotnet test NodeKit.sln --no-build --configuration Release --collect:"XPlat Code Coverage" --results-directory TestResults
+dotnet test --solution NodeKit.sln --no-build --configuration Release --results-directory TestResults --coverage --coverage-output coverage.cobertura.xml --coverage-output-format cobertura
 ./scripts/ci-check-coverage.sh
 ```
 
@@ -377,12 +377,12 @@ Latest local result:
 
 ```text
 - Locked restore: pass
-- Package audit: pass; xunit v2 is reported as deprecated and tracked for a dedicated migration
+- Package audit: pass
 - Format: pass
 - Build: pass, 0 warnings, 0 errors
 - Tests: pass, 82 passed, 0 failed, 0 skipped
 - Coverage threshold: pass, line >= 0.1400 and branch >= 0.0900
-- Coverage artifact generated under TestResults/<run-id>/coverage.cobertura.xml
+- Coverage artifact generated under TestResults/coverage.cobertura.xml
 ```
 
 CI workflow:

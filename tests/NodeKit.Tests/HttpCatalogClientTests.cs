@@ -72,7 +72,7 @@ namespace NodeKit.Tests
                 """;
 
             using var client = MakeClient(HttpStatusCode.OK, json);
-            var result = await client.ListToolsAsync();
+            var result = await client.ListToolsAsync(TestContext.Current.CancellationToken);
 
             Assert.Single(result);
             var tool = result[0];
@@ -92,7 +92,7 @@ namespace NodeKit.Tests
         public async Task ListToolsAsync_EmptyList_ReturnsEmpty()
         {
             using var client = MakeClient(HttpStatusCode.OK, """{"tools":[]}""");
-            var result = await client.ListToolsAsync();
+            var result = await client.ListToolsAsync(TestContext.Current.CancellationToken);
             Assert.Empty(result);
         }
 
@@ -108,7 +108,7 @@ namespace NodeKit.Tests
                 }
                 """;
             using var client = MakeClient(HttpStatusCode.OK, json);
-            var result = await client.ListToolsAsync();
+            var result = await client.ListToolsAsync(TestContext.Current.CancellationToken);
 
             Assert.Equal(2, result.Count);
             Assert.Equal("bwa", result[0].ToolName);
@@ -133,7 +133,7 @@ namespace NodeKit.Tests
                 }
                 """;
             using var client = MakeClient(HttpStatusCode.OK, json);
-            var result = await client.ListToolsAsync();
+            var result = await client.ListToolsAsync(TestContext.Current.CancellationToken);
 
             Assert.Single(result);
             Assert.Equal("samtools 1.17", result[0].DisplayLabel);
@@ -155,7 +155,7 @@ namespace NodeKit.Tests
                 }
                 """;
             using var client = MakeClient(HttpStatusCode.OK, json);
-            var result = await client.ListToolsAsync();
+            var result = await client.ListToolsAsync(TestContext.Current.CancellationToken);
 
             Assert.Single(result);
             Assert.Equal("star", result[0].DisplayLabel);
@@ -174,7 +174,7 @@ namespace NodeKit.Tests
                 }
                 """;
             using var client = MakeClient(HttpStatusCode.OK, json);
-            var result = await client.ListToolsAsync();
+            var result = await client.ListToolsAsync(TestContext.Current.CancellationToken);
 
             Assert.Single(result);
             Assert.Equal(expected, result[0].RegisteredAt);
@@ -185,7 +185,7 @@ namespace NodeKit.Tests
         {
             using var client = MakeClient(HttpStatusCode.InternalServerError, "internal error");
             await Assert.ThrowsAsync<HttpRequestException>(
-                () => client.ListToolsAsync());
+                () => client.ListToolsAsync(TestContext.Current.CancellationToken));
         }
 
         [Fact]
@@ -193,7 +193,7 @@ namespace NodeKit.Tests
         {
             using var client = MakeClient(HttpStatusCode.NotFound, "not found");
             await Assert.ThrowsAsync<HttpRequestException>(
-                () => client.ListToolsAsync());
+                () => client.ListToolsAsync(TestContext.Current.CancellationToken));
         }
 
         // ── IntegrityHealth 매핑 ─────────────────────────────────────────────
@@ -215,7 +215,7 @@ namespace NodeKit.Tests
                 }
                 """;
             using var client = MakeClient(HttpStatusCode.OK, json);
-            var result = await client.ListToolsAsync();
+            var result = await client.ListToolsAsync(TestContext.Current.CancellationToken);
 
             Assert.Single(result);
             Assert.Equal("Partial", result[0].IntegrityHealth);
@@ -233,7 +233,7 @@ namespace NodeKit.Tests
                 }
                 """;
             using var client = MakeClient(HttpStatusCode.OK, json);
-            var result = await client.ListToolsAsync();
+            var result = await client.ListToolsAsync(TestContext.Current.CancellationToken);
 
             Assert.Single(result);
             Assert.Equal(string.Empty, result[0].IntegrityHealth);
@@ -267,7 +267,7 @@ namespace NodeKit.Tests
                 }
                 """;
             using var client = MakeClient(HttpStatusCode.OK, json);
-            var result = await client.ListDataAsync();
+            var result = await client.ListDataAsync(TestContext.Current.CancellationToken);
 
             Assert.Single(result);
             var d = result[0];
@@ -289,7 +289,7 @@ namespace NodeKit.Tests
         public async Task ListDataAsync_EmptyList_ReturnsEmpty()
         {
             using var client = MakeClient(HttpStatusCode.OK, """{"data":[]}""");
-            var result = await client.ListDataAsync();
+            var result = await client.ListDataAsync(TestContext.Current.CancellationToken);
             Assert.Empty(result);
         }
 
@@ -310,7 +310,7 @@ namespace NodeKit.Tests
                 }
                 """;
             using var client = MakeClient(HttpStatusCode.OK, json);
-            var result = await client.ListDataAsync();
+            var result = await client.ListDataAsync(TestContext.Current.CancellationToken);
 
             Assert.Single(result);
             Assert.Equal("hg38-reference 2024-01", result[0].DisplayLabel);
@@ -332,7 +332,7 @@ namespace NodeKit.Tests
                 }
                 """;
             using var client = MakeClient(HttpStatusCode.OK, json);
-            var result = await client.ListDataAsync();
+            var result = await client.ListDataAsync(TestContext.Current.CancellationToken);
 
             Assert.Single(result);
             Assert.Equal("hg38-reference", result[0].DisplayLabel);
@@ -343,7 +343,7 @@ namespace NodeKit.Tests
         {
             using var client = MakeClient(HttpStatusCode.InternalServerError, "error");
             await Assert.ThrowsAsync<HttpRequestException>(
-                () => client.ListDataAsync());
+                () => client.ListDataAsync(TestContext.Current.CancellationToken));
         }
 
         // ── Dispose ───────────────────────────────────────────────────────────

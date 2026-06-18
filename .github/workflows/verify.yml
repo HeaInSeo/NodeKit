@@ -48,7 +48,7 @@ jobs:
         run: dotnet build NodeKit.sln --no-restore --configuration Release /p:TreatWarningsAsErrors=true /p:EnforceCodeStyleInBuild=true
 
       - name: Test with coverage
-        run: dotnet test NodeKit.sln --no-build --configuration Release --collect:"XPlat Code Coverage" --results-directory TestResults
+        run: dotnet test --solution NodeKit.sln --no-build --configuration Release --results-directory TestResults --coverage --coverage-output coverage.cobertura.xml --coverage-output-format cobertura
 
       - name: Coverage threshold
         run: ./scripts/ci-check-coverage.sh
@@ -57,5 +57,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage
-          path: TestResults/**/coverage.cobertura.xml
+          path: TestResults/coverage.cobertura.xml
           if-no-files-found: error
