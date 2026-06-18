@@ -1,5 +1,47 @@
 # NodeKit — Claude Code Guidelines
 
+## 0. Active planning memory
+
+Read `docs/NODEKIT_CLI_FIRST_SPRINT_PLAN.md` before resuming NodeKit work.
+
+Current planning source of truth:
+
+- NodeKit must not implement the new `ToolSpecRequest` production path yet.
+- Keep the current `BuildRequest` / `BuildAndRegister` legacy gRPC path working.
+- NodeKit migrates only after NodeVault Phase 1 is complete:
+  - canonical `ResolveToolSpec` implementation
+  - `SubmitToolBuild` API
+- Follow `PLATFORM_SCHEDULE.md` Phase 6 order.
+
+Until that gate opens, immediate NodeKit work is limited to legacy path stability,
+L1 validation quality, BuildRequest mapping quality, gRPC client resilience, CI,
+lint, tests, and coverage. Older sprint documents under `docs/obsolete/` are
+historical reference only and must not override the active sprint plan.
+
+New application state should follow the same direction as DagEdit: ReactiveUI /
+System.Reactive first, with DynamicData where collection change streams are useful.
+The current UI is still largely code-behind/event-handler based; do not expand
+that pattern for new validation, submission progress, or result state. Introduce
+focused reactive ViewModel/state objects for new behavior while keeping pure
+validation and serialization code deterministic and easy to test.
+
+At the start of each development session, observe NodeVault without editing it:
+
+- `git -C /opt/go/src/github.com/HeaInSeo/NodeVault status --short --branch`
+- read `/opt/go/src/github.com/HeaInSeo/NodeVault/docs/PLATFORM_SCHEDULE.md`
+- read `/opt/go/src/github.com/HeaInSeo/NodeVault/docs/PLATFORM_MAP.md`
+- inspect `/opt/go/src/github.com/HeaInSeo/NodeVault/protos/nodevault/v1/nodevault.proto`
+
+NodeVault's planning/API documents are the upstream platform source of truth for
+NodeKit integration. If NodeVault has only partial new-path support, NodeKit must
+stay compatible with the legacy `BuildRequest` / `BuildAndRegister` path.
+
+NodeVault and adjacent platform services are tested on remote infrastructure by
+default. Discover live environment details from documents under
+`~/.config/infra-lab`; do not assume a local NodeVault process. NodeKit local
+tests should remain independent of live NodeVault unless an integration test is
+explicitly opted in.
+
 ## 1. Responsibility boundary (immutable)
 
 **NodeKit owns**: ToolDefinition authoring (UI forms, field validation), DataDefinition authoring
@@ -8,15 +50,20 @@ DockGuard policy execution via `WasmPolicyChecker`, BuildRequest / DataRegisterR
 and gRPC transmission to NodeVault, AdminToolList / AdminDataList display (via Catalog 서비스 REST API),
 and all admin UX semantics (status feedback, error display, policy management UI).
 
+**NodeVault is a Kubernetes data-plane app.** NodeKit integrates with it through
+the documented gRPC/REST API surface and must not reach into Kubernetes directly.
+
 **NodeVault owns**: BuildRequest / DataRegisterRequest reception, tool image build orchestration
 (L2/L3/L4), reference data packaging (sori), OCI referrer push, artifact index management (SoT),
 DockGuard policy bundle management (`PolicyService`), Harbor lifecycle control, and Harbor webhook
-reconciliation. NodeVault replaces NodeVault.
+reconciliation.
 
 **Catalog 서비스 owns**: Read-only artifact palette (tools + reference data) for pipeline builders.
 NodeKit queries Catalog 서비스 REST API for AdminToolList and AdminDataList.
 
 Do not implement image building, Job scheduling, or K8s API calls in NodeKit.
+Do not implement production `ToolSpecRequest`, `ResolveToolSpec`, or `SubmitToolBuild`
+client paths until NodeVault Phase 1 is complete and the active sprint plan permits it.
 Do not implement editor UX, selection policy, or undo/redo in NodeKit — those belong to DagEdit.
 
 ## 2. Key term boundaries (immutable)

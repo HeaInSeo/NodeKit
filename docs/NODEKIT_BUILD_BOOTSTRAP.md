@@ -1,7 +1,7 @@
 # NodeKit Build Bootstrap
 
 작성일: 2026-04-08  
-최종 수정: 2026-04-19
+최종 수정: 2026-06-18
 
 ---
 
@@ -71,8 +71,9 @@ NodeKit과 NodeVault의 proto 스키마가 일치해야 한다:
 
 ### compiler warning
 
-현재 `dotnet build` 시 276개 경고가 존재한다 (CA1062).
-CLAUDE.md §8 기준 위반 — 다음 작업 전 해소 필요.
+`CLAUDE.md`의 warning policy를 따른다. 변경 작업은 새 compiler/analyzer warning을
+추가하지 않아야 하며, legacy path 안정화 작업 중 CI/lint/test/coverage 기준을
+`docs/NODEKIT_CLI_FIRST_SPRINT_PLAN.md`에 맞춰 정리한다.
 
 ---
 

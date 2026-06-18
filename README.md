@@ -100,6 +100,18 @@ EOF
 
 ## 핵심 개념
 
+### 현재 개발 기준
+
+현재 NodeKit 작업의 기준 문서는
+[`docs/NODEKIT_CLI_FIRST_SPRINT_PLAN.md`](docs/NODEKIT_CLI_FIRST_SPRINT_PLAN.md)입니다.
+
+NodeKit은 당분간 기존 `BuildRequest` / `BuildAndRegister` gRPC 경로를 유지합니다.
+`ToolSpecRequest`, `ResolveToolSpec`, `SubmitToolBuild` 생산 경로는 NodeVault Phase 1 완료 후
+`PLATFORM_SCHEDULE.md` Phase 6 순서에 따라 migration할 때만 추가합니다.
+
+NodeVault는 Kubernetes data-plane app입니다. NodeKit은 gRPC/REST API로만 연동하며,
+Kubernetes API를 직접 호출하지 않습니다.
+
 ### L1 정책 검증 (로컬 실행)
 
 NodeKit은 빌드 요청 전송 전에 DockGuard 정책을 **로컬에서 WASM으로 실행**합니다.  
@@ -132,7 +144,7 @@ NodeKit (이 앱)
   ├─ L1 검증 (로컬 WASM)
   │
   ├─ gRPC :50051 ──► NodeVault
-  │                    ├─ L2 이미지 빌드 (buildah/podbridge5)
+  │                    ├─ L2 이미지 빌드
   │                    ├─ L3 dry-run (K8s)
   │                    └─ L4 smoke run (K8s)
   │
@@ -140,7 +152,8 @@ NodeKit (이 앱)
                        └─ 등록된 Tool / Data 목록 제공
 ```
 
-상세 설계는 [CLAUDE.md](CLAUDE.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 참조.
+현재 작업 기준은 [docs/NODEKIT_CLI_FIRST_SPRINT_PLAN.md](docs/NODEKIT_CLI_FIRST_SPRINT_PLAN.md),
+책임 경계는 [CLAUDE.md](CLAUDE.md), 상세 설계는 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 참조.
 
 ---
 

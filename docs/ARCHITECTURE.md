@@ -1,10 +1,11 @@
 # NodeKit 아키텍처 개요
 
-버전: 1.1  
-작성일: 2026-04-18 / 갱신: 2026-04-20  
-상태: 현재 구현 기준
+버전: 1.2
+작성일: 2026-04-18 / 갱신: 2026-06-18
+상태: 현재 구현 + active planning 기준
 
 관련 문서:
+- [NODEKIT_CLI_FIRST_SPRINT_PLAN.md](NODEKIT_CLI_FIRST_SPRINT_PLAN.md) — 현재 NodeKit 작업 기준
 - **[PLATFORM_MAP.md](../../NodeVault/docs/PLATFORM_MAP.md)** — 전체 플랫폼 구성, end-to-end 흐름, 현재 상태 (개발 세션 시작 시 먼저 읽을 것)
   - 절대 경로: `/opt/go/src/github.com/HeaInSeo/NodeVault/docs/PLATFORM_MAP.md`
 - [CLAUDE.md](../CLAUDE.md) — 책임 경계, 재현성 규칙, 결정 체크리스트 (규범 문서)
@@ -16,6 +17,15 @@
 ## 역할 한 줄 정의
 
 관리자가 Tool/Data를 정의하고 L1 검증을 수행한 뒤 NodeVault로 빌드 요청을 전송하는 **관리자 전용 데스크톱 클라이언트**.
+
+NodeVault는 Kubernetes data-plane app이며, NodeKit은 문서화된 gRPC/REST API로만 연동한다.
+NodeKit은 Kubernetes API를 직접 호출하지 않는다.
+NodeVault 및 관련 플랫폼 서비스의 live 테스트는 원격 인프라를 기본으로 하며,
+접속 정보와 운영 문서는 `~/.config/infra-lab` 아래 문서를 확인한다.
+
+현재 구현 단계에서는 기존 `BuildRequest` / `BuildAndRegister` legacy gRPC 경로를 유지한다.
+`ToolSpecRequest`, `ResolveToolSpec`, `SubmitToolBuild` 생산 경로는 NodeVault Phase 1 완료 후
+`PLATFORM_SCHEDULE.md` Phase 6에서 migration이 허용될 때까지 추가하지 않는다.
 
 ---
 
@@ -98,7 +108,7 @@ BuildRequest (proto)
   │ gRPC stream
   ▼
 [NodeVault BuildService]
-  → L2(podbridge5) → L3(dry-run) → L4(smoke) → index 등록
+  → L2(image build) → L3(dry-run) → L4(smoke) → index 등록
   → BuildEvent stream →
   ▼
 [NodeKit] 빌드 로그 표시 → 완료 알림
@@ -182,3 +192,10 @@ NavToolListButton / NavDataListButton 클릭
 | `DockGuard` 저장소 | `dockguard.wasm` 번들 생성 | `make policy DOCKGUARD=...` |
 
 api-protos Sprint 1-4 완료. canonical source는 `NodeVault/protos/nodevault/v1/`.
+
+---
+
+## 문서 기준
+
+현재 기준 문서는 `NODEKIT_CLI_FIRST_SPRINT_PLAN.md`와 `CLAUDE.md`이다.
+`docs/obsolete/` 아래의 예전 스프린트/조사 문서는 보관용이며, 현재 작업 순서나 API migration 판단에 사용하지 않는다.

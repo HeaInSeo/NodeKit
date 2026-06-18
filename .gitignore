@@ -4,6 +4,7 @@
 bin/
 obj/
 out/
+publish/
 
 # Visual Studio 파일
 .vs/
@@ -37,6 +38,11 @@ coverage.cobertura.xml
 *.log
 *.tmp
 /tmp/
+
+# 로컬 에이전트/실험 산출물
+.codex
+NodeKit_POC/
+images/
 
 # OS
 .DS_Store
