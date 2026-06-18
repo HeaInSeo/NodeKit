@@ -12,7 +12,7 @@ namespace NodeKit.Tests
     public sealed class WasmPolicyCheckerTests
     {
         // 빌드 출력 디렉토리에 복사된 .wasm 경로
-        private static readonly string WasmPath = Path.Combine(
+        private static readonly string _wasmPath = Path.Combine(
             Path.GetDirectoryName(typeof(WasmPolicyCheckerTests).Assembly.Location)!,
             "assets",
             "policy",
@@ -20,8 +20,8 @@ namespace NodeKit.Tests
 
         private static WasmPolicyChecker CreateChecker()
         {
-            Assert.True(File.Exists(WasmPath), $"dockguard.wasm not found at: {WasmPath}");
-            var bytes = File.ReadAllBytes(WasmPath);
+            Assert.True(File.Exists(_wasmPath), $"dockguard.wasm not found at: {_wasmPath}");
+            var bytes = File.ReadAllBytes(_wasmPath);
             var bundle = new PolicyBundle(bytes, "test");
             return new WasmPolicyChecker(bundle);
         }

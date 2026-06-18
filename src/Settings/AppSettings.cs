@@ -1,7 +1,7 @@
 namespace NodeKit.Settings;
 
 /// <summary>Connection settings persisted across NodeKit sessions.</summary>
-public sealed class AppSettings
+internal sealed class AppSettings
 {
     /// <summary>NodeVault gRPC server address (Build + Policy RPCs).</summary>
     public string NodeVaultAddress { get; set; } = "http://100.123.80.48:50051";

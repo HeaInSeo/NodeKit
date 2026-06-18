@@ -8,7 +8,7 @@ namespace NodeKit.Grpc
     /// NodeKit → NodeVault gRPC 전송 단위.
     /// L1 검증 통과 후 BuildRequestFactory.FromToolDefinition()으로 생성된다.
     /// </summary>
-    public class BuildRequest
+    internal class BuildRequest
     {
         public string RequestId { get; set; } = Guid.NewGuid().ToString();
 

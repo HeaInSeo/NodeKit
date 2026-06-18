@@ -17,23 +17,22 @@ using NodeKit.Validation;
 
 namespace NodeKit.UI
 {
-    public partial class MainWindow : Window
+    internal partial class MainWindow : Window, IDisposable
     {
         private readonly ImageUriValidator _imageUriValidator = new();
         private readonly PackageVersionValidator _packageVersionValidator = new();
         private readonly RequiredFieldsValidator _requiredFieldsValidator = new();
         private readonly ValidatedDefinitionState _validatedDefinitionState = new();
 
-#pragma warning disable CA1001 // Disposed in OnWindowClosed (Window has no IDisposable)
         private WasmPolicyChecker? _policyChecker;
         private GrpcBuildClient? _buildClient;
         private HttpCatalogClient? _catalogClient;
         private GrpcPolicyBundleProvider? _policyProvider;
         private CancellationTokenSource? _buildCts;
-#pragma warning restore CA1001
         private string? _buildClientAddress;
         private string? _catalogClientAddress;
         private string? _policyProviderAddress;
+        private bool _disposed;
 
         private AppSettings _settings = new();
 
@@ -42,7 +41,7 @@ namespace NodeKit.UI
             InitializeComponent();
 
             _settings = SettingsService.Load();
-            _policyChecker = TryLoadPolicyChecker();
+            _policyChecker = MainWindowFormHelpers.TryLoadPolicyChecker();
 
             AddInputButton.Click += (_, _) => AddInputRow(InputRowsPanel);
             AddOutputButton.Click += (_, _) => AddOutputRow(OutputRowsPanel);
@@ -51,9 +50,21 @@ namespace NodeKit.UI
             Closed += OnWindowClosed;
 
             NavAuthoringButton.Click += (_, _) => ShowPanel(AuthoringPanel);
-            NavToolListButton.Click += (_, _) => { ShowPanel(ToolListPanel); _ = LoadToolListAsync(); };
-            NavDataListButton.Click += (_, _) => { ShowPanel(DataListPanel); _ = LoadDataListAsync(); };
-            NavPolicyButton.Click += (_, _) => { ShowPanel(PolicyPanel); _ = LoadPolicyListAsync(); };
+            NavToolListButton.Click += (_, _) =>
+            {
+                ShowPanel(ToolListPanel);
+                _ = LoadToolListAsync();
+            };
+            NavDataListButton.Click += (_, _) =>
+            {
+                ShowPanel(DataListPanel);
+                _ = LoadDataListAsync();
+            };
+            NavPolicyButton.Click += (_, _) =>
+            {
+                ShowPanel(PolicyPanel);
+                _ = LoadPolicyListAsync();
+            };
             NavSettingsButton.Click += (_, _) => ShowPanel(SettingsPanel);
             RefreshToolListButton.Click += (_, _) => _ = LoadToolListAsync();
             RefreshDataListButton.Click += (_, _) => _ = LoadDataListAsync();
@@ -71,27 +82,33 @@ namespace NodeKit.UI
             ApplySettingsToUI();
         }
 
+        public void Dispose()
+        {
+            DisposeResources();
+            GC.SuppressFinalize(this);
+        }
+
         private void ShowPanel(Avalonia.Controls.Control target)
         {
             AuthoringPanel.IsVisible = target == AuthoringPanel;
-            ToolListPanel.IsVisible  = target == ToolListPanel;
-            DataListPanel.IsVisible  = target == DataListPanel;
-            PolicyPanel.IsVisible    = target == PolicyPanel;
-            SettingsPanel.IsVisible  = target == SettingsPanel;
+            ToolListPanel.IsVisible = target == ToolListPanel;
+            DataListPanel.IsVisible = target == DataListPanel;
+            PolicyPanel.IsVisible = target == PolicyPanel;
+            SettingsPanel.IsVisible = target == SettingsPanel;
         }
 
         private void ApplySettingsToUI()
         {
             SettingsNodeVaultAddressBox.Text = _settings.NodeVaultAddress;
-            SettingsCatalogAddressBox.Text   = _settings.CatalogAddress;
-            SettingsFilePathLabel.Text       = SettingsService.FilePath;
-            SettingsSavedPanel.IsVisible     = false;
+            SettingsCatalogAddressBox.Text = _settings.CatalogAddress;
+            SettingsFilePathLabel.Text = SettingsService.FilePath;
+            SettingsSavedPanel.IsVisible = false;
         }
 
         private void OnSaveSettingsClicked(object? sender, RoutedEventArgs e)
         {
             var nodeVaultAddr = SettingsNodeVaultAddressBox.Text?.Trim() ?? string.Empty;
-            var catalogAddr   = SettingsCatalogAddressBox.Text?.Trim()   ?? string.Empty;
+            var catalogAddr = SettingsCatalogAddressBox.Text?.Trim() ?? string.Empty;
 
             _settings.NodeVaultAddress = string.IsNullOrEmpty(nodeVaultAddr)
                 ? new AppSettings().NodeVaultAddress
@@ -103,8 +120,8 @@ namespace NodeKit.UI
             SettingsService.Save(_settings);
 
             // 캐시된 클라이언트 폐기 — 다음 요청 시 새 주소로 재생성
-            _buildClientAddress    = null;
-            _catalogClientAddress  = null;
+            _buildClientAddress = null;
+            _catalogClientAddress = null;
             _policyProviderAddress = null;
 
             SettingsSavedPanel.IsVisible = true;
@@ -117,36 +134,10 @@ namespace NodeKit.UI
             _settings = new AppSettings();
             SettingsService.Save(_settings);
             ApplySettingsToUI();
-            _buildClientAddress    = null;
-            _catalogClientAddress  = null;
+            _buildClientAddress = null;
+            _catalogClientAddress = null;
             _policyProviderAddress = null;
             StatusBar.Text = "기본값으로 초기화되었습니다.";
-        }
-
-        private static WasmPolicyChecker? TryLoadPolicyChecker()
-        {
-            try
-            {
-                var wasmPath = Path.Combine(
-                    AppDomain.CurrentDomain.BaseDirectory,
-                    "assets",
-                    "policy",
-                    "dockguard.wasm");
-
-                if (!File.Exists(wasmPath))
-                {
-                    return null;
-                }
-
-                var bytes = File.ReadAllBytes(wasmPath);
-                return new WasmPolicyChecker(new PolicyBundle(bytes, $"local:{Path.GetFileName(wasmPath)}"));
-            }
-#pragma warning disable CA1031
-            catch
-            {
-                return null;
-            }
-#pragma warning restore CA1031
         }
 
         // ─── I/O 동적 행 관리 ─────────────────────────────────────────────────
@@ -160,8 +151,8 @@ namespace NodeKit.UI
                 ColumnDefinitions = new ColumnDefinitions("2*,4,1.5*,4,1.2*,4,60,4,Auto"),
             };
 
-            var nameBox   = MakePortTextBox("이름 (예: reads)", 0, row);
-            var roleBox   = MakePortTextBox("역할 (예: sample-fastq)", 2, row);
+            var nameBox = MakePortTextBox("이름 (예: reads)", 0, row);
+            var roleBox = MakePortTextBox("역할 (예: sample-fastq)", 2, row);
             var formatBox = MakePortTextBox("형식 (예: fastq)", 4, row);
 
             var shapeBox = new ComboBox
@@ -190,8 +181,8 @@ namespace NodeKit.UI
                 ColumnDefinitions = new ColumnDefinitions("2*,4,1.5*,4,1.2*,4,60,4,60,4,Auto"),
             };
 
-            var nameBox   = MakePortTextBox("이름 (예: aligned_bam)", 0, row);
-            var roleBox   = MakePortTextBox("역할 (예: aligned-bam)", 2, row);
+            var nameBox = MakePortTextBox("이름 (예: aligned_bam)", 0, row);
+            var roleBox = MakePortTextBox("역할 (예: aligned-bam)", 2, row);
             var formatBox = MakePortTextBox("형식 (예: bam)", 4, row);
 
             var shapeBox = new ComboBox
@@ -226,7 +217,7 @@ namespace NodeKit.UI
         {
             var box = new TextBox
             {
-                Watermark = watermark,
+                PlaceholderText = watermark,
                 Background = new SolidColorBrush(Color.Parse("#1e1d2e")),
                 Foreground = Brushes.White,
                 BorderBrush = new SolidColorBrush(Color.Parse("#333")),
@@ -266,72 +257,7 @@ namespace NodeKit.UI
             row.Children.Add(btn);
         }
 
-        /// <summary>Input 행에서 ToolInput 목록을 수집한다.</summary>
-        private static List<ToolInput> CollectInputSpecs(StackPanel panel)
-        {
-            var result = new List<ToolInput>();
-            foreach (var child in panel.Children)
-            {
-                if (child is not Grid row)
-                {
-                    continue;
-                }
-
-                var boxes = row.Children.OfType<TextBox>().ToList();
-                var combos = row.Children.OfType<ComboBox>().ToList();
-                var name = boxes.ElementAtOrDefault(0)?.Text?.Trim() ?? string.Empty;
-                if (string.IsNullOrEmpty(name))
-                {
-                    continue;
-                }
-
-                result.Add(new ToolInput
-                {
-                    Name = name,
-                    Role = boxes.ElementAtOrDefault(1)?.Text?.Trim() ?? string.Empty,
-                    Format = boxes.ElementAtOrDefault(2)?.Text?.Trim() ?? string.Empty,
-                    Shape = combos.ElementAtOrDefault(0)?.SelectedItem?.ToString() ?? "single",
-                    Required = true,
-                });
-            }
-
-            return result;
-        }
-
-        /// <summary>Output 행에서 ToolOutput 목록을 수집한다.</summary>
-        private static List<ToolOutput> CollectOutputSpecs(StackPanel panel)
-        {
-            var result = new List<ToolOutput>();
-            foreach (var child in panel.Children)
-            {
-                if (child is not Grid row)
-                {
-                    continue;
-                }
-
-                var boxes = row.Children.OfType<TextBox>().ToList();
-                var combos = row.Children.OfType<ComboBox>().ToList();
-                var name = boxes.ElementAtOrDefault(0)?.Text?.Trim() ?? string.Empty;
-                if (string.IsNullOrEmpty(name))
-                {
-                    continue;
-                }
-
-                result.Add(new ToolOutput
-                {
-                    Name = name,
-                    Role = boxes.ElementAtOrDefault(1)?.Text?.Trim() ?? string.Empty,
-                    Format = boxes.ElementAtOrDefault(2)?.Text?.Trim() ?? string.Empty,
-                    Shape = combos.ElementAtOrDefault(0)?.SelectedItem?.ToString() ?? "single",
-                    Class = combos.ElementAtOrDefault(1)?.SelectedItem?.ToString() ?? "primary",
-                });
-            }
-
-            return result;
-        }
-
         // ─── 검증 및 빌드 ─────────────────────────────────────────────────────
-
         private void OnValidateClicked(object? sender, RoutedEventArgs e)
         {
             InvalidateValidationState();
@@ -639,12 +565,7 @@ namespace NodeKit.UI
 
         private void OnWindowClosed(object? sender, EventArgs e)
         {
-            _buildCts?.Cancel();
-            _buildCts?.Dispose();
-            _buildClient?.Dispose();
-            _catalogClient?.Dispose();
-            _policyProvider?.Dispose();
-            _policyChecker?.Dispose();
+            DisposeResources();
         }
 
         private ToolDefinition BuildDefinitionFromForm()
@@ -663,39 +584,15 @@ namespace NodeKit.UI
                 ImageUri = ImageUriBox.Text ?? string.Empty,
                 DockerfileContent = DockerfileBox.Text ?? string.Empty,
                 Script = ScriptBox.Text ?? string.Empty,
-                Command = ParseCommandJson(CommandBox.Text),
+                Command = MainWindowFormHelpers.ParseCommandJson(CommandBox.Text),
                 EnvironmentSpec = EnvSpecBox.Text ?? string.Empty,
-                Inputs = CollectInputSpecs(InputRowsPanel),
-                Outputs = CollectOutputSpecs(OutputRowsPanel),
+                Inputs = MainWindowFormHelpers.CollectInputSpecs(InputRowsPanel),
+                Outputs = MainWindowFormHelpers.CollectOutputSpecs(OutputRowsPanel),
                 DisplayLabel = DisplayLabelBox.Text?.Trim() ?? string.Empty,
                 DisplayDescription = DisplayDescriptionBox.Text?.Trim() ?? string.Empty,
                 DisplayCategory = DisplayCategoryBox.Text?.Trim() ?? string.Empty,
                 DisplayTags = tags,
             };
-        }
-
-        /// <summary>
-        /// 사용자 입력 문자열을 JSON 배열로 파싱해 커맨드 목록을 반환한다.
-        /// 빈 입력이거나 파싱 실패 시 빈 목록을 반환한다.
-        /// </summary>
-        private static List<string> ParseCommandJson(string? raw)
-        {
-            if (string.IsNullOrWhiteSpace(raw))
-            {
-                return new List<string>();
-            }
-
-            try
-            {
-                var parsed = JsonSerializer.Deserialize<List<string>>(raw.Trim());
-                return parsed ?? new List<string>();
-            }
-#pragma warning disable CA1031
-            catch
-            {
-                return new List<string>();
-            }
-#pragma warning restore CA1031
         }
 
         private void RegisterValidationInvalidationHandlers()
@@ -749,6 +646,22 @@ namespace NodeKit.UI
             }
 
             return _policyProvider;
+        }
+
+        private void DisposeResources()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _buildCts?.Cancel();
+            _buildCts?.Dispose();
+            _buildClient?.Dispose();
+            _catalogClient?.Dispose();
+            _policyProvider?.Dispose();
+            _policyChecker?.Dispose();
+            _disposed = true;
         }
     }
 }

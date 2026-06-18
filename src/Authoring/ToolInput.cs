@@ -1,7 +1,7 @@
 namespace NodeKit.Authoring
 {
     /// <summary>Tool의 named input 포트 계약.</summary>
-    public class ToolInput
+    internal class ToolInput
     {
         /// <summary>포트 이름 (예: "reads").</summary>
         public string Name { get; set; } = string.Empty;

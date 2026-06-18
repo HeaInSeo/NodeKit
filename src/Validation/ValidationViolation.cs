@@ -1,8 +1,15 @@
 namespace NodeKit.Validation
 {
     /// <summary>단일 검증 위반 항목.</summary>
-    public class ValidationViolation
+    internal class ValidationViolation
     {
+        public ValidationViolation(string ruleId, string message, string? field = null)
+        {
+            RuleId = ruleId;
+            Message = message;
+            Field = field;
+        }
+
         /// <summary>규칙 ID (예: "L1-001", "DFM002").</summary>
         public string RuleId { get; set; } = string.Empty;
 
@@ -11,12 +18,5 @@ namespace NodeKit.Validation
 
         /// <summary>위반이 발생한 필드 이름 (선택).</summary>
         public string? Field { get; set; }
-
-        public ValidationViolation(string ruleId, string message, string? field = null)
-        {
-            RuleId = ruleId;
-            Message = message;
-            Field = field;
-        }
     }
 }

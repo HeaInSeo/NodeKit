@@ -8,7 +8,7 @@ namespace NodeKit.Validation
     /// <summary>
     /// L1 필수 필드 및 기본 I/O 구조 검증기.
     /// </summary>
-    public class RequiredFieldsValidator : IValidator
+    internal class RequiredFieldsValidator : IValidator
     {
         public ValidationResult Validate(ToolDefinition definition)
         {

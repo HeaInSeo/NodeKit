@@ -8,14 +8,11 @@ namespace NodeKit.Validation
     /// - latest 태그 차단
     /// - digest(@sha256:...) 미포함 차단
     /// </summary>
-    public class ImageUriValidator : IValidator
+    internal class ImageUriValidator : IValidator
     {
         public ValidationResult Validate(ToolDefinition definition)
         {
-            if (definition is null)
-            {
-                throw new ArgumentNullException(nameof(definition));
-            }
+            ArgumentNullException.ThrowIfNull(definition);
 
             var uri = definition.ImageUri;
 

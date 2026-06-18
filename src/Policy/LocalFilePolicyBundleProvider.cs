@@ -7,7 +7,7 @@ namespace NodeKit.Policy
     /// 로컬 .wasm 파일에서 정책 번들을 로드한다.
     /// 스프린트 초기 구현 — NodeVault PolicyService 완성 후 GrpcPolicyBundleProvider로 교체.
     /// </summary>
-    public class LocalFilePolicyBundleProvider : IPolicyBundleProvider
+    internal class LocalFilePolicyBundleProvider : IPolicyBundleProvider
     {
         private readonly string _wasmPath;
 

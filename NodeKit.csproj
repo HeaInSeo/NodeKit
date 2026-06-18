@@ -52,6 +52,22 @@
 
   <ItemGroup>
     <Compile Remove="tests/**/*.cs" />
+    <Compile Remove="src/NodeKit.Core/**" />
+    <Compile Remove="src/NodeKit.Cli/**" />
+    <Compile Remove="NodeKit_POC/**" />
+    <Compile Remove="publish/**" />
+    <AvaloniaResource Remove="NodeKit_POC/**" />
+    <AvaloniaResource Remove="publish/**" />
+    <AvaloniaXaml Remove="NodeKit_POC/**" />
+    <AvaloniaXaml Remove="publish/**" />
+    <EmbeddedResource Remove="NodeKit_POC/**" />
+    <EmbeddedResource Remove="publish/**" />
+    <None Remove="src/NodeKit.Core/**" />
+    <None Remove="src/NodeKit.Cli/**" />
+    <None Remove="NodeKit_POC/**" />
+    <None Remove="publish/**" />
+    <Content Remove="NodeKit_POC/**" />
+    <Content Remove="publish/**" />
   </ItemGroup>
 
   <!-- DockGuard 정책 wasm 번들: 빌드 출력 디렉토리에 복사 -->

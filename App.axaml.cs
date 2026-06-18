@@ -5,7 +5,7 @@ using NodeKit.UI;
 
 namespace NodeKit
 {
-    public partial class App : Application
+    internal partial class App : Application
     {
         public override void Initialize()
         {

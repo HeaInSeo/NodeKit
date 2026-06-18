@@ -6,8 +6,8 @@ using System.Text.Json;
 using System.Threading;
 using Grpc.Core;
 using Grpc.Net.Client;
-using Nodevault.V1;
 using NodeKit.Authoring;
+using Nodevault.V1;
 
 namespace NodeKit.Grpc
 {
@@ -15,7 +15,7 @@ namespace NodeKit.Grpc
     /// NodeVault BuildService gRPC 클라이언트 구현.
     /// BuildRequest를 전송하고 빌드 이벤트 스트림을 IAsyncEnumerable로 노출한다.
     /// </summary>
-    public sealed class GrpcBuildClient : IBuildClient, IDisposable
+    internal sealed class GrpcBuildClient : IBuildClient, IDisposable
     {
         private readonly GrpcChannel _channel;
         private readonly BuildService.BuildServiceClient _client;

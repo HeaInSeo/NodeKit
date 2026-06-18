@@ -8,7 +8,7 @@ namespace NodeKit.Policy
     /// 스프린트 초기: LocalFilePolicyBundleProvider (로컬 .wasm 파일)
     /// NodeVault PolicyService 완성 후: GrpcPolicyBundleProvider로 교체
     /// </summary>
-    public interface IPolicyBundleProvider
+    internal interface IPolicyBundleProvider
     {
         Task<PolicyBundle> GetLatestBundleAsync();
     }

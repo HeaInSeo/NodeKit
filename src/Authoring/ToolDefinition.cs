@@ -8,7 +8,7 @@ namespace NodeKit.Authoring
     /// BuildRequest 생성 전까지의 작업 중인 정의다.
     /// RegisteredToolDefinition과 구분: 이 객체는 NodeVault에 전달 전 초안이다.
     /// </summary>
-    public class ToolDefinition
+    internal class ToolDefinition
     {
         public Guid Id { get; set; } = Guid.NewGuid();
 

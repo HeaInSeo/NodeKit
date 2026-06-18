@@ -9,7 +9,7 @@ namespace NodeKit.Authoring
     /// RegisteredDataDefinition(NodeVault 확정 객체)과 구분:
     /// 이 객체는 NodeVault에 전달 전 초안이다.
     /// </summary>
-    public class DataDefinition
+    internal class DataDefinition
     {
         public Guid Id { get; set; } = Guid.NewGuid();
 

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Grpc.Net.Client;
@@ -7,26 +6,11 @@ using Nodevault.V1;
 
 namespace NodeKit.Policy
 {
-    /// <summary>정책 목록 조회 결과.</summary>
-    public sealed class PolicyListResult
-    {
-        public string BundleVersion { get; init; } = string.Empty;
-        public IReadOnlyList<PolicyEntry> Policies { get; init; } = Array.Empty<PolicyEntry>();
-    }
-
-    /// <summary>단일 정책 규칙 메타데이터.</summary>
-    public sealed class PolicyEntry
-    {
-        public string RuleId { get; init; } = string.Empty;
-        public string Name { get; init; } = string.Empty;
-        public string Description { get; init; } = string.Empty;
-    }
-
     /// <summary>
     /// NodeVault PolicyService gRPC로부터 DockGuard 번들을 가져온다.
     /// LocalFilePolicyBundleProvider의 런타임 교체 대상.
     /// </summary>
-    public sealed class GrpcPolicyBundleProvider : IPolicyBundleProvider, IDisposable
+    internal sealed class GrpcPolicyBundleProvider : IPolicyBundleProvider, IDisposable
     {
         private readonly GrpcChannel _channel;
         private readonly PolicyService.PolicyServiceClient _client;

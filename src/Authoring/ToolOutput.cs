@@ -1,7 +1,7 @@
 namespace NodeKit.Authoring
 {
     /// <summary>Tool의 named output 포트 계약.</summary>
-    public class ToolOutput
+    internal class ToolOutput
     {
         /// <summary>포트 이름 (예: "aligned_bam").</summary>
         public string Name { get; set; } = string.Empty;

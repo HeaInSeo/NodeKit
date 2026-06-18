@@ -8,7 +8,7 @@ namespace NodeKit.Grpc
     /// NodeKit → NodeVault gRPC 전송 단위 (참조 데이터 등록).
     /// L1 검증 통과 후 DataRegisterRequestFactory.FromDataDefinition()으로 생성된다.
     /// </summary>
-    public class DataRegisterRequest
+    internal class DataRegisterRequest
     {
         public string RequestId { get; set; } = Guid.NewGuid().ToString();
 

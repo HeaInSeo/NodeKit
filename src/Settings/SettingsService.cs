@@ -9,9 +9,9 @@ namespace NodeKit.Settings;
 /// Path: {AppData}/NodeKit/settings.json
 /// Failures are silently swallowed; defaults are returned on any load error.
 /// </summary>
-public static class SettingsService
+internal static class SettingsService
 {
-    private static readonly JsonSerializerOptions s_writeOpts = new() { WriteIndented = true };
+    private static readonly JsonSerializerOptions _writeOptions = new() { WriteIndented = true };
 
     /// <summary>Full path to the settings JSON file.</summary>
     public static string FilePath { get; } = Path.Combine(
@@ -45,6 +45,6 @@ public static class SettingsService
     {
         ArgumentNullException.ThrowIfNull(settings);
         Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-        File.WriteAllText(FilePath, JsonSerializer.Serialize(settings, s_writeOpts));
+        File.WriteAllText(FilePath, JsonSerializer.Serialize(settings, _writeOptions));
     }
 }

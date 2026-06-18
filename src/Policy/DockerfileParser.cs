@@ -10,7 +10,7 @@ namespace NodeKit.Policy
     /// </summary>
     internal static class DockerfileParser
     {
-        private static readonly char[] SpaceSeparators = { ' ', '\t' };
+        private static readonly char[] _spaceSeparators = { ' ', '\t' };
 
         /// <summary>
         /// Dockerfile 내용을 파싱하여 명령어 목록을 반환한다.
@@ -52,7 +52,7 @@ namespace NodeKit.Policy
                     continue;
                 }
 
-                var parts = fullLine.Split(SpaceSeparators, 2, StringSplitOptions.RemoveEmptyEntries);
+                var parts = fullLine.Split(_spaceSeparators, 2, StringSplitOptions.RemoveEmptyEntries);
                 if (parts.Length == 0)
                 {
                     continue;
@@ -71,12 +71,12 @@ namespace NodeKit.Policy
                 if (cmd == "COPY")
                 {
                     instruction.Value = new List<string>(
-                        rest.Split(SpaceSeparators, StringSplitOptions.RemoveEmptyEntries));
+                        rest.Split(_spaceSeparators, StringSplitOptions.RemoveEmptyEntries));
                 }
                 else if (cmd == "FROM")
                 {
                     instruction.Value = new List<string>(
-                        rest.Split(SpaceSeparators, StringSplitOptions.RemoveEmptyEntries));
+                        rest.Split(_spaceSeparators, StringSplitOptions.RemoveEmptyEntries));
                 }
                 else
                 {

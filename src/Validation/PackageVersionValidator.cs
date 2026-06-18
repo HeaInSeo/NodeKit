@@ -15,16 +15,14 @@ namespace NodeKit.Validation
     /// conda 형식:  name=version=build  (예: bwa=0.7.17=h5bf99c6_8)
     /// pip 형식:    name==version       (예: numpy==1.26.4)
     /// </summary>
-    public class PackageVersionValidator : IValidator
+    internal class PackageVersionValidator : IValidator
     {
-        private static readonly char[] DockerfileTokenSeparators = { ' ', '\t' };
+        private static readonly char[] _dockerfileTokenSeparators = { ' ', '\t' };
+        private static readonly string[] _shellCommandSeparators = { "&&", ";" };
 
         public ValidationResult Validate(ToolDefinition definition)
         {
-            if (definition is null)
-            {
-                throw new ArgumentNullException(nameof(definition));
-            }
+            ArgumentNullException.ThrowIfNull(definition);
 
             var violations = new List<ValidationViolation>();
 
@@ -158,10 +156,10 @@ namespace NodeKit.Validation
                 ? rawInstruction[3..].Trim()
                 : string.Empty;
 
-            foreach (var command in runBody.Split(new[] { "&&", ";" }, StringSplitOptions.RemoveEmptyEntries))
+            foreach (var command in runBody.Split(_shellCommandSeparators, StringSplitOptions.RemoveEmptyEntries))
             {
                 var tokens = command
-                    .Split(DockerfileTokenSeparators, StringSplitOptions.RemoveEmptyEntries)
+                    .Split(_dockerfileTokenSeparators, StringSplitOptions.RemoveEmptyEntries)
                     .ToList();
 
                 if (tokens.Count < 2)
@@ -177,7 +175,7 @@ namespace NodeKit.Validation
                 for (var index = 2; index < tokens.Count; index++)
                 {
                     var token = tokens[index];
-                    if (token.StartsWith("-", StringComparison.Ordinal))
+                    if (token.StartsWith('-'))
                     {
                         continue;
                     }
@@ -187,7 +185,7 @@ namespace NodeKit.Validation
             }
         }
 
-        private static bool IsCondaInstallCommand(IReadOnlyList<string> tokens)
+        private static bool IsCondaInstallCommand(List<string> tokens)
         {
             return tokens.Count >= 2 &&
                 (string.Equals(tokens[0], "micromamba", StringComparison.OrdinalIgnoreCase) ||
