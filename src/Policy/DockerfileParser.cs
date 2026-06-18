@@ -67,8 +67,8 @@ namespace NodeKit.Policy
                     Raw = fullLine,
                 };
 
-                // COPY: 인자를 개별 토큰으로 분리 (--from=builder 감지용)
-                if (cmd == "COPY")
+                // COPY/ADD: 인자를 개별 토큰으로 분리 (--from=builder 감지용)
+                if (cmd == "COPY" || cmd == "ADD")
                 {
                     instruction.Value = new List<string>(
                         rest.Split(_spaceSeparators, StringSplitOptions.RemoveEmptyEntries));

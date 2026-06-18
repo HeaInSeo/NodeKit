@@ -10,6 +10,7 @@ namespace NodeKit.UI.ViewModels
     internal sealed class ValidationViewModel : ReactiveObject
     {
         private readonly ImageUriValidator _imageUriValidator;
+        private readonly DockerfileStructureValidator _dockerfileStructureValidator;
         private readonly PackageVersionValidator _packageVersionValidator;
         private readonly RequiredFieldsValidator _requiredFieldsValidator;
         private readonly ValidatedDefinitionState _validatedDefinitionState;
@@ -23,12 +24,14 @@ namespace NodeKit.UI.ViewModels
         public ValidationViewModel(
             RequiredFieldsValidator requiredFieldsValidator,
             ImageUriValidator imageUriValidator,
+            DockerfileStructureValidator dockerfileStructureValidator,
             PackageVersionValidator packageVersionValidator,
             ValidatedDefinitionState validatedDefinitionState,
             IPolicyChecker? policyChecker)
         {
             _requiredFieldsValidator = requiredFieldsValidator;
             _imageUriValidator = imageUriValidator;
+            _dockerfileStructureValidator = dockerfileStructureValidator;
             _packageVersionValidator = packageVersionValidator;
             _validatedDefinitionState = validatedDefinitionState;
             _policyChecker = policyChecker;
@@ -96,6 +99,7 @@ namespace NodeKit.UI.ViewModels
             {
                 _requiredFieldsValidator.Validate(definition),
                 _imageUriValidator.Validate(definition),
+                _dockerfileStructureValidator.Validate(definition),
                 _packageVersionValidator.Validate(definition),
             };
             var staticCombined = ValidationResult.Combine(staticResults);

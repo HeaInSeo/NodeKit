@@ -168,6 +168,9 @@ Progress:
 - 2026-06-18: RequiredFieldsValidator now rejects missing version, missing I/O
   role/format values, invalid I/O shape/class values, and empty command entries
   before legacy BuildAndRegister submission.
+- 2026-06-18: DockerfileStructureValidator added for first-instruction FROM,
+  dangling line continuation, COPY/ADD arity, build context escape, and remote
+  ADD checks before legacy BuildAndRegister submission.
 ```
 
 ### Sprint 2. BuildRequest Mapping Quality

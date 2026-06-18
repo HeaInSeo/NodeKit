@@ -64,6 +64,7 @@ namespace NodeKit.Tests
             new(
                 new RequiredFieldsValidator(),
                 new ImageUriValidator(),
+                new DockerfileStructureValidator(),
                 new PackageVersionValidator(),
                 new ValidatedDefinitionState(),
                 withPolicyChecker ? new StubPolicyChecker(policyResult ?? PolicyResult.Pass) : null);

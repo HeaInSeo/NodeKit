@@ -314,6 +314,76 @@ dependencies:
             };
     }
 
+    public class DockerfileStructureValidatorTests
+    {
+        private readonly DockerfileStructureValidator _sut = new();
+
+        [Fact]
+        public void Pass_WhenDockerfileHasFromAndValidCopy()
+        {
+            var definition = Def("FROM ubuntu:22.04\nCOPY app/ /app/\nRUN echo ok\n");
+
+            Assert.True(_sut.Validate(definition).IsValid);
+        }
+
+        [Fact]
+        public void Fail_WhenFirstInstructionIsNotFrom()
+        {
+            var result = _sut.Validate(Def("RUN echo before-from\nFROM ubuntu:22.04\n"));
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-DOCKER-002");
+        }
+
+        [Fact]
+        public void Fail_WhenFromHasNoImage()
+        {
+            var result = _sut.Validate(Def("FROM\nRUN echo ok\n"));
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-DOCKER-003");
+        }
+
+        [Fact]
+        public void Fail_WhenDockerfileHasDanglingLineContinuation()
+        {
+            var result = _sut.Validate(Def("FROM ubuntu:22.04\nRUN echo ok \\\n"));
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-DOCKER-004");
+        }
+
+        [Fact]
+        public void Fail_WhenCopyHasNoDestination()
+        {
+            var result = _sut.Validate(Def("FROM ubuntu:22.04\nCOPY app/\n"));
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-DOCKER-005");
+        }
+
+        [Fact]
+        public void Fail_WhenCopySourceEscapesBuildContext()
+        {
+            var result = _sut.Validate(Def("FROM ubuntu:22.04\nCOPY ../secret /app/secret\n"));
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-DOCKER-006");
+        }
+
+        [Fact]
+        public void Fail_WhenAddUsesRemoteSource()
+        {
+            var result = _sut.Validate(Def("FROM ubuntu:22.04\nADD https://example.com/tool.tar.gz /tmp/tool.tar.gz\n"));
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-DOCKER-007");
+        }
+
+        private static ToolDefinition Def(string dockerfile) =>
+            new() { DockerfileContent = dockerfile };
+    }
+
     public class ValidatedDefinitionStateTests
     {
         [Fact]

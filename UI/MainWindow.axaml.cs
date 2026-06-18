@@ -42,6 +42,7 @@ namespace NodeKit.UI
             _validationViewModel = new ValidationViewModel(
                 new RequiredFieldsValidator(),
                 new ImageUriValidator(),
+                new DockerfileStructureValidator(),
                 new PackageVersionValidator(),
                 new ValidatedDefinitionState(),
                 _policyChecker);
