@@ -158,6 +158,15 @@ Done when:
 - No production ToolSpecRequest path exists.
 ```
 
+Progress:
+
+```text
+- 2026-06-18: validation execution/state moved from MainWindow code-behind into
+  UI/ViewModels/ValidationViewModel using ReactiveUI ReactiveObject.
+- MainWindow still owns legacy form collection and visual panel updates; new
+  validation state should continue moving into reactive ViewModel code.
+```
+
 ### Sprint 2. BuildRequest Mapping Quality
 
 Goal:

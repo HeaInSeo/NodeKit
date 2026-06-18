@@ -13,17 +13,14 @@ using NodeKit.Authoring;
 using NodeKit.Grpc;
 using NodeKit.Policy;
 using NodeKit.Settings;
+using NodeKit.UI.ViewModels;
 using NodeKit.Validation;
 
 namespace NodeKit.UI
 {
     internal partial class MainWindow : Window, IDisposable
     {
-        private readonly ImageUriValidator _imageUriValidator = new();
-        private readonly PackageVersionValidator _packageVersionValidator = new();
-        private readonly RequiredFieldsValidator _requiredFieldsValidator = new();
-        private readonly ValidatedDefinitionState _validatedDefinitionState = new();
-
+        private readonly ValidationViewModel _validationViewModel;
         private WasmPolicyChecker? _policyChecker;
         private GrpcBuildClient? _buildClient;
         private HttpCatalogClient? _catalogClient;
@@ -42,6 +39,12 @@ namespace NodeKit.UI
 
             _settings = SettingsService.Load();
             _policyChecker = MainWindowFormHelpers.TryLoadPolicyChecker();
+            _validationViewModel = new ValidationViewModel(
+                new RequiredFieldsValidator(),
+                new ImageUriValidator(),
+                new PackageVersionValidator(),
+                new ValidatedDefinitionState(),
+                _policyChecker);
 
             AddInputButton.Click += (_, _) => AddInputRow(InputRowsPanel);
             AddOutputButton.Click += (_, _) => AddOutputRow(OutputRowsPanel);
@@ -260,63 +263,14 @@ namespace NodeKit.UI
         // ─── 검증 및 빌드 ─────────────────────────────────────────────────────
         private void OnValidateClicked(object? sender, RoutedEventArgs e)
         {
-            InvalidateValidationState();
-            StatusBar.Text = "검증 중...";
-
             var definition = BuildDefinitionFromForm();
-
-            // L1-Static: 이미지 URI + 패키지 버전 검증
-            var staticResults = new[]
-            {
-                _requiredFieldsValidator.Validate(definition),
-                _imageUriValidator.Validate(definition),
-                _packageVersionValidator.Validate(definition),
-            };
-            var staticCombined = ValidationResult.Combine(staticResults);
-
-            // L1-Policy: DockGuard WASM 검증 (Dockerfile이 있는 경우)
-            var allViolations = new List<ValidationViolation>(staticCombined.Violations);
-            if (!string.IsNullOrWhiteSpace(definition.DockerfileContent))
-            {
-                if (_policyChecker != null)
-                {
-                    var policyResult = _policyChecker.Check(definition.DockerfileContent);
-                    foreach (var pv in policyResult.Violations)
-                    {
-                        allViolations.Add(new ValidationViolation(pv.RuleId, pv.Message, "DockerfileContent"));
-                    }
-                }
-                else
-                {
-                    allViolations.Add(new ValidationViolation(
-                        "POLICY-UNAVAIL",
-                        "DockGuard 정책 번들을 로드할 수 없습니다 (assets/policy/dockguard.wasm 확인 필요).",
-                        "DockerfileContent"));
-                }
-            }
-
-            if (allViolations.Count == 0)
-            {
-                ValidationResultPanel.IsVisible = false;
-                ValidationPassPanel.IsVisible = true;
-                _validatedDefinitionState.MarkValidated(definition);
-                SendBuildButton.IsEnabled = true;
-                StatusBar.Text = "L1 검증 통과 — 빌드 요청 준비 완료";
-            }
-            else
-            {
-                ValidationPassPanel.IsVisible = false;
-                ValidationResultPanel.IsVisible = true;
-                ViolationsList.ItemsSource = allViolations
-                    .Select(v => $"[{v.RuleId}] {v.Message}")
-                    .ToList();
-                StatusBar.Text = $"L1 검증 실패 — {allViolations.Count}개 위반";
-            }
+            _validationViewModel.Validate(definition);
+            ApplyValidationStateToUi();
         }
 
         private async void OnSendBuildClicked(object? sender, RoutedEventArgs e)
         {
-            if (!_validatedDefinitionState.HasValidatedDefinition)
+            if (!_validationViewModel.HasValidatedDefinition)
             {
                 return;
             }
@@ -329,11 +283,10 @@ namespace NodeKit.UI
             }
 
             var definition = BuildDefinitionFromForm();
-            if (!_validatedDefinitionState.Matches(definition))
+            if (!_validationViewModel.Matches(definition))
             {
-                InvalidateValidationState();
-                ValidationPassPanel.IsVisible = false;
-                StatusBar.Text = "입력값이 검증 이후 변경되었습니다. 다시 L1 검증을 실행하세요.";
+                _validationViewModel.MarkDefinitionChanged();
+                ApplyValidationStateToUi();
                 return;
             }
 
@@ -373,7 +326,7 @@ namespace NodeKit.UI
 #pragma warning restore CA1031
             finally
             {
-                Dispatcher.UIThread.Post(() => SendBuildButton.IsEnabled = _validatedDefinitionState.HasValidatedDefinition);
+                Dispatcher.UIThread.Post(() => SendBuildButton.IsEnabled = _validationViewModel.HasValidatedDefinition);
             }
         }
 
@@ -549,6 +502,7 @@ namespace NodeKit.UI
                 var newChecker = new WasmPolicyChecker(bundle);
                 _policyChecker?.Dispose();
                 _policyChecker = newChecker;
+                _validationViewModel.SetPolicyChecker(newChecker);
                 Dispatcher.UIThread.Post(() =>
                 {
                     PolicyBundleVersionLabel.Text = bundle.Version;
@@ -608,8 +562,19 @@ namespace NodeKit.UI
 
         private void InvalidateValidationState()
         {
-            _validatedDefinitionState.Invalidate();
+            _validationViewModel.Invalidate();
             SendBuildButton.IsEnabled = false;
+        }
+
+        private void ApplyValidationStateToUi()
+        {
+            ValidationPassPanel.IsVisible = _validationViewModel.IsValidationPassVisible;
+            ValidationResultPanel.IsVisible = _validationViewModel.IsValidationResultVisible;
+            SendBuildButton.IsEnabled = _validationViewModel.CanSubmitBuild;
+            StatusBar.Text = _validationViewModel.StatusMessage;
+            ViolationsList.ItemsSource = _validationViewModel.Violations
+                .Select(v => $"[{v.RuleId}] {v.Message}")
+                .ToList();
         }
 
         private GrpcBuildClient GetBuildClient(string address)
