@@ -72,11 +72,31 @@ namespace NodeKit.Tests
             new()
             {
                 Name = "bwa",
+                Version = "0.7.17",
                 ImageUri = "registry.example.com/bwa:0.7.17@sha256:abc123",
                 DockerfileContent = "FROM ubuntu:22.04\nRUN echo ok\n",
                 Script = "bwa mem",
-                Inputs = { new ToolInput { Name = "reads" } },
-                Outputs = { new ToolOutput { Name = "aligned" } },
+                Inputs =
+                {
+                    new ToolInput
+                    {
+                        Name = "reads",
+                        Role = "sample-fastq",
+                        Format = "fastq",
+                        Shape = "pair",
+                    },
+                },
+                Outputs =
+                {
+                    new ToolOutput
+                    {
+                        Name = "aligned",
+                        Role = "aligned-bam",
+                        Format = "bam",
+                        Shape = "single",
+                        Class = "primary",
+                    },
+                },
             };
 
         private sealed class StubPolicyChecker : IPolicyChecker

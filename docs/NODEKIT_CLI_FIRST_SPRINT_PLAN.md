@@ -165,6 +165,9 @@ Progress:
   UI/ViewModels/ValidationViewModel using ReactiveUI ReactiveObject.
 - MainWindow still owns legacy form collection and visual panel updates; new
   validation state should continue moving into reactive ViewModel code.
+- 2026-06-18: RequiredFieldsValidator now rejects missing version, missing I/O
+  role/format values, invalid I/O shape/class values, and empty command entries
+  before legacy BuildAndRegister submission.
 ```
 
 ### Sprint 2. BuildRequest Mapping Quality
