@@ -86,6 +86,9 @@ NodeKit should follow the DagEdit operational bar:
 All GitHub Actions CI must be green.
 Lint/analyzer checks must be green.
 No warning regression is allowed.
+NuGet dependency graph must be locked and reproducible.
+Known vulnerable packages fail CI.
+Security workflows must cover dependency review and CodeQL.
 ```
 
 Coverage policy for this phase:
@@ -361,27 +364,33 @@ NodeVault observation:
 Local CI-equivalent commands:
 
 ```bash
-dotnet restore NodeKit.sln
+dotnet restore NodeKit.sln --locked-mode
+./scripts/ci-audit-packages.sh
 dotnet format NodeKit.sln --no-restore --verify-no-changes --verbosity minimal
-dotnet build NodeKit.sln --no-restore --configuration Release /p:TreatWarningsAsErrors=true
+dotnet build NodeKit.sln --no-restore --configuration Release /p:TreatWarningsAsErrors=true /p:EnforceCodeStyleInBuild=true
 dotnet test NodeKit.sln --no-build --configuration Release --collect:"XPlat Code Coverage" --results-directory TestResults
 ```
 
 Latest local result:
 
 ```text
-- Restore: pass
+- Locked restore: pass
+- Package audit: pass; xunit v2 is reported as deprecated and tracked for a dedicated migration
 - Format: pass
 - Build: pass, 0 warnings, 0 errors
-- Tests: pass, 59 passed, 0 failed, 0 skipped
+- Tests: pass, 82 passed, 0 failed, 0 skipped
 - Coverage artifact generated under TestResults/<run-id>/coverage.cobertura.xml
 ```
 
 CI workflow:
 
 ```text
-.github/workflows/verify.yml runs restore, format, warnings-as-errors build,
-and coverage test on main branch pushes / pull requests.
+.github/workflows/verify.yml runs locked restore, NuGet package audit, format,
+warnings-as-errors build, and coverage test on main branch pushes / pull requests.
+.github/workflows/dependency-review.yml blocks vulnerable or denied-license
+dependency changes on pull requests.
+.github/workflows/codeql.yml runs CodeQL C# security-and-quality analysis on
+pushes, pull requests, and a weekly schedule.
 ```
 
 ## 7. Non-Goals Until NodeVault Phase 1 Completes

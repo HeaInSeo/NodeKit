@@ -36,13 +36,16 @@ jobs:
           restore-keys: nuget-${{ runner.os }}-
 
       - name: Restore
-        run: dotnet restore NodeKit.sln
+        run: dotnet restore NodeKit.sln --locked-mode
+
+      - name: NuGet package audit
+        run: ./scripts/ci-audit-packages.sh
 
       - name: Format
         run: dotnet format NodeKit.sln --no-restore --verify-no-changes --verbosity minimal
 
       - name: Build
-        run: dotnet build NodeKit.sln --no-restore --configuration Release /p:TreatWarningsAsErrors=true
+        run: dotnet build NodeKit.sln --no-restore --configuration Release /p:TreatWarningsAsErrors=true /p:EnforceCodeStyleInBuild=true
 
       - name: Test with coverage
         run: dotnet test NodeKit.sln --no-build --configuration Release --collect:"XPlat Code Coverage" --results-directory TestResults

@@ -19,6 +19,7 @@ Active planning rule:
 - New application state should follow the DagEdit direction: ReactiveUI / System.Reactive first, with DynamicData when collection change streams are useful.
 - The existing UI is still largely code-behind/event-handler based. Do not expand that pattern for new validation, submission progress, or result state; introduce focused reactive ViewModel/state objects instead.
 - CI includes reactive architecture guard tests. If `MainWindow.axaml.cs` grows, gains more click subscriptions, or gains more `async void` handlers, move the work into reactive ViewModel/state code instead of raising the baseline.
+- Commercial guardrails are active: NuGet versions must be explicit, lock files must stay committed, CI uses `dotnet restore --locked-mode`, vulnerable packages fail package audit, and direct Kubernetes client dependencies are blocked.
 
 Historical documents under `docs/obsolete/` are preserved for context only. They do not override the active sprint plan.
 
