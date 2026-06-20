@@ -31,7 +31,7 @@ C# / Avalonia UI로 작성되어 Windows, macOS, Linux(Ubuntu)에서 동작합�
 ### 방법 1 — 소스에서 빌드 (개발 환경)
 
 ```bash
-# 의존성 설치 (dotnet 9 SDK 필요)
+# 의존성 설치 (dotnet 10 SDK 필요)
 dotnet restore
 
 # 실행
@@ -161,6 +161,6 @@ NodeKit (이 앱)
 
 | 항목 | 버전 |
 |------|------|
-| .NET SDK | 9.0 이상 |
-| Avalonia | 11.3.13 |
+| .NET SDK | 10.0 이상 |
+| Avalonia | 12.0.1 |
 | OS | Windows 10+, macOS 12+, Ubuntu 22.04+ |

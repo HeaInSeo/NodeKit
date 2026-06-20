@@ -31,7 +31,7 @@ Built with C# / Avalonia UI — runs on Windows, macOS, and Linux (Ubuntu).
 ### Option 1 — Build from source (development)
 
 ```bash
-# Install dependencies (requires dotnet 9 SDK)
+# Install dependencies (requires dotnet 10 SDK)
 dotnet restore
 
 # Run
@@ -147,6 +147,6 @@ For detailed design, see [CLAUDE.md](CLAUDE.md) and [docs/ARCHITECTURE.md](docs/
 
 | Item | Version |
 |------|---------|
-| .NET SDK | 9.0+ |
-| Avalonia | 11.3.13 |
+| .NET SDK | 10.0+ |
+| Avalonia | 12.0.1 |
 | OS | Windows 10+, macOS 12+, Ubuntu 22.04+ |
