@@ -54,7 +54,7 @@ namespace NodeKit.Grpc
             }
         }
 
-        private static Nodevault.V1.BuildRequest ToProto(BuildRequest r)
+        internal static Nodevault.V1.BuildRequest ToProto(BuildRequest r)
         {
             var proto = new Nodevault.V1.BuildRequest
             {
@@ -85,7 +85,7 @@ namespace NodeKit.Grpc
             return proto;
         }
 
-        private static PortSpec ToPortSpec(ToolInput i) => new()
+        internal static PortSpec ToPortSpec(ToolInput i) => new()
         {
             Name = i.Name,
             Role = i.Role,
@@ -94,7 +94,7 @@ namespace NodeKit.Grpc
             Required = i.Required,
         };
 
-        private static PortSpec ToPortSpec(ToolOutput o) => new()
+        internal static PortSpec ToPortSpec(ToolOutput o) => new()
         {
             Name = o.Name,
             Role = o.Role,
