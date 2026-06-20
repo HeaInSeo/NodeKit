@@ -18,6 +18,7 @@ namespace NodeKit.Policy
         private bool _disposed;
 
         // builtin ID → 이름 매핑 (builtins() 함수 호출 결과)
+        // null: 아직 부트스트랩하지 않음(또는 실패). 실패 시 캐시하지 않고 매 Check 호출마다 재시도한다.
         private Dictionary<int, string>? _builtinMap;
 
         public WasmPolicyChecker(PolicyBundle bundle)
@@ -37,6 +38,17 @@ namespace NodeKit.Policy
             if (_builtinMap == null)
             {
                 _builtinMap = BootstrapBuiltinMap();
+                if (_builtinMap == null)
+                {
+                    // builtin 매핑을 구성할 수 없으면 regex.match 등 builtin 호출이
+                    // 전부 null을 반환해 정책이 조용히 fail-open되므로, 평가를 진행하지 않고 차단한다.
+                    return new PolicyResult(new[]
+                    {
+                        new PolicyViolation(
+                            "WASM-BUILTIN-ERR",
+                            "정책 builtin 매핑 부트스트랩 실패 — 평가를 신뢰할 수 없어 차단합니다."),
+                    });
+                }
             }
 
             using var store = new Store(_engine);
@@ -147,11 +159,17 @@ namespace NodeKit.Policy
             };
         }
 
-        private Dictionary<int, string> BootstrapBuiltinMap()
+        /// <summary>
+        /// builtin ID → 이름 매핑을 구성한다. 부트스트랩이 실패하면(builtins() 누락,
+        /// 인스턴스화 실패, JSON 파싱 실패 등) null을 반환한다 — 빈 map을 반환하면
+        /// 호출부가 "builtin 없음"과 "부트스트랩 실패"를 구분할 수 없어 fail-open으로
+        /// 이어지기 때문에 명시적으로 구분한다.
+        /// </summary>
+        private Dictionary<int, string>? BootstrapBuiltinMap()
         {
-            var map = new Dictionary<int, string>();
             try
             {
+                var map = new Dictionary<int, string>();
                 using var store = new Store(_engine);
                 var memory = new Memory(store, 2, null, false);
                 using var linker = new Linker(_engine);
@@ -167,7 +185,7 @@ namespace NodeKit.Policy
                 var builtinsFn = instance.GetFunction<int>("builtins");
                 if (builtinsFn == null)
                 {
-                    return map;
+                    return null;
                 }
 
                 var builtinsPtr = builtinsFn();
@@ -181,15 +199,15 @@ namespace NodeKit.Policy
                 {
                     map[prop.Value.GetInt32()] = prop.Name;
                 }
+
+                return map;
             }
 #pragma warning disable CA1031
             catch
             {
-                // ignore — empty map means all builtins return 0 (null)
+                return null;
             }
 #pragma warning restore CA1031
-
-            return map;
         }
     }
 }

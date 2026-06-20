@@ -37,7 +37,7 @@ namespace NodeKit.UI
         {
             InitializeComponent();
 
-            _settings = SettingsService.Load();
+            _settings = SettingsService.Load(out var settingsCorrupted);
             _policyChecker = MainWindowFormHelpers.TryLoadPolicyChecker();
             _validationViewModel = new ValidationViewModel(
                 new RequiredFieldsValidator(),
@@ -84,6 +84,11 @@ namespace NodeKit.UI
 
             // 저장된 설정을 Settings 패널 TextBox에 반영
             ApplySettingsToUI();
+
+            if (settingsCorrupted)
+            {
+                StatusBar.Text = "경고: 저장된 설정 파일을 읽을 수 없어 기본값으로 초기화되었습니다. ⚙ 서버 설정에서 확인하세요.";
+            }
         }
 
         public void Dispose()
@@ -121,7 +126,17 @@ namespace NodeKit.UI
                 ? new AppSettings().CatalogAddress
                 : catalogAddr;
 
-            SettingsService.Save(_settings);
+#pragma warning disable CA1031
+            try
+            {
+                SettingsService.Save(_settings);
+            }
+            catch (Exception ex)
+            {
+                StatusBar.Text = $"설정 저장 오류: {ex.Message}";
+                return;
+            }
+#pragma warning restore CA1031
 
             // 캐시된 클라이언트 폐기 — 다음 요청 시 새 주소로 재생성
             _buildClientAddress = null;
@@ -135,8 +150,21 @@ namespace NodeKit.UI
 
         private void OnResetSettingsClicked(object? sender, RoutedEventArgs e)
         {
-            _settings = new AppSettings();
-            SettingsService.Save(_settings);
+            var resetSettings = new AppSettings();
+
+#pragma warning disable CA1031
+            try
+            {
+                SettingsService.Save(resetSettings);
+            }
+            catch (Exception ex)
+            {
+                StatusBar.Text = $"설정 초기화 오류: {ex.Message}";
+                return;
+            }
+#pragma warning restore CA1031
+
+            _settings = resetSettings;
             ApplySettingsToUI();
             _buildClientAddress = null;
             _catalogClientAddress = null;

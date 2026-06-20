@@ -12,6 +12,7 @@ namespace NodeKit.Validation
     {
         private const char FieldSeparator = '\u001f';
         private const char ItemSeparator = '\u001e';
+        private const char SubFieldSeparator = '\u001d';
 
         internal static string Create(ToolDefinition definition)
         {
@@ -19,14 +20,38 @@ namespace NodeKit.Validation
 
             var builder = new StringBuilder();
             Append(builder, definition.Name);
+            Append(builder, definition.Version);
             Append(builder, definition.ImageUri);
             Append(builder, definition.DockerfileContent);
             Append(builder, definition.Script);
             Append(builder, definition.EnvironmentSpec);
-            AppendList(builder, definition.Inputs.Select(input => input.Name));
-            AppendList(builder, definition.Outputs.Select(output => output.Name));
+            AppendList(builder, definition.Command);
+            AppendList(builder, definition.Inputs.Select(FormatInput));
+            AppendList(builder, definition.Outputs.Select(FormatOutput));
+            Append(builder, definition.DisplayLabel);
+            Append(builder, definition.DisplayDescription);
+            Append(builder, definition.DisplayCategory);
+            AppendList(builder, definition.DisplayTags);
             return builder.ToString();
         }
+
+        private static string FormatInput(ToolInput input) =>
+            string.Join(
+                SubFieldSeparator,
+                input.Name,
+                input.Role,
+                input.Format,
+                input.Shape,
+                input.Required);
+
+        private static string FormatOutput(ToolOutput output) =>
+            string.Join(
+                SubFieldSeparator,
+                output.Name,
+                output.Role,
+                output.Format,
+                output.Shape,
+                output.Class);
 
         private static void Append(StringBuilder builder, string? value)
         {

@@ -83,6 +83,7 @@ namespace NodeKit.Policy
             {
                 using var doc = JsonDocument.Parse(resultJson);
                 var violations = new List<PolicyViolation>();
+                var sawResultEntry = false;
 
                 foreach (var entry in doc.RootElement.EnumerateArray())
                 {
@@ -96,12 +97,26 @@ namespace NodeKit.Policy
                         continue;
                     }
 
+                    sawResultEntry = true;
+
                     foreach (var msg in result.EnumerateArray())
                     {
                         var message = msg.GetString() ?? string.Empty;
                         var ruleId = ExtractRuleId(message);
                         violations.Add(new PolicyViolation(ruleId, message));
                     }
+                }
+
+                // entrypoint가 평가되지 않아 "result" 항목 자체가 없는 경우(번들 불일치 등)를
+                // "위반 없음"으로 오인하면 정책이 조용히 fail-open되므로 명시적으로 차단한다.
+                if (!sawResultEntry)
+                {
+                    return new PolicyResult(new[]
+                    {
+                        new PolicyViolation(
+                            "WASM-EMPTY-RESULT",
+                            $"정책 평가 결과에 result 항목이 없습니다(entrypoint 불일치 가능) — 신뢰할 수 없어 차단합니다. raw={resultJson}"),
+                    });
                 }
 
                 return new PolicyResult(violations);

@@ -532,5 +532,79 @@ dependencies:
 
             Assert.False(state.Matches(changed));
         }
+
+        [Fact]
+        public void Matches_ReturnsFalse_WhenVersionChangedAfterValidation()
+        {
+            var state = new ValidatedDefinitionState();
+            var definition = Baseline();
+
+            state.MarkValidated(definition);
+            definition.Version = "2.0.0";
+
+            Assert.False(state.Matches(definition));
+        }
+
+        [Fact]
+        public void Matches_ReturnsFalse_WhenCommandChangedAfterValidation()
+        {
+            var state = new ValidatedDefinitionState();
+            var definition = Baseline();
+
+            state.MarkValidated(definition);
+            definition.Command.Add("--verbose");
+
+            Assert.False(state.Matches(definition));
+        }
+
+        [Fact]
+        public void Matches_ReturnsFalse_WhenInputRoleChangedAfterValidation()
+        {
+            var state = new ValidatedDefinitionState();
+            var definition = Baseline();
+
+            state.MarkValidated(definition);
+            definition.Inputs[0].Role = "different-role";
+
+            Assert.False(state.Matches(definition));
+        }
+
+        [Fact]
+        public void Matches_ReturnsFalse_WhenOutputClassChangedAfterValidation()
+        {
+            var state = new ValidatedDefinitionState();
+            var definition = Baseline();
+
+            state.MarkValidated(definition);
+            definition.Outputs[0].Class = "secondary";
+
+            Assert.False(state.Matches(definition));
+        }
+
+        [Fact]
+        public void Matches_ReturnsFalse_WhenDisplayLabelChangedAfterValidation()
+        {
+            var state = new ValidatedDefinitionState();
+            var definition = Baseline();
+
+            state.MarkValidated(definition);
+            definition.DisplayLabel = "New Label";
+
+            Assert.False(state.Matches(definition));
+        }
+
+        private static ToolDefinition Baseline() =>
+            new()
+            {
+                Name = "BWA",
+                Version = "1.0.0",
+                ImageUri = "reg/img:1.0@sha256:abc",
+                DockerfileContent = "FROM ubuntu:22.04@sha256:abc123def456",
+                Script = "echo hi",
+                Command = { "/bin/sh", "-c", "run.sh" },
+                Inputs = { new ToolInput { Name = "reads.fq", Role = "sample-fastq" } },
+                Outputs = { new ToolOutput { Name = "out.bam", Class = "primary" } },
+                DisplayLabel = "BWA-MEM",
+            };
     }
 }
