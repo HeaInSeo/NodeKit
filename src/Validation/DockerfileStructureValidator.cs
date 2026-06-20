@@ -82,6 +82,32 @@ namespace NodeKit.Validation
                     "L1-DOCKER-003",
                     "FROM 명령에는 base image가 필요합니다.",
                     field));
+                return;
+            }
+
+            ValidateBaseImagePinning(violations, firstInstruction.Value[0], field);
+        }
+
+        private static void ValidateBaseImagePinning(
+            List<ValidationViolation> violations,
+            string baseImage,
+            string field)
+        {
+            if (baseImage.Contains(":latest", StringComparison.OrdinalIgnoreCase))
+            {
+                violations.Add(new ValidationViolation(
+                    "L1-DOCKER-008",
+                    $"FROM base image에 'latest' 태그는 허용되지 않습니다. 정확한 버전 태그 + digest(@sha256:...)를 사용하세요. ({baseImage})",
+                    field));
+                return;
+            }
+
+            if (!baseImage.Contains("@sha256:", StringComparison.OrdinalIgnoreCase))
+            {
+                violations.Add(new ValidationViolation(
+                    "L1-DOCKER-009",
+                    $"FROM base image에 digest(@sha256:...)가 없습니다. 재현성 보장을 위해 digest 고정이 필수입니다. ({baseImage})",
+                    field));
             }
         }
 

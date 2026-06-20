@@ -47,14 +47,28 @@ namespace NodeKit.Validation
             }
 
             // conda yml 형식 감지
-            if (spec.TrimStart().StartsWith("name:", StringComparison.Ordinal) ||
-                spec.Contains("dependencies:", StringComparison.Ordinal))
+            if (IsCondaEnvironmentYaml(spec))
             {
                 return ValidateConda(spec);
             }
 
             // requirements.txt 형식 감지
             return ValidatePip(spec);
+        }
+
+        private static bool IsCondaEnvironmentYaml(string spec)
+        {
+            foreach (var rawLine in spec.Split('\n', StringSplitOptions.None))
+            {
+                var trimmed = rawLine.TrimStart();
+                if (trimmed.StartsWith("name:", StringComparison.Ordinal) ||
+                    trimmed.StartsWith("dependencies:", StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static ValidationResult ValidateConda(string spec)
@@ -206,7 +220,7 @@ namespace NodeKit.Validation
             var expression = packageExpression.Trim();
             var segments = expression.Split('=', StringSplitOptions.None);
 
-            if (segments.Length <= 1)
+            if (segments.Length <= 1 || string.IsNullOrWhiteSpace(segments[1]))
             {
                 violations.Add(new ValidationViolation(
                     "L1-PKG-001",
@@ -215,7 +229,7 @@ namespace NodeKit.Validation
                 return;
             }
 
-            if (segments.Length == 2)
+            if (segments.Length <= 2 || string.IsNullOrWhiteSpace(segments[2]))
             {
                 violations.Add(new ValidationViolation(
                     "L1-PKG-002",

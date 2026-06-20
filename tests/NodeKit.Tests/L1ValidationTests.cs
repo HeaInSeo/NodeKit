@@ -184,6 +184,47 @@ dependencies:
             Assert.Contains(result.Violations, v => v.RuleId == "L1-PKG-003" && v.Message.Contains("numpy", System.StringComparison.Ordinal));
         }
 
+        [Fact]
+        public void Fail_WhenPipSpecHasDependenciesWordInComment()
+        {
+            var def = DefWithSpec("# our dependencies: numpy, scipy\nnumpy\n");
+
+            var result = _sut.Validate(def);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-PKG-003" && v.Message.Contains("numpy", System.StringComparison.Ordinal));
+        }
+
+        [Fact]
+        public void Fail_WhenCondaPackageHasEmptyVersionSegment()
+        {
+            var def = DefWithSpec(@"
+name: myenv
+dependencies:
+  - bwa==0.7.17
+");
+
+            var result = _sut.Validate(def);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-PKG-001");
+        }
+
+        [Fact]
+        public void Fail_WhenCondaPackageHasEmptyBuildSegment()
+        {
+            var def = DefWithSpec(@"
+name: myenv
+dependencies:
+  - bwa=0.7.17=
+");
+
+            var result = _sut.Validate(def);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-PKG-002");
+        }
+
         private static ToolDefinition DefWithSpec(string spec) =>
             new() { ImageUri = "reg/img:1.0@sha256:abc", EnvironmentSpec = spec };
     }
@@ -343,9 +384,35 @@ dependencies:
         [Fact]
         public void Pass_WhenDockerfileHasFromAndValidCopy()
         {
-            var definition = Def("FROM ubuntu:22.04\nCOPY app/ /app/\nRUN echo ok\n");
+            var definition = Def("FROM ubuntu:22.04@sha256:abc123def456\nCOPY app/ /app/\nRUN echo ok\n");
 
             Assert.True(_sut.Validate(definition).IsValid);
+        }
+
+        [Fact]
+        public void Fail_WhenFromBaseImageHasLatestTag()
+        {
+            var result = _sut.Validate(Def("FROM ubuntu:latest\nRUN echo ok\n"));
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-DOCKER-008");
+        }
+
+        [Fact]
+        public void Fail_WhenFromBaseImageHasNoDigest()
+        {
+            var result = _sut.Validate(Def("FROM ubuntu:22.04\nRUN echo ok\n"));
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-DOCKER-009");
+        }
+
+        [Fact]
+        public void Pass_WhenFromBaseImageIsFullyPinned()
+        {
+            var result = _sut.Validate(Def("FROM ubuntu:22.04@sha256:abc123def456\nRUN echo ok\n"));
+
+            Assert.True(result.IsValid);
         }
 
         [Fact]
