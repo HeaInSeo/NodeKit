@@ -249,6 +249,16 @@
               </StackPanel>
             </Border>
 
+            <!-- 빌드 실패 표시 -->
+            <Border Name="BuildFailurePanel" IsVisible="False"
+                    Background="#2a1a1a" BorderBrush="#c0392b" BorderThickness="1" CornerRadius="4" Padding="12">
+              <StackPanel Spacing="4">
+                <TextBlock Text="✗ 빌드 실패" Foreground="#e74c3c" FontSize="13" FontWeight="SemiBold"/>
+                <TextBlock Name="BuildFailureMessageLabel" Foreground="#ddb0b0" FontSize="11"
+                           TextWrapping="Wrap"/>
+              </StackPanel>
+            </Border>
+
           </StackPanel>
         </ScrollViewer>
 

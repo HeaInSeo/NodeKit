@@ -297,6 +297,7 @@ namespace NodeKit.UI
             BuildLogPanel.IsVisible = true;
             BuildLogBox.Text = string.Empty;
             BuildSuccessPanel.IsVisible = false;
+            BuildFailurePanel.IsVisible = false;
             SendBuildButton.IsEnabled = false;
             StatusBar.Text = "빌드 요청 전송 중...";
 
@@ -323,6 +324,8 @@ namespace NodeKit.UI
                 {
                     StatusBar.Text = message;
                     AppendLog($"[ERROR] {message}");
+                    BuildFailureMessageLabel.Text = message;
+                    BuildFailurePanel.IsVisible = true;
                 });
             }
 #pragma warning restore CA1031
@@ -349,6 +352,8 @@ namespace NodeKit.UI
                     break;
 
                 case BuildEventKind.Failed:
+                    BuildFailureMessageLabel.Text = ev.Message;
+                    BuildFailurePanel.IsVisible = true;
                     StatusBar.Text = $"빌드 실패: {ev.Message}";
                     break;
             }
