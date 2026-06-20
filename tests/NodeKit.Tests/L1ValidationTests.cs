@@ -30,6 +30,7 @@ namespace NodeKit.Tests
             var def = Def("ubuntu@sha256:abc");
             var result = _sut.Validate(def);
             Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-IMG-003");
         }
 
         [Fact]
@@ -45,7 +46,9 @@ namespace NodeKit.Tests
         public void Fail_WhenEmpty()
         {
             var def = Def(string.Empty);
-            Assert.False(_sut.Validate(def).IsValid);
+            var result = _sut.Validate(def);
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-IMG-001");
         }
 
         [Fact]
@@ -223,6 +226,25 @@ dependencies:
         }
 
         [Fact]
+        public void Fail_WhenIoNamesAreEmpty()
+        {
+            var definition = new ToolDefinition
+            {
+                Name = "BWA",
+                DockerfileContent = "FROM ubuntu:22.04",
+                Script = "echo hi",
+                Inputs = { new ToolInput { Name = "  " } },
+                Outputs = { new ToolOutput { Name = string.Empty } },
+            };
+
+            var result = _sut.Validate(definition);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-REQ-006");
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-REQ-008");
+        }
+
+        [Fact]
         public void Fail_WhenIoContractFieldsAreMissingOrInvalid()
         {
             var definition = new ToolDefinition
@@ -324,6 +346,15 @@ dependencies:
             var definition = Def("FROM ubuntu:22.04\nCOPY app/ /app/\nRUN echo ok\n");
 
             Assert.True(_sut.Validate(definition).IsValid);
+        }
+
+        [Fact]
+        public void Fail_WhenDockerfileHasNoExecutableInstructions()
+        {
+            var result = _sut.Validate(Def("# just a comment\n"));
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-DOCKER-001");
         }
 
         [Fact]
