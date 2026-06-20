@@ -10,12 +10,17 @@ namespace NodeKit.Tests
     /// <summary>
     /// GrpcBuildClient 실연동 테스트.
     ///
-    /// 전제: NodeVault가 100.123.80.48:50051 에서 실행 중이어야 한다.
-    /// NODEVAULT_INTEGRATION=1 환경변수가 설정된 경우에만 실행된다.
+    /// NODEVAULT_INTEGRATION=1 환경변수가 설정된 경우에만 실행된다 (기본값: 스킵).
+    /// 대상 주소는 NODEVAULT_INTEGRATION_ADDRESS로 오버라이드할 수 있다.
+    /// 현재 live 환경의 접속 정보는 ~/.config/infra-lab 문서를 확인한다 —
+    /// 기본값은 그 문서에 기록된 시점의 주소이며 인프라가 바뀌면 stale해질 수 있다.
     /// </summary>
     public sealed class GrpcBuildClientIntegrationTests
     {
-        private const string NodeVaultAddress = "http://100.123.80.48:50051";
+        private const string DefaultNodeVaultAddress = "http://100.123.80.48:50051";
+
+        private static string NodeVaultAddress =>
+            Environment.GetEnvironmentVariable("NODEVAULT_INTEGRATION_ADDRESS") ?? DefaultNodeVaultAddress;
 
         private static bool ShouldRun =>
             Environment.GetEnvironmentVariable("NODEVAULT_INTEGRATION") == "1";

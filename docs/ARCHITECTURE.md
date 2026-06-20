@@ -22,6 +22,8 @@ NodeVault는 Kubernetes data-plane app이며, NodeKit은 문서화된 gRPC/REST 
 NodeKit은 Kubernetes API를 직접 호출하지 않는다.
 NodeVault 및 관련 플랫폼 서비스의 live 테스트는 원격 인프라를 기본으로 하며,
 접속 정보와 운영 문서는 `~/.config/infra-lab` 아래 문서를 확인한다.
+NodeKit 쪽 live 연동 테스트(`GrpcBuildClientIntegrationTests`)는 기본적으로 스킵되며
+`NODEVAULT_INTEGRATION=1`로 옵트인하고, 주소는 `NODEVAULT_INTEGRATION_ADDRESS`로 override한다.
 
 현재 구현 단계에서는 기존 `BuildRequest` / `BuildAndRegister` legacy gRPC 경로를 유지한다.
 `ToolSpecRequest`, `ResolveToolSpec`, `SubmitToolBuild` 생산 경로는 NodeVault Phase 1 완료 후
