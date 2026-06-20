@@ -19,6 +19,8 @@ namespace NodeKit.Validation
     {
         private static readonly char[] _dockerfileTokenSeparators = { ' ', '\t' };
         private static readonly string[] _shellCommandSeparators = { "&&", ";" };
+        private static readonly Regex _editableInstallPattern =
+            new(@"^(-e|--editable)(\s|=)", RegexOptions.Compiled);
 
         public ValidationResult Validate(ToolDefinition definition)
         {
@@ -131,9 +133,23 @@ namespace NodeKit.Validation
             {
                 var line = rawLine.Trim();
 
-                if (string.IsNullOrWhiteSpace(line) ||
-                    line.StartsWith('#') ||
-                    line.StartsWith('-'))
+                if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#'))
+                {
+                    continue;
+                }
+
+                // -e/--editable (git+... 포함)은 버전 고정이 불가능한 설치 방식이라
+                // 다른 '-' 옵션(-r, --index-url 등)처럼 그냥 건너뛰면 검증을 통째로 우회한다.
+                if (_editableInstallPattern.IsMatch(line))
+                {
+                    violations.Add(new ValidationViolation(
+                        "L1-PKG-004",
+                        $"editable/VCS 설치는 버전을 고정할 수 없어 차단됩니다: '{line}'",
+                        "EnvironmentSpec"));
+                    continue;
+                }
+
+                if (line.StartsWith('-'))
                 {
                     continue;
                 }

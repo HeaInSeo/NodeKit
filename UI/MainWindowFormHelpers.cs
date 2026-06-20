@@ -4,6 +4,8 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using Avalonia.Controls;
+using Avalonia.Layout;
+using Avalonia.Media;
 using NodeKit.Authoring;
 using NodeKit.Policy;
 
@@ -37,6 +39,21 @@ namespace NodeKit.UI
 #pragma warning restore CA1031
         }
 
+        /// <summary>Input 행에 "필수" 체크박스를 추가한다(기본 체크됨 — ToolInput.Required 기본값과 동일).</summary>
+        public static CheckBox AddRequiredCheckBox(Grid row, int column)
+        {
+            var box = new CheckBox
+            {
+                Content = "필수",
+                IsChecked = true,
+                Foreground = Brushes.White,
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+            Grid.SetColumn(box, column);
+            row.Children.Add(box);
+            return box;
+        }
+
         public static List<ToolInput> CollectInputSpecs(StackPanel panel)
         {
             var result = new List<ToolInput>();
@@ -49,6 +66,7 @@ namespace NodeKit.UI
 
                 var boxes = row.Children.OfType<TextBox>().ToList();
                 var combos = row.Children.OfType<ComboBox>().ToList();
+                var checkBoxes = row.Children.OfType<CheckBox>().ToList();
                 var name = boxes.ElementAtOrDefault(0)?.Text?.Trim() ?? string.Empty;
                 if (string.IsNullOrEmpty(name))
                 {
@@ -61,7 +79,7 @@ namespace NodeKit.UI
                     Role = boxes.ElementAtOrDefault(1)?.Text?.Trim() ?? string.Empty,
                     Format = boxes.ElementAtOrDefault(2)?.Text?.Trim() ?? string.Empty,
                     Shape = combos.ElementAtOrDefault(0)?.SelectedItem?.ToString() ?? "single",
-                    Required = true,
+                    Required = checkBoxes.ElementAtOrDefault(0)?.IsChecked ?? true,
                 });
             }
 

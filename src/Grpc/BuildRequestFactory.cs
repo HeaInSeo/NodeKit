@@ -19,13 +19,13 @@ namespace NodeKit.Grpc
                 DockerfileContent = def.DockerfileContent,
                 Script = def.Script,
                 EnvironmentSpec = def.EnvironmentSpec,
-                Inputs = def.Inputs,
-                Outputs = def.Outputs,
-                Command = def.Command,
+                Inputs = new(def.Inputs),
+                Outputs = new(def.Outputs),
+                Command = new(def.Command),
                 DisplayLabel = def.DisplayLabel,
                 DisplayDescription = def.DisplayDescription,
                 DisplayCategory = def.DisplayCategory,
-                DisplayTags = def.DisplayTags,
+                DisplayTags = new(def.DisplayTags),
             };
         }
     }

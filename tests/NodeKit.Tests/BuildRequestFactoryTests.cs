@@ -169,5 +169,30 @@ namespace NodeKit.Tests
             Assert.Equal("single", output.Shape);
             Assert.Equal("secondary", output.Class);
         }
+
+        [Fact]
+        public void FromToolDefinition_MutatingDefinitionListsAfterward_DoesNotAffectRequest()
+        {
+            var def = new ToolDefinition
+            {
+                ImageUri = "reg/img:1.0@sha256:abc",
+                Inputs = { new ToolInput { Name = "reads" } },
+                Outputs = { new ToolOutput { Name = "aligned" } },
+                Command = new List<string> { "/bin/sh" },
+                DisplayTags = new List<string> { "alignment" },
+            };
+
+            var req = BuildRequestFactory.FromToolDefinition(def);
+
+            def.Inputs.Add(new ToolInput { Name = "ref" });
+            def.Outputs.Add(new ToolOutput { Name = "log" });
+            def.Command.Add("-c");
+            def.DisplayTags.Add("fastq");
+
+            Assert.Single(req.Inputs);
+            Assert.Single(req.Outputs);
+            Assert.Single(req.Command);
+            Assert.Single(req.DisplayTags);
+        }
     }
 }

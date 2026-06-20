@@ -196,6 +196,36 @@ dependencies:
         }
 
         [Fact]
+        public void Fail_WhenPipSpecHasEditableInstall()
+        {
+            var def = DefWithSpec("numpy==1.26.4\n-e git+https://github.com/example/foo.git@main#egg=foo\n");
+
+            var result = _sut.Validate(def);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-PKG-004" && v.Message.Contains("git+", System.StringComparison.Ordinal));
+        }
+
+        [Fact]
+        public void Fail_WhenPipSpecHasLongFormEditableInstall()
+        {
+            var def = DefWithSpec("numpy==1.26.4\n--editable=./local/foo\n");
+
+            var result = _sut.Validate(def);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-PKG-004");
+        }
+
+        [Fact]
+        public void Pass_WhenPipSpecHasOrdinaryDashOption()
+        {
+            var def = DefWithSpec("numpy==1.26.4\n-r other-requirements.txt\n--no-cache-dir\n");
+
+            Assert.True(_sut.Validate(def).IsValid);
+        }
+
+        [Fact]
         public void Fail_WhenCondaPackageHasEmptyVersionSegment()
         {
             var def = DefWithSpec(@"

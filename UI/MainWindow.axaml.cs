@@ -177,10 +177,10 @@ namespace NodeKit.UI
         /// <summary>Input 포트 행 추가: name / role / format / shape / required / ×</summary>
         private void AddInputRow(StackPanel panel)
         {
-            // columns: name(2*) gap role(1.5*) gap format(1.2*) gap shape(60) gap ×
+            // columns: name(2*) gap role(1.5*) gap format(1.2*) gap shape(60) gap required(Auto) gap ×
             var row = new Grid
             {
-                ColumnDefinitions = new ColumnDefinitions("2*,4,1.5*,4,1.2*,4,60,4,Auto"),
+                ColumnDefinitions = new ColumnDefinitions("2*,4,1.5*,4,1.2*,4,60,4,Auto,4,Auto"),
             };
 
             var nameBox = MakePortTextBox("이름 (예: reads)", 0, row);
@@ -197,8 +197,8 @@ namespace NodeKit.UI
             };
             Grid.SetColumn(shapeBox, 6);
             row.Children.Add(shapeBox);
-
-            AddRemoveButton(row, 8, panel, () => nameBox.Text = string.Empty);
+            MainWindowFormHelpers.AddRequiredCheckBox(row, 8);
+            AddRemoveButton(row, 10, panel, () => nameBox.Text = string.Empty);
 
             panel.Children.Add(row);
             InvalidateValidationState();
