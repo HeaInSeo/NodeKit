@@ -375,10 +375,10 @@ namespace NodeKit.UI
             }
 
             StatusBar.Text = "툴 목록 조회 중...";
-            var toolRegistryClient = GetCatalogClient(address);
 
             try
             {
+                var toolRegistryClient = GetCatalogClient(address);
                 var tools = await toolRegistryClient.ListToolsAsync().ConfigureAwait(false);
                 Dispatcher.UIThread.Post(() =>
                 {
@@ -421,10 +421,10 @@ namespace NodeKit.UI
             }
 
             StatusBar.Text = "데이터 목록 조회 중...";
-            var catalogClient = GetCatalogClient(address);
 
             try
             {
+                var catalogClient = GetCatalogClient(address);
                 var dataList = await catalogClient.ListDataAsync().ConfigureAwait(false);
                 Dispatcher.UIThread.Post(() =>
                 {
@@ -469,10 +469,10 @@ namespace NodeKit.UI
             }
 
             StatusBar.Text = "정책 목록 조회 중...";
-            var policyProvider = GetPolicyProvider(address);
 
             try
             {
+                var policyProvider = GetPolicyProvider(address);
                 var result = await policyProvider.ListPoliciesAsync().ConfigureAwait(false);
                 Dispatcher.UIThread.Post(() =>
                 {
@@ -501,10 +501,10 @@ namespace NodeKit.UI
             }
 
             StatusBar.Text = "번들 갱신 중...";
-            var policyProvider = GetPolicyProvider(address);
 
             try
             {
+                var policyProvider = GetPolicyProvider(address);
                 var bundle = await policyProvider.GetLatestBundleAsync().ConfigureAwait(false);
                 var newChecker = new WasmPolicyChecker(bundle);
                 _policyChecker?.Dispose();
