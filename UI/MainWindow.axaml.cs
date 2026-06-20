@@ -291,7 +291,6 @@ namespace NodeKit.UI
                 return;
             }
 
-            var buildClient = GetBuildClient(address);
             var request = BuildRequestFactory.FromToolDefinition(definition);
 
             // UI 초기화
@@ -307,6 +306,7 @@ namespace NodeKit.UI
 
             try
             {
+                var buildClient = GetBuildClient(address);
 #pragma warning disable CA2007 // IAsyncEnumerable does not support ConfigureAwait directly
                 await foreach (var ev in buildClient.BuildAndRegisterAsync(request, cts.Token))
 #pragma warning restore CA2007
@@ -318,10 +318,11 @@ namespace NodeKit.UI
 #pragma warning disable CA1031
             catch (Exception ex) when (!cts.IsCancellationRequested)
             {
+                var message = BuildErrorMessages.Describe(ex);
                 Dispatcher.UIThread.Post(() =>
                 {
-                    StatusBar.Text = $"gRPC 오류: {ex.Message}";
-                    AppendLog($"[ERROR] {ex.Message}");
+                    StatusBar.Text = message;
+                    AppendLog($"[ERROR] {message}");
                 });
             }
 #pragma warning restore CA1031

@@ -116,5 +116,46 @@ namespace NodeKit.Tests
 
             Assert.Equal(string.Empty, proto.Command);
         }
+
+        [Theory]
+        [InlineData((int)Nodevault.V1.BuildEventKind.Log, (int)BuildEventKind.Log)]
+        [InlineData((int)Nodevault.V1.BuildEventKind.JobCreated, (int)BuildEventKind.JobCreated)]
+        [InlineData((int)Nodevault.V1.BuildEventKind.JobRunning, (int)BuildEventKind.JobRunning)]
+        [InlineData((int)Nodevault.V1.BuildEventKind.PushSucceeded, (int)BuildEventKind.RegistryPushSucceeded)]
+        [InlineData((int)Nodevault.V1.BuildEventKind.DigestAcquired, (int)BuildEventKind.DigestAcquired)]
+        [InlineData((int)Nodevault.V1.BuildEventKind.Succeeded, (int)BuildEventKind.Succeeded)]
+        [InlineData((int)Nodevault.V1.BuildEventKind.Failed, (int)BuildEventKind.Failed)]
+        public void MapKind_MapsEachKnownKind(int protoValue, int expectedValue)
+        {
+            var proto = (Nodevault.V1.BuildEventKind)protoValue;
+            var expected = (BuildEventKind)expectedValue;
+            Assert.Equal(expected, GrpcBuildClient.MapKind(proto));
+        }
+
+        [Fact]
+        public void MapKind_UnknownKind_FallsBackToLog()
+        {
+            Assert.Equal(BuildEventKind.Log, GrpcBuildClient.MapKind((Nodevault.V1.BuildEventKind)(-1)));
+        }
+
+        [Fact]
+        public void FromProto_MapsAllFields()
+        {
+            var timestamp = DateTimeOffset.Parse("2026-06-19T12:34:56Z", System.Globalization.CultureInfo.InvariantCulture);
+            var ev = new Nodevault.V1.BuildEvent
+            {
+                Kind = Nodevault.V1.BuildEventKind.DigestAcquired,
+                Message = "digest acquired",
+                Timestamp = timestamp.ToUnixTimeMilliseconds(),
+                Digest = "sha256:abc123",
+            };
+
+            var mapped = GrpcBuildClient.FromProto(ev);
+
+            Assert.Equal(BuildEventKind.DigestAcquired, mapped.Kind);
+            Assert.Equal("digest acquired", mapped.Message);
+            Assert.Equal(timestamp.UtcDateTime, mapped.Timestamp);
+            Assert.Equal("sha256:abc123", mapped.Digest);
+        }
     }
 }

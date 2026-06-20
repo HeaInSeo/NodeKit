@@ -103,7 +103,7 @@ namespace NodeKit.Grpc
             Class = o.Class,
         };
 
-        private static BuildEvent FromProto(Nodevault.V1.BuildEvent ev)
+        internal static BuildEvent FromProto(Nodevault.V1.BuildEvent ev)
         {
             return new BuildEvent
             {
@@ -114,7 +114,7 @@ namespace NodeKit.Grpc
             };
         }
 
-        private static BuildEventKind MapKind(Nodevault.V1.BuildEventKind kind) => kind switch
+        internal static BuildEventKind MapKind(Nodevault.V1.BuildEventKind kind) => kind switch
         {
             Nodevault.V1.BuildEventKind.Log => BuildEventKind.Log,
             Nodevault.V1.BuildEventKind.JobCreated => BuildEventKind.JobCreated,
