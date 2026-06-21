@@ -2,7 +2,7 @@
 
 Status: Active Planning  
 Created: 2026-06-17  
-Updated: 2026-06-17  
+Updated: 2026-06-21  
 Scope: NodeKit work before NodeVault Phase 1 / PLATFORM_SCHEDULE.md Phase 6
 
 ## 0. Resume Note For Agents
@@ -419,4 +419,157 @@ NodeKit은 지금 당장 새 ToolSpecRequest 경로를 구현하지 말 것.
 현재 BuildRequest / BuildAndRegister legacy gRPC 경로를 유지하고 동작하게 두는 것이 맞다.
 NodeVault Phase 1 (ResolveToolSpec canonical 구현 + SubmitToolBuild API)이 완료된 후 NodeKit이 migration한다.
 PLATFORM_SCHEDULE.md Phase 6 순서대로 진행한다.
+```
+
+## 9. Recipe Authoring Boundary And CLI Command Naming (2026-06-21 design intent)
+
+A first-pass draft filling in the `raw_spec` schema per variant, the concrete
+CLI command interface, and the `src/NodeKit.Cli/` scope left open below is in
+[`docs/NODEKIT_CLI_RECIPE_SPEC_DRAFT.md`](NODEKIT_CLI_RECIPE_SPEC_DRAFT.md) —
+marked DRAFT, pending review, not yet adopted.
+
+"NodeKit does not build images" does not mean "NodeKit does not choose what
+recipe a tool uses." This section records a design decision about what NodeKit
+is allowed to own. It does not move the Sprint 6 entry criteria in Section 4.
+
+Boundary, restated:
+
+```text
+NodeKit owns:
+- recipe variant selection (the user's choice of how a tool gets built)
+- collecting the inputs that variant needs (e.g. a Dockerfile, a conda env spec)
+- normalizing/validating that input as a raw_spec payload
+- rendering a ToolSpecRequest / BuildRequest from it
+- L1 validation
+- exporting the rendered request to a file
+- submitting the request once Sprint 6 entry criteria are met
+
+NodeKit does not own:
+- executing docker / buildah / buildkit build
+- pushing to a registry
+- recording a canonical image digest
+- ResolvedToolSpec generation
+- NodeVault index/catalog mutation
+```
+
+This matches the live NodeVault contract: `ToolSpecRequest.raw_spec`
+(`protos/nodevault/v1/nodevault.proto`) is an opaque string. NodeVault's
+`pkg/resolve` only computes digests from it and recognizes
+`base_image`/`base_image_uri`/`image_uri` keys for pin checking. No
+recipe-variant schema exists on the NodeVault side — defining the variant list
+is NodeKit authoring-layer scope.
+
+Recipe variants under consideration:
+
+```text
+1. conda / bioconda / conda-forge
+2. micromamba
+3. existing BioContainer
+4. source build
+5. local package mirror
+6. Dockerfile fallback
+```
+
+Command naming, chosen to avoid implying NodeKit executes builds or owns
+NodeVault-side resolve:
+
+```text
+nodekit recipe select   - choose a recipe variant
+nodekit spec render     - render a ToolSpecRequest / BuildRequest from collected input
+nodekit request export  - write the rendered request to a file (no network call)
+nodekit validate        - run L1 validation
+nodekit submit          - submit to NodeVault (Sprint 6 gate only)
+```
+
+Avoid `nodekit build`: it reads as "NodeKit builds the image locally," which is
+the one thing this layer must never do. If a `build` alias ships later for UX
+reasons, its documented meaning must be "submit a build request," not "build
+locally."
+
+What can start now vs. what stays gated:
+
+```text
+Can start now (touches nothing in NodeVault):
+- recipe variant selection UX/CLI scaffolding
+- collecting Dockerfile / conda spec / etc. input per variant
+- L1 validation of that input
+- request export to a local file
+
+Stays gated behind Sprint 6 entry criteria (Section 4):
+- nodekit submit, or any network call that sends ToolSpecRequest to NodeVault
+- any client-side ResolveToolSpec or SubmitToolBuild call
+```
+
+### 9.1 한국어 요약
+
+"NodeKit이 이미지를 직접 빌드하지 않는다"는 말이 "NodeKit이 빌드 레시피 선택도
+하지 않는다"는 뜻은 아니다. 이 섹션은 NodeKit이 가질 수 있는 권한 범위에 대한
+설계 결정을 기록한 것이며, 4번 섹션의 Sprint 6 진입 조건 자체를 바꾸지 않는다.
+
+경계 재정리:
+
+```text
+NodeKit이 담당하는 영역:
+- recipe variant 선택 (사용자가 어떤 방식으로 도구를 빌드할지 고르는 것)
+- 해당 variant에 필요한 입력 수집 (예: Dockerfile, conda env spec)
+- 그 입력을 raw_spec payload로 정규화/검증
+- 이를 바탕으로 ToolSpecRequest / BuildRequest 렌더링
+- L1 validation
+- 렌더링된 request를 파일로 export
+- Sprint 6 진입 조건이 충족된 후 request 제출(submit)
+
+NodeKit이 담당하지 않는 영역:
+- docker / buildah / buildkit build 실행
+- registry push
+- canonical image digest 기록
+- ResolvedToolSpec 생성
+- NodeVault index/catalog 변경
+```
+
+이는 실제 NodeVault 계약과 일치한다: `ToolSpecRequest.raw_spec`
+(`protos/nodevault/v1/nodevault.proto`)은 opaque한 문자열이고, NodeVault의
+`pkg/resolve`는 거기서 digest만 계산하며 `base_image`/`base_image_uri`/
+`image_uri` 키만 pin 여부 확인용으로 인식한다. NodeVault 쪽에는 recipe-variant
+스키마가 존재하지 않으므로, variant 목록을 정의하는 것은 NodeKit authoring
+레이어의 범위다.
+
+검토 중인 recipe variant:
+
+```text
+1. conda / bioconda / conda-forge
+2. micromamba
+3. existing BioContainer
+4. source build
+5. local package mirror
+6. Dockerfile fallback
+```
+
+명령 이름 (NodeKit이 빌드를 실행하거나 NodeVault의 resolve 권한을 가진 것처럼
+보이지 않도록 선택):
+
+```text
+nodekit recipe select   - recipe variant 선택
+nodekit spec render     - 수집한 입력으로 ToolSpecRequest / BuildRequest 렌더링
+nodekit request export  - 렌더링된 request를 파일로 저장 (네트워크 호출 없음)
+nodekit validate        - L1 검증 실행
+nodekit submit          - NodeVault에 제출 (Sprint 6 게이트 이후에만)
+```
+
+`nodekit build`는 피한다: "NodeKit이 로컬에서 이미지를 빌드한다"로 읽혀, 이 계층이
+절대 해서는 안 되는 바로 그 일을 암시하기 때문이다. 추후 UX상 `build`라는
+별칭(alias)을 쓰더라도, 그 의미는 "빌드 request를 제출한다"여야 하며 "로컬에서
+빌드한다"가 되어서는 안 된다.
+
+지금 시작 가능한 것 vs. 게이트가 풀려야 하는 것:
+
+```text
+지금 시작 가능 (NodeVault를 전혀 건드리지 않음):
+- recipe variant 선택 UX/CLI 골격
+- variant별 Dockerfile / conda spec 등 입력 수집
+- 그 입력에 대한 L1 검증
+- request를 로컬 파일로 export
+
+Sprint 6 진입 조건(4번 섹션)이 충족되기 전까지 보류:
+- nodekit submit, 또는 ToolSpecRequest를 NodeVault로 보내는 모든 네트워크 호출
+- 클라이언트 측 ResolveToolSpec / SubmitToolBuild 호출
 ```
