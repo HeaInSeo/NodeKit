@@ -11,7 +11,7 @@ namespace NodeKit.Tests
         [Fact]
         public void Pass_WhenDigestAndTagPresent()
         {
-            var def = Def("registry.example.com/bwa-mem2:2.2.1@sha256:abc123def456");
+            var def = Def($"registry.example.com/bwa-mem2:2.2.1@sha256:{ValidDigest}");
             Assert.True(_sut.Validate(def).IsValid);
         }
 
@@ -64,9 +64,31 @@ namespace NodeKit.Tests
         [Fact]
         public void Pass_WhenRegistryPortAndTagBothExist()
         {
-            var def = Def("registry.example.com:5000/bwa-mem2:2.2.1@sha256:abc123def456");
+            var def = Def($"registry.example.com:5000/bwa-mem2:2.2.1@sha256:{ValidDigest}");
             Assert.True(_sut.Validate(def).IsValid);
         }
+
+        [Fact]
+        public void Fail_WhenDigestIsTooShort()
+        {
+            var def = Def("registry.example.com/bwa-mem2:2.2.1@sha256:abc123def456");
+            var result = _sut.Validate(def);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-IMG-005");
+        }
+
+        [Fact]
+        public void Fail_WhenDigestContainsNonHexCharacters()
+        {
+            var def = Def($"registry.example.com/bwa-mem2:2.2.1@sha256:{ValidDigest[..63]}g");
+            var result = _sut.Validate(def);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-IMG-005");
+        }
+
+        private const string ValidDigest = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
         private static ToolDefinition Def(string imageUri) =>
             new() { ImageUri = imageUri };
@@ -506,6 +528,39 @@ dependencies:
 
             Assert.False(result.IsValid);
             Assert.Contains(result.Violations, v => v.RuleId == "L1-DOCKER-007");
+        }
+
+        [Fact]
+        public void Fail_WhenCopySourceContainsVariableReference()
+        {
+            var result = _sut.Validate(Def("FROM ubuntu:22.04\nCOPY $APP_DIR/app /app/\n"));
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-DOCKER-010");
+        }
+
+        [Fact]
+        public void Fail_WhenCopySourceContainsBracedVariableReference()
+        {
+            var result = _sut.Validate(Def("FROM ubuntu:22.04\nCOPY ${APP_DIR}/app /app/\n"));
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-DOCKER-010");
+        }
+
+        [Fact]
+        public void Pass_WhenHeredocBodyLineStartsWithCopyKeyword()
+        {
+            // heredoc 본문은 Dockerfile 명령이 아니므로, 우연히 COPY로 시작하는 줄이 있어도
+            // L1-DOCKER-006으로 오탐(false positive)되면 안 된다.
+            var dockerfile = "FROM ubuntu:22.04@sha256:abc123def456\n" +
+                "RUN <<EOF\n" +
+                "COPY ../secret /app/secret\n" +
+                "EOF\n";
+
+            var result = _sut.Validate(Def(dockerfile));
+
+            Assert.True(result.IsValid);
         }
 
         private static ToolDefinition Def(string dockerfile) =>

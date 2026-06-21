@@ -12,6 +12,10 @@ namespace NodeKit.Policy
     {
         private static readonly char[] _spaceSeparators = { ' ', '\t' };
 
+        private static readonly Regex _heredocPattern = new(
+            @"<<-?\s*(['""]?)(?<delim>[A-Za-z_][A-Za-z0-9_]*)\1",
+            RegexOptions.Compiled);
+
         /// <summary>
         /// Dockerfile 내용을 파싱하여 명령어 목록을 반환한다.
         /// </summary>
@@ -27,9 +31,9 @@ namespace NodeKit.Policy
 
             string pending = string.Empty;
 
-            foreach (var rawLine in lines)
+            for (var i = 0; i < lines.Length; i++)
             {
-                var line = rawLine.TrimEnd();
+                var line = lines[i].TrimEnd();
 
                 // 주석 및 빈 줄 건너뜀
                 if (string.IsNullOrWhiteSpace(line) || line.TrimStart().StartsWith('#'))
@@ -60,6 +64,20 @@ namespace NodeKit.Policy
 
                 var cmd = parts[0].ToUpperInvariant();
                 var rest = parts.Length > 1 ? parts[1] : string.Empty;
+
+                // heredoc 본문은 별도 명령어로 파싱하지 않고 건너뛴다 (예: RUN <<EOF ... EOF)
+                var heredocMatch = _heredocPattern.Match(rest);
+                if (heredocMatch.Success)
+                {
+                    var delimiter = heredocMatch.Groups["delim"].Value;
+                    var bodyEnd = i + 1;
+                    while (bodyEnd < lines.Length && lines[bodyEnd].Trim() != delimiter)
+                    {
+                        bodyEnd++;
+                    }
+
+                    i = bodyEnd;
+                }
 
                 var instruction = new DockerfileInstruction
                 {

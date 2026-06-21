@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using NodeKit.Authoring;
 using NodeKit.Policy;
 
@@ -12,6 +13,10 @@ namespace NodeKit.Validation
     /// </summary>
     internal class DockerfileStructureValidator : IValidator
     {
+        private static readonly Regex _variableReferencePattern = new(
+            @"\$(\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*)",
+            RegexOptions.Compiled);
+
         public ValidationResult Validate(ToolDefinition definition)
         {
             ArgumentNullException.ThrowIfNull(definition);
@@ -153,6 +158,14 @@ namespace NodeKit.Validation
                     violations.Add(new ValidationViolation(
                         "L1-DOCKER-006",
                         $"{command} source '{source}'는 build context 밖을 참조할 수 없습니다.",
+                        field));
+                }
+
+                if (_variableReferencePattern.IsMatch(source))
+                {
+                    violations.Add(new ValidationViolation(
+                        "L1-DOCKER-010",
+                        $"{command} source '{source}'는 ARG/ENV 변수 참조를 포함하여 build context 범위를 정적으로 검증할 수 없습니다 — 변수 없이 고정된 경로를 사용하세요.",
                         field));
                 }
 

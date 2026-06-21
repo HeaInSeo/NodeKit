@@ -1,4 +1,5 @@
 using System;
+using System.Text.RegularExpressions;
 using NodeKit.Authoring;
 
 namespace NodeKit.Validation
@@ -7,9 +8,12 @@ namespace NodeKit.Validation
     /// L1 이미지 URI 검증기.
     /// - latest 태그 차단
     /// - digest(@sha256:...) 미포함 차단
+    /// - digest 형식(64자리 hex) 불일치 차단
     /// </summary>
     internal class ImageUriValidator : IValidator
     {
+        private static readonly Regex _sha256DigestPattern = new(@"^[0-9a-fA-F]{64}$", RegexOptions.Compiled);
+
         public ValidationResult Validate(ToolDefinition definition)
         {
             ArgumentNullException.ThrowIfNull(definition);
@@ -47,11 +51,22 @@ namespace NodeKit.Validation
             }
 
             // SHA256 digest 필수
-            if (!uri.Contains("@sha256:", StringComparison.OrdinalIgnoreCase))
+            var digestIndex = uri.IndexOf("@sha256:", StringComparison.OrdinalIgnoreCase);
+            if (digestIndex < 0)
             {
                 return ValidationResult.Fail(
                     "L1-IMG-004",
                     $"이미지 digest(@sha256:...)가 없습니다. 재현성 보장을 위해 digest 고정이 필수입니다. ({uri})",
+                    nameof(definition.ImageUri));
+            }
+
+            // digest 형식 검증 (64자리 hex)
+            var digest = uri[(digestIndex + "@sha256:".Length)..];
+            if (!_sha256DigestPattern.IsMatch(digest))
+            {
+                return ValidationResult.Fail(
+                    "L1-IMG-005",
+                    $"이미지 digest 형식이 올바르지 않습니다. sha256 digest는 64자리 16진수여야 합니다. ({uri})",
                     nameof(definition.ImageUri));
             }
 
