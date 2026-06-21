@@ -112,6 +112,11 @@ Before sending a build request, NodeKit runs DockGuard policies **locally via WA
 | `AS builder` alias required | Multi-stage FROM standardization |
 | … (9 rules total) | See full list in the **Policy Management** screen |
 
+> These rules apply to `ToolDefinition` (tool build requests). `DataDefinition`
+> (reference data registration) currently has no equivalent L1 rules — per NodeVault's
+> `docs/NONGOALS.md` N-09, strengthening `DataDefinition` / `DataRegisterRequest`
+> validation is intentionally deferred until Phase P3. Worth revisiting later.
+
 ### stableRef vs casHash
 
 | Identifier | Purpose | Example |

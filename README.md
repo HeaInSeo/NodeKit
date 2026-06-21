@@ -125,6 +125,11 @@ NodeKit은 빌드 요청 전송 전에 DockGuard 정책을 **로컬에서 WASM�
 | `AS builder` 별칭 필수 | 멀티스테이지 FROM 표준화 |
 | … (총 9개 규칙) | `정책 관리` 화면에서 전체 목록 확인 |
 
+> 위 규칙은 `ToolDefinition`(Tool 빌드 요청) 대상입니다. `DataDefinition`(참조 데이터
+> 등록)에는 현재 대응하는 L1 규칙이 없습니다 — NodeVault `docs/NONGOALS.md` N-09에 따라
+> `DataDefinition` / `DataRegisterRequest` 검증 강화는 Phase P3까지 의도적으로 보류된
+> 상태입니다. 추후 재검토 필요.
+
 ### stableRef vs casHash
 
 | 식별자 | 용도 | 예시 |
