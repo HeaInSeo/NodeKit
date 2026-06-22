@@ -254,14 +254,18 @@ layer; nothing here assumes that will happen or what it would look like.
    NodeKit-only (Section 6).
 5. ~~Should a `submit` stub ship this sprint?~~ **No** — not specified at all
    (Section 5/6).
-6. **New, still open:** `ImageUri` semantics for non-BioContainer variants.
-   The renderer currently sets `ToolDefinition.ImageUri = BaseImage` for
-   Conda/Micromamba/PackageMirror/SourceBuild/DockerfileFallback — i.e. it
-   reuses the pinned input image as the value of a field whose actual product
-   meaning (intended push target? same as the Dockerfile's `FROM`? something
-   NodeVault overwrites post-build?) was never fully pinned down even before
-   this draft existed. This is a pragmatic placeholder, not a confirmed
-   semantic — needs a decision before the CLI executable ships.
+6. ~~`ImageUri` semantics for non-BioContainer variants.~~ **Resolved**, see
+   [`docs/NODEKIT_IMAGEURI_SEMANTICS_REPORT.md`](NODEKIT_IMAGEURI_SEMANTICS_REPORT.md):
+   `ImageUri` must denote the same pinned, already-existing input image as the
+   Dockerfile's `FROM` line — `ImageUriValidator` requiring a digest *before*
+   any build runs makes this the only consistent reading (a not-yet-built
+   result has no digest yet). `RecipeRenderer` reusing `BaseImage` /
+   `BioContainerImageUri` for `ImageUri` was therefore already correct, not a
+   placeholder. What the report leaves open as a separate, deliberately
+   unstarted follow-up: `DockerfileStructureValidator` never cross-checks its
+   `FROM` line against `ToolDefinition.ImageUri`, so the two can silently
+   diverge today — closing that gap needs a new validator rule, decided and
+   implemented separately from this draft.
 7. **New, still open:** none of the six variants' rendered Dockerfiles have
    been run through an actual `docker build` — only through NodeKit's L1
    static validators. The shell syntax (`curl`/`sha256sum -c`/`conda
@@ -308,8 +312,16 @@ mirror/copy로 최적화할지는 NodeVault의 선택이고 NodeKit 쪽 질문�
 스펙으로도 넣지 않는다 — 커맨드가 존재하지 않는 것 자체가 "아직 안 됨"을 가장
 명확하게 전달하는 방법이다.
 
-**새로 남은 질문**: (1) BioContainer 외 variant들에서 `ImageUri =
-BaseImage`로 재사용하는 것이 맞는 product 의미인지 — 이 필드의 실제 의미(빌드
-타깃? FROM과 동일해야 함? NodeVault가 빌드 후 덮어씀?)는 이 초안 이전부터도
-확정된 적이 없었다. (2) 6개 variant가 생성하는 Dockerfile 전부 NodeKit L1
+**`ImageUri` 의미는 해결됨**: 별도 보고서
+([`docs/NODEKIT_IMAGEURI_SEMANTICS_REPORT.md`](NODEKIT_IMAGEURI_SEMANTICS_REPORT.md))
+에서 확정 — `ImageUri`는 Dockerfile `FROM`과 같은, 빌드 전 이미 존재하는
+pinned input 이미지를 가리켜야 한다(`ImageUriValidator`가 빌드 전 시점에
+digest를 강제하므로, 아직 만들어지지 않은 결과물을 가리킬 수 없다는 게
+근거). `RecipeRenderer`가 `BaseImage`/`BioContainerImageUri`를 그대로
+`ImageUri`에 채우는 동작은 placeholder가 아니라 처음부터 맞는 동작이었다.
+다만 `DockerfileStructureValidator`가 `FROM` 라인을 `ImageUri`와 대조하지
+않아서 둘이 달라도 지금은 통과하는 gap이 남아있고, 이건 별도 validator 규칙
+추가로 다뤄야 할 후속 작업으로 분리했다.
+
+**여전히 남은 질문**: 6개 variant가 생성하는 Dockerfile 전부 NodeKit L1
 정적 검증만 통과했을 뿐, 실제 `docker build`로 검증된 적은 없다.
