@@ -270,8 +270,15 @@ layer; nothing here assumes that will happen or what it would look like.
    is NodeVault's call. Separate, deliberately unstarted follow-up:
    `DockerfileStructureValidator` never cross-checks its `FROM` line against
    `ToolDefinition.ImageUri`, so the two can silently diverge today (candidate
-   rule `L1-IMG-006`) — and that follow-up must first settle how multistage
-   Dockerfiles are handled before it can be implemented.
+   rule `L1-IMG-006`); it also only validates `instructions[0]`, so any `FROM`
+   in a multistage Dockerfile beyond the first is never checked at all. The
+   multistage policy question is now decided (see
+   [`docs/NODEKIT_IMAGEURI_SEMANTICS_REPORT.md`](NODEKIT_IMAGEURI_SEMANTICS_REPORT.md)
+   §4–§6): multistage Dockerfiles are allowed, but reproducibility rules apply
+   uniformly to every `FROM` instruction — no builder-stage exception. The
+   validator change itself (widening `L1-DOCKER-008`/`009`'s scope from the
+   first instruction to all `FROM` instructions, plus the new `L1-IMG-006`
+   cross-check) is a proposed follow-up, not yet implemented.
 7. **New, still open:** none of the six variants' rendered Dockerfiles have
    been run through an actual `docker build` — only through NodeKit's L1
    static validators. The shell syntax (`curl`/`sha256sum -c`/`conda
@@ -332,8 +339,14 @@ placeholder가 아니라 처음부터 맞는 동작이었다. **여기서 재정
 있고, 이는 NodeVault의 결정 영역이라 이 보고서가 단정하지 않는다. 별도
 후속 작업: `DockerfileStructureValidator`가 `FROM` 라인을 `ImageUri`와
 대조하지 않아서 둘이 달라도 지금은 통과하는 gap이 남아있고(후보 규칙
-`L1-IMG-006`), 그 전에 멀티스테이지 Dockerfile 처리 방침을 먼저 정해야
-한다.
+`L1-IMG-006`), 첫 번째 instruction만 검사해서 멀티스테이지의 두 번째 이후
+`FROM`은 전혀 검사되지 않는 gap도 있다. 멀티스테이지 처리 방침은 결정됨
+([`docs/NODEKIT_IMAGEURI_SEMANTICS_REPORT.md`](NODEKIT_IMAGEURI_SEMANTICS_REPORT.md)
+4~6절 참고): 멀티스테이지를 허용하되 builder stage 예외 없이 모든 `FROM`에
+재현성 규칙(latest 금지, digest 필수)을 동일하게 적용한다. validator 코드
+변경(`L1-DOCKER-008`/`009`의 검사 범위를 첫 instruction에서 모든 `FROM`으로
+확장 + 신규 `L1-IMG-006` cross-check 추가)은 제안된 후속 작업이며 아직
+구현하지 않았다.
 
 **여전히 남은 질문**: 6개 variant가 생성하는 Dockerfile 전부 NodeKit L1
 정적 검증만 통과했을 뿐, 실제 `docker build`로 검증된 적은 없다.

@@ -140,79 +140,191 @@ authoring 단계에서) 두 값이 같은 개념을 가리켜야 한다면, 서�
 NodeKit이 그 빌드를 "어떤 이미지"라고 기록하는지(`ImageUri`)가 달라질 수
 있다는 뜻이기 때문이다.
 
-## 4. 후속 규칙 후보 (이번 라운드에서 구현하지 않음)
+## 4. 멀티스테이지 Dockerfile 정책 — 결정됨
 
-cross-field 검증 규칙을 추가한다면 규칙 ID는 기존 체계와 충돌하지 않게
-정해야 한다. 현재 사용 중인 ID:
-
-```text
-L1-IMG-001 ~ L1-IMG-005     (ImageUriValidator)
-L1-DOCKER-001 ~ L1-DOCKER-010  (DockerfileStructureValidator — 010까지 이미 사용 중, ARG/ENV 변수 참조 차단)
-```
-
-`L1-DOCKER-010`은 이미 다른 규칙(빌드 컨텍스트 source의 변수 참조 차단)에
-쓰이고 있어 재사용할 수 없다. 빈 번호인 **`L1-IMG-006`**이 더 적합하다 —
-의미상으로도 "`ImageUri`와 Dockerfile의 관계를 검증한다"는 건
-`ImageUriValidator`(또는 그 확장) 쪽 책임으로 보는 게 자연스럽다.
+**Decision.** 멀티스테이지 Dockerfile은 허용한다. 단, builder 스테이지를
+예외로 두지 않고 모든 `FROM` instruction에 재현성 규칙을 동일하게
+적용한다.
 
 ```text
-L1-IMG-006: ToolDefinition.ImageUri must match the first Dockerfile FROM base image.
+- First FROM must match ToolDefinition.ImageUri.
+- Every FROM must be digest-pinned with @sha256.
+- Every FROM must reject the latest tag.
+- No builder-stage exception.
+- Package-level reproducibility inside stages is a separate follow-up.
 ```
 
-이 규칙 자체는 **이번 라운드에서 구현하지 않는다.** CLAUDE.md §9
-("L1 rule change → 새 규칙에 대한 직접 테스트, pass + block 케이스")와 §7
-("small diffs")에 따라 별도 커밋/별도 결정으로 분리한다.
+**근거**
 
-## 5. 후속 이슈: 멀티스테이지 Dockerfile
+1. **Builder stage도 최종 산출물에 영향을 준다.** Builder stage 자체는
+   최종 이미지 레이어에 직접 남지 않을 수 있지만, 그 안에서 컴파일한
+   바이너리/생성한 인덱스 등 빌드 산출물은 `COPY --from`으로 최종 stage에
+   복사된다. 예:
 
-위 4번 규칙을 실제로 구현하기 전에 먼저 결정해야 할 것이 있다 —
-`DockerfileStructureValidator`는 지금 **첫 번째 `FROM`만** 검사한다
-(`instructions[0]`). 멀티스테이지 Dockerfile은 검증되지 않는 `FROM`을
-가질 수 있다:
+   ```dockerfile
+   FROM golang:latest AS builder
+   RUN go build -o app
 
-```dockerfile
-FROM ubuntu:22.04@sha256:...
-RUN echo build
+   FROM debian:12@sha256:...
+   COPY --from=builder /src/app /usr/local/bin/app
+   ```
 
-FROM alpine:latest
-COPY --from=0 /x /x
-```
+   `golang:latest`가 바뀌면 컴파일러/libc/빌드 도구 버전이 바뀌고, 그 결과
+   `app` 바이너리도 달라질 수 있다. "최종 stage만 고정하면 충분하다"는
+   전제는 이 경로를 놓친다.
 
-여기서 두 번째 `FROM alpine:latest`는 `latest` 태그인데도 현재
-`ValidateFromInstruction`이 `instructions[0]`만 보기 때문에 전혀 검사되지
-않는다. `L1-IMG-006`(또는 그 대안)을 설계할 때 다음을 같이 결정해야 한다 —
-이번 보고서는 질문만 남기고 답하지 않는다:
+2. **FROM digest pinning은 author 비용이 낮다.** `image:tag@sha256:...`
+   한 줄을 추가하는 정도라, builder stage라고 면제해서 얻는 실익이 크지
+   않다. 반대로 면제를 두면 재현성 규칙(CLAUDE.md §3)에 케이스별 예외가
+   생긴다 — 이 프로젝트는 `latest`/digest 미고정에 예외/완화 플래그를
+   두지 않는다는 원칙을 이미 갖고 있고, builder stage 예외도 그 성격의
+   완화에 해당한다.
+
+3. **stage 내부 패키지 pinning은 별개 문제다.** builder stage 안에서
+   `apt-get install -y gcc`처럼 OS 패키지를 받는 부분도 재현성에 영향을
+   주지만, 이건 `FROM` 이미지 자체의 pinning과는 다른 검증 표면이다(이미
+   `PackageVersionValidator`가 conda/micromamba만 보고 apt/apk/yum/pip/npm
+   은 보지 않는 것과 같은 종류의 별도 gap). 이번 결정은 `FROM` image
+   pinning만 다루고, stage 내부 패키지 pinning은 분리된 후속 이슈로
+   남긴다.
+
+4. **최종 stage 판별 로직은 도입하지 않는다.** "최종 stage만 강제, builder
+   는 예외"를 구현하려면 어느 stage가 최종인지, `COPY --from`이 어떤
+   stage를 참조하는지를 분석해야 한다 — 구현 복잡도와 버그 표면이 늘어난다.
+   이번 정책은 stage 구분 없이 모든 `FROM`에 같은 규칙을 적용하는 단순한
+   경로를 택한다.
+
+**현재 schema 한계.** legacy `ToolDefinition`은 `ImageUri` 필드가
+하나뿐이라, 멀티스테이지의 모든 base image를 표현할 방법이 없다.
 
 ```text
-1. 첫 번째 FROM은 ToolDefinition.ImageUri와 반드시 같아야 하는가?
-2. 모든 FROM에 digest pinning을 강제해야 하는가?
-3. 모든 FROM에서 latest를 금지해야 하는가?
-4. 멀티스테이지를 허용할 것인가, 아니면 현재 Sprint에서는 단일 FROM만 허용할 것인가?
+Current legacy ToolDefinition has a single ImageUri field.
+
+Therefore:
+- ToolDefinition.ImageUri represents the first Dockerfile FROM image.
+- The first FROM must match ToolDefinition.ImageUri.
+- Additional FROM instructions are validated at the Dockerfile level.
+- Additional FROM images are not yet normalized into a baseImages[] model.
 ```
 
-## 6. 이번에 실제로 바뀌는 것 / 안 바뀌는 것
+향후 ToolSpec/Recipe 쪽에서는 스테이지별 base image를 구조화하는 모델을
+고려할 수 있다 —
 
-- **바뀜(문서만)**: `NODEKIT_CLI_RECIPE_SPEC_DRAFT.md` §7 질문 #6을 이
-  보고서 결론(0번 Scope 포함)으로 resolved 처리.
+```json
+{
+  "baseImages": [
+    { "stage": "builder", "image": "golang:1.22@sha256:..." },
+    { "stage": "final", "image": "debian:12@sha256:..." }
+  ]
+}
+```
+
+이번 Sprint에서는 `baseImages[]` 모델을 새로 도입하지 않는다 — legacy
+`ToolDefinition`의 단일 `ImageUri` 구조를 그대로 두고, Dockerfile 자체의
+정적 검증만 확장한다.
+
+## 5. 규칙 ID 정리 (충돌 해결)
+
+기존에 사용 중인 ID를 확인한 결과:
+
+```text
+L1-IMG-001 ~ L1-IMG-005        (ImageUriValidator)
+L1-DOCKER-001 ~ L1-DOCKER-010  (DockerfileStructureValidator)
+```
+
+`L1-DOCKER-010`은 이미 다른 규칙(빌드 컨텍스트 source의 ARG/ENV 변수
+참조 차단)에 쓰이고 있어 "모든 FROM 검증"용으로 재사용할 수 없다. 의미는
+유지하되 ID는 다음처럼 조정한다:
+
+```text
+L1-DOCKER-008 (기존 ID 유지, 적용 범위만 확장):
+  Every Dockerfile FROM image must not use the latest tag.
+  (지금까지 첫 번째 FROM에만 적용 → 모든 FROM에 적용으로 확장)
+
+L1-DOCKER-009 (기존 ID 유지, 적용 범위만 확장):
+  Every Dockerfile FROM image must be digest-pinned with @sha256.
+  (지금까지 첫 번째 FROM에만 적용 → 모든 FROM에 적용으로 확장)
+
+L1-IMG-006 (신규):
+  ToolDefinition.ImageUri must match the first Dockerfile FROM image.
+```
+
+"모든 FROM에 latest 금지/digest 필수"는 기존 `L1-DOCKER-008`/`009`가
+이미 표현하는 위반 종류와 같다 — 차이는 *검사 범위*(첫 번째 instruction만
+→ 전체 `FROM` instruction)뿐이므로, 새 ID를 만드는 대신 기존 ID의 검사
+범위를 넓히는 쪽으로 정리했다(`L1-DOCKER-011`은 만들지 않음). `ImageUri`
+↔ 첫 번째 `FROM` 비교는 기존에 없던 cross-field 검증이라 새 ID
+(`L1-IMG-006`)가 필요하고, `ImageUriValidator` 쪽 책임으로 둔다 — 두
+검증기 모두 같은 `ToolDefinition` 인스턴스를 받으므로 구현상 제약은 없다.
+
+## 6. Follow-up 구현 계획 (제안, 이번 라운드에서 코드 변경 없음)
+
+**변경 범위 (작게 유지)**
+
+- `src/Validation/DockerfileStructureValidator.cs`: `ValidateFromInstruction`
+  호출을 `instructions[0]`에서 `instructions.Where(i => i.Cmd == "FROM")`
+  전체로 확장. `L1-DOCKER-002`/`003`(첫 instruction은 FROM이어야 함)은
+  구조 검사라 의미상 그대로 첫 번째 instruction 위치만 본다 — 바뀌는 건
+  pinning 검사(`L1-DOCKER-008`/`009`) 범위뿐이다.
+- `src/Validation/ImageUriValidator.cs`: 첫 번째 `FROM`의 base image를
+  추출해 `definition.ImageUri`와 비교하는 `L1-IMG-006` 검사 추가. 기존
+  `DockerfileStructureValidator`가 쓰는 `DockerfileParser`를 재사용해
+  파싱 로직을 중복 구현하지 않는다.
+
+**하지 않는 것**
+
+```text
+- builder stage 예외 만들기
+- 최종 stage만 검증하는 정책 만들기
+- stage graph / COPY --from 분석 도입
+- baseImages[] schema를 이번 Sprint에 도입
+- apt/apk/yum/pip/npm package pinning까지 한 번에 해결하려고 하기
+```
+
+**테스트 계획**
+
+```text
+통과:
+  FROM ubuntu:22.04@sha256:aaa... AS builder   (ToolDefinition.ImageUri와 일치)
+  RUN echo build
+  FROM debian:12@sha256:bbb...
+  COPY --from=builder /x /x
+
+실패 1 — 첫 번째 FROM이 ImageUri와 불일치 (L1-IMG-006)
+실패 2 — 두 번째 FROM이 latest (L1-DOCKER-008, 확장된 범위)
+실패 3 — 두 번째 FROM에 digest 없음 (L1-DOCKER-009, 확장된 범위)
+실패 4 — builder stage(첫 FROM 아님)가 latest여도 차단됨, 예외 없음 확인
+```
+
+이 절은 **구현 계획 제안이며, 이번 라운드에서 코드를 변경하지 않는다.**
+CLAUDE.md §9(L1 rule 변경 시 pass/block 케이스 직접 테스트)와 §7
+(small diffs)에 따라, 실제 구현은 이 계획에 대한 별도 확인 후 별도
+커밋으로 진행한다.
+
+## 7. 이번에 실제로 바뀌는 것 / 안 바뀌는 것
+
+- **바뀜(문서만)**: `NODEKIT_CLI_RECIPE_SPEC_DRAFT.md` §7 질문 #6을
+  이 보고서 결론(0번 Scope 포함)으로 resolved 처리. 멀티스테이지 정책(4번)
+  과 규칙 ID 정리(5번)도 문서에 확정.
 - **안 바뀜(이번 라운드)**: validator 코드, `RecipeRenderer` 동작, proto —
-  전부 변경 없음. authoring 단계 동작은 이미 결론과 일치하는 상태라 고칠
-  필요가 없다.
-- **다음 결정이 필요한 것**: `L1-IMG-006`(`ImageUri` ↔ Dockerfile `FROM`
-  cross-field 검증) 추가 여부와, 그 전에 먼저 정해야 하는 멀티스테이지
-  Dockerfile 처리 방침(5번). 둘 다 사용자 검토 후 별도 작업으로 진행할지
-  결정.
+  전부 변경 없음. 6번의 구현 계획은 제안일 뿐 아직 코드로 옮기지 않았다.
+- **다음 단계**: 6번 구현 계획에 대한 go-ahead를 받으면 별도 커밋으로
+  `DockerfileStructureValidator`/`ImageUriValidator`를 수정하고 4개
+  테스트 케이스를 추가한다.
 
-## 7. 최종 결론
+## 8. 최종 결론
 
-**Accepted with scope restriction.**
+**Accepted.**
 
-NodeKit authoring-time `ToolDefinition.ImageUri` and the current legacy
-`BuildRequest.ImageUri` mean the pinned input/base image and should match
-Dockerfile `FROM`. `RecipeRenderer`'s current `BaseImage` reuse is
-therefore correct. However, this decision does not redefine post-build
-`RegisterToolRequest.image_uri` or `RegisteredToolDefinition.image_uri`,
-which may represent the registered output image reference. Cross-field
-validation between `ImageUri` and Dockerfile `FROM` remains a separate
-follow-up task (candidate rule `L1-IMG-006`), and that follow-up must
-first decide how multistage Dockerfiles are handled (Section 5) before
-implementation.
+NodeKit allows multi-stage Dockerfiles, but reproducibility rules apply
+uniformly to every `FROM` instruction. The first `FROM` must match
+`ToolDefinition.ImageUri`. Every `FROM`, including builder stages, must
+be digest-pinned and must not use the `latest` tag. Builder stages are
+not exempt because they can affect final build outputs. Package-level
+reproducibility inside stages remains a separate follow-up issue.
+
+이 결정은 NodeKit authoring-time `ToolDefinition.ImageUri`와 현재 legacy
+`BuildRequest.ImageUri`에만 적용된다 — post-build
+`RegisterToolRequest.image_uri` / `RegisteredToolDefinition.image_uri`
+의미는 이 보고서가 재정의하지 않는다(0번 Scope). 실제 validator 구현은
+6번 계획에 대한 별도 확인 후 별도 작업으로 진행한다.
