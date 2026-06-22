@@ -88,6 +88,41 @@ namespace NodeKit.Tests
             Assert.Contains(result.Violations, v => v.RuleId == "L1-IMG-005");
         }
 
+        [Fact]
+        public void Pass_WhenMultistageDockerfileFirstFromMatchesImageUriAndAllStagesArePinned()
+        {
+            var imageUri = $"ubuntu:22.04@sha256:{ValidDigest}";
+            var def = new ToolDefinition
+            {
+                ImageUri = imageUri,
+                DockerfileContent =
+                    $"FROM {imageUri} AS builder\n" +
+                    "RUN echo build\n" +
+                    $"FROM debian:12@sha256:{ValidDigest}\n" +
+                    "COPY --from=builder /x /x\n",
+            };
+
+            var result = _sut.Validate(def);
+
+            Assert.True(result.IsValid);
+        }
+
+        [Fact]
+        public void Fail_WhenFirstFromDoesNotMatchImageUri()
+        {
+            var imageUri = $"ubuntu:22.04@sha256:{ValidDigest}";
+            var def = new ToolDefinition
+            {
+                ImageUri = imageUri,
+                DockerfileContent = $"FROM alpine:3.20@sha256:{ValidDigest}\nRUN echo ok\n",
+            };
+
+            var result = _sut.Validate(def);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-IMG-006");
+        }
+
         private const string ValidDigest = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
         private static ToolDefinition Def(string imageUri) =>
@@ -546,6 +581,57 @@ dependencies:
 
             Assert.False(result.IsValid);
             Assert.Contains(result.Violations, v => v.RuleId == "L1-DOCKER-010");
+        }
+
+        [Fact]
+        public void Pass_WhenMultistageDockerfileEveryFromIsPinned()
+        {
+            var result = _sut.Validate(Def(
+                "FROM ubuntu:22.04@sha256:abc123def456 AS builder\n" +
+                "RUN echo build\n" +
+                "FROM debian:12@sha256:def456abc123\n" +
+                "COPY --from=builder /x /x\n"));
+
+            Assert.True(result.IsValid);
+        }
+
+        [Fact]
+        public void Fail_WhenSecondStageFromHasLatestTag()
+        {
+            var result = _sut.Validate(Def(
+                "FROM ubuntu:22.04@sha256:abc123def456 AS builder\n" +
+                "RUN echo build\n" +
+                "FROM alpine:latest\n" +
+                "COPY --from=builder /x /x\n"));
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-DOCKER-008");
+        }
+
+        [Fact]
+        public void Fail_WhenSecondStageFromHasNoDigest()
+        {
+            var result = _sut.Validate(Def(
+                "FROM ubuntu:22.04@sha256:abc123def456 AS builder\n" +
+                "RUN echo build\n" +
+                "FROM alpine:3.20\n" +
+                "COPY --from=builder /x /x\n"));
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-DOCKER-009");
+        }
+
+        [Fact]
+        public void Fail_WhenBuilderStageFromHasLatestTag_NoBuilderStageException()
+        {
+            var result = _sut.Validate(Def(
+                "FROM golang:latest AS builder\n" +
+                "RUN go build -o app\n" +
+                "FROM debian:12@sha256:abc123def456\n" +
+                "COPY --from=builder /src/app /usr/local/bin/app\n"));
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-DOCKER-008");
         }
 
         [Fact]

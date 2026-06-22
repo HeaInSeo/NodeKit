@@ -47,6 +47,7 @@ namespace NodeKit.Validation
             }
 
             ValidateFromInstruction(violations, instructions[0], nameof(definition.DockerfileContent));
+            ValidateAllFromInstructionsPinning(violations, instructions, nameof(definition.DockerfileContent));
             ValidateCopyAndAddInstructions(violations, instructions, nameof(definition.DockerfileContent));
             return new ValidationResult(violations);
         }
@@ -87,10 +88,23 @@ namespace NodeKit.Validation
                     "L1-DOCKER-003",
                     "FROM 명령에는 base image가 필요합니다.",
                     field));
-                return;
             }
+        }
 
-            ValidateBaseImagePinning(violations, firstInstruction.Value[0], field);
+        private static void ValidateAllFromInstructionsPinning(
+            List<ValidationViolation> violations,
+            IReadOnlyList<DockerfileInstruction> instructions,
+            string field)
+        {
+            foreach (var instruction in instructions)
+            {
+                if (!string.Equals(instruction.Cmd, "FROM", StringComparison.Ordinal) || instruction.Value.Count == 0)
+                {
+                    continue;
+                }
+
+                ValidateBaseImagePinning(violations, instruction.Value[0], field);
+            }
         }
 
         private static void ValidateBaseImagePinning(

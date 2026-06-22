@@ -1,6 +1,7 @@
 using System;
 using System.Text.RegularExpressions;
 using NodeKit.Authoring;
+using NodeKit.Policy;
 
 namespace NodeKit.Validation
 {
@@ -68,6 +69,23 @@ namespace NodeKit.Validation
                     "L1-IMG-005",
                     $"이미지 digest 형식이 올바르지 않습니다. sha256 digest는 64자리 16진수여야 합니다. ({uri})",
                     nameof(definition.ImageUri));
+            }
+
+            // ImageUri는 Dockerfile의 첫 번째 FROM base image와 같아야 한다 —
+            // 둘 다 빌드 전부터 이미 존재하는 동일한 pinned input 이미지를 가리킨다.
+            if (!string.IsNullOrWhiteSpace(definition.DockerfileContent))
+            {
+                var instructions = DockerfileParser.Parse(definition.DockerfileContent);
+                if (instructions.Count > 0
+                    && string.Equals(instructions[0].Cmd, "FROM", StringComparison.Ordinal)
+                    && instructions[0].Value.Count > 0
+                    && !string.Equals(instructions[0].Value[0], uri, StringComparison.Ordinal))
+                {
+                    return ValidationResult.Fail(
+                        "L1-IMG-006",
+                        $"ImageUri가 Dockerfile의 첫 번째 FROM base image와 일치하지 않습니다. ImageUri='{uri}', FROM='{instructions[0].Value[0]}'",
+                        nameof(definition.ImageUri));
+                }
             }
 
             return ValidationResult.Pass;

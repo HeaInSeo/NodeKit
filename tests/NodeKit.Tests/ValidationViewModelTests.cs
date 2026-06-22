@@ -75,7 +75,7 @@ namespace NodeKit.Tests
                 Name = "bwa",
                 Version = "0.7.17",
                 ImageUri = "registry.example.com/bwa:0.7.17@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-                DockerfileContent = "FROM ubuntu:22.04@sha256:abc123def456\nRUN echo ok\n",
+                DockerfileContent = "FROM registry.example.com/bwa:0.7.17@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\nRUN echo ok\n",
                 Script = "bwa mem",
                 Inputs =
                 {
