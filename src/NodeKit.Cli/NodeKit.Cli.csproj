@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>NodeKit.Cli</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>NodeKit.Cli.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      ProjectReference to ../../NodeKit.csproj 의도적으로 사용 안 함:
+      해당 프로젝트는 Avalonia/SkiaSharp/Grpc.Net.Client/Google.Protobuf/Wasmtime를
+      참조하며, CLI는 legacy BuildRequest 렌더링/검증 경로만 필요하다.
+      아래 파일들은 모두 System.* 외 의존성이 없는 순수 POCO/로직 코드이므로
+      소스 링크로만 가져온다.
+    -->
+    <Compile Include="..\Authoring\ToolDefinition.cs" Link="Authoring\ToolDefinition.cs" />
+    <Compile Include="..\Authoring\ToolInput.cs" Link="Authoring\ToolInput.cs" />
+    <Compile Include="..\Authoring\ToolOutput.cs" Link="Authoring\ToolOutput.cs" />
+    <Compile Include="..\Authoring\Recipes\RecipeDocument.cs" Link="Authoring\Recipes\RecipeDocument.cs" />
+    <Compile Include="..\Authoring\Recipes\RecipeVariant.cs" Link="Authoring\Recipes\RecipeVariant.cs" />
+    <Compile Include="..\Authoring\Recipes\RecipeRenderer.cs" Link="Authoring\Recipes\RecipeRenderer.cs" />
+
+    <Compile Include="..\Validation\IValidator.cs" Link="Validation\IValidator.cs" />
+    <Compile Include="..\Validation\ValidationResult.cs" Link="Validation\ValidationResult.cs" />
+    <Compile Include="..\Validation\ValidationViolation.cs" Link="Validation\ValidationViolation.cs" />
+    <Compile Include="..\Validation\RequiredFieldsValidator.cs" Link="Validation\RequiredFieldsValidator.cs" />
+    <Compile Include="..\Validation\ImageUriValidator.cs" Link="Validation\ImageUriValidator.cs" />
+    <Compile Include="..\Validation\DockerfileStructureValidator.cs" Link="Validation\DockerfileStructureValidator.cs" />
+    <Compile Include="..\Validation\PackageVersionValidator.cs" Link="Validation\PackageVersionValidator.cs" />
+    <Compile Include="..\Validation\Recipes\RecipeValidator.cs" Link="Validation\Recipes\RecipeValidator.cs" />
+
+    <Compile Include="..\Policy\DockerfileParser.cs" Link="Policy\DockerfileParser.cs" />
+    <Compile Include="..\Policy\DockerfileInstruction.cs" Link="Policy\DockerfileInstruction.cs" />
+
+    <Compile Include="..\Grpc\BuildRequest.cs" Link="Grpc\BuildRequest.cs" />
+    <Compile Include="..\Grpc\BuildRequestFactory.cs" Link="Grpc\BuildRequestFactory.cs" />
+  </ItemGroup>
+</Project>
