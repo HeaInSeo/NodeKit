@@ -176,42 +176,46 @@ digest check is a substring `Contains` rather than the stricter format check
 
 ## 5. CLI command interface
 
-Library-level (`RecipeValidator` / `RecipeRenderer`) is implemented. The CLI
-commands below describe the intended thin wrapper over that library; the
-executable itself is not yet built (Section 6).
+Implemented in `src/NodeKit.Cli/` (`Program.cs` / `CliApp.cs`), registered in
+`NodeKit.sln`. Two commands only — the earlier four-command draft below was
+collapsed once it was clear `recipe select` (skeleton generation) and the
+split `spec render` / `request export` / `validate --input` surface added
+ceremony without adding safety: both real commands already have to render
+and validate internally before they can do anything useful, so there is no
+path where rendering or validating alone is the end goal.
 
 ```text
-nodekit recipe select --variant <id> --tool-name <name> --version <version> --out <recipe.json>
-  Writes a recipe.json skeleton for the chosen variant.
-  Exit 0 success. Exit 2 unknown --variant or missing required flags.
+nodekit validate <recipe.json>
+  Runs RecipeValidator on the recipe, then RecipeRenderer.Render to get a
+  ToolDefinition, then the full existing L1 validator chain
+  (RequiredFieldsValidator, ImageUriValidator, DockerfileStructureValidator,
+  PackageVersionValidator) on that ToolDefinition. Prints "OK" on success;
+  prints every violation as "<RuleId> (<Field>): <Message>" to stderr on
+  failure.
+  Exit 0 zero violations. Exit 1 one or more violations.
+  Exit 2 missing argument, unreadable file, or malformed recipe JSON.
 
-nodekit spec render --recipe <recipe.json> --out <tool-definition.json>
-  Calls RecipeRenderer.Render and writes the resulting ToolDefinition as JSON.
-  Exit 0 success. Exit 2 malformed JSON / IO error.
-
-nodekit validate --input <recipe.json|tool-definition.json>
-  Runs RecipeValidator (if given a recipe.json) and/or the existing L1
-  validator chain (if given a tool-definition.json) and prints violations.
-  Exit 0 zero violations. Exit 1 one or more violations. Exit 2 IO/parse error.
-
-nodekit request export --input <tool-definition.json> --out <build-request.json>
-  Re-runs validate internally first and refuses to write the file if it
-  fails (fail-closed — an export must never carry an unvalidated definition).
-  Maps ToolDefinition -> BuildRequest via the existing BuildRequestFactory.
-  No network call.
-  Exit 0 success. Exit 1 validation failed, nothing written. Exit 2 IO error.
+nodekit render <recipe.json> --out <build-request.json>
+  Runs the same validate step internally first and refuses to write the
+  output file if it fails (fail-closed — a render must never carry an
+  unvalidated definition). On success, maps ToolDefinition -> BuildRequest
+  via the existing BuildRequestFactory and writes it as indented JSON
+  (the legacy BuildRequest POCO shape, PascalCase fields). `--out -` writes
+  to stdout instead of a file. No network call.
+  Exit 0 success. Exit 1 validation failed, nothing written.
+  Exit 2 missing argument, unreadable file, or malformed recipe JSON.
 ```
+
+There is no separate `recipe select` (skeleton generation), `spec render`
+(ToolDefinition-only export), or `request export` (validate-only-then-export)
+command — `validate` and `render` each do the full
+recipe-validate -> render -> L1-validate pipeline in one step.
 
 `nodekit submit` is **not specified here** — see Section 6. Reserving the name
 in prose without a stub avoids implying it is close to working.
 
-Renamed from the previous draft: `toolspec.json` → `tool-definition.json`,
-because this repo has no real `ToolSpecRequest` yet (Section 0) and the old
-name read as if it did.
-
 File naming convention (suggested default for `--out`, not enforced):
-`recipe.<tool-name>.<version>.json`, `tool-definition.<tool-name>.<version>.json`,
-`build-request.<tool-name>.<version>.json`.
+`recipe.<tool-name>.<version>.json`, `build-request.<tool-name>.<version>.json`.
 
 ## 6. `src/NodeKit.Cli/` scope
 
@@ -224,16 +228,28 @@ File naming convention (suggested default for `--out`, not enforced):
   `RecipeRendererTests.cs` — including end-to-end checks that every variant's
   rendered `ToolDefinition` passes the full existing L1 validator chain with
   zero violations.
+- `src/NodeKit.Cli/NodeKit.Cli.csproj`, `Program.cs`, `CliApp.cs` — the
+  `validate`/`render` commands described in Section 5, registered in
+  `NodeKit.sln`. Source-links the relevant pure-logic files instead of taking
+  a `ProjectReference` on `NodeKit.csproj`, so it carries none of that
+  project's Avalonia/Grpc.Net.Client/Google.Protobuf/Wasmtime/ReactiveUI
+  dependencies — confirmed by inspecting the published `bin/` output.
+- `tests/NodeKit.Cli.Tests/` — validate/render success and failure paths,
+  including the fail-closed "no output file on validation failure" behavior.
 
 **Still not started:**
 
-- The actual `nodekit` CLI executable. Re-including `src/NodeKit.Cli/` in the
-  solution (currently excluded from `NodeKit.csproj`) is a separate task.
 - `nodekit submit` in any form — not even a hard-fail stub. A stub command
   risks reading as "almost ready"; the cleanest signal that submission isn't
   available yet is for the command to simply not exist.
-- Any change to `L1-DOCKER-009`/`L1-DOCKER-010` (pre-existing, unrelated to
-  this draft).
+
+`L1-DOCKER-008`/`009`'s pinning check was later widened to cover every `FROM`
+instruction (not just the first), and a new `L1-IMG-006` cross-check
+(`ImageUri` vs. the Dockerfile's first `FROM`) was added — that change is
+owned by `docs/NODEKIT_IMAGEURI_SEMANTICS_REPORT.md`, not this draft, and is
+already implemented (see Section 7, item 6). `L1-DOCKER-010` (ARG/ENV
+variable reference in COPY/ADD source) remains untouched and out of scope
+here.
 
 `recipe_variant`/`RecipeVariant` is a **NodeKit authoring-layer term only** —
 NodeVault has no equivalent schema today. If NodeVault later introduces an
@@ -278,7 +294,7 @@ layer; nothing here assumes that will happen or what it would look like.
    uniformly to every `FROM` instruction — no builder-stage exception. The
    validator change itself (widening `L1-DOCKER-008`/`009`'s scope from the
    first instruction to all `FROM` instructions, plus the new `L1-IMG-006`
-   cross-check) is a proposed follow-up, not yet implemented.
+   cross-check) is implemented and tested (Section 6).
 7. **New, still open:** none of the six variants' rendered Dockerfiles have
    been run through an actual `docker build` — only through NodeKit's L1
    static validators. The shell syntax (`curl`/`sha256sum -c`/`conda
@@ -286,12 +302,13 @@ layer; nothing here assumes that will happen or what it would look like.
 
 ## 8. 한국어 요약
 
-이 문서는 **부분 구현됨, 설계는 아직 검토 중** 상태다. 아래에서 설명하는 recipe
-모델, recipe-level validator, renderer는 실제 코드로 존재하며
-(`src/Authoring/Recipes/`, `src/Validation/Recipes/`,
-`tests/NodeKit.Tests/Recipes/`) 테스트로 커버된다. CLI 실행 파일
-(`src/NodeKit.Cli/`)은 아직 만들지 않았다 — 그 아래 헤드리스 라이브러리 레이어만
-존재한다.
+이 문서는 **구현됨** 상태다. 아래에서 설명하는 recipe 모델, recipe-level
+validator, renderer는 실제 코드로 존재하며 (`src/Authoring/Recipes/`,
+`src/Validation/Recipes/`, `tests/NodeKit.Tests/Recipes/`) 테스트로
+커버된다. CLI 실행 파일(`src/NodeKit.Cli/`)도 만들었다 — `nodekit validate
+<recipe.json>` / `nodekit render <recipe.json> --out <build-request.json>`
+두 명령만 제공하며 (5절), `NodeKit.sln`에 등록되어 있고 `tests/NodeKit.Cli.Tests/`로
+커버된다 (6절). `nodekit submit`은 여전히 존재하지 않는다.
 
 **현재 경로 vs 미래 경로**: 이 초안은 현재 legacy 경로만 대상으로 한다 —
 `RecipeDocument → ToolDefinition → BuildRequest → BuildAndRegister`. 이 저장소에
@@ -345,8 +362,8 @@ placeholder가 아니라 처음부터 맞는 동작이었다. **여기서 재정
 4~6절 참고): 멀티스테이지를 허용하되 builder stage 예외 없이 모든 `FROM`에
 재현성 규칙(latest 금지, digest 필수)을 동일하게 적용한다. validator 코드
 변경(`L1-DOCKER-008`/`009`의 검사 범위를 첫 instruction에서 모든 `FROM`으로
-확장 + 신규 `L1-IMG-006` cross-check 추가)은 제안된 후속 작업이며 아직
-구현하지 않았다.
+확장 + 신규 `L1-IMG-006` cross-check 추가)은 실제로 구현했고 테스트도
+추가했다 (6절).
 
 **여전히 남은 질문**: 6개 variant가 생성하는 Dockerfile 전부 NodeKit L1
 정적 검증만 통과했을 뿐, 실제 `docker build`로 검증된 적은 없다.
