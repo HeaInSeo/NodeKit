@@ -27,6 +27,40 @@
     <Compile Include="..\Authoring\Recipes\RecipeDocument.cs" Link="Authoring\Recipes\RecipeDocument.cs" />
     <Compile Include="..\Authoring\Recipes\RecipeBuildKind.cs" Link="Authoring\Recipes\RecipeBuildKind.cs" />
     <Compile Include="..\Authoring\Recipes\RecipeRenderer.cs" Link="Authoring\Recipes\RecipeRenderer.cs" />
+    <Compile Include="..\Authoring\Recipes\RecipeAuthoringSession.cs" Link="Authoring\Recipes\RecipeAuthoringSession.cs" />
+    <Compile Include="..\Authoring\Recipes\RecipeAuthoringSnapshot.cs" Link="Authoring\Recipes\RecipeAuthoringSnapshot.cs" />
+    <Compile Include="..\Authoring\Recipes\RecipeAuthoringSessionMetadata.cs" Link="Authoring\Recipes\RecipeAuthoringSessionMetadata.cs" />
+    <Compile Include="..\Authoring\Recipes\RecipeFieldCatalog.cs" Link="Authoring\Recipes\RecipeFieldCatalog.cs" />
+    <Compile Include="..\Authoring\Recipes\RecipeFieldDescriptor.cs" Link="Authoring\Recipes\RecipeFieldDescriptor.cs" />
+    <Compile Include="..\Authoring\Recipes\RecipeFieldType.cs" Link="Authoring\Recipes\RecipeFieldType.cs" />
+    <Compile Include="..\Authoring\Recipes\RecipeFieldRequirement.cs" Link="Authoring\Recipes\RecipeFieldRequirement.cs" />
+    <Compile Include="..\Authoring\Recipes\RecipeFieldValueSummary.cs" Link="Authoring\Recipes\RecipeFieldValueSummary.cs" />
+    <Compile Include="..\Authoring\Recipes\RecipeChoice.cs" Link="Authoring\Recipes\RecipeChoice.cs" />
+    <Compile Include="..\Authoring\Recipes\LocalizedText.cs" Link="Authoring\Recipes\LocalizedText.cs" />
+    <Compile Include="..\Authoring\Recipes\RecipeMethodId.cs" Link="Authoring\Recipes\RecipeMethodId.cs" />
+    <Compile Include="..\Authoring\Recipes\RecipeMethodInfo.cs" Link="Authoring\Recipes\RecipeMethodInfo.cs" />
+    <Compile Include="..\Authoring\Recipes\RecipeMethodCatalog.cs" Link="Authoring\Recipes\RecipeMethodCatalog.cs" />
+    <Compile Include="..\Authoring\Recipes\RecipeMethodQuestion.cs" Link="Authoring\Recipes\RecipeMethodQuestion.cs" />
+    <Compile Include="..\Authoring\Recipes\RecipeMethodQuestionCatalog.cs" Link="Authoring\Recipes\RecipeMethodQuestionCatalog.cs" />
+    <Compile Include="..\Authoring\Recipes\RecipeMethodAnswers.cs" Link="Authoring\Recipes\RecipeMethodAnswers.cs" />
+    <Compile Include="..\Authoring\Recipes\Answer.cs" Link="Authoring\Recipes\Answer.cs" />
+    <Compile Include="..\Authoring\Recipes\RecipeMethodRecommender.cs" Link="Authoring\Recipes\RecipeMethodRecommender.cs" />
+    <Compile Include="..\Authoring\Recipes\RecipeMethodRecommendation.cs" Link="Authoring\Recipes\RecipeMethodRecommendation.cs" />
+    <Compile Include="..\Authoring\Recipes\RecipeMethodCandidate.cs" Link="Authoring\Recipes\RecipeMethodCandidate.cs" />
+    <Compile Include="..\Authoring\Recipes\RecipeBuildKindResolver.cs" Link="Authoring\Recipes\RecipeBuildKindResolver.cs" />
+    <Compile Include="..\Authoring\Recipes\InputOutputPresetCatalog.cs" Link="Authoring\Recipes\InputOutputPresetCatalog.cs" />
+    <Compile Include="..\Authoring\Recipes\ToolInputPreset.cs" Link="Authoring\Recipes\ToolInputPreset.cs" />
+    <Compile Include="..\Authoring\Recipes\ToolOutputPreset.cs" Link="Authoring\Recipes\ToolOutputPreset.cs" />
+    <Compile Include="..\Authoring\Recipes\ChangeMethodPreview.cs" Link="Authoring\Recipes\ChangeMethodPreview.cs" />
+    <Compile Include="..\Authoring\Recipes\ChangeMethodDecision.cs" Link="Authoring\Recipes\ChangeMethodDecision.cs" />
+    <Compile Include="..\Authoring\Recipes\RecipeValidationRecoveryPlan.cs" Link="Authoring\Recipes\RecipeValidationRecoveryPlan.cs" />
+    <Compile Include="..\Authoring\Recipes\RecipeValidationRecoveryAction.cs" Link="Authoring\Recipes\RecipeValidationRecoveryAction.cs" />
+    <Compile Include="..\Authoring\Recipes\RecoveryActionKind.cs" Link="Authoring\Recipes\RecoveryActionKind.cs" />
+    <Compile Include="..\Authoring\Recipes\FormatNormalizer.cs" Link="Authoring\Recipes\FormatNormalizer.cs" />
+    <Compile Include="..\Authoring\Recipes\RoleNormalizer.cs" Link="Authoring\Recipes\RoleNormalizer.cs" />
+    <Compile Include="..\Authoring\Recipes\ChannelNormalizer.cs" Link="Authoring\Recipes\ChannelNormalizer.cs" />
+    <Compile Include="..\Authoring\Recipes\RecipeValueNormalizationResult.cs" Link="Authoring\Recipes\RecipeValueNormalizationResult.cs" />
+    <Compile Include="..\Authoring\Recipes\RecipeValueNormalizationAction.cs" Link="Authoring\Recipes\RecipeValueNormalizationAction.cs" />
 
     <Compile Include="..\Validation\IValidator.cs" Link="Validation\IValidator.cs" />
     <Compile Include="..\Validation\ValidationResult.cs" Link="Validation\ValidationResult.cs" />

@@ -24,11 +24,14 @@ namespace NodeKit.Cli
             Converters = { new JsonStringEnumConverter() },
         };
 
-        public static int Run(string[] args, TextWriter stdout, TextWriter stderr)
+        public static int Run(string[] args, TextWriter stdout, TextWriter stderr) =>
+            Run(args, TextReader.Null, stdout, stderr);
+
+        public static int Run(string[] args, TextReader stdin, TextWriter stdout, TextWriter stderr)
         {
             if (args.Length == 0)
             {
-                stderr.WriteLine("사용법: nodekit validate <recipe.json> | nodekit render <recipe.json> --out <build-request.json>");
+                stderr.WriteLine("사용법: nodekit validate <recipe.json> | nodekit render <recipe.json> --out <build-request.json> | nodekit recipe create <recipe.json> [...]");
                 return 2;
             }
 
@@ -36,13 +39,25 @@ namespace NodeKit.Cli
             {
                 "validate" => RunValidate(args, stdout, stderr),
                 "render" => RunRender(args, stdout, stderr),
+                "recipe" => RunRecipe(args, stdin, stdout, stderr),
                 _ => Unknown(args[0], stderr),
             };
         }
 
+        private static int RunRecipe(string[] args, TextReader stdin, TextWriter stdout, TextWriter stderr)
+        {
+            if (args.Length < 3 || args[1] != "create")
+            {
+                stderr.WriteLine("사용법: nodekit recipe create <recipe.json> [--method ...] [--non-interactive ...]");
+                return 2;
+            }
+
+            return RecipeCreateCommand.Run(args[2], args[3..], stdin, stdout, stderr);
+        }
+
         private static int Unknown(string command, TextWriter stderr)
         {
-            stderr.WriteLine($"알 수 없는 명령입니다: {command} (validate | render 만 지원합니다)");
+            stderr.WriteLine($"알 수 없는 명령입니다: {command} (validate | render | recipe 만 지원합니다)");
             return 2;
         }
 
@@ -157,7 +172,7 @@ namespace NodeKit.Cli
             return true;
         }
 
-        private static void PrintViolations(System.Collections.Generic.IReadOnlyList<ValidationViolation> violations, TextWriter stderr)
+        internal static void PrintViolations(System.Collections.Generic.IReadOnlyList<ValidationViolation> violations, TextWriter stderr)
         {
             foreach (var violation in violations)
             {
