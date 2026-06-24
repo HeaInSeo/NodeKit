@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using NodeKit.Authoring.Recipes;
@@ -60,14 +59,14 @@ namespace NodeKit.Cli
                 return 2;
             }
 
-            var violations = ValidateRecipe(recipe!);
-            if (violations.Count == 0)
+            var result = RecipeValidationPipeline.ValidateRecipe(recipe!);
+            if (result.IsValid)
             {
                 stdout.WriteLine("OK");
                 return 0;
             }
 
-            PrintViolations(violations, stderr);
+            PrintViolations(result.Violations, stderr);
             return 1;
         }
 
@@ -90,10 +89,10 @@ namespace NodeKit.Cli
                 return 2;
             }
 
-            var violations = ValidateRecipe(recipe!);
-            if (violations.Count > 0)
+            var result = RecipeValidationPipeline.ValidateRecipe(recipe!);
+            if (!result.IsValid)
             {
-                PrintViolations(violations, stderr);
+                PrintViolations(result.Violations, stderr);
                 return 1;
             }
 
@@ -158,28 +157,7 @@ namespace NodeKit.Cli
             return true;
         }
 
-        private static System.Collections.Generic.List<ValidationViolation> ValidateRecipe(RecipeDocument recipe)
-        {
-            var violations = RecipeValidator.Validate(recipe).Violations.ToList();
-
-            var definition = RecipeRenderer.Render(recipe);
-            IValidator[] l1Validators =
-            {
-                new RequiredFieldsValidator(),
-                new ImageUriValidator(),
-                new DockerfileStructureValidator(),
-                new PackageVersionValidator(),
-            };
-
-            foreach (var validator in l1Validators)
-            {
-                violations.AddRange(validator.Validate(definition).Violations);
-            }
-
-            return violations;
-        }
-
-        private static void PrintViolations(System.Collections.Generic.List<ValidationViolation> violations, TextWriter stderr)
+        private static void PrintViolations(System.Collections.Generic.IReadOnlyList<ValidationViolation> violations, TextWriter stderr)
         {
             foreach (var violation in violations)
             {

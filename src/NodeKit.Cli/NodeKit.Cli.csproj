@@ -36,6 +36,7 @@
     <Compile Include="..\Validation\DockerfileStructureValidator.cs" Link="Validation\DockerfileStructureValidator.cs" />
     <Compile Include="..\Validation\PackageVersionValidator.cs" Link="Validation\PackageVersionValidator.cs" />
     <Compile Include="..\Validation\Recipes\RecipeValidator.cs" Link="Validation\Recipes\RecipeValidator.cs" />
+    <Compile Include="..\Validation\Recipes\RecipeValidationPipeline.cs" Link="Validation\Recipes\RecipeValidationPipeline.cs" />
 
     <Compile Include="..\Policy\DockerfileParser.cs" Link="Policy\DockerfileParser.cs" />
     <Compile Include="..\Policy\DockerfileInstruction.cs" Link="Policy\DockerfileInstruction.cs" />

@@ -25,6 +25,16 @@ namespace NodeKit.Authoring.Recipes
         /// </summary>
         public string BaseImage { get; set; } = string.Empty;
 
+        /// <summary>
+        /// container method authoring field — see
+        /// docs/NODEKIT_CLI_RECIPE_AUTHORING_UX_BEGINNER_DESIGN.md Section 9.3.
+        /// Tag-only BaseImage is allowed mid-authoring; ImageDigest is the
+        /// separate field that final L1 validation (CLAUDE.md Section 3)
+        /// requires to be present. Not yet consumed by RecipeRenderer —
+        /// RecipeAuthoringSession (Sprint R5) is the field's first reader.
+        /// </summary>
+        public string ImageDigest { get; set; } = string.Empty;
+
         // ── Conda / Micromamba / PackageMirror ──────────────────────────────
         public List<string> Channels { get; set; } = new();
 
@@ -32,6 +42,15 @@ namespace NodeKit.Authoring.Recipes
 
         /// <summary>PackageMirror only: internal mirror URL used in place of public channels.</summary>
         public string PackageMirrorUri { get; set; } = string.Empty;
+
+        /// <summary>
+        /// package method authoring field, Defaulted to "conda" by Build() —
+        /// see design doc Section 9.4. Not yet consumed by RecipeRenderer.
+        /// </summary>
+        public string PackageEngine { get; set; } = string.Empty;
+
+        /// <summary>mirror method authoring field, Optional in v1 — see design doc Section 9.5.</summary>
+        public string MirrorKind { get; set; } = string.Empty;
 
         // ── BioContainer ─────────────────────────────────────────────────────
         /// <summary>Pinned external image URI. This build kind's only image input.</summary>
@@ -45,8 +64,17 @@ namespace NodeKit.Authoring.Recipes
 
         public List<string> SourceBuildCommands { get; set; } = new();
 
+        /// <summary>source method authoring field, Recommended (not blocking) — see design doc Section 9.6.</summary>
+        public List<string> BuildDependencies { get; set; } = new();
+
         // ── DockerfileFallback ───────────────────────────────────────────────
         public string DockerfileContent { get; set; } = string.Empty;
+
+        /// <summary>dockerfile method authoring field — alternative to DockerfileContent, see design doc Section 9.7.</summary>
+        public string DockerfilePath { get; set; } = string.Empty;
+
+        /// <summary>dockerfile method authoring field, Defaulted to the current directory by Build() — see design doc Section 9.7.</summary>
+        public string BuildContext { get; set; } = string.Empty;
 
         // ── Common ToolDefinition-shaped fields ─────────────────────────────
         public string Script { get; set; } = string.Empty;
