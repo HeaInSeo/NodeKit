@@ -1,9 +1,10 @@
-# NodeKit CLI Recipe Authoring UX — Beginner-Oriented Design v0.7
+# NodeKit CLI Recipe Authoring UX — Beginner-Oriented Design v0.8
 
 > Status: design draft, freeze-ready candidate.
 > This document defines the intended NodeKit CLI recipe authoring UX and the reusable authoring core architecture for CLI, future GUI, and future MCP front ends.
 > Nothing in this document is assumed to be implemented yet.
 > Terminology in this document already applies the build-kind patch — see [`NODEKIT_CLI_RECIPE_AUTHORING_UX_TERMINOLOGY_PATCH.md`](NODEKIT_CLI_RECIPE_AUTHORING_UX_TERMINOLOGY_PATCH.md). "variant"/`RecipeVariant` is not used anywhere below; the internal concept is `RecipeBuildKind`.
+> v0.8 patch: `ImageDigest` is corrected from `Recommended` to `Required`. CLAUDE.md §3 blocks any image reference without a pinned `@sha256:` digest at L1 with no exceptions; an authoring-level `Recommended` tier cannot relax that. Authoring-level field requirement and final L1 policy are two different layers — see §5.6, §9.3, §19.3, §34.
 
 ---
 
@@ -514,10 +515,20 @@ authoring session metadata에만 반영한다.
 
 ### 5.6 image tag-only warning
 
-`ImageDigest`는 `Recommended` field다.
-따라서 tag-only `ImageRef`는 warning을 출력하지만 진행을 막지 않는다.
+`ImageDigest`는 `Required` field다. CLAUDE.md §3은 `@sha256:` digest가 없는 이미지 참조를 L1에서 예외 없이 block한다 — authoring-level requirement는 이 정책을 완화할 수 없다.
 
-non-interactive에서도 별도 수락 flag를 요구하지 않는다.
+다만 authoring 중에는 digest를 아직 모르는 상태로 `ImageRef`에 tag만 입력하는 것을 막지 않는다. 그 시점에는 즉시 blocking하지 않고 warning만 보여준다.
+
+```text
+tag-only ImageRef를 입력하면:
+이 상태로 저장을 시도하면 final validation(L1)에서 차단됩니다.
+digest를 알고 있다면 지금 입력하세요.
+모른다면 나중에 digest를 채운 뒤 다시 저장을 시도해야 합니다.
+```
+
+`ImageDigest`는 v1에서 자동으로 resolve되지 않는다(§1.2 — 실제 image pull 확인은 v1 범위 밖). 즉 v1에서 tag-only로 작성을 끝까지 진행한 사용자는 final validation에서 막힌다는 사실을 authoring 중에 정직하게 미리 안내한다.
+
+이것은 accept-flag로 우회할 수 있는 warning이 아니라 누락된 Required field이므로, 별도 수락 flag를 두지 않는다.
 
 ```text
 --accept-image-tag-warning 옵션은 v1에 두지 않는다.
@@ -535,7 +546,7 @@ non-interactive에서도 별도 수락 flag를 요구하지 않는다.
 
 ```text
 PackageEngine = 값이 없으면 conda 기본값 적용
-ImageDigest = 없어도 되지만 강한 warning 표시
+BuildDependencies = 없어도 되지만 재현성 차원에서 명시를 권장
 MirrorKind = v1에서는 없어도 됨
 ```
 
@@ -581,9 +592,9 @@ PackageEngine 누락
 ```
 
 ```text
-ImageDigest 누락
+BuildDependencies 누락
 → Recommended
-→ tag-only reproducibility warning 출력
+→ dependency 명시 권장 warning 출력
 → 계속
 ```
 
@@ -738,15 +749,17 @@ Inputs/Outputs는 `CommonScalarFields`에 포함하지 않는다.
 | Field                     | Requirement | Default | 설명                              |
 | ------------------------- | ----------- | ------- | ------------------------------- |
 | `ImageRef`                | Required    | -       | 사용할 컨테이너 이미지 참조                 |
-| `ImageDigest`             | Recommended | -       | digest 고정 권장                    |
+| `ImageDigest`             | Required    | -       | digest 고정. CLAUDE.md §3 L1 규칙에 따라 final validation에서 필수 |
 | `Entrypoint` 또는 `Command` | Optional    | -       | 이미지 기본 entrypoint를 그대로 쓰지 않을 경우 |
 
 v1 정책:
 
 ```text
-ImageRef tag-only 입력은 허용한다.
-단, 강한 warning을 표시한다.
-warning은 blocking violation이 아니다.
+authoring 중에는 ImageRef tag-only 입력을 막지 않는다.
+다만 digest가 없으면 final validation(L1, CLAUDE.md §3)에서 block된다.
+이 사실을 authoring 중 warning으로 미리 안내한다.
+warning 표시는 field 입력 자체를 막지 않지만, ImageDigest 누락은
+final validation에서 blocking violation으로 처리된다.
 ```
 
 ---
@@ -784,7 +797,7 @@ v1에서는 mirror 종류 모델이 아직 확정되지 않았으므로 `MirrorK
 | `SourceUri`           | Required    | -       | source archive 또는 release URI  |
 | `SourceChecksum`      | Required    | -       | v1에서는 `sha256:<64 hex>` 형식만 허용 |
 | `SourceBuildCommands` | Required    | -       | source를 빌드하는 명령어 목록            |
-| `BuildDependencies`   | Optional    | -       | 빌드에 필요한 dependency 목록          |
+| `BuildDependencies`   | Recommended | -       | 빌드에 필요한 dependency 목록 — 없어도 되지만 재현성을 위해 명시 권장 |
 
 `SourceChecksum` parser는 향후 `algo:hex` 일반형으로 확장 가능하게 설계하되, v1 validator는 `sha256`만 허용한다.
 
@@ -1023,8 +1036,8 @@ HasExistingDockerfile == No
 - 이 방법은 새로 패키지를 설치하거나 소스코드를 빌드하지 않아도 됩니다.
 
 주의:
-- tag만 사용하면 재현성이 약할 수 있습니다.
-- 가능하면 digest로 고정된 이미지 URI를 사용하세요.
+- digest로 고정된 이미지 URI가 필요합니다.
+- tag만 알고 있다면 우선 진행할 수 있지만, digest 없이는 최종 저장 시점에 검증이 막힙니다.
 
 대안:
 1. 패키지로 설치하기
@@ -1702,6 +1715,17 @@ nodekit recipe create
 recipe create가 만든 recipe는 nodekit validate에서 다시 실패하면 안 된다.
 ```
 
+authoring-level field requirement(`RecipeFieldRequirement`)와 final L1 정책(CLAUDE.md §3)은 별개의 층이다.
+
+```text
+RecipeFieldRequirement는 authoring session이 "다음 필드로 넘어갈 수 있는가"를 결정한다.
+CLAUDE.md §3의 reproducibility 규칙(latest tag block, digest 미고정 block,
+version+build string 미고정 block)은 authoring requirement와 무관하게
+final validation의 L1 chain에서 항상 적용된다.
+```
+
+따라서 `ImageDigest`처럼 L1이 block하는 값은 authoring-level requirement도 `Required`로 둔다 — `Recommended`/`Optional`로 두면 "create는 성공하지만 validate는 실패"하는 상태가 생겨 위 원칙을 어긴다. tag-only `ImageRef`로 작성을 진행한 session은 final validation에서 반드시 block되며, 이는 fail-closed 원칙(§2.6)에 따라 `recipe.json`을 쓰지 않고 RecoveryPlan을 생성한다.
+
 ---
 
 ## 20. RecoveryPlan
@@ -2305,7 +2329,8 @@ recipe 파일은 아직 작성하지 않았습니다.
 
 ```text
 PackageEngine → Defaulted, default conda
-ImageDigest → Recommended, missing이면 warning
+ImageDigest → Required, missing이면 final validation에서 blocking violation (CLAUDE.md §3 L1 규칙)
+BuildDependencies → Recommended, missing이면 warning
 SourceChecksum → Required, missing이면 blocking violation
 BuildContext → Defaulted, default current directory
 MirrorKind → Optional
@@ -2319,7 +2344,8 @@ Required 누락 → 실패
 Defaulted 누락 → default 적용 후 계속
 Recommended 누락 → warning 출력 후 계속
 Optional 누락 → 계속
-ImageDigest 누락 → stderr warning 후 계속
+ImageDigest 누락 → Required 누락이므로 실패 (CLAUDE.md §3 L1 규칙)
+BuildDependencies 누락 → stderr warning 후 계속
 --accept-image-tag-warning 옵션은 존재하지 않음
 ```
 
@@ -2563,16 +2589,16 @@ MirrorKind를 Defaulted 또는 Choice field로 승격
 
 ## 34. 확정된 결정
 
-다음 항목은 v0.7에서 확정한다.
+다음 항목은 v0.7~v0.8에서 확정한다. (24, 25는 v0.8 패치에서 추가)
 
 ```text
 1. 사용자가 고르는 것은 RecipeMethodId다.
 2. RecipeBuildKind는 Build() 이후 final validation/render 직전에 resolve한다.
 3. PackageEngine은 Defaulted field이고 기본값은 conda다.
 4. --engine micromamba는 v1에 포함한다.
-5. ImageRef tag-only는 허용하되 warning을 표시한다.
-6. ImageDigest는 Recommended field다.
-7. Image tag-only warning에는 별도 accept flag를 두지 않는다.
+5. ImageRef tag-only는 authoring 중에는 입력을 막지 않지만, final validation(L1)에서 CLAUDE.md §3에 따라 block된다.
+6. ImageDigest는 Required field다 — CLAUDE.md §3 L1 digest-pinning 규칙과 일치시킨다.
+7. tag-only ImageRef는 accept flag로 우회할 수 있는 warning이 아니라 Required field 누락이므로, 별도 accept flag를 두지 않는다.
 8. SourceChecksum은 v1에서 sha256:<64 hex>만 허용한다.
 9. role normalize는 snake_case로 한다.
 10. fastq.gz는 v1에서 compression warning + format suggestion만 제공한다.
@@ -2589,6 +2615,8 @@ MirrorKind를 Defaulted 또는 Choice field로 승격
 21. invalidated field는 blocking이 아니라 warning 상태다.
 22. invalidated field는 사용자가 재확인하거나 수정하면 해제된다.
 23. MirrorKind는 v1에서 Optional이다.
+24. BuildDependencies는 v1에서 Recommended다.
+25. RecipeFieldRequirement(authoring-level)와 CLAUDE.md §3 reproducibility 규칙(final L1)은 서로 다른 층이며, L1이 block하는 필드는 authoring-level requirement도 Required로 둔다.
 ```
 
 ---
