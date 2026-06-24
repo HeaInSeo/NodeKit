@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using NodeKit.Authoring;
 using NodeKit.Authoring.Recipes;
+using NodeKit.Validation;
 using NodeKit.Validation.Recipes;
 using Xunit;
 
@@ -117,15 +118,77 @@ namespace NodeKit.Tests.Recipes
         }
 
         [Fact]
-        public void AppendListItem_AfterCompleteListField_Throws()
+        public void AppendListItem_AfterCompleteListField_AppendsItemAndStaysComplete()
         {
             var session = new RecipeAuthoringSession();
             session.SelectMethod(RecipeMethodId.Package);
             session.AppendListItem("Packages", "bwa=0.7.17=h5bf99c6_8");
             session.CompleteListField("Packages");
 
-            var ex = Assert.Throws<InvalidOperationException>(() => session.AppendListItem("Packages", "samtools=1.19=h50ea8bc_0"));
-            Assert.Contains("Sprint R6", ex.Message, StringComparison.Ordinal);
+            var violations = session.AppendListItem("Packages", "samtools=1.19=h50ea8bc_0");
+
+            Assert.Empty(violations);
+            Assert.Equal("2개 항목", session.Snapshot().Values.Single(v => v.FieldName == "Packages").DisplayValue);
+        }
+
+        [Fact]
+        public void EditListItem_ReplacesItemAtIndex()
+        {
+            var session = new RecipeAuthoringSession();
+            session.SelectMethod(RecipeMethodId.Package);
+            session.AppendListItem("Channels", "biocnda");
+            session.CompleteListField("Channels");
+
+            var violations = session.EditListItem("Channels", 0, "bioconda");
+
+            Assert.Empty(violations);
+        }
+
+        [Fact]
+        public void EditListItem_OutOfRangeIndex_Throws()
+        {
+            var session = new RecipeAuthoringSession();
+            session.SelectMethod(RecipeMethodId.Package);
+            session.AppendListItem("Channels", "bioconda");
+
+            Assert.Throws<ArgumentOutOfRangeException>(() => session.EditListItem("Channels", 5, "conda-forge"));
+        }
+
+        [Fact]
+        public void EditListItem_InvalidValue_ReturnsViolationWithoutMutating()
+        {
+            var session = new RecipeAuthoringSession();
+            session.SelectMethod(RecipeMethodId.Package);
+            session.AppendListItem("Channels", "bioconda");
+
+            var violations = session.EditListItem("Channels", 0, "   ");
+
+            Assert.NotEmpty(violations);
+        }
+
+        [Fact]
+        public void DeleteListItem_OnRequiredFieldDownToZero_Throws()
+        {
+            var session = new RecipeAuthoringSession();
+            session.SelectMethod(RecipeMethodId.Package);
+            session.AppendListItem("Packages", "bwa=0.7.17=h5bf99c6_8");
+            session.CompleteListField("Packages");
+
+            var ex = Assert.Throws<InvalidOperationException>(() => session.DeleteListItem("Packages", 0));
+            Assert.Contains("at least one item", ex.Message, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public void DeleteListItem_OnOptionalFieldDownToZero_Succeeds()
+        {
+            var session = new RecipeAuthoringSession();
+            session.SelectMethod(RecipeMethodId.Container);
+            session.AppendListItem("Command", "bwa");
+            session.CompleteListField("Command");
+
+            session.DeleteListItem("Command", 0);
+
+            Assert.Equal("0개 항목", session.Snapshot().Values.Single(v => v.FieldName == "Command").DisplayValue);
         }
 
         [Fact]
@@ -387,6 +450,260 @@ namespace NodeKit.Tests.Recipes
 
             Assert.False(session.IsComplete);
             Assert.Throws<InvalidOperationException>(() => session.Build());
+        }
+
+        [Fact]
+        public void PreviewMethodChange_PackageToSource_DiscardsPackageSpecificFields()
+        {
+            var session = new RecipeAuthoringSession();
+            session.SelectMethod(RecipeMethodId.Package);
+
+            var preview = session.PreviewMethodChange(RecipeMethodId.Source);
+
+            Assert.Contains("Packages", preview.DiscardedFields);
+            Assert.Contains("Channels", preview.DiscardedFields);
+            Assert.Contains("PackageEngine", preview.DiscardedFields);
+        }
+
+        [Fact]
+        public void PreviewMethodChange_SourceToPackage_DiscardsSourceSpecificFields()
+        {
+            var session = new RecipeAuthoringSession();
+            session.SelectMethod(RecipeMethodId.Source);
+
+            var preview = session.PreviewMethodChange(RecipeMethodId.Package);
+
+            Assert.Contains("SourceUri", preview.DiscardedFields);
+            Assert.Contains("SourceChecksum", preview.DiscardedFields);
+            Assert.Contains("SourceBuildCommands", preview.DiscardedFields);
+            Assert.Contains("BuildDependencies", preview.DiscardedFields);
+        }
+
+        [Fact]
+        public void PreviewMethodChange_DockerfileToPackage_DiscardsDockerfileSpecificFields()
+        {
+            var session = new RecipeAuthoringSession();
+            session.SelectMethod(RecipeMethodId.Dockerfile);
+
+            var preview = session.PreviewMethodChange(RecipeMethodId.Package);
+
+            Assert.Contains("DockerfilePath", preview.DiscardedFields);
+            Assert.Contains("DockerfileContent", preview.DiscardedFields);
+            Assert.Contains("BuildContext", preview.DiscardedFields);
+        }
+
+        [Fact]
+        public void PreviewMethodChange_NeverListsToolNameOrVersionAsDiscarded()
+        {
+            var session = new RecipeAuthoringSession();
+            session.SelectMethod(RecipeMethodId.Package);
+
+            var preview = session.PreviewMethodChange(RecipeMethodId.Source);
+
+            Assert.DoesNotContain("ToolName", preview.DiscardedFields);
+            Assert.DoesNotContain("ToolVersion", preview.DiscardedFields);
+            Assert.Contains("ToolName", preview.PreservedFields);
+            Assert.Contains("ToolVersion", preview.PreservedFields);
+        }
+
+        [Fact]
+        public void ChangeMethod_Cancel_LeavesSessionUnchanged()
+        {
+            var session = new RecipeAuthoringSession();
+            session.SelectMethod(RecipeMethodId.Package);
+            session.AppendListItem("Packages", "bwa=0.7.17=h5bf99c6_8");
+            session.CompleteListField("Packages");
+
+            session.ChangeMethod(RecipeMethodId.Source, ChangeMethodDecision.Cancel);
+
+            Assert.Equal(RecipeMethodId.Package, session.Snapshot().SelectedMethod);
+            Assert.Contains(session.Snapshot().Values, v => v.FieldName == "Packages");
+        }
+
+        [Fact]
+        public void ChangeMethod_Proceed_DiscardsMethodSpecificFieldsAndSwitchesMethod()
+        {
+            var session = new RecipeAuthoringSession();
+            session.SelectMethod(RecipeMethodId.Package);
+            session.AppendListItem("Packages", "bwa=0.7.17=h5bf99c6_8");
+            session.CompleteListField("Packages");
+            session.AppendListItem("Channels", "bioconda");
+            session.CompleteListField("Channels");
+
+            session.ChangeMethod(RecipeMethodId.Source, ChangeMethodDecision.Proceed);
+
+            var snapshot = session.Snapshot();
+            Assert.Equal(RecipeMethodId.Source, snapshot.SelectedMethod);
+            Assert.DoesNotContain(snapshot.Values, v => v.FieldName == "Packages");
+            Assert.DoesNotContain(snapshot.Values, v => v.FieldName == "Channels");
+        }
+
+        [Fact]
+        public void ChangeMethod_Proceed_PreservesSharedFieldsButInvalidatesThem()
+        {
+            var session = new RecipeAuthoringSession();
+            session.SelectMethod(RecipeMethodId.Package);
+            session.SetField("ToolName", "bwa-mem");
+            session.SetField("ToolVersion", "0.7.17");
+            session.AppendListItem("Inputs", new ToolInput { Name = "reads", Role = "reads", Format = "fastq", Shape = "pair", Required = true });
+            session.CompleteListField("Inputs");
+
+            session.ChangeMethod(RecipeMethodId.Source, ChangeMethodDecision.Proceed);
+
+            var snapshot = session.Snapshot();
+            Assert.Contains(snapshot.Values, v => v.FieldName == "ToolName");
+            Assert.Contains(snapshot.Values, v => v.FieldName == "Inputs");
+            Assert.Contains("Inputs", snapshot.InvalidatedFields);
+            Assert.DoesNotContain("ToolName", snapshot.InvalidatedFields);
+        }
+
+        [Fact]
+        public void ChangeMethod_Proceed_DoesNotBlockIsCompleteForInvalidatedFields()
+        {
+            var session = new RecipeAuthoringSession();
+            session.SelectMethod(RecipeMethodId.Container);
+            session.SetField("ToolName", "bwa-mem");
+            session.SetField("ToolVersion", "0.7.17");
+            session.SetField("ImageRef", "condaforge/miniforge3:24.3.0-0");
+            session.SetField("ImageDigest", "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+            session.CompleteListField("Command");
+            session.AppendListItem("Inputs", new ToolInput { Name = "reads", Role = "reads", Format = "fastq", Shape = "pair", Required = true });
+            session.CompleteListField("Inputs");
+            session.AppendListItem("Outputs", new ToolOutput { Name = "bam", Role = "alignment", Format = "bam", Shape = "single", Class = "primary" });
+            session.CompleteListField("Outputs");
+
+            session.ChangeMethod(RecipeMethodId.Dockerfile, ChangeMethodDecision.Proceed);
+            session.SetField("DockerfilePath", "./Dockerfile");
+            session.SetField("DockerfileContent", "FROM scratch");
+
+            Assert.True(session.IsComplete);
+            Assert.Contains("Inputs", session.Snapshot().InvalidatedFields);
+        }
+
+        [Fact]
+        public void ChangeMethod_Proceed_ResetsMethodSpecificMetadata()
+        {
+            var session = new RecipeAuthoringSession();
+            session.SelectMethod(RecipeMethodId.Dockerfile);
+            session.AcceptDockerfileWarning();
+            Assert.True(session.Metadata.DockerfileWarningAccepted);
+
+            session.ChangeMethod(RecipeMethodId.Package, ChangeMethodDecision.Proceed);
+
+            Assert.False(session.Metadata.DockerfileWarningAccepted);
+        }
+
+        [Fact]
+        public void ChangeMethod_Proceed_ResetsContainerImageTagWarningMetadata()
+        {
+            var session = new RecipeAuthoringSession();
+            session.SelectMethod(RecipeMethodId.Container);
+            session.ShowImageTagWarning();
+            session.AcceptImageTagWarning();
+
+            session.ChangeMethod(RecipeMethodId.Package, ChangeMethodDecision.Proceed);
+
+            Assert.False(session.Metadata.ImageTagWarningShown);
+            Assert.False(session.Metadata.ImageTagWarningAccepted);
+        }
+
+        [Fact]
+        public void ConfirmInvalidatedField_ClearsInvalidatedState()
+        {
+            var session = new RecipeAuthoringSession();
+            session.SelectMethod(RecipeMethodId.Package);
+            session.AppendListItem("Inputs", new ToolInput { Name = "reads", Role = "reads", Format = "fastq", Shape = "pair", Required = true });
+            session.CompleteListField("Inputs");
+            session.ChangeMethod(RecipeMethodId.Source, ChangeMethodDecision.Proceed);
+            Assert.Contains("Inputs", session.Snapshot().InvalidatedFields);
+
+            session.ConfirmInvalidatedField("Inputs");
+
+            Assert.DoesNotContain("Inputs", session.Snapshot().InvalidatedFields);
+        }
+
+        [Fact]
+        public void EditListItem_OnInvalidatedListField_ClearsInvalidatedState()
+        {
+            var session = new RecipeAuthoringSession();
+            session.SelectMethod(RecipeMethodId.Package);
+            session.AppendListItem("Inputs", new ToolInput { Name = "reads", Role = "reads", Format = "fastq", Shape = "pair", Required = true });
+            session.CompleteListField("Inputs");
+            session.ChangeMethod(RecipeMethodId.Source, ChangeMethodDecision.Proceed);
+
+            session.EditListItem("Inputs", 0, new ToolInput { Name = "reads2", Role = "reads", Format = "fastq", Shape = "pair", Required = true });
+
+            Assert.DoesNotContain("Inputs", session.Snapshot().InvalidatedFields);
+        }
+
+        [Fact]
+        public void BuildRecoveryPlan_RequiredFieldViolation_ProducesEditSingleFieldAction()
+        {
+            var session = CompletePackageSession();
+            var violations = new[] { new ValidationViolation("L1-RCP-001", "Packages 값이 필요합니다.", "Packages") };
+
+            var plan = session.BuildRecoveryPlan(violations);
+
+            Assert.Single(plan.Actions);
+            Assert.Equal(RecoveryActionKind.EditSingleField, plan.Actions[0].Kind);
+            Assert.Contains("Packages", plan.Actions[0].RelatedFields);
+            Assert.Empty(plan.UnmappedViolations);
+        }
+
+        [Fact]
+        public void BuildRecoveryPlan_UnpinnedDigestViolation_ProducesEditRelatedFieldsAction()
+        {
+            var session = new RecipeAuthoringSession();
+            session.SelectMethod(RecipeMethodId.Container);
+            var violations = new[] { new ValidationViolation("L1-IMG-004", "ImageUri에 digest가 없습니다.", "ImageUri") };
+
+            var plan = session.BuildRecoveryPlan(violations);
+
+            Assert.Single(plan.Actions);
+            Assert.Equal(RecoveryActionKind.EditRelatedFields, plan.Actions[0].Kind);
+            Assert.Contains("ImageRef", plan.Actions[0].RelatedFields);
+            Assert.Contains("ImageDigest", plan.Actions[0].RelatedFields);
+            Assert.Empty(plan.UnmappedViolations);
+        }
+
+        [Fact]
+        public void BuildRecoveryPlan_InputsOutputsViolation_ProducesReviewSectionAction()
+        {
+            var session = CompletePackageSession();
+            var violations = new[] { new ValidationViolation("L1-RCP-010", "Inputs와 렌더링된 build request가 맞지 않습니다.", "Inputs") };
+
+            var plan = session.BuildRecoveryPlan(violations);
+
+            Assert.Single(plan.Actions);
+            Assert.Equal(RecoveryActionKind.ReviewSection, plan.Actions[0].Kind);
+            Assert.Empty(plan.UnmappedViolations);
+        }
+
+        [Fact]
+        public void BuildRecoveryPlan_UnmappedField_ProducesShowExplanationOnlyActionAndUnmappedViolation()
+        {
+            var session = CompletePackageSession();
+            var violations = new[] { new ValidationViolation("L1-RCP-099", "Script 값에 문제가 있습니다.", "Script") };
+
+            var plan = session.BuildRecoveryPlan(violations);
+
+            Assert.Single(plan.Actions);
+            Assert.Equal(RecoveryActionKind.ShowExplanationOnly, plan.Actions[0].Kind);
+            Assert.Single(plan.UnmappedViolations);
+            Assert.Equal("Script", plan.UnmappedViolations[0].Field);
+        }
+
+        [Fact]
+        public void BuildRecoveryPlan_NoFieldOnViolation_ProducesShowExplanationOnlyAction()
+        {
+            var session = CompletePackageSession();
+            var violations = new[] { new ValidationViolation("L1-RCP-098", "알 수 없는 오류입니다.") };
+
+            var plan = session.BuildRecoveryPlan(violations);
+
+            Assert.Single(plan.Actions);
+            Assert.Equal(RecoveryActionKind.ShowExplanationOnly, plan.Actions[0].Kind);
+            Assert.Single(plan.UnmappedViolations);
         }
 
         private static RecipeAuthoringSession CompletePackageSession()

@@ -6,7 +6,8 @@ namespace NodeKit.Authoring.Recipes
     /// Review/debug/UI-display snapshot of an authoring session. Works on
     /// incomplete sessions, never applies Defaulted values, never runs
     /// validation. Not a final recipe — see design doc Section 18.1.
-    /// InvalidatedFields is always empty until ChangeMethod (Sprint R6).
+    /// InvalidatedFields lists fields ChangeMethod preserved but marked for
+    /// re-confirmation — see design doc Section 16.4.
     /// </summary>
     internal sealed record RecipeAuthoringSnapshot(
         RecipeMethodId? SelectedMethod,
