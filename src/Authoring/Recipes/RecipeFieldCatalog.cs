@@ -15,6 +15,11 @@ namespace NodeKit.Authoring.Recipes
     /// </summary>
     internal static class RecipeFieldCatalog
     {
+        private static readonly string[] _baseImageFieldExamples =
+        {
+            "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        };
+
         public static IReadOnlyList<RecipeFieldDescriptor> CommonScalarFields { get; } = new[]
         {
             new RecipeFieldDescriptor(
@@ -117,6 +122,7 @@ namespace NodeKit.Authoring.Recipes
                 },
                 [RecipeMethodId.Package] = new[]
                 {
+                    BaseImageField(),
                     new RecipeFieldDescriptor(
                         Name: "Packages",
                         Type: RecipeFieldType.StringList,
@@ -156,6 +162,7 @@ namespace NodeKit.Authoring.Recipes
                 },
                 [RecipeMethodId.Mirror] = new[]
                 {
+                    BaseImageField(),
                     new RecipeFieldDescriptor(
                         Name: "MirrorUri",
                         Type: RecipeFieldType.Scalar,
@@ -189,6 +196,7 @@ namespace NodeKit.Authoring.Recipes
                 },
                 [RecipeMethodId.Source] = new[]
                 {
+                    BaseImageField(),
                     new RecipeFieldDescriptor(
                         Name: "SourceUri",
                         Type: RecipeFieldType.Scalar,
@@ -236,6 +244,7 @@ namespace NodeKit.Authoring.Recipes
                 },
                 [RecipeMethodId.Dockerfile] = new[]
                 {
+                    BaseImageField(),
                     new RecipeFieldDescriptor(
                         Name: "DockerfilePath",
                         Type: RecipeFieldType.Scalar,
@@ -290,6 +299,25 @@ namespace NodeKit.Authoring.Recipes
 
         public static IReadOnlyList<RecipeFieldDescriptor> RecommendedFieldsFor(RecipeMethodId method) =>
             FieldsFor(method).Where(f => f.Requirement == RecipeFieldRequirement.Recommended).ToList();
+
+        // Package/Mirror/Source/Dockerfile methods all render recipe.BaseImage
+        // directly as ToolDefinition.ImageUri (no separate ImageDigest field
+        // combining like Container's BioContainerImageUri) — the digest must
+        // be embedded in this field's value itself to pass ImageUriValidator's
+        // L1 digest-pinning rule. See RecipeRenderer.RenderInstallerFamily/
+        // RenderSourceBuild and RecipeValidator.ValidateBaseImagePresent.
+        private static RecipeFieldDescriptor BaseImageField() => new(
+            Name: "ImageRef",
+            Type: RecipeFieldType.Scalar,
+            Requirement: RecipeFieldRequirement.Required,
+            DefaultValue: null,
+            Label: Text("기반 이미지", "Base image"),
+            Help: Text(
+                "이 빌드의 기반이 되는 컨테이너 이미지입니다. 별도의 digest 필드가 없으므로 이 값 자체에 @sha256:... digest를 포함해야 최종 검증을 통과합니다.",
+                "The base container image for this build. There is no separate digest field, so this value itself must include the @sha256:... digest to pass final validation."),
+            Examples: _baseImageFieldExamples,
+            Choices: Array.Empty<RecipeChoice>(),
+            Apply: (recipe, value) => recipe.BaseImage = (string)value);
 
         private static LocalizedText Text(string ko, string en) =>
             new(new Dictionary<string, string> { ["ko"] = ko, ["en"] = en });

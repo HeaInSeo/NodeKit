@@ -36,6 +36,7 @@ namespace NodeKit.Tests.Recipes
             session.SetField("ToolName", "bwa-mem");
             session.SetField("ToolVersion", "0.7.17");
             session.SetField("Script", "run.sh");
+            session.SetField("ImageRef", "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
             session.AppendListItem("Packages", "bwa=0.7.17=h5bf99c6_8");
             session.CompleteListField("Packages");
             session.AppendListItem("Channels", "bioconda");
@@ -287,6 +288,7 @@ namespace NodeKit.Tests.Recipes
             session.SetField("ToolName", "bwa-mem");
             session.SetField("ToolVersion", "0.7.17");
             session.SetField("Script", "run.sh");
+            session.SetField("ImageRef", "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
             session.SetField("PackageEngine", "micromamba");
             session.AppendListItem("Packages", "bwa=0.7.17=h5bf99c6_8");
             session.CompleteListField("Packages");
@@ -732,6 +734,7 @@ namespace NodeKit.Tests.Recipes
             session.SetField("ToolName", "bwa-mem");
             session.SetField("ToolVersion", "0.7.17");
             session.SetField("Script", "run.sh");
+            session.SetField("ImageRef", "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
             session.AppendListItem("Packages", "bwa=0.7.17=h5bf99c6_8");
             session.CompleteListField("Packages");
             session.AppendListItem("Channels", "bioconda");
