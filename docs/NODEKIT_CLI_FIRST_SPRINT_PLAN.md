@@ -2,7 +2,7 @@
 
 Status: Active Planning  
 Created: 2026-06-17  
-Updated: 2026-06-21  
+Updated: 2026-06-24  
 Scope: NodeKit work before NodeVault Phase 1 / PLATFORM_SCHEDULE.md Phase 6
 
 ## 0. Resume Note For Agents
@@ -572,4 +572,281 @@ nodekit submit          - NodeVault에 제출 (Sprint 6 게이트 이후에만)
 Sprint 6 진입 조건(4번 섹션)이 충족되기 전까지 보류:
 - nodekit submit, 또는 ToolSpecRequest를 NodeVault로 보내는 모든 네트워크 호출
 - 클라이언트 측 ResolveToolSpec / SubmitToolBuild 호출
+```
+
+## 10. Recipe Authoring Session Implementation Sprints (2026-06-24)
+
+Design source:
+[`docs/NODEKIT_CLI_RECIPE_AUTHORING_UX_BEGINNER_DESIGN.md`](NODEKIT_CLI_RECIPE_AUTHORING_UX_BEGINNER_DESIGN.md)
+v0.8 (§32 implementation order, §33 v1 scope, §19.3
+authoring-requirement-vs-L1-policy boundary).
+
+This track is the "Can start now" half of Section 9 — it does not move the
+Sprint 6 entry criteria and does not touch NodeVault. It is independent of
+the BuildRequest/ToolSpecRequest migration gate.
+
+Today's shipped state, for calibration: `src/Authoring/Recipes/` already has
+`RecipeDocument`, `RecipeRenderer`, `RecipeVariant`; `src/Validation/Recipes/`
+already has `RecipeValidator`; `src/NodeKit.Cli/CliApp.cs` already has
+`recipe validate` / `recipe render`. None of `RecipeMethodId`,
+`RecipeFieldRequirement`, `RecipeFieldCatalog`, `RecipeMethodCatalog`,
+`RecipeMethodRecommender`, `RecipeBuildKindResolver`, or
+`RecipeAuthoringSession` exist yet — Sprints R0-R7 are additive on top of the
+existing legacy `validate`/`render` path, not a replacement of it.
+
+### Sprint R0. RecipeVariant -> RecipeBuildKind Rename
+
+Goal:
+
+```text
+Apply the already-decided rename in code before any new type is added.
+```
+
+Tasks:
+
+```text
+1. Rename RecipeVariant to RecipeBuildKind across src/Authoring/Recipes,
+   src/Validation/Recipes, and all referencing tests.
+2. Touch nothing else in the same commit.
+```
+
+Done when:
+
+```text
+- Build succeeds with 0 new warnings.
+- Existing tests pass unchanged (mechanical rename; no new tests required
+  per Section 9 of CLAUDE.md's validation-responsibility table).
+```
+
+### Sprint R1. Method And Field-Requirement Type Skeleton
+
+Goal:
+
+```text
+Add the two foundational enums the rest of the design depends on.
+```
+
+Tasks:
+
+```text
+1. Add RecipeMethodId (Container, Package, Mirror, Source, Dockerfile).
+2. Add RecipeFieldRequirement (Required, Defaulted, Optional, Recommended).
+```
+
+Done when:
+
+```text
+- Both enums compile; neither is referenced by existing code yet.
+- No behavior change to the legacy validate/render path.
+```
+
+### Sprint R2. Field Catalog And Shared Validation Pipeline
+
+Goal:
+
+```text
+Establish the field-requirement data model and a single validation entry
+point shared by validate, render, and the future recipe create.
+```
+
+Tasks:
+
+```text
+1. Implement RecipeFieldCatalog keyed by RecipeMethodId + RecipeFieldRequirement.
+2. Implement the field composition contract: common scalar fields + method
+   fields + Inputs/Outputs (Inputs/Outputs are Required for every method).
+3. Extract RecipeValidationPipeline as the single L1 gate shared by
+   validate/render today and recipe create later.
+4. Apply the v0.8 rule directly: any field CLAUDE.md Section 3 blocks at L1
+   (unpinned tag, missing digest, unpinned package version) must be
+   RecipeFieldRequirement.Required, never Recommended/Optional.
+```
+
+Done when:
+
+```text
+- RecipeFieldCatalog tests cover FieldsFor ordering and the Inputs/Outputs
+  always-Required invariant.
+- Existing validate/render tests still pass after the pipeline extraction.
+```
+
+### Sprint R3. Method Recommendation Engine
+
+Goal:
+
+```text
+Implement the beginner-facing method recommender.
+```
+
+Tasks:
+
+```text
+1. Implement RecipeMethodCatalog (per-method description/prep/warning text).
+2. Implement RecipeMethodQuestionCatalog (fixed question order).
+3. Implement RecipeMethodRecommender: the IsRestrictedNetwork top-level gate,
+   the priority table, and the Answer tri-state (Yes/No/Unknown) where
+   Unknown is neither evidence for nor against a method.
+```
+
+Done when:
+
+```text
+- All recommender test scenarios from the design's test plan pass, including
+  internal-network Yes/Unknown/No combinations and Unknown-heavy answers.
+```
+
+### Sprint R4. Build-Kind Resolution, Presets, Normalization
+
+Goal:
+
+```text
+Wire method selection to the existing RecipeBuildKind model and add the
+input/output convenience layer.
+```
+
+Tasks:
+
+```text
+1. Implement RecipeBuildKindResolver.Resolve(RecipeMethodId, RecipeDocument),
+   guarded to throw if called before Defaulted fields are applied (e.g.
+   PackageEngine empty for RecipeMethodId.Package).
+2. Implement InputOutputPresetCatalog (FASTQ/BAM/VCF presets).
+3. Implement format/role/channel normalization (.gz suffix detection,
+   snake_case, choice-first selection).
+```
+
+Done when:
+
+```text
+- Resolver tests cover both the pre-Build() guard violation and the
+  Package -> Conda/Micromamba branch.
+- Preset/normalization tests match the design's worked examples.
+```
+
+### Sprint R5. RecipeAuthoringSession Core
+
+Goal:
+
+```text
+Implement the authoring session state machine and its Snapshot/Build/
+ValidateDraft contracts.
+```
+
+Tasks:
+
+```text
+1. Implement RecipeAuthoringSession: SelectMethod, NextField, SetField,
+   AppendListItem, CompleteListField, SkipOptionalField, IsComplete.
+2. Implement Snapshot() (works on incomplete sessions, never applies
+   Defaulted values, never validates) and Build() (requires IsComplete,
+   throws otherwise, sole place Defaulted values are applied).
+3. Implement ValidateDraft() as authoring-level only: it must never call
+   RecipeBuildKindResolver, RecipeRenderer, or the L1 validator chain.
+```
+
+Done when:
+
+```text
+- A guard test proves Build() before IsComplete throws.
+- A guard test proves ValidateDraft() does not invoke the resolver, renderer,
+  or L1 chain even when the draft happens to be field-complete.
+- A test proves the Section 19.3 invariant end to end: a recipe that
+  RecipeAuthoringSession produces does not fail nodekit validate afterward
+  (in particular for the Required ImageDigest field, see the v0.8 patch).
+```
+
+### Sprint R6. ChangeMethod, Recovery, List Editing
+
+Goal:
+
+```text
+Implement the parts of the session that handle revision and recovery, not
+just forward progress.
+```
+
+Tasks:
+
+```text
+1. Implement PreviewMethodChange / ChangeMethod: atomically discard
+   incompatible method-specific fields, reset method-specific session
+   metadata (DockerfileWarningAccepted, ImageTagWarningShown/Accepted), and
+   mark shared Inputs/Outputs fields invalidated rather than discarding them.
+2. Implement the invalidated-field lifecycle (mark on ChangeMethod, clear on
+   re-confirm / edit / preset-reselect / discard).
+3. Implement RecipeValidationRecoveryPlan / RecoveryActionKind, built from
+   final-validation failures while keeping the session alive.
+4. Implement per-item list field editing (edit/add/delete on an existing
+   list field, not just append).
+```
+
+Done when:
+
+```text
+- ChangeMethod tests cover field discard, metadata reset, and the
+  invalidated (not discarded) treatment of shared fields.
+- RecoveryPlan tests cover at least one Required-field failure and one L1
+  policy failure (e.g. unpinned digest) producing distinct recovery actions.
+```
+
+### Sprint R7. CLI Wiring, Non-Interactive Mode, Golden Tests
+
+Goal:
+
+```text
+Connect the session to a real CLI command and lock in the beginner scenarios.
+```
+
+Tasks:
+
+```text
+1. Wire nodekit recipe create to RecipeAuthoringSession (interactive wizard).
+2. Add non-interactive flags (--method, --engine,
+   --accept-dockerfile-warning, etc.) covering the same field set.
+3. Add golden transcript tests for the design's beginner scenarios.
+4. Keep nodekit validate / nodekit render as-is; recipe create only adds an
+   authoring front end that ends in the same RecipeValidationPipeline call.
+```
+
+Done when:
+
+```text
+- Interactive and non-interactive paths produce identical RecipeDocument
+  output for the same logical answers.
+- Golden transcript tests pass and are reviewed as fixtures, not snapshots
+  that auto-update.
+```
+
+### 10.1 Sequencing Note
+
+```text
+R0 and R1 are mechanical and can be one sitting each.
+R2 is required before R3-R6 (field catalog underlies everything).
+R3 and R4 can be reordered relative to each other but both must precede R5.
+R5 is the highest-risk sprint: the Snapshot/Build/ValidateDraft contract is
+where a quiet regression would silently reopen the ImageDigest-class
+conflict this plan exists to prevent (see Section 19.3 of the design doc).
+R6 depends on R5. R7 depends on everything above being stable; it is an
+integration sprint, not a place to discover new design questions.
+There is little parallelism available — the dependency chain is mostly linear.
+```
+
+### 10.2 한국어 요약
+
+```text
+이 트랙(R0-R7)은 9번 섹션의 "지금 시작 가능" 절반에 해당하며, Sprint 6
+진입 조건을 옮기지 않고 NodeVault를 건드리지 않는다.
+
+R0: RecipeVariant -> RecipeBuildKind 리네임 (기계적, 단독 커밋)
+R1: RecipeMethodId / RecipeFieldRequirement 타입 골격
+R2: RecipeFieldCatalog + RecipeValidationPipeline 공유화
+    (CLAUDE.md 3번 섹션 L1 하드룰 대상 필드는 전부 Required로)
+R3: RecipeMethodCatalog / RecipeMethodQuestionCatalog / RecipeMethodRecommender
+R4: RecipeBuildKindResolver + InputOutputPresetCatalog + 정규화
+R5: RecipeAuthoringSession 본체 (Snapshot/Build/ValidateDraft 계약) —
+    위험도 가장 높음. ImageDigest류 충돌이 조용히 재발하지 않는지
+    end-to-end로 검증해야 함 (설계 문서 19.3절).
+R6: ChangeMethod / invalidated field / RecoveryPlan / 리스트 편집
+R7: CLI 와이어링(recipe create) + non-interactive 모드 + golden transcript 테스트
+
+순서는 거의 선형이다: R0,R1 -> R2 -> (R3,R4 순서 교환 가능) -> R5 -> R6 -> R7.
 ```
