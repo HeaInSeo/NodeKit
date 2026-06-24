@@ -18,6 +18,7 @@ namespace NodeKit.Authoring.Recipes
             {
                 ["Name"] = new[] { "ToolName" },
                 ["Version"] = new[] { "ToolVersion" },
+                ["Script"] = new[] { "Script" },
                 ["ImageUri"] = new[] { "ImageRef", "ImageDigest" },
                 ["BioContainerImageUri"] = new[] { "ImageRef", "ImageDigest" },
                 ["BaseImage"] = new[] { "ImageRef" },

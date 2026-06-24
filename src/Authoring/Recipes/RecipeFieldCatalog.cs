@@ -37,6 +37,18 @@ namespace NodeKit.Authoring.Recipes
                 Examples: new[] { "0.7.17" },
                 Choices: Array.Empty<RecipeChoice>(),
                 Apply: (recipe, value) => recipe.Version = (string)value),
+            new RecipeFieldDescriptor(
+                Name: "Script",
+                Type: RecipeFieldType.Scalar,
+                Requirement: RecipeFieldRequirement.Required,
+                DefaultValue: null,
+                Label: Text("실행 스크립트", "Run script"),
+                Help: Text(
+                    "도구 실행 시 사용할 스크립트 경로 또는 명령입니다. BuildRequest의 필수 필드입니다.",
+                    "The script path or command to run the tool. Required by BuildRequest."),
+                Examples: new[] { "run.sh" },
+                Choices: Array.Empty<RecipeChoice>(),
+                Apply: (recipe, value) => recipe.Script = (string)value),
         };
 
         public static RecipeFieldDescriptor InputsField { get; } = new(

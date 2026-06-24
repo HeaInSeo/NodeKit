@@ -35,6 +35,7 @@ namespace NodeKit.Tests.Recipes
             session.SelectMethod(RecipeMethodId.Package);
             session.SetField("ToolName", "bwa-mem");
             session.SetField("ToolVersion", "0.7.17");
+            session.SetField("Script", "run.sh");
             session.AppendListItem("Packages", "bwa=0.7.17=h5bf99c6_8");
             session.CompleteListField("Packages");
             session.AppendListItem("Channels", "bioconda");
@@ -53,6 +54,7 @@ namespace NodeKit.Tests.Recipes
             session.SelectMethod(RecipeMethodId.Container);
             session.SetField("ToolName", "bwa-mem");
             session.SetField("ToolVersion", "0.7.17");
+            session.SetField("Script", "run.sh");
             session.SetField("ImageRef", "condaforge/miniforge3:24.3.0-0");
             session.SetField("ImageDigest", "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
 
@@ -240,6 +242,7 @@ namespace NodeKit.Tests.Recipes
 
             session.SetField("ToolName", "bwa-mem");
             session.SetField("ToolVersion", "0.7.17");
+            session.SetField("Script", "run.sh");
             session.SetField("ImageRef", "condaforge/miniforge3:24.3.0-0");
             session.SetField("ImageDigest", "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
             Assert.False(session.IsComplete);
@@ -283,6 +286,7 @@ namespace NodeKit.Tests.Recipes
             session.SelectMethod(RecipeMethodId.Package);
             session.SetField("ToolName", "bwa-mem");
             session.SetField("ToolVersion", "0.7.17");
+            session.SetField("Script", "run.sh");
             session.SetField("PackageEngine", "micromamba");
             session.AppendListItem("Packages", "bwa=0.7.17=h5bf99c6_8");
             session.CompleteListField("Packages");
@@ -353,6 +357,7 @@ namespace NodeKit.Tests.Recipes
             session.SelectMethod(RecipeMethodId.Source);
             session.SetField("ToolName", "bwa-mem");
             session.SetField("ToolVersion", "0.7.17");
+            session.SetField("Script", "run.sh");
             session.SetField("SourceUri", "https://example.org/bwa.tar.gz");
             session.SetField("SourceChecksum", "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
             session.AppendListItem("SourceBuildCommands", "make");
@@ -408,6 +413,7 @@ namespace NodeKit.Tests.Recipes
             session.SelectMethod(RecipeMethodId.Container);
             session.SetField("ToolName", "bwa-mem");
             session.SetField("ToolVersion", "0.7.17");
+            session.SetField("Script", "run.sh");
             session.SetField("ImageRef", "condaforge/miniforge3:24.3.0-0");
             session.SetField("ImageDigest", "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
             session.CompleteListField("Command");
@@ -419,10 +425,6 @@ namespace NodeKit.Tests.Recipes
             Assert.True(session.IsComplete);
 
             var document = session.Build();
-
-            // Script has no RecipeFieldCatalog field yet (pre-existing gap, out of R5
-            // scope) — set directly so this test isolates the digest-pinning invariant.
-            document.Script = "run.sh";
             document.BuildKind = RecipeBuildKindResolver.Resolve(RecipeMethodId.Container, document);
 
             var result = RecipeValidationPipeline.ValidateRecipe(document);
@@ -441,6 +443,7 @@ namespace NodeKit.Tests.Recipes
             session.SelectMethod(RecipeMethodId.Container);
             session.SetField("ToolName", "bwa-mem");
             session.SetField("ToolVersion", "0.7.17");
+            session.SetField("Script", "run.sh");
             session.SetField("ImageRef", "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
             session.CompleteListField("Command");
             session.AppendListItem("Inputs", new ToolInput { Name = "reads", Role = "reads", Format = "fastq", Shape = "pair", Required = true });
@@ -545,6 +548,7 @@ namespace NodeKit.Tests.Recipes
             session.SelectMethod(RecipeMethodId.Package);
             session.SetField("ToolName", "bwa-mem");
             session.SetField("ToolVersion", "0.7.17");
+            session.SetField("Script", "run.sh");
             session.AppendListItem("Inputs", new ToolInput { Name = "reads", Role = "reads", Format = "fastq", Shape = "pair", Required = true });
             session.CompleteListField("Inputs");
 
@@ -564,6 +568,7 @@ namespace NodeKit.Tests.Recipes
             session.SelectMethod(RecipeMethodId.Container);
             session.SetField("ToolName", "bwa-mem");
             session.SetField("ToolVersion", "0.7.17");
+            session.SetField("Script", "run.sh");
             session.SetField("ImageRef", "condaforge/miniforge3:24.3.0-0");
             session.SetField("ImageDigest", "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
             session.CompleteListField("Command");
@@ -651,6 +656,20 @@ namespace NodeKit.Tests.Recipes
         }
 
         [Fact]
+        public void BuildRecoveryPlan_MissingScriptViolation_ProducesEditSingleFieldAction()
+        {
+            var session = CompletePackageSession();
+            var violations = new[] { new ValidationViolation("L1-REQ-003", "실행 스크립트는 필수입니다.", "Script") };
+
+            var plan = session.BuildRecoveryPlan(violations);
+
+            Assert.Single(plan.Actions);
+            Assert.Equal(RecoveryActionKind.EditSingleField, plan.Actions[0].Kind);
+            Assert.Contains("Script", plan.Actions[0].RelatedFields);
+            Assert.Empty(plan.UnmappedViolations);
+        }
+
+        [Fact]
         public void BuildRecoveryPlan_UnpinnedDigestViolation_ProducesEditRelatedFieldsAction()
         {
             var session = new RecipeAuthoringSession();
@@ -683,14 +702,14 @@ namespace NodeKit.Tests.Recipes
         public void BuildRecoveryPlan_UnmappedField_ProducesShowExplanationOnlyActionAndUnmappedViolation()
         {
             var session = CompletePackageSession();
-            var violations = new[] { new ValidationViolation("L1-RCP-099", "Script 값에 문제가 있습니다.", "Script") };
+            var violations = new[] { new ValidationViolation("L1-RCP-099", "BuildKind 값에 문제가 있습니다.", "BuildKind") };
 
             var plan = session.BuildRecoveryPlan(violations);
 
             Assert.Single(plan.Actions);
             Assert.Equal(RecoveryActionKind.ShowExplanationOnly, plan.Actions[0].Kind);
             Assert.Single(plan.UnmappedViolations);
-            Assert.Equal("Script", plan.UnmappedViolations[0].Field);
+            Assert.Equal("BuildKind", plan.UnmappedViolations[0].Field);
         }
 
         [Fact]
@@ -712,6 +731,7 @@ namespace NodeKit.Tests.Recipes
             session.SelectMethod(RecipeMethodId.Package);
             session.SetField("ToolName", "bwa-mem");
             session.SetField("ToolVersion", "0.7.17");
+            session.SetField("Script", "run.sh");
             session.AppendListItem("Packages", "bwa=0.7.17=h5bf99c6_8");
             session.CompleteListField("Packages");
             session.AppendListItem("Channels", "bioconda");
