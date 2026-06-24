@@ -13,7 +13,7 @@ namespace NodeKit.Authoring.Recipes
 
         public string SchemaVersion { get; set; } = "draft-1";
 
-        public RecipeVariant Variant { get; set; }
+        public RecipeBuildKind BuildKind { get; set; }
 
         public string ToolName { get; set; } = string.Empty;
 
@@ -34,7 +34,7 @@ namespace NodeKit.Authoring.Recipes
         public string PackageMirrorUri { get; set; } = string.Empty;
 
         // ── BioContainer ─────────────────────────────────────────────────────
-        /// <summary>Pinned external image URI. This variant's only image input.</summary>
+        /// <summary>Pinned external image URI. This build kind's only image input.</summary>
         public string BioContainerImageUri { get; set; } = string.Empty;
 
         // ── SourceBuild ──────────────────────────────────────────────────────

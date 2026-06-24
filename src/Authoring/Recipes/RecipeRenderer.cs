@@ -7,7 +7,7 @@ namespace NodeKit.Authoring.Recipes
 {
     /// <summary>
     /// Renders a RecipeDocument into a ToolDefinition for the current legacy
-    /// BuildRequest path. Every variant produces a non-empty DockerfileContent
+    /// BuildRequest path. Every build kind produces a non-empty DockerfileContent
     /// because BuildRequest.dockerfile_content is a required field regardless
     /// of how the image's contents were chosen (RequiredFieldsValidator L1-REQ-002).
     /// </summary>
@@ -31,29 +31,29 @@ namespace NodeKit.Authoring.Recipes
                 DisplayTags = new List<string>(recipe.DisplayTags),
             };
 
-            switch (recipe.Variant)
+            switch (recipe.BuildKind)
             {
-                case RecipeVariant.Conda:
+                case RecipeBuildKind.Conda:
                     RenderInstallerFamily(recipe, definition, "conda", recipe.Channels);
                     break;
-                case RecipeVariant.Micromamba:
+                case RecipeBuildKind.Micromamba:
                     RenderInstallerFamily(recipe, definition, "micromamba", recipe.Channels);
                     break;
-                case RecipeVariant.PackageMirror:
+                case RecipeBuildKind.PackageMirror:
                     RenderInstallerFamily(recipe, definition, "conda", new List<string> { recipe.PackageMirrorUri });
                     break;
-                case RecipeVariant.BioContainer:
+                case RecipeBuildKind.BioContainer:
                     RenderBioContainer(recipe, definition);
                     break;
-                case RecipeVariant.SourceBuild:
+                case RecipeBuildKind.SourceBuild:
                     RenderSourceBuild(recipe, definition);
                     break;
-                case RecipeVariant.DockerfileFallback:
+                case RecipeBuildKind.DockerfileFallback:
                     definition.ImageUri = recipe.BaseImage;
                     definition.DockerfileContent = recipe.DockerfileContent;
                     break;
                 default:
-                    throw new ArgumentOutOfRangeException(nameof(recipe), recipe.Variant, "Unknown recipe variant.");
+                    throw new ArgumentOutOfRangeException(nameof(recipe), recipe.BuildKind, "Unknown recipe build kind.");
             }
 
             return definition;

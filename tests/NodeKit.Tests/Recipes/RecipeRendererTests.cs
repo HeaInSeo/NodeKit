@@ -24,7 +24,7 @@ namespace NodeKit.Tests.Recipes
         [Fact]
         public void Render_Conda_SetsImageUriAndDockerfileWithInstallLine()
         {
-            var recipe = NewRecipe(RecipeVariant.Conda);
+            var recipe = NewRecipe(RecipeBuildKind.Conda);
             recipe.BaseImage = PinnedBaseImage;
             recipe.Channels.AddRange(new[] { "bioconda", "conda-forge" });
             recipe.Packages.Add("bwa=0.7.17=h5bf99c6_8");
@@ -40,7 +40,7 @@ namespace NodeKit.Tests.Recipes
         [Fact]
         public void Render_Conda_PassesFullL1ValidatorChain()
         {
-            var recipe = NewRecipe(RecipeVariant.Conda);
+            var recipe = NewRecipe(RecipeBuildKind.Conda);
             recipe.BaseImage = PinnedBaseImage;
             recipe.Channels.AddRange(new[] { "bioconda", "conda-forge" });
             recipe.Packages.Add("bwa=0.7.17=h5bf99c6_8");
@@ -54,7 +54,7 @@ namespace NodeKit.Tests.Recipes
         [Fact]
         public void Render_Micromamba_UsesMicromambaInstallCommand()
         {
-            var recipe = NewRecipe(RecipeVariant.Micromamba);
+            var recipe = NewRecipe(RecipeBuildKind.Micromamba);
             recipe.BaseImage = PinnedBaseImage;
             recipe.Channels.Add("bioconda");
             recipe.Packages.Add("samtools=1.17=h00cdaf9_0");
@@ -70,7 +70,7 @@ namespace NodeKit.Tests.Recipes
         [Fact]
         public void Render_PackageMirror_UsesMirrorUriAsChannel()
         {
-            var recipe = NewRecipe(RecipeVariant.PackageMirror);
+            var recipe = NewRecipe(RecipeBuildKind.PackageMirror);
             recipe.BaseImage = PinnedBaseImage;
             recipe.PackageMirrorUri = "https://mirror.internal/conda-channel";
             recipe.Packages.Add("bwa=0.7.17=h5bf99c6_8");
@@ -85,7 +85,7 @@ namespace NodeKit.Tests.Recipes
         [Fact]
         public void Render_BioContainer_SetsImageUriAndMinimalWrapperDockerfile()
         {
-            var recipe = NewRecipe(RecipeVariant.BioContainer);
+            var recipe = NewRecipe(RecipeBuildKind.BioContainer);
             recipe.BioContainerImageUri = PinnedBioContainerImage;
 
             var definition = RecipeRenderer.Render(recipe);
@@ -99,7 +99,7 @@ namespace NodeKit.Tests.Recipes
         [Fact]
         public void Render_SourceBuild_EmbedsBareHexChecksumNotPrefixed()
         {
-            var recipe = NewRecipe(RecipeVariant.SourceBuild);
+            var recipe = NewRecipe(RecipeBuildKind.SourceBuild);
             recipe.BaseImage = PinnedBaseImage;
             recipe.SourceUri = "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz";
             recipe.SourceChecksum = "sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd";
@@ -115,7 +115,7 @@ namespace NodeKit.Tests.Recipes
         [Fact]
         public void Render_SourceBuild_PassesFullL1ValidatorChain()
         {
-            var recipe = NewRecipe(RecipeVariant.SourceBuild);
+            var recipe = NewRecipe(RecipeBuildKind.SourceBuild);
             recipe.BaseImage = PinnedBaseImage;
             recipe.SourceUri = "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz";
             recipe.SourceChecksum = "sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd";
@@ -130,7 +130,7 @@ namespace NodeKit.Tests.Recipes
         [Fact]
         public void Render_DockerfileFallback_PassesThroughVerbatim()
         {
-            var recipe = NewRecipe(RecipeVariant.DockerfileFallback);
+            var recipe = NewRecipe(RecipeBuildKind.DockerfileFallback);
             recipe.BaseImage = PinnedBaseImage;
             recipe.DockerfileContent = $"FROM {PinnedBaseImage}\nRUN echo ok\n";
 
@@ -142,10 +142,10 @@ namespace NodeKit.Tests.Recipes
             Assert.Empty(violations);
         }
 
-        private static RecipeDocument NewRecipe(RecipeVariant variant) =>
+        private static RecipeDocument NewRecipe(RecipeBuildKind buildKind) =>
             new()
             {
-                Variant = variant,
+                BuildKind = buildKind,
                 ToolName = "bwa-mem",
                 Version = "0.7.17",
                 Script = "bwa mem -t 4 ref.fa reads_1.fq reads_2.fq",

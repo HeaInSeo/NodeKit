@@ -5,7 +5,7 @@ namespace NodeKit.Authoring.Recipes
     /// raw_spec contract has no equivalent schema; see
     /// docs/NODEKIT_CLI_RECIPE_SPEC_DRAFT.md.
     /// </summary>
-    internal enum RecipeVariant
+    internal enum RecipeBuildKind
     {
         Conda,
         Micromamba,

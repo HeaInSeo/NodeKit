@@ -8,7 +8,7 @@ namespace NodeKit.Validation.Recipes
     /// <summary>
     /// Recipe-level L1 validation. Checks only what is invisible after
     /// RecipeRenderer flattens a RecipeDocument into a ToolDefinition —
-    /// variant_payload completeness and source checksum format. Everything
+    /// build-kind payload completeness and source checksum format. Everything
     /// else (name/version/digest pinning/Dockerfile structure) is already
     /// covered by the existing ToolDefinition-level validators once rendered,
     /// so it is intentionally not duplicated here.
@@ -24,46 +24,46 @@ namespace NodeKit.Validation.Recipes
 
             var violations = new List<ValidationViolation>();
 
-            switch (recipe.Variant)
+            switch (recipe.BuildKind)
             {
-                case RecipeVariant.Conda:
-                case RecipeVariant.Micromamba:
+                case RecipeBuildKind.Conda:
+                case RecipeBuildKind.Micromamba:
                     ValidateBaseImagePresent(recipe, violations);
                     ValidatePackagesPresent(recipe, violations);
                     break;
-                case RecipeVariant.PackageMirror:
+                case RecipeBuildKind.PackageMirror:
                     ValidateBaseImagePresent(recipe, violations);
                     ValidatePackagesPresent(recipe, violations);
                     if (string.IsNullOrWhiteSpace(recipe.PackageMirrorUri))
                     {
                         violations.Add(new ValidationViolation(
                             "L1-RCP-003",
-                            "package mirror variant에는 PackageMirrorUri가 필요합니다.",
+                            "package mirror build kind에는 PackageMirrorUri가 필요합니다.",
                             nameof(recipe.PackageMirrorUri)));
                     }
 
                     break;
-                case RecipeVariant.BioContainer:
+                case RecipeBuildKind.BioContainer:
                     if (string.IsNullOrWhiteSpace(recipe.BioContainerImageUri))
                     {
                         violations.Add(new ValidationViolation(
                             "L1-RCP-005",
-                            "BioContainer variant에는 BioContainerImageUri가 필요합니다.",
+                            "BioContainer build kind에는 BioContainerImageUri가 필요합니다.",
                             nameof(recipe.BioContainerImageUri)));
                     }
 
                     break;
-                case RecipeVariant.SourceBuild:
+                case RecipeBuildKind.SourceBuild:
                     ValidateBaseImagePresent(recipe, violations);
                     ValidateSourceBuild(recipe, violations);
                     break;
-                case RecipeVariant.DockerfileFallback:
+                case RecipeBuildKind.DockerfileFallback:
                     ValidateBaseImagePresent(recipe, violations);
                     if (string.IsNullOrWhiteSpace(recipe.DockerfileContent))
                     {
                         violations.Add(new ValidationViolation(
                             "L1-RCP-008",
-                            "dockerfile fallback variant에는 DockerfileContent가 필요합니다.",
+                            "dockerfile fallback build kind에는 DockerfileContent가 필요합니다.",
                             nameof(recipe.DockerfileContent)));
                     }
 
@@ -79,7 +79,7 @@ namespace NodeKit.Validation.Recipes
             {
                 violations.Add(new ValidationViolation(
                     "L1-RCP-001",
-                    $"{recipe.Variant} variant에는 BaseImage가 필요합니다.",
+                    $"{recipe.BuildKind} build kind에는 BaseImage가 필요합니다.",
                     nameof(recipe.BaseImage)));
             }
         }
@@ -90,7 +90,7 @@ namespace NodeKit.Validation.Recipes
             {
                 violations.Add(new ValidationViolation(
                     "L1-RCP-002",
-                    $"{recipe.Variant} variant에는 최소 1개 이상의 패키지가 필요합니다.",
+                    $"{recipe.BuildKind} build kind에는 최소 1개 이상의 패키지가 필요합니다.",
                     nameof(recipe.Packages)));
             }
         }
@@ -101,7 +101,7 @@ namespace NodeKit.Validation.Recipes
             {
                 violations.Add(new ValidationViolation(
                     "L1-RCP-006",
-                    "source build variant에는 SourceUri가 필요합니다.",
+                    "source build kind에는 SourceUri가 필요합니다.",
                     nameof(recipe.SourceUri)));
             }
 
@@ -109,7 +109,7 @@ namespace NodeKit.Validation.Recipes
             {
                 violations.Add(new ValidationViolation(
                     "L1-SRC-001",
-                    "source build variant에는 SourceChecksum이 필요합니다 — 체크섬 없이는 재현성을 보장할 수 없습니다.",
+                    "source build kind에는 SourceChecksum이 필요합니다 — 체크섬 없이는 재현성을 보장할 수 없습니다.",
                     nameof(recipe.SourceChecksum)));
             }
             else if (!_sourceChecksumPattern.IsMatch(recipe.SourceChecksum))
@@ -124,7 +124,7 @@ namespace NodeKit.Validation.Recipes
             {
                 violations.Add(new ValidationViolation(
                     "L1-RCP-007",
-                    "source build variant에는 최소 1개 이상의 build command가 필요합니다.",
+                    "source build kind에는 최소 1개 이상의 build command가 필요합니다.",
                     nameof(recipe.SourceBuildCommands)));
             }
         }

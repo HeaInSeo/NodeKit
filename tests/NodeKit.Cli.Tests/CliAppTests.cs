@@ -21,7 +21,7 @@ namespace NodeKit.Cli.Tests
 
         private const string ValidRecipeJson = """
         {
-            "Variant": "DockerfileFallback",
+            "BuildKind": "DockerfileFallback",
             "ToolName": "bwa",
             "Version": "0.7.17",
             "BaseImage": "registry.example.com/bwa:0.7.17@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
@@ -34,7 +34,7 @@ namespace NodeKit.Cli.Tests
 
         private const string InvalidRecipeJson = """
         {
-            "Variant": "SourceBuild",
+            "BuildKind": "SourceBuild",
             "ToolName": "bwa",
             "Version": "0.7.17",
             "BaseImage": "registry.example.com/bwa:0.7.17@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",

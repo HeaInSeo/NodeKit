@@ -14,7 +14,7 @@ namespace NodeKit.Tests.Recipes
         {
             var recipe = new RecipeDocument
             {
-                Variant = RecipeVariant.Conda,
+                BuildKind = RecipeBuildKind.Conda,
                 BaseImage = PinnedBaseImage,
                 Packages = { "bwa=0.7.17=h5bf99c6_8" },
             };
@@ -29,7 +29,7 @@ namespace NodeKit.Tests.Recipes
         {
             var recipe = new RecipeDocument
             {
-                Variant = RecipeVariant.Conda,
+                BuildKind = RecipeBuildKind.Conda,
                 BaseImage = PinnedBaseImage,
             };
 
@@ -43,7 +43,7 @@ namespace NodeKit.Tests.Recipes
         {
             var recipe = new RecipeDocument
             {
-                Variant = RecipeVariant.Conda,
+                BuildKind = RecipeBuildKind.Conda,
                 Packages = { "bwa=0.7.17=h5bf99c6_8" },
             };
 
@@ -57,7 +57,7 @@ namespace NodeKit.Tests.Recipes
         {
             var recipe = new RecipeDocument
             {
-                Variant = RecipeVariant.PackageMirror,
+                BuildKind = RecipeBuildKind.PackageMirror,
                 BaseImage = PinnedBaseImage,
                 Packages = { "bwa=0.7.17=h5bf99c6_8" },
             };
@@ -72,7 +72,7 @@ namespace NodeKit.Tests.Recipes
         {
             var recipe = new RecipeDocument
             {
-                Variant = RecipeVariant.PackageMirror,
+                BuildKind = RecipeBuildKind.PackageMirror,
                 BaseImage = PinnedBaseImage,
                 PackageMirrorUri = "https://mirror.internal/conda-channel",
                 Packages = { "bwa=0.7.17=h5bf99c6_8" },
@@ -86,7 +86,7 @@ namespace NodeKit.Tests.Recipes
         [Fact]
         public void Validate_BioContainer_WithoutImageUri_Fails()
         {
-            var recipe = new RecipeDocument { Variant = RecipeVariant.BioContainer };
+            var recipe = new RecipeDocument { BuildKind = RecipeBuildKind.BioContainer };
 
             var result = RecipeValidator.Validate(recipe);
 
@@ -98,7 +98,7 @@ namespace NodeKit.Tests.Recipes
         {
             var recipe = new RecipeDocument
             {
-                Variant = RecipeVariant.BioContainer,
+                BuildKind = RecipeBuildKind.BioContainer,
                 BioContainerImageUri = "quay.io/biocontainers/bwa:0.7.17--h5bf99c6_8@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
             };
 
@@ -112,7 +112,7 @@ namespace NodeKit.Tests.Recipes
         {
             var recipe = new RecipeDocument
             {
-                Variant = RecipeVariant.SourceBuild,
+                BuildKind = RecipeBuildKind.SourceBuild,
                 BaseImage = PinnedBaseImage,
                 SourceUri = "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz",
                 SourceBuildCommands = { "make", "make install" },
@@ -128,7 +128,7 @@ namespace NodeKit.Tests.Recipes
         {
             var recipe = new RecipeDocument
             {
-                Variant = RecipeVariant.SourceBuild,
+                BuildKind = RecipeBuildKind.SourceBuild,
                 BaseImage = PinnedBaseImage,
                 SourceUri = "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz",
                 SourceChecksum = "not-a-real-checksum",
@@ -145,7 +145,7 @@ namespace NodeKit.Tests.Recipes
         {
             var recipe = new RecipeDocument
             {
-                Variant = RecipeVariant.SourceBuild,
+                BuildKind = RecipeBuildKind.SourceBuild,
                 BaseImage = PinnedBaseImage,
                 SourceUri = "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz",
                 SourceChecksum = ValidChecksum,
@@ -161,7 +161,7 @@ namespace NodeKit.Tests.Recipes
         {
             var recipe = new RecipeDocument
             {
-                Variant = RecipeVariant.SourceBuild,
+                BuildKind = RecipeBuildKind.SourceBuild,
                 BaseImage = PinnedBaseImage,
                 SourceUri = "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz",
                 SourceChecksum = ValidChecksum,
@@ -178,7 +178,7 @@ namespace NodeKit.Tests.Recipes
         {
             var recipe = new RecipeDocument
             {
-                Variant = RecipeVariant.DockerfileFallback,
+                BuildKind = RecipeBuildKind.DockerfileFallback,
                 BaseImage = PinnedBaseImage,
             };
 
@@ -192,7 +192,7 @@ namespace NodeKit.Tests.Recipes
         {
             var recipe = new RecipeDocument
             {
-                Variant = RecipeVariant.DockerfileFallback,
+                BuildKind = RecipeBuildKind.DockerfileFallback,
                 BaseImage = PinnedBaseImage,
                 DockerfileContent = "FROM ubuntu:22.04@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\nRUN echo ok\n",
             };

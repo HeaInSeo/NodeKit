@@ -25,7 +25,7 @@
     <Compile Include="..\Authoring\ToolInput.cs" Link="Authoring\ToolInput.cs" />
     <Compile Include="..\Authoring\ToolOutput.cs" Link="Authoring\ToolOutput.cs" />
     <Compile Include="..\Authoring\Recipes\RecipeDocument.cs" Link="Authoring\Recipes\RecipeDocument.cs" />
-    <Compile Include="..\Authoring\Recipes\RecipeVariant.cs" Link="Authoring\Recipes\RecipeVariant.cs" />
+    <Compile Include="..\Authoring\Recipes\RecipeBuildKind.cs" Link="Authoring\Recipes\RecipeBuildKind.cs" />
     <Compile Include="..\Authoring\Recipes\RecipeRenderer.cs" Link="Authoring\Recipes\RecipeRenderer.cs" />
 
     <Compile Include="..\Validation\IValidator.cs" Link="Validation\IValidator.cs" />
