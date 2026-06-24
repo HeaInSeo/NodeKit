@@ -30,8 +30,10 @@ namespace NodeKit.Authoring.Recipes
         /// docs/NODEKIT_CLI_RECIPE_AUTHORING_UX_BEGINNER_DESIGN.md Section 9.3.
         /// Tag-only BaseImage is allowed mid-authoring; ImageDigest is the
         /// separate field that final L1 validation (CLAUDE.md Section 3)
-        /// requires to be present. Not yet consumed by RecipeRenderer —
-        /// RecipeAuthoringSession (Sprint R5) is the field's first reader.
+        /// requires to be present. RecipeAuthoringSession.Build() combines
+        /// this with BaseImage into BioContainerImageUri, which is what
+        /// RecipeRenderer/RecipeValidator actually read for the BioContainer
+        /// build kind.
         /// </summary>
         public string ImageDigest { get; set; } = string.Empty;
 
