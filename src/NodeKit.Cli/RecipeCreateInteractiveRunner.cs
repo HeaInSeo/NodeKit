@@ -13,10 +13,11 @@ namespace NodeKit.Cli
     /// Interactive `nodekit recipe create` wizard: recommender Q&amp;A,
     /// method selection, field-by-field prompts driven by
     /// RecipeAuthoringSession.NextField, /help, /review, /change-method,
-    /// /cancel (/quit, /exit) escape hatches, and final-validation recovery
-    /// via BuildRecoveryPlan. See
+    /// /cancel (/quit, /exit) escape hatches, Ctrl+C cancellation via
+    /// IRecipeCreateCancellationSource, and final-validation recovery via
+    /// BuildRecoveryPlan. See
     /// docs/NODEKIT_CLI_RECIPE_AUTHORING_UX_BEGINNER_DESIGN.md Sections 10-20
-    /// and docs/NODEKIT_CLI_RECIPE_AUTHORING_UX_V0.9.2.md Section 17.
+    /// and docs/NODEKIT_CLI_RECIPE_AUTHORING_UX_V0.9.2.md Sections 17-18.
     /// </summary>
     internal static class RecipeCreateInteractiveRunner
     {
@@ -33,6 +34,18 @@ namespace NodeKit.Cli
             "최종 검증에서 막히거나, 통과하더라도 나중에 다른 결과가 나올 수 있습니다.";
 
         public static int Run(string outPath, RecipeCreateOptions parsed, TextReader stdin, TextWriter stdout, TextWriter stderr)
+        {
+            using var cancellation = new ConsoleCancelKeyCancellationSource();
+            return Run(outPath, parsed, stdin, stdout, stderr, cancellation);
+        }
+
+        internal static int Run(
+            string outPath,
+            RecipeCreateOptions parsed,
+            TextReader stdin,
+            TextWriter stdout,
+            TextWriter stderr,
+            IRecipeCreateCancellationSource cancellation)
         {
             var session = new RecipeAuthoringSession();
 
@@ -62,7 +75,7 @@ namespace NodeKit.Cli
                     }
                 }
 
-                RunFieldLoop(session, stdin, stdout);
+                RunFieldLoop(session, stdin, stdout, cancellation);
 
                 var document = session.Build();
                 document.BuildKind = RecipeBuildKindResolver.Resolve(session.Snapshot().SelectedMethod!.Value, document);
@@ -70,7 +83,7 @@ namespace NodeKit.Cli
                 var result = RecipeValidationPipeline.ValidateRecipe(document);
                 while (!result.IsValid)
                 {
-                    if (!RunRecoveryLoop(session, result.Violations, stdin, stdout))
+                    if (!RunRecoveryLoop(session, result.Violations, stdin, stdout, cancellation))
                     {
                         stderr.WriteLine("최종 검증을 통과하지 못해 저장하지 않습니다.");
                         CliApp.PrintViolations(result.Violations, stderr);
@@ -199,43 +212,48 @@ namespace NodeKit.Cli
             return line == "y";
         }
 
-        private static void RunFieldLoop(RecipeAuthoringSession session, TextReader stdin, TextWriter stdout)
+        private static void RunFieldLoop(RecipeAuthoringSession session, TextReader stdin, TextWriter stdout, IRecipeCreateCancellationSource cancellation)
         {
             RecipeFieldDescriptor? field;
             while ((field = session.NextField()) != null)
             {
-                PromptField(session, field, stdin, stdout);
+                PromptField(session, field, stdin, stdout, cancellation);
             }
         }
 
-        private static void PromptField(RecipeAuthoringSession session, RecipeFieldDescriptor field, TextReader stdin, TextWriter stdout)
+        private static void PromptField(RecipeAuthoringSession session, RecipeFieldDescriptor field, TextReader stdin, TextWriter stdout, IRecipeCreateCancellationSource cancellation)
         {
             switch (field.Type)
             {
                 case RecipeFieldType.Scalar:
-                    PromptScalarField(session, field, stdin, stdout);
+                    PromptScalarField(session, field, stdin, stdout, cancellation);
                     break;
                 case RecipeFieldType.Choice:
-                    PromptChoiceField(session, field, stdin, stdout);
+                    PromptChoiceField(session, field, stdin, stdout, cancellation);
                     break;
                 case RecipeFieldType.StringList:
-                    PromptStringListField(session, field, stdin, stdout);
+                    PromptStringListField(session, field, stdin, stdout, cancellation);
                     break;
                 case RecipeFieldType.InputList:
-                    PromptInputListField(session, stdin, stdout);
+                    PromptInputListField(session, stdin, stdout, cancellation);
                     break;
                 case RecipeFieldType.OutputList:
-                    PromptOutputListField(session, stdin, stdout);
+                    PromptOutputListField(session, stdin, stdout, cancellation);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(field), field.Type, "Unsupported field type.");
             }
         }
 
-        private static void PromptScalarField(RecipeAuthoringSession session, RecipeFieldDescriptor field, TextReader stdin, TextWriter stdout)
+        private static void PromptScalarField(RecipeAuthoringSession session, RecipeFieldDescriptor field, TextReader stdin, TextWriter stdout, IRecipeCreateCancellationSource cancellation)
         {
             while (true)
             {
+                if (cancellation.IsCancellationRequested)
+                {
+                    throw new RecipeCreateCancelledException();
+                }
+
                 stdout.WriteLine($"{field.Label.Get("ko")} — {field.Help.Get("ko")}");
                 var line = stdin.ReadLine() ?? string.Empty;
 
@@ -275,10 +293,15 @@ namespace NodeKit.Cli
             }
         }
 
-        private static void PromptChoiceField(RecipeAuthoringSession session, RecipeFieldDescriptor field, TextReader stdin, TextWriter stdout)
+        private static void PromptChoiceField(RecipeAuthoringSession session, RecipeFieldDescriptor field, TextReader stdin, TextWriter stdout, IRecipeCreateCancellationSource cancellation)
         {
             while (true)
             {
+                if (cancellation.IsCancellationRequested)
+                {
+                    throw new RecipeCreateCancelledException();
+                }
+
                 stdout.WriteLine($"{field.Label.Get("ko")} — {field.Help.Get("ko")}");
                 for (var i = 0; i < field.Choices.Count; i++)
                 {
@@ -334,11 +357,16 @@ namespace NodeKit.Cli
             return input;
         }
 
-        private static void PromptStringListField(RecipeAuthoringSession session, RecipeFieldDescriptor field, TextReader stdin, TextWriter stdout)
+        private static void PromptStringListField(RecipeAuthoringSession session, RecipeFieldDescriptor field, TextReader stdin, TextWriter stdout, IRecipeCreateCancellationSource cancellation)
         {
             stdout.WriteLine($"{field.Label.Get("ko")} — {field.Help.Get("ko")} (빈 줄 입력 시 종료)");
             while (true)
             {
+                if (cancellation.IsCancellationRequested)
+                {
+                    throw new RecipeCreateCancelledException();
+                }
+
                 var line = stdin.ReadLine() ?? string.Empty;
                 if (TryHandleChangeMethod(session, line, stdin, stdout))
                 {
@@ -382,7 +410,7 @@ namespace NodeKit.Cli
             }
         }
 
-        private static void PromptInputListField(RecipeAuthoringSession session, TextReader stdin, TextWriter stdout) =>
+        private static void PromptInputListField(RecipeAuthoringSession session, TextReader stdin, TextWriter stdout, IRecipeCreateCancellationSource cancellation) =>
             PromptPresetListField(
                 session,
                 "Inputs",
@@ -390,10 +418,11 @@ namespace NodeKit.Cli
                 InputOutputPresetCatalog.InputPresets.Select(p => (p.Id, p.Label.Get("ko"))).ToList(),
                 stdin,
                 stdout,
+                cancellation,
                 custom => PromptCustomInputSpec(custom, stdin, stdout),
                 (name, spec) => RecipeCreateInputOutputSpec.ApplyInput(session, name, spec));
 
-        private static void PromptOutputListField(RecipeAuthoringSession session, TextReader stdin, TextWriter stdout) =>
+        private static void PromptOutputListField(RecipeAuthoringSession session, TextReader stdin, TextWriter stdout, IRecipeCreateCancellationSource cancellation) =>
             PromptPresetListField(
                 session,
                 "Outputs",
@@ -401,6 +430,7 @@ namespace NodeKit.Cli
                 InputOutputPresetCatalog.OutputPresets.Select(p => (p.Id, p.Label.Get("ko"))).ToList(),
                 stdin,
                 stdout,
+                cancellation,
                 custom => PromptCustomOutputSpec(custom, stdin, stdout),
                 (name, spec) => RecipeCreateInputOutputSpec.ApplyOutput(session, name, spec));
 
@@ -411,12 +441,18 @@ namespace NodeKit.Cli
             IReadOnlyList<(string Id, string Label)> presets,
             TextReader stdin,
             TextWriter stdout,
+            IRecipeCreateCancellationSource cancellation,
             Func<string, string> buildCustomSpecSuffix,
             Func<string, string, IReadOnlyList<ValidationViolation>> apply)
         {
             stdout.WriteLine($"{label} 항목을 추가하세요 (빈 줄 입력 시 종료)");
             while (true)
             {
+                if (cancellation.IsCancellationRequested)
+                {
+                    throw new RecipeCreateCancelledException();
+                }
+
                 stdout.WriteLine("이름:");
                 var name = stdin.ReadLine() ?? string.Empty;
                 if (TryHandleChangeMethod(session, name, stdin, stdout))
@@ -671,7 +707,7 @@ namespace NodeKit.Cli
             }
         }
 
-        private static bool RunRecoveryLoop(RecipeAuthoringSession session, IReadOnlyList<ValidationViolation> violations, TextReader stdin, TextWriter stdout)
+        private static bool RunRecoveryLoop(RecipeAuthoringSession session, IReadOnlyList<ValidationViolation> violations, TextReader stdin, TextWriter stdout, IRecipeCreateCancellationSource cancellation)
         {
             var plan = session.BuildRecoveryPlan(violations);
 
@@ -694,19 +730,19 @@ namespace NodeKit.Cli
                 || index < 1 || index > plan.Actions.Count)
             {
                 stdout.WriteLine("알 수 없는 선택입니다.");
-                return RunRecoveryLoop(session, violations, stdin, stdout);
+                return RunRecoveryLoop(session, violations, stdin, stdout, cancellation);
             }
 
             var chosen = plan.Actions[index - 1];
             foreach (var fieldName in chosen.RelatedFields)
             {
-                ReEditField(session, fieldName, stdin, stdout);
+                ReEditField(session, fieldName, stdin, stdout, cancellation);
             }
 
             return true;
         }
 
-        private static void ReEditField(RecipeAuthoringSession session, string fieldName, TextReader stdin, TextWriter stdout)
+        private static void ReEditField(RecipeAuthoringSession session, string fieldName, TextReader stdin, TextWriter stdout, IRecipeCreateCancellationSource cancellation)
         {
             if (fieldName is "Inputs" or "Outputs")
             {
@@ -714,11 +750,11 @@ namespace NodeKit.Cli
 
                 if (fieldName == "Inputs")
                 {
-                    PromptInputListField(session, stdin, stdout);
+                    PromptInputListField(session, stdin, stdout, cancellation);
                 }
                 else
                 {
-                    PromptOutputListField(session, stdin, stdout);
+                    PromptOutputListField(session, stdin, stdout, cancellation);
                 }
 
                 return;
@@ -731,7 +767,7 @@ namespace NodeKit.Cli
             }
 
             session.ConfirmInvalidatedField(fieldName);
-            PromptField(session, field, stdin, stdout);
+            PromptField(session, field, stdin, stdout, cancellation);
         }
 
         private static void ReviewListSection(RecipeAuthoringSession session, string fieldName, TextReader stdin, TextWriter stdout)

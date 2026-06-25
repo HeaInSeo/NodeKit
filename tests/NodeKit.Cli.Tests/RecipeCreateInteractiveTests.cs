@@ -578,5 +578,108 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(130, exitCode);
             Assert.False(File.Exists(outPath));
         }
+
+        [Fact]
+        public void SimulatedCtrlC_AtFirstFieldPrompt_ExitsWithCode130WithoutSavingOrStackTrace()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "n", "n", "y", "n", "n", "n", // Q&A -> recommend container
+                "", // accept recommended method
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var cancellation = new SequencedCancellationSource(checksBeforeCancellation: 0);
+            var exitCode = RecipeCreateInteractiveRunner.Run(
+                outPath,
+                new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), Array.Empty<(string, string)>(), Array.Empty<(string, string)>(), null),
+                new StringReader(string.Join("\n", transcript)),
+                stdout,
+                stderr,
+                cancellation);
+
+            Assert.Equal(130, exitCode);
+            Assert.False(File.Exists(outPath));
+            Assert.Empty(stderr.ToString());
+            Assert.DoesNotContain("Exception", stdout.ToString());
+            Assert.Contains("recipe 생성을 취소했습니다.", stdout.ToString());
+            Assert.Contains("파일은 저장되지 않았습니다.", stdout.ToString());
+        }
+
+        [Fact]
+        public void SimulatedCtrlC_AndCancelCommand_ProduceIdenticalExitCodeAndMessage()
+        {
+            var cancelOutPath = Path.Combine(_workDir, "cancel.json");
+            var cancelTranscript = new[]
+            {
+                "n", "n", "y", "n", "n", "n", // Q&A -> recommend container
+                "", // accept recommended method
+                "bwa-mem", // ToolName
+                "/cancel", // at ToolVersion prompt
+                "1", // confirm cancellation
+            };
+
+            var cancelStdout = new StringWriter();
+            var cancelExitCode = CliApp.Run(
+                new[] { "recipe", "create", cancelOutPath },
+                new StringReader(string.Join("\n", cancelTranscript)),
+                cancelStdout,
+                new StringWriter());
+
+            var ctrlCOutPath = Path.Combine(_workDir, "ctrlc.json");
+            var ctrlCTranscript = new[]
+            {
+                "n", "n", "y", "n", "n", "n", // Q&A -> recommend container
+                "", // accept recommended method
+            };
+
+            var ctrlCStdout = new StringWriter();
+            var ctrlCExitCode = RecipeCreateInteractiveRunner.Run(
+                ctrlCOutPath,
+                new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), Array.Empty<(string, string)>(), Array.Empty<(string, string)>(), null),
+                new StringReader(string.Join("\n", ctrlCTranscript)),
+                ctrlCStdout,
+                new StringWriter(),
+                new SequencedCancellationSource(checksBeforeCancellation: 0));
+
+            Assert.Equal(cancelExitCode, ctrlCExitCode);
+            Assert.False(File.Exists(cancelOutPath));
+            Assert.False(File.Exists(ctrlCOutPath));
+
+            var cancelMessageLines = cancelStdout.ToString().Replace("\r\n", "\n").TrimEnd('\n').Split('\n')[^2..];
+            var ctrlCMessageLines = ctrlCStdout.ToString().Replace("\r\n", "\n").TrimEnd('\n').Split('\n')[^2..];
+            Assert.Equal(cancelMessageLines, ctrlCMessageLines);
+        }
+
+        /// <summary>
+        /// Fake IRecipeCreateCancellationSource for design doc Section 18.5
+        /// tests — simulates Ctrl+C without a real signal by returning false
+        /// for a fixed number of checks, then true thereafter.
+        /// </summary>
+        private sealed class SequencedCancellationSource : IRecipeCreateCancellationSource
+        {
+            private int _checksRemaining;
+
+            public SequencedCancellationSource(int checksBeforeCancellation)
+            {
+                _checksRemaining = checksBeforeCancellation;
+            }
+
+            public bool IsCancellationRequested
+            {
+                get
+                {
+                    if (_checksRemaining <= 0)
+                    {
+                        return true;
+                    }
+
+                    _checksRemaining--;
+                    return false;
+                }
+            }
+        }
     }
 }

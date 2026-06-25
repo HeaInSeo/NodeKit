@@ -1000,6 +1000,41 @@ Done when:
 - No new compiler warnings (CLAUDE.md Section 8).
 ```
 
+Progress:
+
+```text
+- 2026-06-25: Completed. Added IRecipeCreateCancellationSource
+  (src/NodeKit.Cli/IRecipeCreateCancellationSource.cs), a single-member
+  `bool IsCancellationRequested { get; }` seam per Section 18.5, and its
+  production implementation ConsoleCancelKeyCancellationSource
+  (src/NodeKit.Cli/ConsoleCancelKeyCancellationSource.cs), which subscribes
+  to Console.CancelKeyPress, sets e.Cancel = true so the process survives
+  the signal, and latches a volatile flag. RecipeCreateCancelledException
+  from Sprint R9 is reused (not replaced) for the Ctrl+C path, keeping a
+  single cancellation representation. RecipeCreateInteractiveRunner.Run was
+  split into the public 5-arg overload (constructs a real
+  ConsoleCancelKeyCancellationSource) and an internal 6-arg overload taking
+  IRecipeCreateCancellationSource, reachable from tests via
+  InternalsVisibleTo. The cancellation parameter was threaded through
+  RunFieldLoop, PromptField, RunRecoveryLoop, ReEditField, and a check
+  (`if (cancellation.IsCancellationRequested) throw new
+  RecipeCreateCancelledException();`) was added at the top of the same four
+  prompt-loop insertion points Sprint R9 used (PromptScalarField,
+  PromptChoiceField, PromptStringListField, PromptPresetListField) — not at
+  every stdin read site, per CLAUDE.md Section 7 and consistent with R9's
+  own scope decision. Known limitation: Ctrl+C during the recommender Q&A,
+  method selection, dockerfile-warning confirmation, /change-method's
+  internal reads, or the Inputs/Outputs list-review/edit sub-flow is not yet
+  covered — those sites would need the same threading if this gap matters
+  in practice. Added 2 tests to RecipeCreateInteractiveTests.cs using a fake
+  SequencedCancellationSource (returns false for N checks, then true): one
+  asserting Ctrl+C-equivalent cancellation produces exit code 130, no file
+  written, no stack trace, and the exact /cancel message text; one asserting
+  /cancel and simulated-Ctrl+C produce an identical exit code and final
+  message lines. Full suite: 321/321 passing (38 NodeKit.Cli.Tests + 283
+  NodeKit.Tests), 0 build warnings.
+```
+
 ### Sprint R11. Phase 2 — Authoring Mode Selector + Fast Questionnaire Enrichment
 
 Goal:

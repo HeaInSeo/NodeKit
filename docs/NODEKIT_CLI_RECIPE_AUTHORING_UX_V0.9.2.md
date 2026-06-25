@@ -2858,11 +2858,11 @@ v0.9.2에서는 다음을 구현하지 않는다.
 
 ### Phase 1-B
 
-* [ ] Ctrl+C signal 처리
-* [ ] stack trace 방지
-* [ ] cancellation abstraction 추가
-* [ ] Ctrl+C 테스트 추가
-* [ ] `/cancel`과 Ctrl+C 결과 일관성 검증
+* [x] Ctrl+C signal 처리 (Sprint R10: `ConsoleCancelKeyCancellationSource`)
+* [x] stack trace 방지 (Sprint R10: `RecipeCreateCancelledException` 캐치, /cancel과 동일 처리)
+* [x] cancellation abstraction 추가 (Sprint R10: `IRecipeCreateCancellationSource`)
+* [x] Ctrl+C 테스트 추가 (Sprint R10: fake `SequencedCancellationSource` 주입)
+* [x] `/cancel`과 Ctrl+C 결과 일관성 검증 (Sprint R10)
 
 ### Phase 2
 
