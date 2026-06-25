@@ -65,7 +65,8 @@ namespace NodeKit.Authoring.Recipes
             Help: Text("최소 1개 이상의 입력 정의가 필요합니다.", "At least one input definition is required."),
             Examples: Array.Empty<string>(),
             Choices: Array.Empty<RecipeChoice>(),
-            Apply: (recipe, value) => recipe.Inputs.Add((ToolInput)value));
+            Apply: (recipe, value) => recipe.Inputs.Add((ToolInput)value),
+            ClearList: recipe => recipe.Inputs.Clear());
 
         public static RecipeFieldDescriptor OutputsField { get; } = new(
             Name: "Outputs",
@@ -76,7 +77,8 @@ namespace NodeKit.Authoring.Recipes
             Help: Text("최소 1개 이상의 출력 정의가 필요합니다.", "At least one output definition is required."),
             Examples: Array.Empty<string>(),
             Choices: Array.Empty<RecipeChoice>(),
-            Apply: (recipe, value) => recipe.Outputs.Add((ToolOutput)value));
+            Apply: (recipe, value) => recipe.Outputs.Add((ToolOutput)value),
+            ClearList: recipe => recipe.Outputs.Clear());
 
         public static IReadOnlyDictionary<RecipeMethodId, IReadOnlyList<RecipeFieldDescriptor>> MethodFields { get; } =
             new Dictionary<RecipeMethodId, IReadOnlyList<RecipeFieldDescriptor>>
@@ -118,7 +120,8 @@ namespace NodeKit.Authoring.Recipes
                             "The command to use instead of the image's default entrypoint."),
                         Examples: Array.Empty<string>(),
                         Choices: Array.Empty<RecipeChoice>(),
-                        Apply: (recipe, value) => recipe.Command.Add((string)value)),
+                        Apply: (recipe, value) => recipe.Command.Add((string)value),
+                        ClearList: recipe => recipe.Command.Clear()),
                 },
                 [RecipeMethodId.Package] = new[]
                 {
@@ -132,7 +135,8 @@ namespace NodeKit.Authoring.Recipes
                         Help: Text("설치할 package 목록입니다.", "The list of packages to install."),
                         Examples: new[] { "bwa=0.7.17=h5bf99c6_8" },
                         Choices: Array.Empty<RecipeChoice>(),
-                        Apply: (recipe, value) => recipe.Packages.Add((string)value)),
+                        Apply: (recipe, value) => recipe.Packages.Add((string)value),
+                        ClearList: recipe => recipe.Packages.Clear()),
                     new RecipeFieldDescriptor(
                         Name: "Channels",
                         Type: RecipeFieldType.StringList,
@@ -142,7 +146,8 @@ namespace NodeKit.Authoring.Recipes
                         Help: Text("package channel 목록입니다.", "The list of package channels."),
                         Examples: new[] { "bioconda", "conda-forge" },
                         Choices: Array.Empty<RecipeChoice>(),
-                        Apply: (recipe, value) => recipe.Channels.Add((string)value)),
+                        Apply: (recipe, value) => recipe.Channels.Add((string)value),
+                        ClearList: recipe => recipe.Channels.Clear()),
                     new RecipeFieldDescriptor(
                         Name: "PackageEngine",
                         Type: RecipeFieldType.Choice,
@@ -182,7 +187,8 @@ namespace NodeKit.Authoring.Recipes
                         Help: Text("설치할 package 목록입니다.", "The list of packages to install."),
                         Examples: new[] { "bwa=0.7.17=h5bf99c6_8" },
                         Choices: Array.Empty<RecipeChoice>(),
-                        Apply: (recipe, value) => recipe.Packages.Add((string)value)),
+                        Apply: (recipe, value) => recipe.Packages.Add((string)value),
+                        ClearList: recipe => recipe.Packages.Clear()),
                     new RecipeFieldDescriptor(
                         Name: "MirrorKind",
                         Type: RecipeFieldType.Scalar,
@@ -228,7 +234,8 @@ namespace NodeKit.Authoring.Recipes
                         Help: Text("source를 빌드하는 명령어 목록입니다.", "The list of commands that build the source."),
                         Examples: new[] { "make", "make install" },
                         Choices: Array.Empty<RecipeChoice>(),
-                        Apply: (recipe, value) => recipe.SourceBuildCommands.Add((string)value)),
+                        Apply: (recipe, value) => recipe.SourceBuildCommands.Add((string)value),
+                        ClearList: recipe => recipe.SourceBuildCommands.Clear()),
                     new RecipeFieldDescriptor(
                         Name: "BuildDependencies",
                         Type: RecipeFieldType.StringList,
@@ -240,7 +247,8 @@ namespace NodeKit.Authoring.Recipes
                             "The dependencies the build needs — optional, but recommended for reproducibility."),
                         Examples: Array.Empty<string>(),
                         Choices: Array.Empty<RecipeChoice>(),
-                        Apply: (recipe, value) => recipe.BuildDependencies.Add((string)value)),
+                        Apply: (recipe, value) => recipe.BuildDependencies.Add((string)value),
+                        ClearList: recipe => recipe.BuildDependencies.Clear()),
                 },
                 [RecipeMethodId.Dockerfile] = new[]
                 {

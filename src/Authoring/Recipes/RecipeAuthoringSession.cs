@@ -44,6 +44,8 @@ namespace NodeKit.Authoring.Recipes
         private readonly HashSet<string> _invalidatedFields = new(StringComparer.Ordinal);
         private readonly Dictionary<string, object> _scalarValues = new(StringComparer.Ordinal);
         private readonly Dictionary<string, List<object>> _listItems = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, int> _appliedListItemCounts = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _dirtyListFields = new(StringComparer.Ordinal);
 
         private RecipeMethodId? _selectedMethod;
         private RecipeAuthoringSessionMetadata _metadata = new();
@@ -141,6 +143,7 @@ namespace NodeKit.Authoring.Recipes
 
             items[index] = newValue;
             _invalidatedFields.Remove(fieldName);
+            _dirtyListFields.Add(fieldName);
             return Array.Empty<ValidationViolation>();
         }
 
@@ -167,6 +170,20 @@ namespace NodeKit.Authoring.Recipes
 
             items.RemoveAt(index);
             _invalidatedFields.Remove(fieldName);
+            _dirtyListFields.Add(fieldName);
+        }
+
+        public IReadOnlyList<object> ListItemsFor(string fieldName)
+        {
+            EnsureMethodSelected();
+            var field = GetField(fieldName);
+
+            if (!IsListType(field))
+            {
+                throw new InvalidOperationException($"{fieldName} is not a list field.");
+            }
+
+            return GetListItems(fieldName);
         }
 
         public void CompleteListField(string fieldName)
@@ -397,12 +414,36 @@ namespace NodeKit.Authoring.Recipes
                 throw new InvalidOperationException("Cannot build an incomplete recipe authoring session.");
             }
 
+            // Build() can run more than once for the same session — the interactive
+            // recovery loop (RunRecoveryLoop) re-Builds after each fix attempt. Only
+            // apply items added since the last Build() call, or a retry would Add()
+            // every previously-applied item a second time onto the same _document.
+            // EditListItem/DeleteListItem mutate already-applied indices in place,
+            // which the delta loop below would never revisit — those fields are
+            // marked dirty and get a full ClearList + reapply instead.
             foreach (var field in RecipeFieldCatalog.FieldsFor(_selectedMethod!.Value).Where(IsListType))
             {
-                foreach (var item in GetListItems(field.Name))
+                var items = GetListItems(field.Name);
+
+                if (_dirtyListFields.Remove(field.Name))
                 {
-                    field.Apply(_document, item);
+                    field.ClearList?.Invoke(_document);
+                    foreach (var item in items)
+                    {
+                        field.Apply(_document, item);
+                    }
+
+                    _appliedListItemCounts[field.Name] = items.Count;
+                    continue;
                 }
+
+                var alreadyApplied = _appliedListItemCounts.GetValueOrDefault(field.Name);
+                for (var i = alreadyApplied; i < items.Count; i++)
+                {
+                    field.Apply(_document, items[i]);
+                }
+
+                _appliedListItemCounts[field.Name] = items.Count;
             }
 
             foreach (var field in RecipeFieldCatalog.DefaultedFieldsFor(_selectedMethod.Value))

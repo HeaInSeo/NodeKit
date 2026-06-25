@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using NodeKit.Authoring;
 using NodeKit.Authoring.Recipes;
 using NodeKit.Validation;
 using NodeKit.Validation.Recipes;
@@ -11,12 +12,13 @@ namespace NodeKit.Cli
     /// <summary>
     /// Interactive `nodekit recipe create` wizard: recommender Q&amp;A,
     /// method selection, field-by-field prompts driven by
-    /// RecipeAuthoringSession.NextField, /change-method escape hatch, and
-    /// final-validation recovery via BuildRecoveryPlan. See
+    /// RecipeAuthoringSession.NextField, /help and /change-method escape
+    /// hatches, and final-validation recovery via BuildRecoveryPlan. See
     /// docs/NODEKIT_CLI_RECIPE_AUTHORING_UX_BEGINNER_DESIGN.md Sections 10-20.
     /// </summary>
     internal static class RecipeCreateInteractiveRunner
     {
+        private const string HelpCommand = "/help";
         private const string ChangeMethodCommand = "/change-method";
 
         private const string DockerfileWarningText =
@@ -226,6 +228,11 @@ namespace NodeKit.Cli
                     return;
                 }
 
+                if (TryHandleHelp(field, line, stdout))
+                {
+                    continue;
+                }
+
                 if (line.Trim().Length == 0 && field.Requirement == RecipeFieldRequirement.Optional)
                 {
                     session.SkipOptionalField(field.Name);
@@ -256,6 +263,11 @@ namespace NodeKit.Cli
                 if (TryHandleChangeMethod(session, line, stdin, stdout))
                 {
                     return;
+                }
+
+                if (TryHandleHelp(field, line, stdout))
+                {
+                    continue;
                 }
 
                 var trimmed = line.Trim();
@@ -295,6 +307,11 @@ namespace NodeKit.Cli
                 if (TryHandleChangeMethod(session, line, stdin, stdout))
                 {
                     return;
+                }
+
+                if (TryHandleHelp(field, line, stdout))
+                {
+                    continue;
                 }
 
                 if (line.Trim().Length == 0)
@@ -359,6 +376,12 @@ namespace NodeKit.Cli
                 if (TryHandleChangeMethod(session, name, stdin, stdout))
                 {
                     return;
+                }
+
+                var listField = fieldName == "Inputs" ? RecipeFieldCatalog.InputsField : RecipeFieldCatalog.OutputsField;
+                if (TryHandleHelp(listField, name, stdout))
+                {
+                    continue;
                 }
 
                 if (name.Trim().Length == 0)
@@ -463,6 +486,32 @@ namespace NodeKit.Cli
             return confirm == "n" ? normalized.OriginalInput : normalized.Value;
         }
 
+        private static bool TryHandleHelp(RecipeFieldDescriptor field, string line, TextWriter stdout)
+        {
+            if (line.Trim() != HelpCommand)
+            {
+                return false;
+            }
+
+            stdout.WriteLine($"{field.Label.Get("ko")} — {field.Help.Get("ko")}");
+            if (field.Examples.Count > 0)
+            {
+                stdout.WriteLine($"예시: {string.Join(", ", field.Examples)}");
+            }
+
+            stdout.WriteLine(DescribeRequirement(field.Requirement));
+            return true;
+        }
+
+        private static string DescribeRequirement(RecipeFieldRequirement requirement) => requirement switch
+        {
+            RecipeFieldRequirement.Required => "필수 항목입니다. 값이 없으면 최종 검증을 통과하지 못합니다.",
+            RecipeFieldRequirement.Recommended => "권장 항목입니다. 비워둘 수 있지만 재현성을 위해 채우는 것을 권장합니다.",
+            RecipeFieldRequirement.Optional => "선택 항목입니다. 비워두고 넘어갈 수 있습니다.",
+            RecipeFieldRequirement.Defaulted => "기본값이 있는 항목입니다. 비워두면 기본값이 적용됩니다.",
+            _ => throw new ArgumentOutOfRangeException(nameof(requirement), requirement, "Unsupported requirement tier."),
+        };
+
         private static bool TryHandleChangeMethod(RecipeAuthoringSession session, string line, TextReader stdin, TextWriter stdout)
         {
             if (line.Trim() != ChangeMethodCommand)
@@ -558,6 +607,8 @@ namespace NodeKit.Cli
         {
             if (fieldName is "Inputs" or "Outputs")
             {
+                ReviewListSection(session, fieldName, stdin, stdout);
+
                 if (fieldName == "Inputs")
                 {
                     PromptInputListField(session, stdin, stdout);
@@ -579,6 +630,148 @@ namespace NodeKit.Cli
             session.ConfirmInvalidatedField(fieldName);
             PromptField(session, field, stdin, stdout);
         }
+
+        private static void ReviewListSection(RecipeAuthoringSession session, string fieldName, TextReader stdin, TextWriter stdout)
+        {
+            while (true)
+            {
+                var items = session.ListItemsFor(fieldName);
+                if (items.Count == 0)
+                {
+                    return;
+                }
+
+                stdout.WriteLine($"현재 {fieldName} 항목:");
+                for (var i = 0; i < items.Count; i++)
+                {
+                    stdout.WriteLine($"  [{i}] {DescribeListItem(items[i])}");
+                }
+
+                stdout.WriteLine("수정: e<번호>, 삭제: d<번호>, 계속하려면 빈 줄:");
+                var line = (stdin.ReadLine() ?? string.Empty).Trim();
+
+                if (line.Length == 0)
+                {
+                    return;
+                }
+
+                if (line[0] == 'e' && int.TryParse(line[1..], System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var editIndex)
+                    && editIndex >= 0 && editIndex < items.Count)
+                {
+                    EditListItemInteractive(session, fieldName, editIndex, stdin, stdout);
+                    continue;
+                }
+
+                if (line[0] == 'd' && int.TryParse(line[1..], System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var deleteIndex)
+                    && deleteIndex >= 0 && deleteIndex < items.Count)
+                {
+                    try
+                    {
+                        session.DeleteListItem(fieldName, deleteIndex);
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        stdout.WriteLine(ex.Message);
+                    }
+
+                    continue;
+                }
+
+                stdout.WriteLine("알 수 없는 선택입니다.");
+            }
+        }
+
+        private static void EditListItemInteractive(RecipeAuthoringSession session, string fieldName, int index, TextReader stdin, TextWriter stdout)
+        {
+            var existingName = DescribeListItemName(session.ListItemsFor(fieldName)[index]);
+
+            if (fieldName == "Inputs")
+            {
+                EditPresetListItem(
+                    index,
+                    existingName,
+                    InputOutputPresetCatalog.InputPresets.Select(p => (p.Id, p.Label.Get("ko"))).ToList(),
+                    stdin,
+                    stdout,
+                    custom => PromptCustomInputSpec(custom, stdin, stdout),
+                    (idx, name, spec) => RecipeCreateInputOutputSpec.EditInput(session, idx, name, spec));
+            }
+            else
+            {
+                EditPresetListItem(
+                    index,
+                    existingName,
+                    InputOutputPresetCatalog.OutputPresets.Select(p => (p.Id, p.Label.Get("ko"))).ToList(),
+                    stdin,
+                    stdout,
+                    custom => PromptCustomOutputSpec(custom, stdin, stdout),
+                    (idx, name, spec) => RecipeCreateInputOutputSpec.EditOutput(session, idx, name, spec));
+            }
+        }
+
+        private static void EditPresetListItem(
+            int index,
+            string existingName,
+            IReadOnlyList<(string Id, string Label)> presets,
+            TextReader stdin,
+            TextWriter stdout,
+            Func<string, string> buildCustomSpecSuffix,
+            Func<int, string, string, IReadOnlyList<ValidationViolation>> edit)
+        {
+            while (true)
+            {
+                stdout.WriteLine($"이름 (빈 줄이면 '{existingName}' 유지):");
+                var nameInput = (stdin.ReadLine() ?? string.Empty).Trim();
+                var name = nameInput.Length == 0 ? existingName : nameInput;
+
+                for (var i = 0; i < presets.Count; i++)
+                {
+                    stdout.WriteLine($"  [{i + 1}] {presets[i].Label}");
+                }
+
+                stdout.WriteLine("프리셋 번호 또는 'custom':");
+                var selection = (stdin.ReadLine() ?? string.Empty).Trim();
+
+                string spec;
+                if (selection == InputOutputPresetCatalog.CustomPresetId)
+                {
+                    spec = $"{InputOutputPresetCatalog.CustomPresetId},{buildCustomSpecSuffix(name)}";
+                }
+                else if (int.TryParse(selection, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var presetIndex)
+                    && presetIndex >= 1 && presetIndex <= presets.Count)
+                {
+                    spec = presets[presetIndex - 1].Id;
+                }
+                else
+                {
+                    stdout.WriteLine("알 수 없는 선택입니다. 다시 입력합니다.");
+                    continue;
+                }
+
+                var violations = edit(index, name, spec);
+                if (violations.Count > 0)
+                {
+                    PrintViolations(violations, stdout);
+                    continue;
+                }
+
+                return;
+            }
+        }
+
+        private static string DescribeListItem(object item) => item switch
+        {
+            ToolInput input => $"{input.Name} (role={input.Role}, format={input.Format}, shape={input.Shape}, required={input.Required})",
+            ToolOutput output => $"{output.Name} (role={output.Role}, format={output.Format}, class={output.Class})",
+            _ => item.ToString() ?? string.Empty,
+        };
+
+        private static string DescribeListItemName(object item) => item switch
+        {
+            ToolInput input => input.Name,
+            ToolOutput output => output.Name,
+            _ => string.Empty,
+        };
 
         private static void PrintViolations(IReadOnlyList<ValidationViolation> violations, TextWriter stdout)
         {

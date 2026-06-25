@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using NodeKit.Authoring;
 using NodeKit.Authoring.Recipes;
@@ -15,62 +16,76 @@ namespace NodeKit.Cli
     {
         public static IReadOnlyList<ValidationViolation> ApplyInput(RecipeAuthoringSession session, string name, string spec)
         {
+            var (input, violations) = BuildInput(name, spec);
+            return input != null ? session.AppendListItem("Inputs", input) : violations;
+        }
+
+        public static IReadOnlyList<ValidationViolation> ApplyOutput(RecipeAuthoringSession session, string name, string spec)
+        {
+            var (output, violations) = BuildOutput(name, spec);
+            return output != null ? session.AppendListItem("Outputs", output) : violations;
+        }
+
+        public static IReadOnlyList<ValidationViolation> EditInput(RecipeAuthoringSession session, int index, string name, string spec)
+        {
+            var (input, violations) = BuildInput(name, spec);
+            return input != null ? session.EditListItem("Inputs", index, input) : violations;
+        }
+
+        public static IReadOnlyList<ValidationViolation> EditOutput(RecipeAuthoringSession session, int index, string name, string spec)
+        {
+            var (output, violations) = BuildOutput(name, spec);
+            return output != null ? session.EditListItem("Outputs", index, output) : violations;
+        }
+
+        private static (ToolInput? Input, IReadOnlyList<ValidationViolation> Violations) BuildInput(string name, string spec)
+        {
             var tokens = spec.Split(',');
 
-            ToolInput input;
             if (tokens[0] == InputOutputPresetCatalog.CustomPresetId)
             {
                 if (tokens.Length < 4)
                 {
-                    return MalformedSpec(name, "custom,role,format,shape[,optional]");
+                    return (null, MalformedSpec(name, "custom,role,format,shape[,optional]"));
                 }
 
-                input = new ToolInput
+                return (new ToolInput
                 {
                     Name = name,
                     Role = tokens[1],
                     Format = tokens[2],
                     Shape = tokens[3],
                     Required = !IsOptional(tokens, 4),
-                };
-            }
-            else
-            {
-                var preset = InputOutputPresetCatalog.FindInputPreset(tokens[0]);
-                input = new ToolInput
-                {
-                    Name = name,
-                    Role = preset.Role,
-                    Format = preset.Format,
-                    Shape = preset.Shape,
-                    Required = !IsOptional(tokens, 1),
-                };
+                }, Array.Empty<ValidationViolation>());
             }
 
-            return session.AppendListItem("Inputs", input);
+            var preset = InputOutputPresetCatalog.FindInputPreset(tokens[0]);
+            return (new ToolInput
+            {
+                Name = name,
+                Role = preset.Role,
+                Format = preset.Format,
+                Shape = preset.Shape,
+                Required = !IsOptional(tokens, 1),
+            }, Array.Empty<ValidationViolation>());
         }
 
-        public static IReadOnlyList<ValidationViolation> ApplyOutput(RecipeAuthoringSession session, string name, string spec)
+        private static (ToolOutput? Output, IReadOnlyList<ValidationViolation> Violations) BuildOutput(string name, string spec)
         {
             var tokens = spec.Split(',');
 
-            ToolOutput output;
             if (tokens[0] == InputOutputPresetCatalog.CustomPresetId)
             {
                 if (tokens.Length < 4)
                 {
-                    return MalformedSpec(name, "custom,role,format,class");
+                    return (null, MalformedSpec(name, "custom,role,format,class"));
                 }
 
-                output = new ToolOutput { Name = name, Role = tokens[1], Format = tokens[2], Class = tokens[3] };
-            }
-            else
-            {
-                var preset = InputOutputPresetCatalog.FindOutputPreset(tokens[0]);
-                output = new ToolOutput { Name = name, Role = preset.Role, Format = preset.Format, Class = preset.Class };
+                return (new ToolOutput { Name = name, Role = tokens[1], Format = tokens[2], Class = tokens[3] }, Array.Empty<ValidationViolation>());
             }
 
-            return session.AppendListItem("Outputs", output);
+            var preset = InputOutputPresetCatalog.FindOutputPreset(tokens[0]);
+            return (new ToolOutput { Name = name, Role = preset.Role, Format = preset.Format, Class = preset.Class }, Array.Empty<ValidationViolation>());
         }
 
         private static bool IsOptional(string[] tokens, int optionalTokenIndex) =>
