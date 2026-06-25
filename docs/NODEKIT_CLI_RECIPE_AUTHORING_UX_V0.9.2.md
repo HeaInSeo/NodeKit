@@ -194,12 +194,12 @@ v0.9.2는 두 개의 interactive entry mode를 제공한다.
 1. 쉬운 안내 모드
 2. 빠른 설정 모드
 
-하지만 두 모드는 내부적으로 같은 `RecipeDraft`, `RecipeSession`, `RecipeValidator`, `RecipeRenderer`로 수렴해야 한다.
+하지만 두 모드는 내부적으로 같은 `RecipeAuthoringSession`, `RecipeValidator`, `RecipeRenderer`로 수렴해야 한다.
 
 ```text
 쉬운 안내 모드
 → 사용자가 가진 단서 기반 method 결정
-→ RecipeDraft
+→ RecipeAuthoringSession
 → 공통 필드 입력
 → method별 필드 입력
 → Inputs/Outputs
@@ -209,7 +209,7 @@ v0.9.2는 두 개의 interactive entry mode를 제공한다.
 
 빠른 설정 모드
 → 기존 6문항 기반 method 추천
-→ RecipeDraft
+→ RecipeAuthoringSession
 → 공통 필드 입력
 → method별 필드 입력
 → Inputs/Outputs
@@ -254,7 +254,7 @@ v0.9.2에서는 사용자-facing 라벨과 내부 필드명을 구분한다.
 하지만 다음 영역에서는 반드시 내부 필드명 `ToolVersion`을 사용한다.
 
 * `RecipeFieldCatalog`
-* `RecipeCreateSession`
+* `RecipeAuthoringSession`
 * non-interactive `--field`
 * `/change-method` field set 차집합 계산
 * validation/recovery field reference
@@ -710,7 +710,7 @@ quay.io/biocontainers/bwa:0.7.17--h7132678_9@sha256:aaa...
 v0.9.2에서는 ImageReferenceNormalizer의 실행 위치를 다음으로 고정한다.
 
 ```text
-RecipeDraft 내부:
+RecipeAuthoringSession 내부:
   ImageRef = digest 없는 repository:tag
   ImageDigest = sha256 digest
 
@@ -810,7 +810,7 @@ ImageDigest:
 
 ### 10.6 container 방식 필드 저장 원칙
 
-RecipeDraft 내부에서는 다음 구조를 권장한다.
+RecipeAuthoringSession 내부에서는 다음 구조를 권장한다.
 
 ```text
 ImageRef: digest 없는 repository:tag
@@ -1769,11 +1769,7 @@ Script:
 
 * Command
 
-`Command`의 타입은 `RecipeFieldCatalog`를 따른다.
-문서에서는 `Command`가 list field라고 가정하지 않는다.
-
-만약 `RecipeFieldCatalog`에서 `Command`가 `StringList`라면 반복 입력을 허용한다.
-만약 scalar field라면 단일 값만 허용한다.
+`Command`는 `RecipeFieldCatalog`에서 `RecipeFieldType.StringList`로 정의되어 있다. 따라서 반복 입력을 허용한다.
 
 #### ImageRef
 
@@ -2353,22 +2349,10 @@ Packages
 Channels
 SourceBuildCommands
 BuildDependencies
+Command
 ```
 
-`Command`는 여기서 제외한다.
-
-이유:
-
-```text
-Command가 StringList인지 scalar인지는 RecipeFieldCatalog를 따른다.
-현재 문서에서는 Command를 반복 list field로 가정하지 않는다.
-```
-
-만약 코드상 `Command`가 `StringList`로 확인되면 향후 문서에 다음처럼 추가할 수 있다.
-
-```text
-Command도 IsListType(Command) == true인 경우 반복 --field 입력을 허용한다.
-```
+`Command`는 `RecipeFieldCatalog`에서 `RecipeFieldType.StringList`로 확인되었으므로 포함한다 (`IsListType(Command) == true`).
 
 ---
 
@@ -2423,10 +2407,6 @@ PromptCommandHandler
   - /quit
   - /exit
 
-RecipeDraft
-  - method 결정 전/후의 임시 상태 저장
-  - /review 출력에 사용
-
 InstallCommandParser
   - Parsed / PartiallyParsed / Failed 반환
 
@@ -2459,7 +2439,9 @@ Input/Output presets
 Final recovery flow
 RecipeFieldCatalog
 RecipeMethodRecommender
-RecipeCreateSession
+RecipeAuthoringSession
+  - method 결정 전/후의 임시 상태 저장
+  - /review 출력에 사용
 ```
 
 ---
@@ -2786,8 +2768,7 @@ ToolVersion은 내부 필드명이며, non-interactive에서는 --field ToolVers
 * `ToolVersion`은 공식 내부 필드명이다.
 * non-interactive 예시는 `--field ToolVersion=...`을 사용한다.
 * 리스트 필드는 반복 입력으로 누적한다.
-* v0.9.2에서 반복 입력을 명시적으로 보장하는 필드는 `Packages`, `Channels`, `SourceBuildCommands`, `BuildDependencies`다.
-* `Command`는 `RecipeFieldCatalog.IsListType(Command)`가 true인 경우에만 반복 입력을 허용한다.
+* v0.9.2에서 반복 입력을 명시적으로 보장하는 필드는 `Packages`, `Channels`, `SourceBuildCommands`, `BuildDependencies`, `Command`다 (`RecipeFieldCatalog.IsListType`이 true인 필드).
 * 문서 예시와 실제 `RecipeCreateOptions` parsing 동작이 일치해야 한다.
 
 ---
@@ -2864,7 +2845,7 @@ v0.9.2에서는 다음을 구현하지 않는다.
 * [ ] 사용 가이드의 `recipe create` 섹션을 새 모드 구조로 업데이트한다.
 * [ ] non-interactive `--field` 문법을 사용 가이드에 명시한다.
 * [ ] 사용자-facing `Version`과 내부 `ToolVersion`의 관계를 사용 가이드에 명시한다.
-* [ ] `Command` 필드 타입은 RecipeFieldCatalog 기준으로 확인한다.
+* [x] `Command` 필드 타입은 RecipeFieldCatalog 기준으로 확인한다. (Sprint R8: `RecipeFieldType.StringList`로 확인됨)
 
 ### Phase 1-A
 
@@ -2906,7 +2887,7 @@ v0.9.2에서는 다음을 구현하지 않는다.
 * [ ] non-interactive `--field` 첫 `=` 기준 parsing 확인
 * [ ] 리스트 필드 반복 입력 누적 확인
 * [ ] `ToolVersion` 필드명 기준으로 non-interactive 예시 업데이트
-* [ ] `Command` 반복 입력 허용 여부를 RecipeFieldCatalog 기준으로 확정
+* [x] `Command` 반복 입력 허용 여부를 RecipeFieldCatalog 기준으로 확정 (StringList, 반복 입력 허용 — 회귀 테스트는 Sprint R14에서 추가)
 * [ ] 문서 예시와 실제 parser 동작 일치 테스트
 
 ---
@@ -2931,6 +2912,6 @@ v0.9.2는 v0.9.1에서 남아 있던 마지막 구현 불일치 가능성을 닫
 
 1. 사용자-facing `Version`은 내부 필드명 `ToolVersion`에 매핑된다.
 2. `ImageReferenceNormalizer`는 `RecipeDocument` 생성 직전에 실행되고, validator/renderer는 digest 포함 canonical URI를 받는다.
-3. `Command`는 반복 list field로 가정하지 않으며, 반복 가능 여부는 `RecipeFieldCatalog.IsListType(Command)`에 따른다.
+3. `Command`는 `RecipeFieldCatalog`에서 `RecipeFieldType.StringList`로 확인되었으므로 반복 list field로 취급한다 (Sprint R8에서 확정).
 
 이 구조는 현재 CLI의 legacy export 범위를 유지하면서도, 향후 MCP 기반 대화형 authoring으로 확장하기 좋은 기반이 된다.

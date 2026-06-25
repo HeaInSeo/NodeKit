@@ -898,6 +898,20 @@ Done when:
   question.
 ```
 
+Progress:
+
+```text
+- 2026-06-25: Completed. All RecipeDraft / RecipeSession / RecipeCreateSession
+  references in NODEKIT_CLI_RECIPE_AUTHORING_UX_V0.9.2.md replaced with
+  RecipeAuthoringSession (Sections 4.5, 5, 10.4, 10.6, 24.1, 24.2). Confirmed
+  via src/Authoring/Recipes/RecipeFieldCatalog.cs that Command is
+  RecipeFieldType.StringList (Optional); updated Sections 20.1, 23.3, 29.4,
+  the implementation checklist (Section 32), and the conclusion (Section 33)
+  from hedged language to a confirmed statement, and added Command to the
+  v0.9.2-guaranteed repeatable list-field set alongside Packages, Channels,
+  SourceBuildCommands, BuildDependencies. No production code touched.
+```
+
 ### Sprint R9. Phase 1-A — Prompt Command Escape Hatches
 
 Goal:
