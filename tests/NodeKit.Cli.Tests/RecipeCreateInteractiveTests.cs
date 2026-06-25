@@ -449,5 +449,134 @@ namespace NodeKit.Cli.Tests
             var json = File.ReadAllText(outPath);
             Assert.Contains("\"ToolName\": \"bwa-mem\"", json);
         }
+
+        [Fact]
+        public void ReviewCommand_AtFieldPrompt_ShowsSetAndUnsetFieldsThenRetriesSameField()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "n", "n", "y", "n", "n", "n", // Q&A -> recommend container
+                "", // accept recommended method
+                "bwa-mem", // ToolName
+                "/review", // at ToolVersion prompt: review instead of answering
+                "0.7.17", // ToolVersion, asked again after review
+                "run.sh", // Script
+                "condaforge/miniforge3:24.3.0-0", // ImageRef
+                DigestOnly, // ImageDigest
+                "", // Command optional list — skip
+                "reads", "1", "", // Inputs
+                "bam", "1", "", // Outputs
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.Empty(stderr.ToString());
+
+            var stdoutText = stdout.ToString();
+            Assert.Contains("ToolName: bwa-mem", stdoutText);
+            Assert.Contains("ToolVersion: 아직 입력 안 함", stdoutText);
+
+            var json = File.ReadAllText(outPath);
+            Assert.Contains("\"Version\": \"0.7.17\"", json);
+        }
+
+        [Fact]
+        public void CancelCommand_DeclinedAtFieldPrompt_ContinuesAndSavesValidRecipe()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "n", "n", "y", "n", "n", "n", // Q&A -> recommend container
+                "", // accept recommended method
+                "bwa-mem", // ToolName
+                "/cancel", // at ToolVersion prompt
+                "2", // decline cancellation, continue
+                "0.7.17", // ToolVersion, asked again after declining
+                "run.sh",
+                "condaforge/miniforge3:24.3.0-0",
+                DigestOnly,
+                "",
+                "reads", "1", "",
+                "bam", "1", "",
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.Contains("[2] 계속 작성", stdout.ToString());
+            Assert.Empty(stderr.ToString());
+            Assert.True(File.Exists(outPath));
+        }
+
+        [Fact]
+        public void CancelCommand_ConfirmedAtFieldPrompt_ExitsWithCode130WithoutSaving()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "n", "n", "y", "n", "n", "n", // Q&A -> recommend container
+                "", // accept recommended method
+                "bwa-mem", // ToolName
+                "/cancel", // at ToolVersion prompt
+                "1", // confirm cancellation
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
+
+            Assert.Equal(130, exitCode);
+            Assert.False(File.Exists(outPath));
+            Assert.Contains("recipe 생성을 취소했습니다.", stdout.ToString());
+            Assert.Contains("파일은 저장되지 않았습니다.", stdout.ToString());
+        }
+
+        [Fact]
+        public void QuitCommand_ConfirmedAtFieldPrompt_ExitsWithCode130WithoutSaving()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "n", "n", "y", "n", "n", "n", // Q&A -> recommend container
+                "", // accept recommended method
+                "bwa-mem", // ToolName
+                "/quit", // at ToolVersion prompt
+                "1", // confirm cancellation
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
+
+            Assert.Equal(130, exitCode);
+            Assert.False(File.Exists(outPath));
+        }
+
+        [Fact]
+        public void ExitCommand_ConfirmedAtFieldPrompt_ExitsWithCode130WithoutSaving()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "n", "n", "y", "n", "n", "n", // Q&A -> recommend container
+                "", // accept recommended method
+                "bwa-mem", // ToolName
+                "/exit", // at ToolVersion prompt
+                "1", // confirm cancellation
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
+
+            Assert.Equal(130, exitCode);
+            Assert.False(File.Exists(outPath));
+        }
     }
 }

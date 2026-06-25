@@ -946,6 +946,30 @@ Done when:
 - Existing recipe create interactive tests still pass unchanged.
 ```
 
+Progress:
+
+```text
+- 2026-06-25: Completed. Added /review, /cancel, /quit, /exit checks to the
+  same four prompt-loop insertion points where /help and /change-method
+  already lived in RecipeCreateInteractiveRunner.cs (PromptScalarField,
+  PromptChoiceField, PromptStringListField, PromptPresetListField) — not to
+  the recommender Q&A or method-selection prompts, consistent with this
+  sprint's "without touching method-recommendation... logic" goal.
+  Cancellation is represented by a new RecipeCreateCancelledException
+  (src/NodeKit.Cli/RecipeCreateCancelledException.cs), chosen over
+  RecipeCreateResultKind.Cancelled because every prompt-loop method here is
+  void — an exception propagates cancellation to Run's single catch site
+  without threading a new result type through every call site. Run() catches
+  it, prints the Section 17.3 cancellation message, and returns 130 (no
+  stack trace, no recipe.json write). /review renders RecipeAuthoringSession.
+  Snapshot() against RecipeFieldCatalog.FieldsFor(method), marking any field
+  absent from Snapshot().Values as "아직 입력 안 함" per Section 17.4. Added 5
+  tests to RecipeCreateInteractiveTests.cs (/review display, /cancel
+  declined-continues, /cancel + /quit + /exit confirmed-exits-130). Full
+  suite: 319/319 passing (36 NodeKit.Cli.Tests + 283 NodeKit.Tests), 0 build
+  warnings.
+```
+
 ### Sprint R10. Phase 1-B — Ctrl+C Signal Cancellation
 
 Goal:

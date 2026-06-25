@@ -2849,12 +2849,12 @@ v0.9.2에서는 다음을 구현하지 않는다.
 
 ### Phase 1-A
 
-* [ ] `/cancel` 구현
-* [ ] `/quit` 구현
-* [ ] `/exit` 구현
-* [ ] `/review` 구현
-* [ ] 취소 시 파일 미생성 보장
-* [ ] 취소 시 exit code 130 반환
+* [x] `/cancel` 구현 (Sprint R9)
+* [x] `/quit` 구현 (Sprint R9: `/cancel`과 동일 처리)
+* [x] `/exit` 구현 (Sprint R9: `/cancel`과 동일 처리)
+* [x] `/review` 구현 (Sprint R9)
+* [x] 취소 시 파일 미생성 보장 (Sprint R9)
+* [x] 취소 시 exit code 130 반환 (Sprint R9)
 
 ### Phase 1-B
 
