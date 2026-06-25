@@ -2,7 +2,7 @@
 
 Status: Active Planning  
 Created: 2026-06-17  
-Updated: 2026-06-24  
+Updated: 2026-06-25  
 Scope: NodeKit work before NodeVault Phase 1 / PLATFORM_SCHEDULE.md Phase 6
 
 ## 0. Resume Note For Agents
@@ -849,4 +849,332 @@ R6: ChangeMethod / invalidated field / RecoveryPlan / 리스트 편집
 R7: CLI 와이어링(recipe create) + non-interactive 모드 + golden transcript 테스트
 
 순서는 거의 선형이다: R0,R1 -> R2 -> (R3,R4 순서 교환 가능) -> R5 -> R6 -> R7.
+```
+
+## 11. Recipe Authoring UX v0.9.2 Implementation Sprints (2026-06-25)
+
+Design source:
+[`docs/NODEKIT_CLI_RECIPE_AUTHORING_UX_V0.9.2.md`](NODEKIT_CLI_RECIPE_AUTHORING_UX_V0.9.2.md)
+("Freeze Candidate"). This document supersedes the v0.8 beginner design doc
+cited in Section 10 for `recipe create`'s first-entry UX. Section 10's R0-R7
+sprints are complete and shipped (`recipe create` today drives
+`RecipeAuthoringSession` / `RecipeFieldCatalog` / `RecipeMethodRecommender`
+end to end; documented in `docs/NODEKIT_CLI_USAGE.md`). This track extends
+that base — it does not redo it.
+
+This track stays inside the same boundary as Sections 9/10: no NodeVault
+submission, no image build, no MCP server implementation. It changes only
+the `recipe create` entry UX, escape-hatch commands, Ctrl+C handling, and
+non-interactive documentation accuracy.
+
+### Sprint R8. Naming And Terminology Alignment
+
+Goal:
+
+```text
+Make the v0.9.2 design doc's terminology match the shipped code before any
+new component is built on top of it.
+```
+
+Tasks:
+
+```text
+1. In NODEKIT_CLI_RECIPE_AUTHORING_UX_V0.9.2.md, replace RecipeDraft /
+   RecipeSession / RecipeCreateSession references with the actual class name
+   RecipeAuthoringSession (Sections 4.5, 24.1, 24.2).
+2. Update Section 23.3 / 29.4 from hedged "Command may or may not be a list
+   field" language to a confirmed statement: Command is
+   RecipeFieldType.StringList in RecipeFieldCatalog today, so
+   IsListType(Command) == true.
+3. No production code changes in this sprint; documentation only.
+```
+
+Done when:
+
+```text
+- grep for "RecipeDraft|RecipeCreateSession" in the v0.9.2 doc returns no
+  hits.
+- Section 23.3 states the Command list-type fact directly, not as an open
+  question.
+```
+
+### Sprint R9. Phase 1-A — Prompt Command Escape Hatches
+
+Goal:
+
+```text
+Let users exit or inspect an in-progress recipe create session at any major
+prompt, without touching method-recommendation or field-catalog logic.
+```
+
+Tasks:
+
+```text
+1. Implement PromptCommandHandler recognizing /help, /review, /cancel,
+   /quit, /exit at every major input prompt (existing /change-method stays
+   as-is; do not change its behavior in this sprint).
+2. Implement /review: render current RecipeAuthoringSession field state,
+   explicitly marking unset fields as not-yet-entered.
+3. Implement /cancel (and /quit, /exit as aliases): confirm, then exit
+   without writing a file.
+4. Add RecipeCreateResultKind.Cancelled (or RecipeCancelledException — pick
+   one per Section 18.4 of the design doc) and map it to process exit
+   code 130.
+```
+
+Done when:
+
+```text
+- Cancelling at any prompt produces no recipe.json on disk.
+- Exit code is 130 on cancellation, distinct from the existing 0/1/2 codes.
+- /review output matches the design doc's "아직 입력 안 함" convention for
+  unset fields.
+- Existing recipe create interactive tests still pass unchanged.
+```
+
+### Sprint R10. Phase 1-B — Ctrl+C Signal Cancellation
+
+Goal:
+
+```text
+Map process-level Ctrl+C onto the same cancellation result as /cancel,
+through a testable abstraction (no real signal in unit tests).
+```
+
+Tasks:
+
+```text
+1. Introduce an IConsoleCancellation (or equivalent) seam so
+   Console.CancelKeyPress is not called directly from logic under test.
+2. Wire Console.CancelKeyPress -> cancellation flag/CancellationToken ->
+   the same Cancelled result path Sprint R9 introduced.
+3. Suppress stack traces on Ctrl+C; print the same cancellation message as
+   /cancel.
+4. Add tests that inject a fake cancellation source and assert: no file
+   written, exit code 130, no stack trace, message matches /cancel's.
+```
+
+Done when:
+
+```text
+- Ctrl+C and /cancel produce identical observable outcomes (file absence,
+  exit code, message) under test.
+- No new compiler warnings (CLAUDE.md Section 8).
+```
+
+### Sprint R11. Phase 2 — Authoring Mode Selector + Fast Questionnaire Enrichment
+
+Goal:
+
+```text
+Add the up-front mode choice and enrich the existing 6-question recommender
+flow with the explanation/example/impact text the design doc specifies,
+without changing recommendation logic.
+```
+
+Tasks:
+
+```text
+1. Implement AuthoringModeSelector: the three-choice entry screen (쉬운 안내
+   모드 / 빠른 설정 모드 / 스크립트-CI 모드 사용법 보기) from Section 7.
+   The third choice prints usage and exits without starting recipe create.
+2. Wrap each of the existing 6 questions (RecipeMethodQuestionCatalog) with
+   the per-question explanation/example/impact text from Sections
+   15.3-15.8. Do not change RecipeMethodRecommender's decision logic.
+3. Implement MethodRecommendationPresenter: the post-recommendation summary
+   screen (Section 16) showing recommended method, reason, upcoming fields,
+   and warnings, with a reject-and-pick-manually path.
+```
+
+Done when:
+
+```text
+- Existing RecipeMethodRecommender tests pass unchanged (logic untouched).
+- New presenter/selector tests cover: mode selection, the CI-mode early
+  exit, and the recommendation-reject-then-manual-select path.
+```
+
+### Sprint R12. Phase 3a — InstallCommandParser Spike
+
+Goal:
+
+```text
+Resolve the highest-uncertainty contract in the whole design — the
+install-command parser's Parsed/PartiallyParsed/Failed boundary — against
+real-world install command strings before BeginnerGuideFlow is built on top
+of it.
+```
+
+Tasks:
+
+```text
+1. Build a fixture table of real install commands (conda, micromamba, pip,
+   curl|bash, git clone && make, and at least 10 more representative
+   bioinformatics-tool install patterns) with their expected
+   Parsed/PartiallyParsed/Failed classification per Section 9.2.
+2. Implement InstallCommandParser against that fixture table only — no CLI
+   wiring yet.
+3. Treat any fixture that the parser cannot classify as expected as a design
+   gap to resolve before Sprint R13, not a bug to patch silently.
+```
+
+Done when:
+
+```text
+- InstallCommandParser passes its fixture table.
+- Any fixture-table gaps found are written back into the v0.9.2 design doc
+  Section 9.2/9.3 as resolved open questions, or explicitly deferred with a
+  noted reason.
+```
+
+### Sprint R13. Phase 3b — Beginner Guide Flow + Image Reference Normalizer
+
+Goal:
+
+```text
+Implement the clue-based entry flow for users who start with no method
+decided, reusing InstallCommandParser from R12 and generalizing the
+ImageRef/ImageDigest composition that already exists narrowly in
+RecipeAuthoringSession.Build() for the Container method.
+```
+
+Tasks:
+
+```text
+1. Implement BeginnerGuideFlow: the first-question clue picker (Section 8.2)
+   and per-clue sub-flows (install command, container image, source/GitHub,
+   Dockerfile, internal mirror, tool-name-only) per Sections 9-14.
+2. Implement ImageReferenceNormalizer as a generalization of the existing
+   BaseImage+ImageDigest composition in RecipeAuthoringSession.Build():
+   accept ImageRef with or without an embedded digest plus an optional
+   separate ImageDigest, detect conflicts (Section 10.5), and run
+   immediately before RecipeDocument construction (Section 10.4) — not
+   inside prompt-layer string handling.
+3. Implement the "아무것도 모름" (no clues at all) safe-exit path (Section 14)
+   that explains the minimum required clue set instead of forcing the
+   wizard forward.
+```
+
+Done when:
+
+```text
+- ImageRef-with-digest, ImageRef-without-digest+separate-ImageDigest, and
+  conflicting-digest cases each produce the documented canonical URI or the
+  documented conflict-resolution prompt.
+- A test proves RecipeValidator/RecipeRenderer/L1 validators only ever see
+  an already-normalized digest-pinned URI, never a raw split ImageRef.
+- The "아무것도 모름" path exits without writing a file and without forcing
+  a method choice.
+```
+
+### Sprint R14. Phase 4 — Non-Interactive Contract Alignment
+
+Goal:
+
+```text
+Bring docs/NODEKIT_CLI_USAGE.md and the v0.9.2 doc's non-interactive
+examples in line with RecipeCreateCommand's actual parsing behavior — this
+is a documentation/test-confirmation sprint, not new parsing logic.
+```
+
+Tasks:
+
+```text
+1. Add a regression test asserting --field splits only on the first '=' and
+   preserves embedded '=' in the value (e.g. Packages=bwa=0.7.17=h5bf99c6_8).
+2. Add a regression test asserting repeated --field Name=Value for a
+   StringList field (Packages, Channels, SourceBuildCommands,
+   BuildDependencies, and Command since R8 confirmed it is StringList)
+   accumulates rather than overwrites.
+3. Update non-interactive examples in both the v0.9.2 doc and
+   docs/NODEKIT_CLI_USAGE.md to use --field ToolVersion=... (internal field
+   name), not --field Version=....
+```
+
+Done when:
+
+```text
+- New regression tests pass against the existing RecipeCreateCommand parser
+  with no production code changes (Section 23 of the design doc frames this
+  as confirming existing behavior, not building new behavior).
+- No non-interactive example in either doc uses the Version alias.
+```
+
+### Sprint R15. Documentation Update
+
+Goal:
+
+```text
+Restructure docs/NODEKIT_CLI_USAGE.md's recipe create section to match the
+shipped v0.9.2 UX, per Section 28 of the design doc.
+```
+
+Tasks:
+
+```text
+1. Restructure the recipe create section into the 2-1..2-9 subsection layout
+   from Section 28 (mode selection, easy guide mode, fast setup mode,
+   common fields, per-method fields, Inputs/Outputs, recovery,
+   non-interactive, escape hatches/review/change-method).
+2. Document /back as explicitly out of scope for v0.9.2 with the reason
+   from Section 17.2, not silently absent.
+3. Document the digest-required-by-default container flow and the
+   Dockerfile-method default-N warning from Sections 10.2/12.2.
+```
+
+Done when:
+
+```text
+- docs/NODEKIT_CLI_USAGE.md's recipe create section reflects the v0.9.2
+  flows a reader would actually see, not the pre-v0.9.2 wizard.
+- No stale field-name examples (Section 19.2's Version/ToolVersion
+  distinction is reflected).
+```
+
+### 11.1 Sequencing Note
+
+```text
+R8 is mechanical documentation cleanup and can run first, independent of
+everything else.
+R9 and R10 are independent of method-recommendation/beginner-flow logic and
+can ship before R11-R13; R10 depends on R9's Cancelled result type existing.
+R11 only touches existing recommender presentation, not its logic; it can
+run in parallel with R9/R10 if capacity allows, but has no hard dependency
+on them.
+R12 must precede R13 — R13 reuses InstallCommandParser and would otherwise
+bake an unvalidated parser contract into BeginnerGuideFlow.
+R13 is the highest-risk sprint in this track, matching the design doc's own
+Phase 3 risk ordering (Section 25).
+R14 only needs RecipeCreateCommand as it exists today; it has no dependency
+on R9-R13 and could run anytime, but is sequenced last among code sprints
+so its doc updates land alongside R15 in one documentation pass.
+R15 depends on R9-R14 being functionally complete, since it documents their
+combined behavior.
+```
+
+### 11.2 한국어 요약
+
+```text
+이 트랙은 v0.9.2 설계 문서(Freeze Candidate)를 구현하는 sprint 시퀀스다.
+10번 섹션의 R0-R7(recipe create 기본 구현)은 이미 완료되어 있고, 이 트랙은
+그 위에 진입 UX/이스케이프 핫치/Ctrl+C/non-interactive 문서 정합성을 추가한다.
+NodeVault 제출, 이미지 빌드, MCP server 구현은 여전히 범위 밖이다.
+
+R8:  문서 용어 정리 (RecipeDraft 등 -> RecipeAuthoringSession, Command는
+     StringList로 확정 — 기계적, 코드 변경 없음, 가장 먼저 처리)
+R9:  Phase 1-A — /help, /review, /cancel, /quit, /exit + 종료 코드 130
+R10: Phase 1-B — Ctrl+C를 같은 취소 결과로 매핑 (R9의 Cancelled 결과 타입 의존)
+R11: Phase 2 — AuthoringModeSelector + 기존 6문항 설명 보강 + 추천 결과 화면
+     (추천 로직 자체는 변경 없음, R9/R10과 병행 가능)
+R12: Phase 3a — InstallCommandParser 스파이크 (실제 설치 명령 fixture 테이블로
+     Parsed/PartiallyParsed/Failed 계약을 먼저 검증, CLI 연결 없음)
+R13: Phase 3b — BeginnerGuideFlow + ImageReferenceNormalizer
+     (R12 의존, 이 트랙에서 위험도 가장 높음)
+R14: Phase 4 — non-interactive 파싱 계약 회귀 테스트 + 문서 예시 정정
+     (--field 첫 '=' 기준, 리스트 필드 반복 누적, ToolVersion 표기)
+R15: 사용 가이드(NODEKIT_CLI_USAGE.md) recipe create 섹션 재구성
+     (R9-R14 완료 후, 마지막)
+
+순서: R8 단독 선행 가능 -> (R9 -> R10) 및 R11은 서로 독립적으로 병행 가능 ->
+R12 -> R13 -> R14 -> R15.
 ```
