@@ -609,6 +609,36 @@ public sealed record InstallCommandParseResult(
 5. parser 결과는 반드시 사용자에게 보여주고 확인을 받는다.
 6. parser가 추출한 값도 최종 validator를 통과해야 한다.
 
+### 9.4 구현 결정사항 (Sprint R12)
+
+R12 spike 구현 과정에서 설계 문서에 명시되지 않았던 경계 케이스에 대해 다음 결정을 내렸다.
+
+#### 지원 엔진
+
+지원 엔진: `conda`, `micromamba`. `mamba`는 지원하지 않는다 → `Failed`.
+사용자는 `conda install` 또는 `micromamba install`로 다시 입력한다.
+
+#### 채널 없는 conda install
+
+`conda install bwa` (채널 미지정) → `PartiallyParsed`, `Missing=[Channels]`.
+conda의 묵시적 `defaults` 채널을 자동 삽입하지 않는다.
+CLAUDE.md §3 재현성 원칙: 채널을 명시하지 않으면 빌드 환경이 달라질 수 있으므로 Missing 처리한다.
+
+#### conda create
+
+`conda create` subcommand → `PartiallyParsed` + 의미론 경고.
+환경 생성 명령은 recipe 생성에 직접 대응하지 않으므로 `conda install`을 권장하는 경고를 추가한다.
+
+#### 래핑된 명령
+
+`/bin/bash -c "conda install ..."` 등 래핑 형식 → `Failed`.
+첫 토큰이 지원 엔진 목록에 없으므로 자동으로 Failed 처리된다.
+
+#### 접근 수준
+
+설계 문서 예시 코드는 `public`으로 표기되어 있으나, NodeKit.csproj에 `EnforceCodeStyleInBuild=true`가 설정되어 있어 CA1515 경고가 발생한다.
+실제 구현에서는 `internal`로 선언하며, `InternalsVisibleTo("NodeKit.Tests")`를 통해 테스트에서 접근한다.
+
 ---
 
 ## 10. 컨테이너 이미지 기반 쉬운 안내 흐름

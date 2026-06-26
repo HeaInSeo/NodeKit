@@ -1138,6 +1138,30 @@ Done when:
   noted reason.
 ```
 
+**Progress (Sprint R12 완료):**
+
+```text
+구현 완료. 빌드 경고 0건, 359/359 테스트 통과.
+
+신규 파일:
+  src/Authoring/Recipes/InstallCommandParseStatus.cs  (internal enum)
+  src/Authoring/Recipes/InstallCommandParseResult.cs  (internal sealed record)
+  src/Authoring/Recipes/InstallCommandParser.cs       (internal static class)
+  tests/NodeKit.Tests/Recipes/InstallCommandParserTests.cs
+    → 26케이스: Parsed 8, ParsedWithWarning 3, PartiallyParsed 3,
+      CondaCreate 2, Failed 14 + OriginalCommand 보존 2건 + 기타 2건
+
+설계 갭 해결 및 문서화 (Section 9.4 추가):
+  - mamba → Failed (지원 엔진 외)
+  - conda install 채널 미지정 → PartiallyParsed (Missing=[Channels]);
+    묵시적 defaults 채널 불삽입 (재현성 원칙)
+  - conda create → PartiallyParsed + 의미론 경고
+  - 래핑 명령 → Failed (첫 토큰 기준)
+  - public → internal 선언 (CA1515; InternalsVisibleTo로 테스트 접근)
+
+커밋: (다음 커밋에 포함)
+```
+
 ### Sprint R13. Phase 3b — Beginner Guide Flow + Image Reference Normalizer
 
 Goal:
