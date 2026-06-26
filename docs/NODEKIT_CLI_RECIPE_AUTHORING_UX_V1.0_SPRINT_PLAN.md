@@ -4,7 +4,7 @@
 작성일: 2026-06-26
 기준 문서: `docs/NODEKIT_CLI_RECIPE_AUTHORING_UX_V1.0.md`
 범위: `nodekit recipe create` authoring UX, interactive recovery 문구, digest resolver seam
-비범위: NodeVault submit/build, 실제 Harbor/OCI 네트워크 resolver, draft 저장/resume, `/back`, DagEdit UI 통합
+비범위: NodeVault submit/build, 실제 Harbor/OCI 네트워크 resolver, draft 저장/resume, 필드 단위 완전 `/back`, DagEdit UI 통합
 
 ---
 

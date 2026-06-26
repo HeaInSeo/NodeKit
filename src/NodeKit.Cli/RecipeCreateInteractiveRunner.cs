@@ -23,6 +23,7 @@ namespace NodeKit.Cli
     {
         private const string HelpCommand = "/help";
         private const string ReviewCommand = "/review";
+        private const string BackCommand = "/back";
         private const string ChangeMethodCommand = "/change-method";
         private const string CancelCommand = "/cancel";
         private const string QuitCommand = "/quit";
@@ -49,74 +50,89 @@ namespace NodeKit.Cli
         {
             try
             {
-                var mode = AuthoringModeSelector.Prompt(stdin, stdout);
-                if (mode is null)
+                while (true)
                 {
-                    return 0;
-                }
-
-                var session = new RecipeAuthoringSession();
-                RecipeMethodId? method;
-
-                if (mode == AuthoringModeSelector.Mode.GuidedBeginner)
-                {
-                    method = BeginnerGuideFlow.Run(session, stdin, stdout, cancellation);
-                    if (method is null)
+                    var mode = AuthoringModeSelector.Prompt(stdin, stdout);
+                    if (mode is null)
                     {
-                        stdout.WriteLine("단서가 부족합니다. recipe를 저장하지 않고 종료합니다.");
                         return 0;
                     }
-                    // Dockerfile warning confirmation is handled inside BeginnerGuideFlow
-                }
-                else
-                {
-                    method = SelectMethod(session, stdin, stdout);
-                    if (method is null)
-                    {
-                        stderr.WriteLine("method 선택이 완료되지 않아 종료합니다.");
-                        return 1;
-                    }
 
-                    if (method == RecipeMethodId.Dockerfile)
+                    var session = new RecipeAuthoringSession();
+                    RecipeMethodId? method;
+
+                    try
                     {
-                        if (parsed.AcceptDockerfileWarning)
+                        RecipeCreateScreen.ClearForNewStep(stdout);
+                        if (mode == AuthoringModeSelector.Mode.GuidedBeginner)
                         {
-                            session.AcceptDockerfileWarning();
-                        }
-                        else if (!ConfirmDockerfileWarning(stdin, stdout))
-                        {
-                            stdout.WriteLine("Dockerfile 방법 진행이 취소되었습니다.");
-                            return 1;
+                            method = BeginnerGuideFlow.Run(session, stdin, stdout, cancellation);
+                            if (method is null)
+                            {
+                                stdout.WriteLine("단서가 부족합니다. recipe를 저장하지 않고 종료합니다.");
+                                return 0;
+                            }
+                            // Dockerfile warning confirmation is handled inside BeginnerGuideFlow
                         }
                         else
                         {
-                            session.AcceptDockerfileWarning();
+                            method = SelectMethod(session, stdin, stdout);
+                            if (method is null)
+                            {
+                                stderr.WriteLine("method 선택이 완료되지 않아 종료합니다.");
+                                return 1;
+                            }
+
+                            if (method == RecipeMethodId.Dockerfile)
+                            {
+                                if (parsed.AcceptDockerfileWarning)
+                                {
+                                    session.AcceptDockerfileWarning();
+                                }
+                                else if (!ConfirmDockerfileWarning(stdin, stdout))
+                                {
+                                    stdout.WriteLine("Dockerfile 방법 진행이 취소되었습니다.");
+                                    return 1;
+                                }
+                                else
+                                {
+                                    session.AcceptDockerfileWarning();
+                                }
+                            }
                         }
                     }
-                }
-
-                RunFieldLoop(session, stdin, stdout, cancellation);
-
-                var document = session.Build();
-                document.BuildKind = RecipeBuildKindResolver.Resolve(session.Snapshot().SelectedMethod!.Value, document);
-
-                var result = RecipeValidationPipeline.ValidateRecipe(document);
-                while (!result.IsValid)
-                {
-                    if (!RunRecoveryLoop(session, result.Violations, stdin, stdout, cancellation))
+                    catch (RecipeCreateBackRequestedException)
                     {
-                        stderr.WriteLine("최종 검증을 통과하지 못해 저장하지 않습니다.");
-                        CliApp.PrintViolations(result.Violations, stderr);
-                        return 1;
+                        stdout.WriteLine("이전 화면으로 돌아갑니다.");
+                        RecipeCreateScreen.ClearForNewStep(stdout);
+                        continue;
                     }
 
-                    document = session.Build();
-                    document.BuildKind = RecipeBuildKindResolver.Resolve(session.Snapshot().SelectedMethod!.Value, document);
-                    result = RecipeValidationPipeline.ValidateRecipe(document);
-                }
+                    RecipeCreateScreen.ClearForNewStep(stdout);
+                    RunFieldLoop(session, stdin, stdout, cancellation);
 
-                RecipeCreateCommand.SaveDocument(document, outPath, stdout);
-                return 0;
+                    var document = session.Build();
+                    document.BuildKind = RecipeBuildKindResolver.Resolve(session.Snapshot().SelectedMethod!.Value, document);
+
+                    var result = RecipeValidationPipeline.ValidateRecipe(document);
+                    while (!result.IsValid)
+                    {
+                        RecipeCreateScreen.ClearForNewStep(stdout);
+                        if (!RunRecoveryLoop(session, result.Violations, stdin, stdout, cancellation))
+                        {
+                            stderr.WriteLine("최종 검증을 통과하지 못해 저장하지 않습니다.");
+                            CliApp.PrintViolations(result.Violations, stderr);
+                            return 1;
+                        }
+
+                        document = session.Build();
+                        document.BuildKind = RecipeBuildKindResolver.Resolve(session.Snapshot().SelectedMethod!.Value, document);
+                        result = RecipeValidationPipeline.ValidateRecipe(document);
+                    }
+
+                    RecipeCreateCommand.SaveDocument(document, outPath, stdout);
+                    return 0;
+                }
             }
             catch (RecipeCreateCancelledException)
             {
@@ -128,11 +144,24 @@ namespace NodeKit.Cli
 
         private static RecipeMethodId? SelectMethod(RecipeAuthoringSession session, TextReader stdin, TextWriter stdout)
         {
-            var answers = AskRecommenderQuestions(stdin, stdout);
-            var recommendation = RecipeMethodRecommender.Recommend(answers);
-            var method = MethodRecommendationPresenter.Present(recommendation, stdin, stdout);
-            session.SelectMethod(method);
-            return method;
+            while (true)
+            {
+                var answers = AskRecommenderQuestions(stdin, stdout);
+                var recommendation = RecipeMethodRecommender.Recommend(answers);
+                RecipeMethodId method;
+                try
+                {
+                    method = MethodRecommendationPresenter.Present(recommendation, stdin, stdout);
+                }
+                catch (RecipeCreateBackRequestedException)
+                {
+                    RecipeCreateScreen.ClearForNewStep(stdout);
+                    continue;
+                }
+
+                session.SelectMethod(method);
+                return method;
+            }
         }
 
         private static RecipeMethodAnswers AskRecommenderQuestions(TextReader stdin, TextWriter stdout)
@@ -148,6 +177,7 @@ namespace NodeKit.Cli
             stdout.WriteLine("  Enter  잘 모르겠음");
             stdout.WriteLine();
             stdout.WriteLine("잘못 선택해도 괜찮습니다.");
+            stdout.WriteLine("이전 화면으로 돌아가려면 /back을 입력하세요.");
             stdout.WriteLine("입력 중 언제든지 /change-method로 작성 방식을 다시 선택할 수 있습니다.");
             stdout.WriteLine("저장하지 않고 종료하려면 /cancel을 입력하세요.");
             stdout.WriteLine();
@@ -214,7 +244,7 @@ namespace NodeKit.Cli
         private static Answer ReadAnswer(TextReader stdin)
         {
             var line = (stdin.ReadLine() ?? string.Empty).Trim().ToLowerInvariant();
-            RecipeCreateEscapeCommands.ThrowIfCancel(line);
+            RecipeCreateEscapeCommands.ThrowIfEscape(line);
             return line switch
             {
                 "y" => Answer.Yes,
@@ -228,7 +258,7 @@ namespace NodeKit.Cli
             stdout.WriteLine(DockerfileWarningText);
             stdout.WriteLine("계속하시겠습니까? [y/N]");
             var line = (stdin.ReadLine() ?? string.Empty).Trim().ToLowerInvariant();
-            RecipeCreateEscapeCommands.ThrowIfCancel(line);
+            RecipeCreateEscapeCommands.ThrowIfEscape(line);
             return line == "y";
         }
 
@@ -287,6 +317,11 @@ namespace NodeKit.Cli
                     continue;
                 }
 
+                if (TryHandleBack(line, stdout))
+                {
+                    continue;
+                }
+
                 if (TryHandleReview(session, line, stdout))
                 {
                     continue;
@@ -335,6 +370,11 @@ namespace NodeKit.Cli
                 }
 
                 if (TryHandleCancel(line, stdin, stdout))
+                {
+                    continue;
+                }
+
+                if (TryHandleBack(line, stdout))
                 {
                     continue;
                 }
@@ -394,6 +434,11 @@ namespace NodeKit.Cli
                 }
 
                 if (TryHandleCancel(line, stdin, stdout))
+                {
+                    continue;
+                }
+
+                if (TryHandleBack(line, stdout))
                 {
                     continue;
                 }
@@ -485,6 +530,11 @@ namespace NodeKit.Cli
                     continue;
                 }
 
+                if (TryHandleBack(name, stdout))
+                {
+                    continue;
+                }
+
                 if (TryHandleReview(session, name, stdout))
                 {
                     continue;
@@ -517,6 +567,15 @@ namespace NodeKit.Cli
 
                 stdout.WriteLine("프리셋 번호 또는 'custom':");
                 var selection = (stdin.ReadLine() ?? string.Empty).Trim();
+                if (TryHandleCancel(selection, stdin, stdout))
+                {
+                    continue;
+                }
+
+                if (TryHandleBack(selection, stdout))
+                {
+                    continue;
+                }
 
                 string spec;
                 if (selection == InputOutputPresetCatalog.CustomPresetId)
@@ -670,6 +729,18 @@ namespace NodeKit.Cli
             throw new RecipeCreateCancelledException();
         }
 
+        private static bool TryHandleBack(string line, TextWriter stdout)
+        {
+            if (line.Trim() != BackCommand)
+            {
+                return false;
+            }
+
+            stdout.WriteLine("/back은 현재 v1.0에서 초기 선택, 쉬운 안내, 빠른 설정 화면 사이에서 지원합니다.");
+            stdout.WriteLine("현재 입력 단계에서는 /review로 값을 확인하거나 /change-method로 작성 방식을 다시 선택하세요.");
+            return true;
+        }
+
         private static string DescribeRequirement(RecipeFieldRequirement requirement) => requirement switch
         {
             RecipeFieldRequirement.Required => "필수 항목입니다. 값이 없으면 최종 검증을 통과하지 못합니다.",
@@ -689,6 +760,12 @@ namespace NodeKit.Cli
             stdout.WriteLine("변경할 방법 번호를 입력하세요: [1] container [2] package [3] mirror [4] source [5] dockerfile");
             var selection = (stdin.ReadLine() ?? string.Empty).Trim();
             RecipeCreateEscapeCommands.ThrowIfCancel(selection);
+            if (RecipeCreateEscapeCommands.IsBack(selection))
+            {
+                stdout.WriteLine("method 변경을 취소하고 현재 입력 단계로 돌아갑니다.");
+                return true;
+            }
+
             if (!MethodRecommendationPresenter.TryParseMethodSelection(selection, out var nextMethod))
             {
                 stdout.WriteLine("알 수 없는 방법입니다. 변경을 취소합니다.");

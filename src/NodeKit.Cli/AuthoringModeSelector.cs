@@ -27,6 +27,7 @@ namespace NodeKit.Cli
                 stdout.WriteLine("언제든 사용할 수 있는 명령:");
                 stdout.WriteLine("  /help           지금 질문 도움말 보기");
                 stdout.WriteLine("  /review         지금까지 입력한 내용 보기");
+                stdout.WriteLine("  /back           이전 주요 화면으로 돌아가기");
                 stdout.WriteLine("  /change-method  작성 방식 다시 선택하기");
                 stdout.WriteLine("  /cancel         저장하지 않고 종료하기");
                 stdout.WriteLine("  /quit           /cancel과 동일");
@@ -59,6 +60,9 @@ namespace NodeKit.Cli
                     case "3":
                         PrintCiUsage(stdout);
                         return null;
+                    case "/back":
+                        stdout.WriteLine("이전 화면이 없습니다. 진행 방식을 선택하거나 /cancel로 종료하세요.");
+                        break;
                     default:
                         stdout.WriteLine("알 수 없는 선택입니다. 다시 선택하세요.");
                         break;

@@ -539,6 +539,52 @@ namespace NodeKit.Cli.Tests
         }
 
         [Fact]
+        public void BackCommand_AtGuidedCluePicker_ReturnsToModeSelector()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "1", // 쉬운 안내 모드
+                "/back", // return to mode selector
+                "3", // CI usage, then exit 0
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.False(File.Exists(outPath));
+            Assert.Empty(stderr.ToString());
+            var stdoutText = stdout.ToString();
+            Assert.Contains("이전 화면으로 돌아갑니다.", stdoutText);
+            Assert.Contains("스크립트/CI 모드", stdoutText);
+        }
+
+        [Fact]
+        public void BackCommand_AtQuickSetupQuestion_ReturnsToModeSelector()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "2", // 빠른 설정 모드
+                "/back", // return to mode selector
+                "3", // CI usage, then exit 0
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.False(File.Exists(outPath));
+            Assert.Empty(stderr.ToString());
+            var stdoutText = stdout.ToString();
+            Assert.Contains("이전 화면으로 돌아갑니다.", stdoutText);
+            Assert.Contains("스크립트/CI 모드", stdoutText);
+        }
+
+        [Fact]
         public void CancelCommand_DeclinedAtFieldPrompt_ContinuesAndSavesValidRecipe()
         {
             var outPath = Path.Combine(_workDir, "recipe.json");
@@ -567,6 +613,36 @@ namespace NodeKit.Cli.Tests
             Assert.Contains("[2] 계속 작성", stdout.ToString());
             Assert.Empty(stderr.ToString());
             Assert.True(File.Exists(outPath));
+        }
+
+        [Fact]
+        public void BackCommand_AtFieldPrompt_PrintsSupportedScopeAndContinues()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "2", // 빠른 설정 모드
+                "n", "n", "y", "n", "n", "n", // Q&A -> recommend container
+                "", // accept recommended method
+                "bwa-mem", // ToolName
+                "/back", // ToolVersion prompt: limited support message, ask again
+                "0.7.17",
+                "bwa mem",
+                "condaforge/miniforge3:24.3.0-0",
+                DigestOnly,
+                "",
+                "reads", "1", "",
+                "bam", "1", "",
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.Empty(stderr.ToString());
+            Assert.True(File.Exists(outPath));
+            Assert.Contains("/back은 현재 v1.0에서 초기 선택", stdout.ToString());
         }
 
         [Fact]

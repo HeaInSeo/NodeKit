@@ -73,6 +73,8 @@ namespace NodeKit.Cli
             stdout.WriteLine();
             stdout.WriteLine("[7] 잘 모르겠다");
             stdout.WriteLine();
+            stdout.WriteLine("이전 화면으로 돌아가려면 /back, 저장하지 않고 종료하려면 /cancel을 입력하세요.");
+            stdout.WriteLine();
             stdout.WriteLine("선택:");
 
             while (true)
@@ -945,14 +947,14 @@ namespace NodeKit.Cli
         private static string ReadTrimmedLine(TextReader stdin)
         {
             var line = (stdin.ReadLine() ?? string.Empty).Trim();
-            RecipeCreateEscapeCommands.ThrowIfCancel(line);
+            RecipeCreateEscapeCommands.ThrowIfEscape(line);
             return line;
         }
 
         private static string ReadRawLine(TextReader stdin)
         {
             var line = stdin.ReadLine() ?? string.Empty;
-            RecipeCreateEscapeCommands.ThrowIfCancel(line);
+            RecipeCreateEscapeCommands.ThrowIfEscape(line);
             return line;
         }
     }

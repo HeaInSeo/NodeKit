@@ -5,7 +5,7 @@
 기준 코드: `NodeKit-main (9).zip`
 대상: `nodekit recipe create` 대화형 UX, final-validation recovery 문구, digest authoring seam
 기반: 기존 repo v1.0 Draft, v0.9.2 구현, 코드 리뷰에서 확인된 실제 구현 상태
-비범위: NodeVault submit, 이미지 빌드, registry push, MCP server, `/back` 네비게이션, DagEdit UI 통합, draft 저장/resume, 실제 Harbor/OCI registry 네트워크 연동, `--verbose` 도입
+비범위: NodeVault submit, 이미지 빌드, registry push, MCP server, 필드 단위 완전 `/back` 네비게이션, DagEdit UI 통합, draft 저장/resume, 실제 Harbor/OCI registry 네트워크 연동, `--verbose` 도입
 
 ---
 
@@ -31,6 +31,7 @@
 | `submit` / `build` / `build-request submit` 명령 | 미구현 / 비범위 | 현재 CLI 계약 밖 |
 | draft 저장/resume | 미구현 / 비범위 | v1.0 범위 밖 |
 | 실제 Harbor/OCI digest resolver | 미구현 / v1.1 이후 | v1.0은 seam까지만 |
+| 초기 주요 화면 `/back` | 구현됨 | guided/quick 선택 이후 `/back` 입력 시 시작 화면으로 복귀 |
 | `--verbose` | 미구현 / v1.0 비범위 | 현재 CLI flag parsing 없음 |
 
 검증용 명령:
@@ -246,7 +247,7 @@ v1.1 이후:
 | 실제 OCI registry resolver | 네트워크/인증/오프라인 정책 필요 |
 | bioconda API 검색/파싱 | 외부 API 의존성 증가 |
 | Docker daemon 연결 | NodeKit 책임 경계 위반 가능 |
-| `/back` 네비게이션 | 기존 문서에서 구조적 비범위 결정 |
+| 필드 단위 완전 `/back` 네비게이션 | 필드 완료 상태와 list edit rollback을 포함한 별도 상태 모델 필요 |
 | DagEdit/Avalonia UI 통합 | 별도 UI 트랙 |
 | `--verbose` 도입 | v1.0 P1 범위 밖 |
 | NodeVault gRPC submit | NodeVault Phase와 별도 조율 필요 |

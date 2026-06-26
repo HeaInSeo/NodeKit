@@ -460,15 +460,16 @@ nodekit recipe create recipe.json \
 |---|---|
 | `/help` | 지금 필드의 라벨, 설명, 예시, 필수 여부를 다시 보여준다 |
 | `/review` | 지금까지 입력한 값 전체를 요약해서 보여준다 |
+| `/back` | 초기 선택, 쉬운 안내, 빠른 설정 화면 사이에서 이전 주요 화면으로 돌아간다 |
 | `/change-method` | 공통 필드 값을 최대한 보존하면서 method 선택 화면으로 돌아간다 |
 | `/cancel` | 저장하지 않고 종료한다 (종료 코드 130) |
 | `/quit` | `/cancel`과 동일 |
 | `/exit` | `/cancel`과 동일 |
 
-**`/back`은 v1.0 범위 밖이다.** 필드 루프가 단방향이고, method 변경 후
-일부 필드가 무효화되며, Inputs/Outputs 편집 중 "이전 단계"의 의미가 모호하기
-때문이다. 이전 값을 고치려면 `/review`로 현재 값을 확인하거나,
-`/change-method` 또는 최종 recovery 화면(2-7절)에서 수정한다.
+`/back`은 v1.0에서 주요 초기 화면 이동까지만 지원한다. 필드 루프는 아직
+단방향이므로 직전 필드 값을 되감지는 않는다. 필드 입력 중 이전 값을 고치려면
+`/review`로 현재 값을 확인하거나, `/change-method` 또는 최종 recovery 화면(2-7절)에서
+수정한다.
 
 ## 3. `nodekit validate <recipe.json>`
 
@@ -624,8 +625,9 @@ ls: cannot access 'build-request.json': No such file or directory
 - 5개 method가 생성하는 Dockerfile은 NodeKit L1 정적 검증만 통과했을 뿐,
   실제 `docker build`로 검증된 적은 없다.
 - `recipe create`의 escape hatch는 `/help`, `/review`, `/change-method`,
-  `/cancel`, `/quit`, `/exit`이다. `/cancel`/`/quit`/`/exit`는 시작 화면,
+  `/back`, `/cancel`, `/quit`, `/exit`이다. `/cancel`/`/quit`/`/exit`는 시작 화면,
   쉬운 안내 모드, 빠른 설정 질문, 필드 입력, recovery 화면에서 사용할 수 있다.
-  `/back`과 draft 저장/resume은 v1.0 범위 밖이다.
+  `/back`은 초기 주요 화면 이동까지만 지원한다. 필드 단위 완전 rollback과
+  draft 저장/resume은 v1.0 범위 밖이다.
 - digest resolver seam은 있지만 기본 구현은 네트워크 조회를 하지 않는
   `NullImageDigestResolver`다. 실제 OCI/Harbor resolver는 v1.1 이후 범위다.

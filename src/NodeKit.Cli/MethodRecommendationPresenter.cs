@@ -97,8 +97,9 @@ namespace NodeKit.Cli
                 {
                     PrintRecommendedSummary(recommended, recommendation, stdout);
                     stdout.WriteLine("이 방식으로 진행할까요? [Y/n]");
+                    stdout.WriteLine("이전 질문 화면으로 돌아가려면 /back을 입력하세요.");
                     var response = (stdin.ReadLine() ?? string.Empty).Trim().ToLowerInvariant();
-                    RecipeCreateEscapeCommands.ThrowIfCancel(response);
+                    RecipeCreateEscapeCommands.ThrowIfEscape(response);
                     if (response != "n")
                     {
                         return recommended;
@@ -218,7 +219,7 @@ namespace NodeKit.Cli
 
             stdout.WriteLine("선택:");
             var line = (stdin.ReadLine() ?? string.Empty).Trim();
-            RecipeCreateEscapeCommands.ThrowIfCancel(line);
+            RecipeCreateEscapeCommands.ThrowIfEscape(line);
             if (TryParseMethodSelection(line, out var method))
             {
                 return method;
