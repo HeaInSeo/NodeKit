@@ -1328,6 +1328,36 @@ Done when:
   distinction is reflected).
 ```
 
+**Progress (Sprint R15 완료):**
+
+```text
+완료:
+- NODEKIT_CLI_USAGE.md 섹션 2 전면 재구성 (2-1~2-5 → 2-1~2-9)
+  2-1: 진행 방식 선택 (AuthoringModeSelector 화면 예시 포함)
+  2-2: 쉬운 안내 모드
+       · 7단서 picker 표 및 화면 예시
+       · container digest 필수 플로우 (MissingDigest → [1-4])
+       · Dockerfile default-N 경고 (y/N 화면)
+       · 아무것도모름 안전종료 설명
+  2-3: 빠른 설정 모드 (기존 6문항 Q&A 보존)
+  2-4: 공통 필드 입력
+  2-5: method별 필드 입력 (container ImageRef+digest 설명 개선)
+  2-6: Inputs/Outputs 입력 (구 2-3 내용)
+  2-7: recovery (구 2-4 내용)
+  2-8: non-interactive
+       · --field 첫 번째 = 구분자 규칙 명시
+       · 목록 필드 반복 누적 명시
+       · 예시 --input/--output 프리셋 id 형식으로 정정
+  2-9: 중간에 나가기 / review / method 변경
+       · /help, /review, /change-method, /cancel, /quit, /exit 표 형식
+       · /back 명시적 범위 밖 기록 (Section 17.2 이유: 단방향 루프,
+         method 변경 후 필드 무효화, Inputs/Outputs 이전 단계 의미 모호)
+
+Version/ToolVersion 확인: 두 문서 모두 --field Version= 잔재 없음 (R14 확인 재확인)
+
+변경: docs/NODEKIT_CLI_USAGE.md (+164 -68)
+```
+
 ### 11.1 Sequencing Note
 
 ```text
