@@ -60,14 +60,114 @@ Avalonia/Grpc.Net.Client/Google.Protobuf/Wasmtime/ReactiveUI 의존성을 전혀
 nodekit recipe create <recipe.json> [--method ...] [--non-interactive ...]
 ```
 
-옵션 없이 실행하면 **대화형 모드**로 들어간다. 모든 옵션을 미리 지정하면
-**non-interactive 모드**(스크립트/CI용)로 한 번에 만들 수도 있다. 아래 2-1은
-대화형, 2-5는 non-interactive를 다룬다.
+옵션 없이 실행하면 **대화형 모드**로 들어간다. `--non-interactive`와 함께
+`--method`/`--field` 등을 모두 지정하면 프롬프트 없이 한 번에 만든다(2-8절).
 
-### 2-1. 1단계 — 방법 추천 질문 (Q&A)
+### 2-1. 진행 방식 선택
 
-가장 먼저 6개의 예/아니오 질문에 답한다. `y`/`n`/모르면 그냥 Enter(`u`로
-처리됨).
+실행하면 가장 먼저 진행 방식을 고른다.
+
+```
+NodeKit recipe create
+
+이 명령은 실행 도구를 컨테이너 recipe로 만드는 마법사입니다.
+처음이라도 괜찮습니다. 모르는 항목은 "잘 모르겠다"를 선택할 수 있습니다.
+
+언제든 사용할 수 있는 명령:
+  /help           지금 질문 도움말 보기
+  /review         지금까지 입력한 내용 보기
+  /change-method  작성 방식 다시 선택하기
+  /cancel         저장하지 않고 종료하기
+  /quit           /cancel과 동일
+  /exit           /cancel과 동일
+
+진행 방식을 선택하세요.
+
+[1] 쉬운 안내 모드
+    도구 이름만 알아도 시작할 수 있습니다.
+    설치 명령, 이미지 주소, GitHub 주소 등을 예시와 함께 하나씩 확인합니다.
+    처음 사용하는 사람에게 추천합니다.
+
+[2] 빠른 설정 모드
+    내부망, mirror, public channel, source checksum, Dockerfile 여부를 알고 있는 경우 사용합니다.
+    기존 Q&A 방식과 비슷하지만 각 선택의 영향과 예시를 함께 보여줍니다.
+
+[3] 스크립트/CI 모드 사용법 보기
+    프롬프트 없이 한 줄 명령으로 recipe를 만들 때 사용합니다.
+
+선택:
+```
+
+`[3]`은 recipe를 만들지 않는다. `--non-interactive` 사용법을 출력하고 종료한다.
+
+### 2-2. 쉬운 안내 모드
+
+처음 사용하거나, 어떤 method를 써야 할지 모를 때 선택한다. 무엇을 알고
+있는지 고르면 그에 맞는 입력 흐름으로 바로 안내한다.
+
+```
+쉬운 안내 모드
+
+정확히 몰라도 괜찮습니다.
+알고 있는 것만 선택하세요.
+
+무엇을 알고 있나요?
+
+[1] 도구 이름만 알고 있다
+[2] 설치 명령을 알고 있다     예: conda install -c bioconda bwa=0.7.17
+[3] 컨테이너 이미지 주소를 알고 있다   예: quay.io/biocontainers/bwa:0.7.17...
+[4] GitHub 또는 소스코드 주소를 알고 있다
+[5] Dockerfile을 가지고 있다
+[6] 회사/학교 내부 저장소를 써야 한다
+[7] 잘 모르겠다
+
+선택:
+```
+
+| 선택 | 연결되는 method |
+|---|---|
+| `[1]` 도구 이름만 | 추가 질문으로 method 결정 |
+| `[2]` 설치 명령 | `package` (conda/micromamba) |
+| `[3]` 컨테이너 이미지 | `container` |
+| `[4]` GitHub/소스 주소 | `source` |
+| `[5]` Dockerfile | `dockerfile` |
+| `[6]` 내부 저장소 | `mirror` |
+| `[7]` 잘 모르겠다 | 최소 필요 단서 안내 후 종료 (파일 저장 없음, 종료 코드 0) |
+
+**컨테이너 이미지 — digest 필수 처리:** `[3]`을 선택하면 이미지 주소를
+입력받는다. digest가 없으면 다음 중 하나를 선택해야 한다.
+
+```
+입력한 이미지 주소에는 digest가 없습니다.
+NodeKit은 재현성을 위해 digest 고정을 요구합니다.
+
+[1] digest가 포함된 이미지 주소를 다시 입력한다
+[2] ImageDigest를 따로 입력한다
+[3] 다른 작성 방식으로 바꾼다
+[4] 취소한다
+```
+
+digest가 이미지 주소에 포함된 경우(`repo:tag@sha256:...`)에는 이 프롬프트가
+나오지 않고 바로 다음 단계로 진행된다.
+
+**Dockerfile — 기본값 N 경고:** `[5]`를 선택하면 재현성 경고가 나온다.
+Enter 또는 `n`을 입력하면 진행되지 않는다. `y`를 입력해야 계속된다.
+
+```
+Dockerfile 방식은 가장 자유롭지만 재현성 책임이 가장 큽니다.
+처음 사용하는 경우 package 또는 container 방식을 먼저 고려하세요.
+
+계속하시겠습니까? [y/N]:
+```
+
+**아무것도 모름 — 안전 종료:** `[7]`을 선택하면 recipe를 저장하지 않고
+종료 코드 0으로 끝난다. 최소로 필요한 단서(설치 명령, 이미지 주소 등)를
+안내한 뒤 강제로 method를 선택하게 하지 않는다.
+
+### 2-3. 빠른 설정 모드
+
+6개의 예/아니오 질문에 답하면 방법(method)을 추천해 준다. `y`/`n`/모르면
+그냥 Enter(`u`로 처리됨).
 
 | 질문 | 의미 |
 |---|---|
@@ -78,7 +178,8 @@ nodekit recipe create <recipe.json> [--method ...] [--non-interactive ...]
 | source URL과 checksum이 있나요? | 소스를 직접 받아 빌드할 수 있는지 |
 | 기존 Dockerfile이 있나요? | 이미 작성된 Dockerfile이 있는지 |
 
-답을 마치면 5가지 방법(method) 중 하나를 추천해 준다:
+답을 마치면 5가지 method 중 하나를 추천해 준다. 추천을 그대로 쓰려면
+**Enter**, 다른 method를 고르려면 화면에 보이는 번호를 입력한다.
 
 | Method | 의미 | 준비물 |
 |---|---|---|
@@ -88,33 +189,32 @@ nodekit recipe create <recipe.json> [--method ...] [--non-interactive ...]
 | `source` | 소스코드로 직접 빌드 | SourceUri + SourceChecksum(sha256) |
 | `dockerfile` | Dockerfile 직접 작성 | Dockerfile 경로 또는 내용 (최후의 수단) |
 
-추천을 그대로 쓰려면 **Enter**, 다른 방법을 쓰려면 화면에 보이는 번호를
-입력한다. `dockerfile`을 고르면 "재현성을 스스로 책임져야 한다"는 강한 경고가
-한 번 더 뜬다 — `y`로 동의해야 진행된다.
+`dockerfile`을 고르면 재현성 경고가 한 번 더 나온다 — `y`로 동의해야 진행된다.
 
-### 2-2. 2단계 — 필드 채우기
+### 2-4. 공통 필드 입력
 
-방법이 정해지면 그 방법에 필요한 필드를 하나씩 물어본다. 화면에 매번
-**라벨 — 설명**이 같이 나오므로 무슨 값을 넣어야 하는지 바로 알 수 있다.
-
-방법별 필드는 다음과 같다 (공통 필드는 모든 방법에 있음):
-
-**공통 필드**
+method가 정해지면 공통 필드를 먼저 물어본다. 화면마다 **라벨 — 설명**이
+같이 나온다.
 
 | 필드 | 필수 여부 | 설명 |
 |---|---|---|
 | `ToolName` | 필수 | recipe가 식별할 도구 이름 (예: `bwa-mem`) |
 | `ToolVersion` | 필수 | 도구 버전 (예: `0.7.17`) |
 | `Script` | 필수 | 실행 스크립트 경로/명령 (예: `run.sh`) |
-| `Inputs` | 필수, 최소 1개 | 입력 정의 목록 (2-3절) |
-| `Outputs` | 필수, 최소 1개 | 출력 정의 목록 (2-3절) |
+
+잘못된 값을 넣으면 이유와 함께 같은 필드를 다시 물어본다. 끝까지 가서야
+막히지 않는다.
+
+### 2-5. method별 필드 입력
+
+공통 필드 다음에 method 전용 필드를 채운다.
 
 **`container`**
 
 | 필드 | 필수 여부 | 설명 |
 |---|---|---|
-| `ImageRef` | 필수 | 이미지 참조 (tag만으로도 일단 진행 가능, 예: `condaforge/miniforge3:24.3.0-0`) |
-| `ImageDigest` | 필수 | digest 고정 (예: `sha256:...`) — 비어 있으면 최종 검증에서 막힘 |
+| `ImageRef` | 필수 | 이미지 주소. `repo:tag@sha256:...` 형식이면 digest 자동 추출. tag만 있으면 digest를 따로 요구한다 |
+| `ImageDigest` | 필수 | digest 고정 (예: `sha256:<64-hex>`). `ImageRef`에 이미 포함된 경우 생략됨 |
 | `Command` | 선택 | 이미지 기본 entrypoint를 바꾸고 싶을 때만 |
 
 **`package`**
@@ -149,23 +249,11 @@ nodekit recipe create <recipe.json> [--method ...] [--non-interactive ...]
 
 | 필드 | 필수 여부 | 설명 |
 |---|---|---|
-| `ImageRef` | 필수 | 기반 이미지 — Dockerfile의 첫 `FROM`과 정확히 같아야 함 |
+| `ImageRef` | 필수 | 기반 이미지 — Dockerfile의 첫 `FROM`과 정확히 같아야 함, digest 포함 필요 |
 | `DockerfilePath` 또는 `DockerfileContent` | 필수 (둘 중 하나) | Dockerfile 경로 또는 내용 |
 | `BuildContext` | 비워두면 자동 | 비어 있으면 현재 디렉터리(`.`) |
 
-각 필드를 입력할 때 잘못된 값을 넣으면(예: 버전 핀 없는 패키지) 바로
-이유와 함께 다시 물어본다 — 끝까지 가서야 막히지 않는다.
-
-#### 막혔을 때 쓰는 명령 (escape hatch)
-
-필드를 입력하는 중에는 값 대신 아래 두 명령을 쓸 수 있다:
-
-- `/help` — 지금 필드의 라벨, 설명, 예시, 필수/선택 여부를 다시 보여주고
-  같은 필드를 다시 물어본다.
-- `/change-method` — 지금까지 입력한 값을 버리지 않고 1단계(Q&A)로 돌아가
-  다른 방법을 고른다.
-
-### 2-3. Inputs/Outputs 입력하기
+### 2-6. Inputs/Outputs 입력
 
 `Inputs`/`Outputs`는 프리셋을 고르거나 직접 입력(`custom`)할 수 있다.
 
@@ -188,12 +276,12 @@ reads
 이름을 빈 줄로 두면 목록 입력이 끝난다(필수 목록은 최소 1개가 있어야
 끝낼 수 있다).
 
-### 2-4. 마지막에 검증 실패하면 — 수정(recovery) 화면
+### 2-7. recovery — 마지막 검증 실패 시 수정
 
-모든 필드를 채운 뒤 내부적으로 최종 검증을 한 번 더 돈다. 필드 하나씩
-받을 때는 못 잡아내는 교차 필드 규칙(예: Dockerfile의 첫 `FROM`과 `ImageRef`가
-일치해야 함, Output의 `Class`가 허용된 값인지) 때문에 여기서 막힐 수 있다.
-이 경우 입력했던 값을 모두 버리지 않고 **고칠 항목만 선택**해서 수정한다.
+모든 필드를 채운 뒤 최종 검증을 한 번 더 돈다. 필드 하나씩 받을 때는
+못 잡아내는 교차 필드 규칙(예: Dockerfile 첫 `FROM`과 `ImageRef` 불일치,
+Output의 `Class` 허용값 위반) 때문에 여기서 막힐 수 있다. 입력값을
+버리지 않고 **고칠 항목만 선택**해서 수정한다.
 
 ```
 최종 검증에 실패했습니다. 다음 중 수정할 항목을 선택하세요:
@@ -204,35 +292,24 @@ reads
 ```
 
 `Inputs`/`Outputs`를 고치는 경우에는 기존 항목을 보여주고 `e<번호>`(수정),
-`d<번호>`(삭제), 빈 줄(계속/추가)로 다룬다:
+`d<번호>`(삭제), 빈 줄(계속/추가)로 다룬다. 다시 검증에 실패하면 같은
+화면이 반복된다. 빈 줄을 입력하면 저장하지 않고 종료한다(종료 코드 1).
 
-```
-현재 Outputs 항목:
-  [0] bam (alignment/bam, class=bogus)
-e0
-이름 (비우면 유지): bam
-  [1] BAM alignment output
-  ...
-프리셋 번호 또는 'custom':
-1
-```
+### 2-8. non-interactive 모드 (스크립트/CI용)
 
-여기서도 다시 검증에 실패하면 같은 화면이 또 나온다 — 빈 줄을 입력하면
-저장하지 않고 종료한다(종료 코드 1).
-
-### 2-5. non-interactive 모드 (스크립트/CI용)
-
-같은 일을 한 줄로 끝내고 싶을 때 쓴다. 질문/프롬프트가 전혀 나오지 않고,
-빠진 값이 있으면 즉시 에러로 끝난다.
+프롬프트가 전혀 나오지 않고 빠진 값이 있으면 즉시 에러로 끝난다.
 
 ```bash
 nodekit recipe create recipe.json \
   --non-interactive --method package \
-  --field ToolName=bwa-mem --field ToolVersion=0.7.17 --field Script=run.sh \
-  --field ImageRef=condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef \
-  --field Packages=bwa=0.7.17=h5bf99c6_8 --field Channels=bioconda \
-  --input reads=1 \
-  --output aligned=1
+  --field ToolName=bwa-mem \
+  --field ToolVersion=0.7.17 \
+  --field Script=run.sh \
+  --field "ImageRef=condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" \
+  --field Packages=bwa=0.7.17=h5bf99c6_8 \
+  --field Channels=bioconda \
+  --input reads=fastq-paired \
+  --output bam=bam-primary
 ```
 
 옵션 정리:
@@ -241,16 +318,35 @@ nodekit recipe create recipe.json \
 |---|---|
 | `--non-interactive` | 필수. 프롬프트 없이 한 번에 처리 |
 | `--method <container\|package\|mirror\|source\|dockerfile>` | 필수. 사용자용 method 이름 (내부 build-kind 이름인 `conda`/`micromamba`/`source-build`/`dockerfile-fallback`은 받지 않는다) |
-| `--field Name=Value` | scalar/choice/list 필드 하나씩 지정. 목록 필드(`Packages`, `Channels`, `Command`, `SourceBuildCommands`, `BuildDependencies`)는 같은 `--field`를 여러 번 줘서 항목을 누적할 수 있다 |
+| `--field Name=Value` | scalar/choice/list 필드 하나씩 지정. **첫 번째 `=`만 구분자** — `Packages=bwa=0.7.17=h5bf99c6_8`처럼 value 안에 `=`가 있어도 그대로 보존된다 |
+| `--field Name=Value` (반복) | 목록 필드(`Packages`, `Channels`, `Command`, `SourceBuildCommands`, `BuildDependencies`)는 같은 이름의 `--field`를 반복해 항목을 누적한다 |
 | `--input Name=Spec` | Inputs 항목 하나. `Spec`은 프리셋 id(`fastq-paired` 등) 또는 `custom,role,format,shape[,optional]` |
 | `--output Name=Spec` | Outputs 항목 하나. `Spec`은 프리셋 id(`bam-primary` 등) 또는 `custom,role,format,class` |
 | `--engine <conda\|micromamba>` | `--method package`에만 사용 가능 |
 | `--accept-dockerfile-warning` | `--method dockerfile`을 non-interactive로 쓸 때 필수 (대화형의 경고 동의를 대신함) |
 
-값을 비워도 되는 `Optional` 필드는 `--field`로 안 주면 자동으로 비워진
-채 진행된다. `Recommended` 필드(`BuildDependencies`)를 비우면 표준에러에
-경고만 찍고 계속 진행한다. 필수 필드가 빠졌거나 최종 검증에 실패하면
-파일을 쓰지 않고 종료 코드 1을 반환한다.
+`Optional` 필드는 `--field`로 안 주면 비워진 채 진행된다. `Recommended`
+필드(`BuildDependencies`)를 비우면 표준에러에 경고만 찍고 계속 진행한다.
+필수 필드가 빠지거나 최종 검증에 실패하면 파일을 쓰지 않고 종료 코드 1을
+반환한다.
+
+### 2-9. 중간에 나가기 / review / method 변경
+
+필드를 입력하는 중 값 대신 아래 명령을 쓸 수 있다.
+
+| 명령 | 동작 |
+|---|---|
+| `/help` | 지금 필드의 라벨, 설명, 예시, 필수 여부를 다시 보여준다 |
+| `/review` | 지금까지 입력한 값 전체를 요약해서 보여준다 |
+| `/change-method` | 공통 필드 값을 최대한 보존하면서 method 선택 화면으로 돌아간다 |
+| `/cancel` | 저장하지 않고 종료한다 (종료 코드 130) |
+| `/quit` | `/cancel`과 동일 |
+| `/exit` | `/cancel`과 동일 |
+
+**`/back`은 v0.9.2 범위 밖이다.** 필드 루프가 단방향이고, method 변경 후
+일부 필드가 무효화되며, Inputs/Outputs 편집 중 "이전 단계"의 의미가 모호하기
+때문이다. 이전 값을 고치려면 `/review`로 현재 값을 확인하거나,
+`/change-method` 또는 최종 recovery 화면(2-7절)에서 수정한다.
 
 ## 3. `nodekit validate <recipe.json>`
 
