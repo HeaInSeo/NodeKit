@@ -78,6 +78,8 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(0, exitCode);
             Assert.False(File.Exists(outPath));
             Assert.Contains("단서가 부족합니다", stdout);
+            Assert.Contains("현재 NodeKit CLI는 외부 검색이나 NodeVault 조회를 하지 않습니다.", stdout);
+            Assert.DoesNotContain("v0.9.2", stdout);
         }
 
         [Fact]

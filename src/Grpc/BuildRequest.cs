@@ -26,7 +26,7 @@ namespace NodeKit.Grpc
         /// <summary>Dockerfile 내용.</summary>
         public string DockerfileContent { get; set; } = string.Empty;
 
-        /// <summary>실행 스크립트.</summary>
+        /// <summary>Legacy 실행 명령 또는 이미지 내부 스크립트 경로.</summary>
         public string Script { get; set; } = string.Empty;
 
         /// <summary>

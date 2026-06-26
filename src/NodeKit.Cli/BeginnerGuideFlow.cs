@@ -814,7 +814,7 @@ namespace NodeKit.Cli
             stdout.WriteLine();
             stdout.WriteLine("아직 recipe를 완성하기 위한 단서가 부족합니다.");
             stdout.WriteLine();
-            stdout.WriteLine("NodeKit v0.9.2 CLI는 외부 검색이나 NodeVault 조회를 하지 않습니다.");
+            stdout.WriteLine("현재 NodeKit CLI는 외부 검색이나 NodeVault 조회를 하지 않습니다.");
             stdout.WriteLine("따라서 recipe 생성을 완료하려면 최소한 다음 중 하나가 필요합니다.");
             stdout.WriteLine();
             stdout.WriteLine("  - conda/micromamba 설치 명령");

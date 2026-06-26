@@ -84,7 +84,7 @@ namespace NodeKit.Cli
             stdout.WriteLine("옵션:");
             stdout.WriteLine("  --field ToolName=<이름>     필드 값 지정 (여러 번 사용 가능)");
             stdout.WriteLine("  --field ToolVersion=<버전>");
-            stdout.WriteLine("  --field Script=<경로>");
+            stdout.WriteLine("  --field Script=<명령 또는 스크립트 경로>");
             stdout.WriteLine("  --field ImageRef=<이미지>");
             stdout.WriteLine("  --input <이름>=<preset>     입력 정의 (preset: fastq-paired, bam, ...)");
             stdout.WriteLine("  --output <이름>=<preset>    출력 정의");
@@ -96,7 +96,7 @@ namespace NodeKit.Cli
             stdout.WriteLine("    --non-interactive --method package \\");
             stdout.WriteLine("    --field ToolName=bwa-mem \\");
             stdout.WriteLine("    --field ToolVersion=0.7.17 \\");
-            stdout.WriteLine("    --field Script=run.sh \\");
+            stdout.WriteLine("    --field \"Script=bwa mem\" \\");
             stdout.WriteLine("    --field \"ImageRef=condaforge/miniforge3:24.3.0-0@sha256:<digest>\" \\");
             stdout.WriteLine("    --field Packages=bwa=0.7.17=h5bf99c6_8 \\");
             stdout.WriteLine("    --field Channels=bioconda \\");

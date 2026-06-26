@@ -309,7 +309,12 @@ method가 정해지면 공통 필드를 먼저 물어본다. 화면마다 **라�
 |---|---|---|
 | `ToolName` | 필수 | recipe가 식별할 도구 이름 (예: `bwa-mem`) |
 | `ToolVersion` | 필수 | 도구 버전 (예: `0.7.17`) |
-| `Script` | 필수 | 실행 스크립트 경로/명령 (예: `run.sh`) |
+| `Script` | 필수 | 기본 실행 명령 또는 이미지 안의 스크립트 경로 (예: `bwa mem`, `/app/run.sh`) |
+
+`Script`라는 내부 필드명은 legacy `BuildRequest` 호환 때문에 유지된다. 장기
+NodeVault toolspec/toolprofile 모델에서는 실행 정보가 `runtime.command`와
+dry-run profile의 `runnerScriptDigest`/observed I/O 기록으로 더 명확히 분리된다.
+따라서 CLI 화면에서는 이 값을 "기본 실행 명령"으로 이해하면 된다.
 
 잘못된 값을 넣으면 이유와 함께 같은 필드를 다시 물어본다. 끝까지 가서야
 막히지 않는다.
@@ -421,7 +426,7 @@ nodekit recipe create recipe.json \
   --non-interactive --method package \
   --field ToolName=bwa-mem \
   --field ToolVersion=0.7.17 \
-  --field Script=run.sh \
+  --field "Script=bwa mem" \
   --field "ImageRef=condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" \
   --field Packages=bwa=0.7.17=h5bf99c6_8 \
   --field Channels=bioconda \
@@ -460,7 +465,7 @@ nodekit recipe create recipe.json \
 | `/quit` | `/cancel`과 동일 |
 | `/exit` | `/cancel`과 동일 |
 
-**`/back`은 v0.9.2 범위 밖이다.** 필드 루프가 단방향이고, method 변경 후
+**`/back`은 v1.0 범위 밖이다.** 필드 루프가 단방향이고, method 변경 후
 일부 필드가 무효화되며, Inputs/Outputs 편집 중 "이전 단계"의 의미가 모호하기
 때문이다. 이전 값을 고치려면 `/review`로 현재 값을 확인하거나,
 `/change-method` 또는 최종 recovery 화면(2-7절)에서 수정한다.

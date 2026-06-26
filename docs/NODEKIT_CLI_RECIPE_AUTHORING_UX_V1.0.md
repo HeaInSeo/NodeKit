@@ -920,6 +920,11 @@ ContainerImageFlow_WhenUserRejectsResolvedDigest_AsksManualDigest()
 | `BuildKind` | 사용자에게 직접 노출하지 않음 | 유지 |
 | `L1-IMG-004` 등 rule ID | interactive에서는 기본 숨김, validate/render에서는 유지 | 유지 |
 
+참고: 내부 필드명 `Script`는 legacy `BuildRequest` 호환을 위해 유지하지만, 사용자
+화면에서는 "기본 실행 명령"으로 표현한다. NodeVault의 장기 toolspec/toolprofile
+방향에서는 실행 정보가 `runtime.command`, `runnerScriptDigest`, observed I/O
+profile로 분리된다.
+
 ---
 
 ## 12. BuildKind 계약 현황

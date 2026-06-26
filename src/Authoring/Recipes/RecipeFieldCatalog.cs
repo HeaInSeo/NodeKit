@@ -47,11 +47,11 @@ namespace NodeKit.Authoring.Recipes
                 Type: RecipeFieldType.Scalar,
                 Requirement: RecipeFieldRequirement.Required,
                 DefaultValue: null,
-                Label: Text("실행 스크립트", "Run script"),
+                Label: Text("기본 실행 명령", "Default run command"),
                 Help: Text(
-                    "도구 실행 시 사용할 스크립트 경로 또는 명령입니다. BuildRequest의 필수 필드입니다.",
-                    "The script path or command to run the tool. Required by BuildRequest."),
-                Examples: new[] { "run.sh" },
+                    "도구 실행 시 사용할 기본 명령 또는 이미지 안의 스크립트 경로입니다. 현재 legacy BuildRequest 호환을 위해 필요합니다.",
+                    "The default command or in-image script path used to run the tool. Required for legacy BuildRequest compatibility."),
+                Examples: new[] { "bwa mem", "/app/run.sh" },
                 Choices: Array.Empty<RecipeChoice>(),
                 Apply: (recipe, value) => recipe.Script = (string)value),
         };

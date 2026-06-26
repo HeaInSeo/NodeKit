@@ -56,7 +56,7 @@ namespace NodeKit.Validation
             {
                 violations.Add(new ValidationViolation(
                     "L1-REQ-003",
-                    "실행 스크립트는 필수입니다.",
+                    "기본 실행 명령은 필수입니다.",
                     nameof(definition.Script)));
             }
 
