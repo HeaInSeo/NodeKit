@@ -836,6 +836,15 @@ ImageDigest:
 
 충돌 상태를 그대로 저장하지 않는다.
 
+> **구현 제약 (R13 확인):** BeginnerGuideFlow 의 컨테이너 서브플로는 이 충돌 경로에 구조적으로 도달하지 않는다.
+> 첫 번째 `Normalize(imageRef, null)` 호출 — imageDigest가 null이므로 separateDigest가 항상 null →
+> DigestConflict 조건(임베디드 ≠ null AND 별도 ≠ null AND 다름) 불충족.
+> MissingDigest 이후 사용자가 입력한 별도 digest로 다시 Normalize를 호출하는 경우에도
+> pendingRef에 임베디드 digest가 없으므로 DigestConflict 불가.
+> 현재 이 UI는 비대화형 모드(`--field ImageRef=...@sha256:aaa --field ImageDigest=sha256:bbb`)
+> 또는 직접 필드 편집 경로에서만 도달 가능하다.
+> 관련 이슈: [#3](https://github.com/HeaInSeo/NodeKit/issues/3)
+
 ---
 
 ### 10.6 container 방식 필드 저장 원칙
