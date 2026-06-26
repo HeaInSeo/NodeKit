@@ -1277,6 +1277,26 @@ Done when:
 - No non-interactive example in either doc uses the Version alias.
 ```
 
+**Progress (Sprint R14 완료):**
+
+```text
+완료:
+- RecipeCreateCommandTests.cs 에 regression 테스트 2건 추가 (production code 변경 없음)
+  • Field_EmbeddedEquals_PreservedAsValue_NotSplitAgain
+    TrySplitOnce(IndexOf('=')) 가 Packages=bwa=0.7.17=h5bf99c6_8 에서
+    이름=Packages, 값=bwa=0.7.17=h5bf99c6_8 으로 분리하는 동작 검증
+  • Field_StringList_RepeatedField_AccumulatesAllValues
+    --field Packages=pkg1 --field Packages=pkg2 (및 Channels) 반복 시
+    덮어쓰지 않고 누적하는 동작 검증
+
+문서 점검:
+  - NODEKIT_CLI_USAGE.md: --field Version= 잔재 없음 (ToolVersion만 사용)
+  - UX v0.9.2 doc: --field Version= 예시 없음
+    (1767번 줄 "공식 문법이 아니다" 설명은 그대로 유지)
+
+최종 테스트 결과: NodeKit.Cli.Tests 59/59 (2 추가), 0 failed. 빌드 경고 0.
+```
+
 ### Sprint R15. Documentation Update
 
 Goal:
