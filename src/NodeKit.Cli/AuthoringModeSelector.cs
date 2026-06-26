@@ -49,6 +49,7 @@ namespace NodeKit.Cli
                 stdout.WriteLine("선택:");
 
                 var line = (stdin.ReadLine() ?? string.Empty).Trim();
+                RecipeCreateEscapeCommands.ThrowIfCancel(line);
                 switch (line)
                 {
                     case "1":

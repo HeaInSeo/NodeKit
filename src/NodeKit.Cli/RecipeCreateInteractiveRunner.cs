@@ -47,16 +47,15 @@ namespace NodeKit.Cli
             TextWriter stderr,
             IRecipeCreateCancellationSource cancellation)
         {
-            var mode = AuthoringModeSelector.Prompt(stdin, stdout);
-            if (mode is null)
-            {
-                return 0;
-            }
-
-            var session = new RecipeAuthoringSession();
-
             try
             {
+                var mode = AuthoringModeSelector.Prompt(stdin, stdout);
+                if (mode is null)
+                {
+                    return 0;
+                }
+
+                var session = new RecipeAuthoringSession();
                 RecipeMethodId? method;
 
                 if (mode == AuthoringModeSelector.Mode.GuidedBeginner)
@@ -215,6 +214,7 @@ namespace NodeKit.Cli
         private static Answer ReadAnswer(TextReader stdin)
         {
             var line = (stdin.ReadLine() ?? string.Empty).Trim().ToLowerInvariant();
+            RecipeCreateEscapeCommands.ThrowIfCancel(line);
             return line switch
             {
                 "y" => Answer.Yes,
@@ -228,6 +228,7 @@ namespace NodeKit.Cli
             stdout.WriteLine(DockerfileWarningText);
             stdout.WriteLine("계속하시겠습니까? [y/N]");
             var line = (stdin.ReadLine() ?? string.Empty).Trim().ToLowerInvariant();
+            RecipeCreateEscapeCommands.ThrowIfCancel(line);
             return line == "y";
         }
 
@@ -547,8 +548,11 @@ namespace NodeKit.Cli
             var format = PromptNormalizedFormat(stdin, stdout);
             stdout.WriteLine("shape (single/pair):");
             var shape = (stdin.ReadLine() ?? "single").Trim();
+            RecipeCreateEscapeCommands.ThrowIfCancel(shape);
             stdout.WriteLine("optional 입력입니까? [y/N]");
-            var optional = (stdin.ReadLine() ?? string.Empty).Trim().ToLowerInvariant() == "y";
+            var optionalInput = (stdin.ReadLine() ?? string.Empty).Trim().ToLowerInvariant();
+            RecipeCreateEscapeCommands.ThrowIfCancel(optionalInput);
+            var optional = optionalInput == "y";
             _ = portName;
             return optional ? $"{role},{format},{shape},optional" : $"{role},{format},{shape}";
         }
@@ -559,6 +563,7 @@ namespace NodeKit.Cli
             var format = PromptNormalizedFormat(stdin, stdout);
             stdout.WriteLine("class (primary/secondary):");
             var outputClass = (stdin.ReadLine() ?? "primary").Trim();
+            RecipeCreateEscapeCommands.ThrowIfCancel(outputClass);
             _ = portName;
             return $"{role},{format},{outputClass}";
         }
@@ -567,6 +572,7 @@ namespace NodeKit.Cli
         {
             stdout.WriteLine("role:");
             var input = stdin.ReadLine() ?? string.Empty;
+            RecipeCreateEscapeCommands.ThrowIfCancel(input);
             var normalized = RoleNormalizer.Normalize(input);
             if (normalized.Message != null)
             {
@@ -580,6 +586,7 @@ namespace NodeKit.Cli
         {
             stdout.WriteLine("format:");
             var input = stdin.ReadLine() ?? string.Empty;
+            RecipeCreateEscapeCommands.ThrowIfCancel(input);
             var normalized = FormatNormalizer.Normalize(input);
 
             if (normalized.Action != RecipeValueNormalizationAction.SuggestedPendingConfirmation)
@@ -594,6 +601,7 @@ namespace NodeKit.Cli
 
             stdout.WriteLine(normalized.Message);
             var confirm = (stdin.ReadLine() ?? string.Empty).Trim().ToLowerInvariant();
+            RecipeCreateEscapeCommands.ThrowIfCancel(confirm);
             return confirm == "n" ? normalized.OriginalInput : normalized.Value;
         }
 
@@ -653,6 +661,7 @@ namespace NodeKit.Cli
             stdout.WriteLine("선택:");
 
             var selection = (stdin.ReadLine() ?? string.Empty).Trim();
+            RecipeCreateEscapeCommands.ThrowIfCancel(selection);
             if (selection != "1")
             {
                 return true;
@@ -679,6 +688,7 @@ namespace NodeKit.Cli
 
             stdout.WriteLine("변경할 방법 번호를 입력하세요: [1] container [2] package [3] mirror [4] source [5] dockerfile");
             var selection = (stdin.ReadLine() ?? string.Empty).Trim();
+            RecipeCreateEscapeCommands.ThrowIfCancel(selection);
             if (!MethodRecommendationPresenter.TryParseMethodSelection(selection, out var nextMethod))
             {
                 stdout.WriteLine("알 수 없는 방법입니다. 변경을 취소합니다.");
@@ -692,6 +702,7 @@ namespace NodeKit.Cli
             stdout.WriteLine("계속할까요? [y/N]");
 
             var confirm = (stdin.ReadLine() ?? string.Empty).Trim().ToLowerInvariant();
+            RecipeCreateEscapeCommands.ThrowIfCancel(confirm);
             session.ChangeMethod(nextMethod, confirm == "y" ? ChangeMethodDecision.Proceed : ChangeMethodDecision.Cancel);
             return true;
         }
@@ -710,6 +721,7 @@ namespace NodeKit.Cli
 
             stdout.WriteLine("번호를 입력하세요 (취소하려면 빈 줄):");
             var selection = (stdin.ReadLine() ?? string.Empty).Trim();
+            RecipeCreateEscapeCommands.ThrowIfCancel(selection);
             if (selection.Length == 0)
             {
                 return false;
@@ -777,6 +789,7 @@ namespace NodeKit.Cli
 
                 stdout.WriteLine("수정: e<번호>, 삭제: d<번호>, 계속하려면 빈 줄:");
                 var line = (stdin.ReadLine() ?? string.Empty).Trim();
+                RecipeCreateEscapeCommands.ThrowIfCancel(line);
 
                 if (line.Length == 0)
                 {
@@ -850,6 +863,7 @@ namespace NodeKit.Cli
             {
                 stdout.WriteLine($"이름 (빈 줄이면 '{existingName}' 유지):");
                 var nameInput = (stdin.ReadLine() ?? string.Empty).Trim();
+                RecipeCreateEscapeCommands.ThrowIfCancel(nameInput);
                 var name = nameInput.Length == 0 ? existingName : nameInput;
 
                 for (var i = 0; i < presets.Count; i++)
@@ -859,6 +873,7 @@ namespace NodeKit.Cli
 
                 stdout.WriteLine("프리셋 번호 또는 'custom':");
                 var selection = (stdin.ReadLine() ?? string.Empty).Trim();
+                RecipeCreateEscapeCommands.ThrowIfCancel(selection);
 
                 string spec;
                 if (selection == InputOutputPresetCatalog.CustomPresetId)

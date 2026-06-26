@@ -44,6 +44,25 @@ namespace NodeKit.Cli.Tests
         // ── Safe-exit paths (아무것도 모름) ─────────────────────────────────────
 
         [Fact]
+        public void CancelCommand_AtGuidedCluePicker_ExitsWithCode130WithoutFile()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "1",       // GuidedBeginner
+                "/cancel", // clue picker
+            };
+
+            var exitCode = RunCli(outPath, transcript, out var stdout, out var stderr);
+
+            Assert.Equal(130, exitCode);
+            Assert.False(File.Exists(outPath));
+            Assert.Empty(stderr);
+            Assert.Contains("recipe 생성을 취소했습니다.", stdout);
+            Assert.Contains("파일은 저장되지 않았습니다.", stdout);
+        }
+
+        [Fact]
         public void NoClue_ExitsWithCode0WithoutFile()
         {
             var outPath = Path.Combine(_workDir, "recipe.json");

@@ -38,6 +38,18 @@ dotnet run --project src/NodeKit.Cli -- render recipe.json --out build-request.j
 아래 절들은 이 세 명령(`recipe create`, `validate`, `render`)을 차례로
 자세히 설명한다.
 
+중간에 그만두려면 대부분의 프롬프트에서 다음 중 하나를 입력한다.
+
+```text
+/cancel
+/quit
+/exit
+```
+
+필드 입력 단계에서는 한 번 더 확인하고, 시작 화면/쉬운 안내 모드/빠른 설정
+질문처럼 아직 값이 저장되지 않은 단계에서는 바로 취소된다. 취소 시 파일은
+저장되지 않고 종료 코드 `130`을 반환한다.
+
 ## 1. 빌드/실행
 
 저장소 루트에서 실행한다.
@@ -156,6 +168,8 @@ NodeKit recipe create
 
 `[3]`은 recipe를 만들지 않는다. `--non-interactive` 사용법을 출력하고 종료한다.
 
+이 화면에서도 `/cancel`, `/quit`, `/exit`로 바로 종료할 수 있다.
+
 ### 2-2. 쉬운 안내 모드
 
 처음 사용하거나, 어떤 method를 써야 할지 모를 때 선택한다. 무엇을 알고
@@ -256,6 +270,8 @@ Dockerfile 방식은 가장 자유롭지만 재현성 책임이 가장 큽니다
 ```
 
 `[6]`을 선택하면 recipe를 저장하지 않고 종료 코드 0으로 끝난다.
+언제든 명령 입력 위치에서 `/cancel`, `/quit`, `/exit`를 입력하면 종료 코드
+130으로 취소된다.
 
 ### 2-3. 빠른 설정 모드
 
@@ -603,6 +619,8 @@ ls: cannot access 'build-request.json': No such file or directory
 - 5개 method가 생성하는 Dockerfile은 NodeKit L1 정적 검증만 통과했을 뿐,
   실제 `docker build`로 검증된 적은 없다.
 - `recipe create`의 escape hatch는 `/help`, `/review`, `/change-method`,
-  `/cancel`, `/quit`, `/exit`이다. `/back`과 draft 저장/resume은 v1.0 범위 밖이다.
+  `/cancel`, `/quit`, `/exit`이다. `/cancel`/`/quit`/`/exit`는 시작 화면,
+  쉬운 안내 모드, 빠른 설정 질문, 필드 입력, recovery 화면에서 사용할 수 있다.
+  `/back`과 draft 저장/resume은 v1.0 범위 밖이다.
 - digest resolver seam은 있지만 기본 구현은 네트워크 조회를 하지 않는
   `NullImageDigestResolver`다. 실제 OCI/Harbor resolver는 v1.1 이후 범위다.

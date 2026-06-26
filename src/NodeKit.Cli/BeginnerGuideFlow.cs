@@ -82,7 +82,7 @@ namespace NodeKit.Cli
                     throw new RecipeCreateCancelledException();
                 }
 
-                var line = (stdin.ReadLine() ?? string.Empty).Trim();
+                var line = ReadTrimmedLine(stdin);
                 switch (line)
                 {
                     case "1":
@@ -133,7 +133,7 @@ namespace NodeKit.Cli
                 stdout.WriteLine();
                 stdout.WriteLine("도구 이름:");
 
-                name = (stdin.ReadLine() ?? string.Empty).Trim();
+                name = ReadTrimmedLine(stdin);
                 if (name.Length > 0)
                 {
                     break;
@@ -163,7 +163,7 @@ namespace NodeKit.Cli
                     throw new RecipeCreateCancelledException();
                 }
 
-                var line = (stdin.ReadLine() ?? string.Empty).Trim();
+                var line = ReadTrimmedLine(stdin);
                 switch (line)
                 {
                     case "1":
@@ -210,7 +210,7 @@ namespace NodeKit.Cli
                 stdout.WriteLine();
                 stdout.WriteLine("설치 명령:");
 
-                var command = stdin.ReadLine() ?? string.Empty;
+                var command = ReadRawLine(stdin);
                 var parsed = InstallCommandParser.Parse(command);
 
                 switch (parsed.Status)
@@ -340,7 +340,7 @@ namespace NodeKit.Cli
                     throw new RecipeCreateCancelledException();
                 }
 
-                var line = (stdin.ReadLine() ?? string.Empty).Trim();
+                var line = ReadTrimmedLine(stdin);
                 switch (line)
                 {
                     case "1": return InstallParseChoice.UseValues;
@@ -396,7 +396,7 @@ namespace NodeKit.Cli
                     throw new RecipeCreateCancelledException();
                 }
 
-                var line = (stdin.ReadLine() ?? string.Empty).Trim();
+                var line = ReadTrimmedLine(stdin);
                 switch (line)
                 {
                     case "1": return InstallParseChoice.UseValues;
@@ -476,7 +476,7 @@ namespace NodeKit.Cli
                     stdout.WriteLine();
                     stdout.WriteLine("이미지 주소:");
 
-                    pendingRef = (stdin.ReadLine() ?? string.Empty).Trim();
+                    pendingRef = ReadTrimmedLine(stdin);
                 }
 
                 var result = ImageReferenceNormalizer.Normalize(pendingRef, null);
@@ -500,7 +500,7 @@ namespace NodeKit.Cli
                         stdout.WriteLine($"  {resolvedDigest}");
                         stdout.WriteLine();
                         stdout.WriteLine("이 digest를 사용할까요? [Y/n]");
-                        var confirm = (stdin.ReadLine() ?? string.Empty).Trim().ToLowerInvariant();
+                        var confirm = ReadTrimmedLine(stdin).ToLowerInvariant();
                         if (confirm.Length == 0 || confirm == "y")
                         {
                             var resolved = ImageReferenceNormalizer.Normalize(pendingRef, resolvedDigest);
@@ -553,7 +553,7 @@ namespace NodeKit.Cli
                         // result will be re-evaluated in next loop iteration with the digest set
                         stdout.WriteLine();
                         stdout.WriteLine("ImageDigest:");
-                        var separateDigest = (stdin.ReadLine() ?? string.Empty).Trim();
+                        var separateDigest = ReadTrimmedLine(stdin);
                         var combined = ImageReferenceNormalizer.Normalize(pendingRef, separateDigest);
                         if (combined.Status == ImageReferenceNormalizeStatus.Normalized)
                         {
@@ -587,7 +587,7 @@ namespace NodeKit.Cli
                     throw new RecipeCreateCancelledException();
                 }
 
-                var line = (stdin.ReadLine() ?? string.Empty).Trim();
+                var line = ReadTrimmedLine(stdin);
                 switch (line)
                 {
                     case "1": return ContainerChoice.Reenter;
@@ -631,7 +631,7 @@ namespace NodeKit.Cli
                 stdout.WriteLine();
                 stdout.WriteLine("소스코드 주소:");
 
-                var uri = (stdin.ReadLine() ?? string.Empty).Trim();
+                var uri = ReadTrimmedLine(stdin);
                 if (string.IsNullOrEmpty(uri))
                 {
                     stdout.WriteLine("주소를 입력해 주세요.");
@@ -642,7 +642,7 @@ namespace NodeKit.Cli
                 PrintSourceChecksumGuidance(stdout, uri);
                 stdout.WriteLine("SourceChecksum:");
 
-                var checksum = (stdin.ReadLine() ?? string.Empty).Trim();
+                var checksum = ReadTrimmedLine(stdin);
                 if (!string.IsNullOrEmpty(checksum))
                 {
                     session.SelectMethod(RecipeMethodId.Source);
@@ -669,7 +669,7 @@ namespace NodeKit.Cli
                         throw new RecipeCreateCancelledException();
                     }
 
-                    var line = (stdin.ReadLine() ?? string.Empty).Trim();
+                    var line = ReadTrimmedLine(stdin);
                     switch (line)
                     {
                         case "1":
@@ -677,7 +677,7 @@ namespace NodeKit.Cli
                             continue;
                         case "2":
                             stdout.WriteLine("SourceChecksum:");
-                            var newChecksum = (stdin.ReadLine() ?? string.Empty).Trim();
+                            var newChecksum = ReadTrimmedLine(stdin);
                             if (!string.IsNullOrEmpty(newChecksum))
                             {
                                 session.SelectMethod(RecipeMethodId.Source);
@@ -729,7 +729,7 @@ namespace NodeKit.Cli
                 stdout.WriteLine();
                 stdout.WriteLine("Dockerfile 경로:");
 
-                var path = (stdin.ReadLine() ?? string.Empty).Trim();
+                var path = ReadTrimmedLine(stdin);
                 if (string.IsNullOrEmpty(path))
                 {
                     stdout.WriteLine("경로를 입력해 주세요.");
@@ -749,7 +749,7 @@ namespace NodeKit.Cli
                 stdout.WriteLine();
                 stdout.WriteLine("계속 진행할까요? [y/N]");
 
-                var confirm = (stdin.ReadLine() ?? string.Empty).Trim().ToLowerInvariant();
+                var confirm = ReadTrimmedLine(stdin).ToLowerInvariant();
                 if (confirm != "y")
                 {
                     return PromptCluePicker(session, stdin, stdout, cancellation, digestResolver);
@@ -790,7 +790,7 @@ namespace NodeKit.Cli
                 stdout.WriteLine();
                 stdout.WriteLine("내부 저장소 주소:");
 
-                var uri = (stdin.ReadLine() ?? string.Empty).Trim();
+                var uri = ReadTrimmedLine(stdin);
                 if (string.IsNullOrEmpty(uri))
                 {
                     stdout.WriteLine("주소를 입력해 주세요.");
@@ -840,7 +840,7 @@ namespace NodeKit.Cli
                     throw new RecipeCreateCancelledException();
                 }
 
-                var line = (stdin.ReadLine() ?? string.Empty).Trim();
+                var line = ReadTrimmedLine(stdin);
                 switch (line)
                 {
                     case "1":
@@ -941,5 +941,19 @@ namespace NodeKit.Cli
             ImageDigestResolutionStatus.Resolved => "이미지 digest를 확인했습니다.",
             _ => throw new ArgumentOutOfRangeException(nameof(result), result.Status, "Unsupported digest resolution status."),
         };
+
+        private static string ReadTrimmedLine(TextReader stdin)
+        {
+            var line = (stdin.ReadLine() ?? string.Empty).Trim();
+            RecipeCreateEscapeCommands.ThrowIfCancel(line);
+            return line;
+        }
+
+        private static string ReadRawLine(TextReader stdin)
+        {
+            var line = stdin.ReadLine() ?? string.Empty;
+            RecipeCreateEscapeCommands.ThrowIfCancel(line);
+            return line;
+        }
     }
 }

@@ -499,6 +499,46 @@ namespace NodeKit.Cli.Tests
         }
 
         [Fact]
+        public void CancelCommand_AtModeSelector_ExitsWithCode130WithoutSaving()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "/cancel",
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
+
+            Assert.Equal(130, exitCode);
+            Assert.False(File.Exists(outPath));
+            Assert.Empty(stderr.ToString());
+            Assert.Contains("recipe 생성을 취소했습니다.", stdout.ToString());
+            Assert.Contains("파일은 저장되지 않았습니다.", stdout.ToString());
+        }
+
+        [Fact]
+        public void CancelCommand_AtQuickSetupQuestion_ExitsWithCode130WithoutSaving()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "2", // 빠른 설정 모드
+                "/cancel",
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
+
+            Assert.Equal(130, exitCode);
+            Assert.False(File.Exists(outPath));
+            Assert.Empty(stderr.ToString());
+            Assert.Contains("recipe 생성을 취소했습니다.", stdout.ToString());
+        }
+
+        [Fact]
         public void CancelCommand_DeclinedAtFieldPrompt_ContinuesAndSavesValidRecipe()
         {
             var outPath = Path.Combine(_workDir, "recipe.json");
