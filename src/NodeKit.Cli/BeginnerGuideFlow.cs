@@ -505,71 +505,10 @@ namespace NodeKit.Cli
                             return RecipeMethodId.Container;
                         }
 
-                        // If still MissingDigest or DigestConflict, fall through to next loop
+                        // If still MissingDigest, fall through to next loop
                         pendingRef = combined.RepositoryAndTag;
                         continue;
                     }
-                }
-
-                // DigestConflict
-                stdout.WriteLine();
-                stdout.WriteLine("ImageRef에 포함된 digest와 별도로 입력한 ImageDigest가 다릅니다.");
-                stdout.WriteLine();
-                stdout.WriteLine("ImageRef digest:");
-                stdout.WriteLine($"  {result.EmbeddedDigest}");
-                stdout.WriteLine();
-                stdout.WriteLine("ImageDigest:");
-                stdout.WriteLine($"  {result.SeparateDigest}");
-                stdout.WriteLine();
-                stdout.WriteLine("둘 중 하나만 사용할 수 있습니다.");
-                stdout.WriteLine();
-                stdout.WriteLine("[1] ImageRef의 digest를 사용한다");
-                stdout.WriteLine("[2] 별도 ImageDigest를 사용한다");
-                stdout.WriteLine("[3] 이미지 주소를 다시 입력한다");
-                stdout.WriteLine("[4] 취소한다");
-                stdout.WriteLine();
-                stdout.WriteLine("선택:");
-
-                while (true)
-                {
-                    if (cancellation.IsCancellationRequested)
-                    {
-                        throw new RecipeCreateCancelledException();
-                    }
-
-                    var conflictLine = (stdin.ReadLine() ?? string.Empty).Trim();
-                    string? resolvedDigest = null;
-                    bool reenter = false;
-
-                    switch (conflictLine)
-                    {
-                        case "1":
-                            resolvedDigest = result.EmbeddedDigest;
-                            break;
-                        case "2":
-                            resolvedDigest = result.SeparateDigest;
-                            break;
-                        case "3":
-                            reenter = true;
-                            break;
-                        case "4":
-                            throw new RecipeCreateCancelledException();
-                        default:
-                            stdout.WriteLine("1–4 중에서 선택해 주세요.");
-                            stdout.WriteLine("선택:");
-                            continue;
-                    }
-
-                    if (reenter)
-                    {
-                        pendingRef = null;
-                        break;
-                    }
-
-                    session.SelectMethod(RecipeMethodId.Container);
-                    session.SetField("ImageRef", result.RepositoryAndTag);
-                    session.SetField("ImageDigest", resolvedDigest!);
-                    return RecipeMethodId.Container;
                 }
             }
         }

@@ -311,7 +311,7 @@ namespace NodeKit.Tests.Recipes
 
             var document = session.Build();
 
-            Assert.Equal(default(RecipeBuildKind), document.BuildKind);
+            Assert.Null(document.BuildKind);
         }
 
         [Fact]

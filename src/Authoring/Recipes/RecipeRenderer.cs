@@ -31,7 +31,7 @@ namespace NodeKit.Authoring.Recipes
                 DisplayTags = new List<string>(recipe.DisplayTags),
             };
 
-            switch (recipe.BuildKind)
+            switch (recipe.BuildKind!.Value)
             {
                 case RecipeBuildKind.Conda:
                     RenderInstallerFamily(recipe, definition, "conda", recipe.Channels);
@@ -53,7 +53,7 @@ namespace NodeKit.Authoring.Recipes
                     definition.DockerfileContent = recipe.DockerfileContent;
                     break;
                 default:
-                    throw new ArgumentOutOfRangeException(nameof(recipe), recipe.BuildKind, "Unknown recipe build kind.");
+                    throw new ArgumentOutOfRangeException(nameof(recipe), recipe.BuildKind.Value, "Unknown recipe build kind.");
             }
 
             return definition;

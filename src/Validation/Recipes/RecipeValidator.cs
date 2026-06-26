@@ -24,7 +24,7 @@ namespace NodeKit.Validation.Recipes
 
             var violations = new List<ValidationViolation>();
 
-            switch (recipe.BuildKind)
+            switch (recipe.BuildKind!.Value)
             {
                 case RecipeBuildKind.Conda:
                 case RecipeBuildKind.Micromamba:

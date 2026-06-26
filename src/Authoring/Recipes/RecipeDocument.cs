@@ -13,7 +13,7 @@ namespace NodeKit.Authoring.Recipes
 
         public string SchemaVersion { get; set; } = "draft-1";
 
-        public RecipeBuildKind BuildKind { get; set; }
+        public RecipeBuildKind? BuildKind { get; set; }
 
         public string ToolName { get; set; } = string.Empty;
 

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using NodeKit.Authoring.Recipes;
 
@@ -14,6 +15,13 @@ namespace NodeKit.Validation.Recipes
     {
         public static ValidationResult ValidateRecipe(RecipeDocument recipe)
         {
+            if (recipe.BuildKind is null)
+            {
+                throw new InvalidOperationException(
+                    "Recipe BuildKind가 설정되지 않았습니다. " +
+                    "ValidateRecipe() 호출 전에 RecipeBuildKindResolver.Resolve()를 먼저 호출하세요.");
+            }
+
             var recipeResult = RecipeValidator.Validate(recipe);
             var definition = RecipeRenderer.Render(recipe);
 

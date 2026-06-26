@@ -793,57 +793,32 @@ CanonicalUri:
 
 ### 10.5 digest 충돌 처리
 
-`ImageRef`에 이미 digest가 있고, 별도 `ImageDigest`도 입력된 경우 다음 규칙을 따른다.
+`DigestConflict`는 `ImageReferenceNormalizer`가 반환하는 상태로, embedded digest와 별도 digest가 모두 제공되었을 때 둘이 다른 경우에 발생한다.
 
-#### 둘이 같은 경우
+**이 상태는 Beginner Guide wizard의 일반 대화형 흐름에서 발생하지 않는다.**
 
-허용한다.
+BeginnerGuideFlow의 컨테이너 서브플로는 embedded digest와 별도 digest를 동시에 충돌하게 입력하는 경로를 제공하지 않으며, 그 UX 분기는 제거되었다(R13 확인 → Issue #3 → 수정 완료).
 
-```text
-ImageRef:
-  repo/tool:1.0@sha256:aaa
+#### DigestConflict가 적용되는 경로
 
-ImageDigest:
-  sha256:aaa
+`DigestConflict`는 다음 경로에서만 의미가 있다:
 
-결과:
-  repo/tool:1.0@sha256:aaa
-```
+- non-interactive 모드에서 `--field ImageRef=repo:tag@sha256:aaa` 와 `--field ImageDigest=sha256:bbb` 를 동시에 지정한 경우
+- scripted usage 또는 direct `SetField` / API 호출로 embedded digest가 있는 ref와 별도 digest를 동시에 전달한 경우
 
-#### 둘이 다른 경우
+이 경우 `ImageReferenceNormalizer.Normalize()` 가 `DigestConflict` 를 반환하고, 호출자는 충돌을 명시적으로 해결해야 한다.
 
-검증 실패 이전에 사용자에게 충돌을 보여준다.
+#### 충돌 해결 원칙
+
+둘이 같으면 허용한다.
 
 ```text
-ImageRef에 포함된 digest와 별도로 입력한 ImageDigest가 다릅니다.
-
-ImageRef digest:
-  sha256:aaa
-
-ImageDigest:
-  sha256:bbb
-
-둘 중 하나만 사용할 수 있습니다.
-
-선택:
-[1] ImageRef의 digest를 사용한다
-[2] 별도 ImageDigest를 사용한다
-[3] 이미지 주소를 다시 입력한다
-[4] 취소한다
-
-선택:
+ImageRef:   repo/tool:1.0@sha256:aaa
+ImageDigest: sha256:aaa
+결과:       repo/tool:1.0@sha256:aaa
 ```
 
-충돌 상태를 그대로 저장하지 않는다.
-
-> **구현 제약 (R13 확인):** BeginnerGuideFlow 의 컨테이너 서브플로는 이 충돌 경로에 구조적으로 도달하지 않는다.
-> 첫 번째 `Normalize(imageRef, null)` 호출 — imageDigest가 null이므로 separateDigest가 항상 null →
-> DigestConflict 조건(임베디드 ≠ null AND 별도 ≠ null AND 다름) 불충족.
-> MissingDigest 이후 사용자가 입력한 별도 digest로 다시 Normalize를 호출하는 경우에도
-> pendingRef에 임베디드 digest가 없으므로 DigestConflict 불가.
-> 현재 이 UI는 비대화형 모드(`--field ImageRef=...@sha256:aaa --field ImageDigest=sha256:bbb`)
-> 또는 직접 필드 편집 경로에서만 도달 가능하다.
-> 관련 이슈: [#3](https://github.com/HeaInSeo/NodeKit/issues/3)
+둘이 다르면 충돌 상태 그대로 저장하지 않는다. 호출자가 어느 digest를 사용할지 명시적으로 결정해야 한다.
 
 ---
 
