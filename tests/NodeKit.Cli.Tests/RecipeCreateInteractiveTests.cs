@@ -36,6 +36,7 @@ namespace NodeKit.Cli.Tests
             var outPath = Path.Combine(_workDir, "recipe.json");
             var transcript = new[]
             {
+                "2", // 빠른 설정 모드
                 "n", // IsRestrictedNetwork
                 "n", // HasInternalPackageMirror
                 "n", // HasExistingContainerImage
@@ -79,6 +80,7 @@ namespace NodeKit.Cli.Tests
             var outPath = Path.Combine(_workDir, "recipe.json");
             var transcript = new[]
             {
+                "2", // 빠른 설정 모드
                 "n", // IsRestrictedNetwork
                 "n", // HasInternalPackageMirror
                 "n", // HasExistingContainerImage
@@ -121,6 +123,7 @@ namespace NodeKit.Cli.Tests
             var interactiveOutPath = Path.Combine(_workDir, "interactive.json");
             var transcript = new[]
             {
+                "2", // 빠른 설정 모드
                 "n", "n", "n", "y", "n", "n", // Q&A -> recommend package
                 "", // accept recommended method
                 "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
@@ -168,6 +171,7 @@ namespace NodeKit.Cli.Tests
             var outPath = Path.Combine(_workDir, "recipe.json");
             var transcript = new[]
             {
+                "2", // 빠른 설정 모드
                 "n", "n", "n", "n", "n", "y", // Q&A -> recommend dockerfile
                 "", // accept recommended method
                 "n", // decline dockerfile warning
@@ -187,6 +191,7 @@ namespace NodeKit.Cli.Tests
             var outPath = Path.Combine(_workDir, "recipe.json");
             var transcript = new[]
             {
+                "2", // 빠른 설정 모드
                 "y", // IsRestrictedNetwork
                 "y", // HasInternalPackageMirror
                 "n", // HasExistingContainerImage
@@ -220,6 +225,7 @@ namespace NodeKit.Cli.Tests
             var outPath = Path.Combine(_workDir, "recipe.json");
             var transcript = new[]
             {
+                "2", // 빠른 설정 모드
                 "u", // IsRestrictedNetwork
                 "n", // HasInternalPackageMirror
                 "n", // HasExistingContainerImage
@@ -253,13 +259,14 @@ namespace NodeKit.Cli.Tests
             var outPath = Path.Combine(_workDir, "recipe.json");
             var transcript = new[]
             {
+                "2", // 빠른 설정 모드
                 "n", // IsRestrictedNetwork
                 "n", // HasInternalPackageMirror
                 "u", // HasExistingContainerImage
                 "u", // HasPackageInPublicChannels
                 "u", // HasSourceArchiveAndChecksum
                 "u", // HasExistingDockerfile
-                "2", // no recommendation — explicitly pick alternative priority 2 (package)
+                "2", // no recommendation — manually pick from fixed menu: [2] package
                 "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
                 "bwa=0.7.17=h5bf99c6_8", "",
                 "bioconda", "",
@@ -286,6 +293,7 @@ namespace NodeKit.Cli.Tests
             var outPath = Path.Combine(_workDir, "recipe.json");
             var transcript = new[]
             {
+                "2", // 빠른 설정 모드
                 "n", "n", "n", "y", "n", "n", // Q&A -> recommend package
                 "", // accept recommended method
                 "bwa-mem", "0.7.17", "run.sh",
@@ -320,6 +328,7 @@ namespace NodeKit.Cli.Tests
             var outPath = Path.Combine(_workDir, "recipe.json");
             var transcript = new[]
             {
+                "2", // 빠른 설정 모드
                 "n", "n", "n", "y", "n", "n", // Q&A -> recommend package
                 "", // accept recommended method
                 "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
@@ -354,6 +363,7 @@ namespace NodeKit.Cli.Tests
             var outPath = Path.Combine(_workDir, "recipe.json");
             var transcript = new[]
             {
+                "2", // 빠른 설정 모드
                 "n", "n", "y", "n", "n", "n", // Q&A -> recommend container
                 "", // accept recommended method
                 "bwa-mem", "0.7.17", "run.sh",
@@ -385,6 +395,7 @@ namespace NodeKit.Cli.Tests
             var outPath = Path.Combine(_workDir, "recipe.json");
             var transcript = new[]
             {
+                "2", // 빠른 설정 모드
                 "n", "n", "y", "n", "n", "n", // Q&A -> recommend container
                 "", // accept recommended method
                 "bwa-mem", "0.7.17", "run.sh",
@@ -422,6 +433,7 @@ namespace NodeKit.Cli.Tests
             var outPath = Path.Combine(_workDir, "recipe.json");
             var transcript = new[]
             {
+                "2", // 빠른 설정 모드
                 "n", "n", "y", "n", "n", "n", // Q&A -> recommend container
                 "", // accept recommended method
                 "/help", // ToolName prompt: request help instead of answering
@@ -456,6 +468,7 @@ namespace NodeKit.Cli.Tests
             var outPath = Path.Combine(_workDir, "recipe.json");
             var transcript = new[]
             {
+                "2", // 빠른 설정 모드
                 "n", "n", "y", "n", "n", "n", // Q&A -> recommend container
                 "", // accept recommended method
                 "bwa-mem", // ToolName
@@ -490,6 +503,7 @@ namespace NodeKit.Cli.Tests
             var outPath = Path.Combine(_workDir, "recipe.json");
             var transcript = new[]
             {
+                "2", // 빠른 설정 모드
                 "n", "n", "y", "n", "n", "n", // Q&A -> recommend container
                 "", // accept recommended method
                 "bwa-mem", // ToolName
@@ -520,6 +534,7 @@ namespace NodeKit.Cli.Tests
             var outPath = Path.Combine(_workDir, "recipe.json");
             var transcript = new[]
             {
+                "2", // 빠른 설정 모드
                 "n", "n", "y", "n", "n", "n", // Q&A -> recommend container
                 "", // accept recommended method
                 "bwa-mem", // ToolName
@@ -543,6 +558,7 @@ namespace NodeKit.Cli.Tests
             var outPath = Path.Combine(_workDir, "recipe.json");
             var transcript = new[]
             {
+                "2", // 빠른 설정 모드
                 "n", "n", "y", "n", "n", "n", // Q&A -> recommend container
                 "", // accept recommended method
                 "bwa-mem", // ToolName
@@ -564,6 +580,7 @@ namespace NodeKit.Cli.Tests
             var outPath = Path.Combine(_workDir, "recipe.json");
             var transcript = new[]
             {
+                "2", // 빠른 설정 모드
                 "n", "n", "y", "n", "n", "n", // Q&A -> recommend container
                 "", // accept recommended method
                 "bwa-mem", // ToolName
@@ -585,6 +602,7 @@ namespace NodeKit.Cli.Tests
             var outPath = Path.Combine(_workDir, "recipe.json");
             var transcript = new[]
             {
+                "2", // 빠른 설정 모드
                 "n", "n", "y", "n", "n", "n", // Q&A -> recommend container
                 "", // accept recommended method
             };
@@ -614,6 +632,7 @@ namespace NodeKit.Cli.Tests
             var cancelOutPath = Path.Combine(_workDir, "cancel.json");
             var cancelTranscript = new[]
             {
+                "2", // 빠른 설정 모드
                 "n", "n", "y", "n", "n", "n", // Q&A -> recommend container
                 "", // accept recommended method
                 "bwa-mem", // ToolName
@@ -631,6 +650,7 @@ namespace NodeKit.Cli.Tests
             var ctrlCOutPath = Path.Combine(_workDir, "ctrlc.json");
             var ctrlCTranscript = new[]
             {
+                "2", // 빠른 설정 모드
                 "n", "n", "y", "n", "n", "n", // Q&A -> recommend container
                 "", // accept recommended method
             };
@@ -651,6 +671,99 @@ namespace NodeKit.Cli.Tests
             var cancelMessageLines = cancelStdout.ToString().Replace("\r\n", "\n").TrimEnd('\n').Split('\n')[^2..];
             var ctrlCMessageLines = ctrlCStdout.ToString().Replace("\r\n", "\n").TrimEnd('\n').Split('\n')[^2..];
             Assert.Equal(cancelMessageLines, ctrlCMessageLines);
+        }
+
+        [Fact]
+        public void ModeSelector_CiModeChoice_PrintsUsageAndExitsWithCode0WithoutQa()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "3", // CI 모드 사용법 보기
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = CliApp.Run(
+                new[] { "recipe", "create", outPath },
+                new StringReader(string.Join("\n", transcript)),
+                stdout,
+                stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.False(File.Exists(outPath));
+            Assert.Empty(stderr.ToString());
+            var stdoutText = stdout.ToString();
+            Assert.Contains("스크립트/CI 모드", stdoutText);
+            Assert.Contains("--non-interactive", stdoutText);
+            Assert.DoesNotContain("Q1.", stdoutText);
+        }
+
+        [Fact]
+        public void ModeSelector_GuidedBeginnerChoice_FallsBackToQuickSetupFlowWithNotice()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "1", // 쉬운 안내 모드 (아직 미구현 → 빠른 설정 모드로 폴백)
+                "n", "n", "n", "y", "n", "n", // Q&A -> recommend package
+                "", // accept recommended method
+                "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
+                "bwa=0.7.17=h5bf99c6_8", "",
+                "bioconda", "",
+                "",
+                "reads", "1", "",
+                "bam", "1", "",
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = CliApp.Run(
+                new[] { "recipe", "create", outPath },
+                new StringReader(string.Join("\n", transcript)),
+                stdout,
+                stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.Empty(stderr.ToString());
+            Assert.Contains("쉬운 안내 모드는 아직 준비 중입니다", stdout.ToString());
+            Assert.True(File.Exists(outPath));
+        }
+
+        [Fact]
+        public void RecommendationReject_ManualMethodSelection_SavesValidRecipe()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "2", // 빠른 설정 모드
+                "n", "n", "n", "y", "n", "n", // Q&A -> recommend package
+                "n", // reject recommendation
+                "1", // manually pick [1] container
+                "bwa-mem", "0.7.17", "run.sh",
+                "condaforge/miniforge3:24.3.0-0", // ImageRef
+                DigestOnly, // ImageDigest
+                "", // Command optional list — skip
+                "reads", "1", "",
+                "bam", "1", "",
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = CliApp.Run(
+                new[] { "recipe", "create", outPath },
+                new StringReader(string.Join("\n", transcript)),
+                stdout,
+                stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.Empty(stderr.ToString());
+            var stdoutText = stdout.ToString();
+            Assert.Contains("추천 작성 방식:", stdoutText);
+            Assert.Contains("다른 작성 방식을 선택하세요", stdoutText);
+
+            var json = File.ReadAllText(outPath);
+            Assert.Contains("\"BuildKind\": \"BioContainer\"", json);
         }
 
         /// <summary>

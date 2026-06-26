@@ -47,6 +47,18 @@ namespace NodeKit.Cli
             TextWriter stderr,
             IRecipeCreateCancellationSource cancellation)
         {
+            var mode = AuthoringModeSelector.Prompt(stdin, stdout);
+            if (mode is null)
+            {
+                return 0;
+            }
+
+            if (mode == AuthoringModeSelector.Mode.GuidedBeginner)
+            {
+                stdout.WriteLine("쉬운 안내 모드는 아직 준비 중입니다. 빠른 설정 모드로 진행합니다.");
+                stdout.WriteLine();
+            }
+
             var session = new RecipeAuthoringSession();
 
             try
@@ -108,30 +120,78 @@ namespace NodeKit.Cli
 
         private static RecipeMethodId? SelectMethod(RecipeAuthoringSession session, TextReader stdin, TextWriter stdout)
         {
-            while (true)
-            {
-                var answers = AskRecommenderQuestions(stdin, stdout);
-                var recommendation = RecipeMethodRecommender.Recommend(answers);
-                DisplayRecommendation(recommendation, stdout);
-
-                var method = PromptMethodChoice(recommendation, stdin, stdout);
-                if (method is null)
-                {
-                    continue;
-                }
-
-                session.SelectMethod(method.Value);
-                return method.Value;
-            }
+            var answers = AskRecommenderQuestions(stdin, stdout);
+            var recommendation = RecipeMethodRecommender.Recommend(answers);
+            var method = MethodRecommendationPresenter.Present(recommendation, stdin, stdout);
+            session.SelectMethod(method);
+            return method;
         }
 
         private static RecipeMethodAnswers AskRecommenderQuestions(TextReader stdin, TextWriter stdout)
         {
+            stdout.WriteLine("빠른 설정 모드");
+            stdout.WriteLine();
+            stdout.WriteLine("이 모드는 도구의 배포 방식이나 빌드 방식을 어느 정도 알고 있는 사용자를 위한 모드입니다.");
+            stdout.WriteLine();
+            stdout.WriteLine("각 질문에는 y/n/Enter로 답할 수 있습니다.");
+            stdout.WriteLine();
+            stdout.WriteLine("  y      예");
+            stdout.WriteLine("  n      아니오");
+            stdout.WriteLine("  Enter  잘 모르겠음");
+            stdout.WriteLine();
+            stdout.WriteLine("잘못 선택해도 괜찮습니다.");
+            stdout.WriteLine("입력 중 언제든지 /change-method로 작성 방식을 다시 선택할 수 있습니다.");
+            stdout.WriteLine("저장하지 않고 종료하려면 /cancel을 입력하세요.");
+            stdout.WriteLine();
+
             var byField = new Dictionary<string, Answer>(StringComparer.Ordinal);
             foreach (var question in RecipeMethodQuestionCatalog.Questions)
             {
-                stdout.WriteLine($"{question.Prompt.Get("ko")} [y/n/u]");
+                if (RecipeMethodQuestionDetailCatalog.ByKey.TryGetValue(question.Key, out var detail))
+                {
+                    stdout.WriteLine(detail.Header);
+                    stdout.WriteLine();
+                    stdout.WriteLine("의미:");
+                    stdout.WriteLine($"  {detail.Meaning}");
+                    stdout.WriteLine();
+                    stdout.WriteLine("예:");
+                    foreach (var example in detail.Examples)
+                    {
+                        stdout.WriteLine($"  - {example}");
+                    }
+
+                    stdout.WriteLine();
+                    stdout.WriteLine("y를 선택하면:");
+                    foreach (var effect in detail.YesEffects)
+                    {
+                        stdout.WriteLine($"  - {effect}");
+                    }
+
+                    stdout.WriteLine();
+                    stdout.WriteLine("n을 선택하면:");
+                    foreach (var effect in detail.NoEffects)
+                    {
+                        stdout.WriteLine($"  - {effect}");
+                    }
+
+                    stdout.WriteLine();
+                    stdout.WriteLine("Enter를 누르면:");
+                    foreach (var effect in detail.EnterEffects)
+                    {
+                        stdout.WriteLine($"  - {effect}");
+                    }
+
+                    stdout.WriteLine();
+                }
+                else
+                {
+                    stdout.WriteLine($"{question.Prompt.Get("ko")}");
+                    stdout.WriteLine();
+                }
+
+                stdout.WriteLine("선택 [y/n/Enter]:");
                 byField[question.Key] = ReadAnswer(stdin);
+                stdout.WriteLine();
             }
 
             return new RecipeMethodAnswers(
@@ -152,56 +212,6 @@ namespace NodeKit.Cli
                 "n" => Answer.No,
                 _ => Answer.Unknown,
             };
-        }
-
-        private static void DisplayRecommendation(RecipeMethodRecommendation recommendation, TextWriter stdout)
-        {
-            stdout.WriteLine(recommendation.RecommendedMethod is { } recommended
-                ? $"추천: {RecipeMethodCatalog.For(recommended).Label.Get("ko")} — {recommendation.Reason}"
-                : $"추천 보류: {recommendation.Reason}");
-
-            foreach (var evidence in recommendation.Evidence)
-            {
-                stdout.WriteLine($"  근거: {evidence}");
-            }
-
-            foreach (var warning in recommendation.Warnings)
-            {
-                stdout.WriteLine($"  경고: {warning}");
-            }
-
-            foreach (var alternative in recommendation.Alternatives)
-            {
-                stdout.WriteLine($"  [{alternative.Priority}] {alternative.Label} — {alternative.Reason}");
-            }
-
-            foreach (var missing in recommendation.MissingInformation)
-            {
-                stdout.WriteLine($"  추가로 필요한 정보: {missing}");
-            }
-        }
-
-        private static RecipeMethodId? PromptMethodChoice(RecipeMethodRecommendation recommendation, TextReader stdin, TextWriter stdout)
-        {
-            stdout.WriteLine(recommendation.RecommendedMethod is { }
-                ? "추천을 사용하려면 Enter, 다른 방법은 번호를 입력하세요:"
-                : "방법 번호를 입력하세요:");
-
-            var line = (stdin.ReadLine() ?? string.Empty).Trim();
-
-            if (line.Length == 0)
-            {
-                return recommendation.RecommendedMethod;
-            }
-
-            var alternative = recommendation.Alternatives.FirstOrDefault(a => a.Priority.ToString(System.Globalization.CultureInfo.InvariantCulture) == line);
-            if (alternative != null)
-            {
-                return alternative.Method;
-            }
-
-            stdout.WriteLine("알 수 없는 선택입니다. 다시 질문합니다.");
-            return null;
         }
 
         private static bool ConfirmDockerfileWarning(TextReader stdin, TextWriter stdout)
@@ -660,7 +670,7 @@ namespace NodeKit.Cli
 
             stdout.WriteLine("변경할 방법 번호를 입력하세요: [1] container [2] package [3] mirror [4] source [5] dockerfile");
             var selection = (stdin.ReadLine() ?? string.Empty).Trim();
-            if (!TryParseMethodSelection(selection, out var nextMethod))
+            if (!MethodRecommendationPresenter.TryParseMethodSelection(selection, out var nextMethod))
             {
                 stdout.WriteLine("알 수 없는 방법입니다. 변경을 취소합니다.");
                 return true;
@@ -675,36 +685,6 @@ namespace NodeKit.Cli
             var confirm = (stdin.ReadLine() ?? string.Empty).Trim().ToLowerInvariant();
             session.ChangeMethod(nextMethod, confirm == "y" ? ChangeMethodDecision.Proceed : ChangeMethodDecision.Cancel);
             return true;
-        }
-
-        private static bool TryParseMethodSelection(string selection, out RecipeMethodId method)
-        {
-            switch (selection)
-            {
-                case "1":
-                case "container":
-                    method = RecipeMethodId.Container;
-                    return true;
-                case "2":
-                case "package":
-                    method = RecipeMethodId.Package;
-                    return true;
-                case "3":
-                case "mirror":
-                    method = RecipeMethodId.Mirror;
-                    return true;
-                case "4":
-                case "source":
-                    method = RecipeMethodId.Source;
-                    return true;
-                case "5":
-                case "dockerfile":
-                    method = RecipeMethodId.Dockerfile;
-                    return true;
-                default:
-                    method = default;
-                    return false;
-            }
         }
 
         private static bool RunRecoveryLoop(RecipeAuthoringSession session, IReadOnlyList<ValidationViolation> violations, TextReader stdin, TextWriter stdout, IRecipeCreateCancellationSource cancellation)

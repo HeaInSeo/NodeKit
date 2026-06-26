@@ -1067,6 +1067,44 @@ Done when:
   exit, and the recommendation-reject-then-manual-select path.
 ```
 
+Progress:
+
+```text
+- 2026-06-26: Completed. Added AuthoringModeSelector
+  (src/NodeKit.Cli/AuthoringModeSelector.cs) — Section 7 entry screen
+  with choices [1] 쉬운 안내 모드 / [2] 빠른 설정 모드 / [3] 스크립트/CI 모드.
+  Mode 3 prints --non-interactive usage and returns exit code 0 without
+  entering the Q&A. Mode 1 is currently a placeholder (routes to the same
+  Q&A flow as mode 2 with a "아직 준비 중" notice; actual BeginnerGuideFlow
+  is deferred to Sprint R13). Added RecipeMethodQuestionDetail record +
+  RecipeMethodQuestionDetailCatalog (src/NodeKit.Cli/) with the
+  Section 15.3-15.8 per-question meaning/example/y-effect/n-effect/
+  enter-effect text for all 6 questions. Updated AskRecommenderQuestions to
+  print the Section 15.2 quick-setup intro screen and enriched question
+  detail before each answer prompt (prompt text changed from "[y/n/u]" to
+  "선택 [y/n/Enter]:", behavior unchanged). Added MethodRecommendationPresenter
+  (src/NodeKit.Cli/MethodRecommendationPresenter.cs) — Section 16 screen
+  showing recommended method, reason, effects, upcoming fields (from
+  RecipeFieldCatalog.FieldsFor), and cautions; accept [Y/n] path or reject
+  → fixed 1-5 manual method menu; internally loops until valid input.
+  Extracted TryParseMethodSelection from RecipeCreateInteractiveRunner
+  (private) into MethodRecommendationPresenter (internal static), shared
+  with TryHandleChangeMethod. Removed DisplayRecommendation, PromptMethodChoice,
+  TryParseMethodSelection from RecipeCreateInteractiveRunner. SelectMethod
+  outer while-loop removed (presenter handles its own looping).
+  All 18 existing interactive test transcripts updated to prepend "2"
+  (quick-setup mode selection). Note: "앞으로 입력할 항목" in the presenter
+  shows catalog field.Name strings (e.g. "ImageRef") rather than the
+  design doc's Section 16 example text ("BaseImage") — this reflects the
+  pre-existing naming difference in RecipeFieldCatalog and is not renamed
+  here per CLAUDE.md §7. Added 3 new tests: CI-mode early exit (exit 0,
+  no Q&A consumed, --non-interactive usage shown), guided-beginner fallback
+  (notice printed, Q&A continues, file saved), recommendation-reject→manual
+  select (picks [1] container, saves BioContainer recipe). Full suite:
+  324/324 passing (41 NodeKit.Cli.Tests + 283 NodeKit.Tests), 0 build
+  warnings. RecipeMethodRecommender tests unchanged and passing.
+```
+
 ### Sprint R12. Phase 3a — InstallCommandParser Spike
 
 Goal:

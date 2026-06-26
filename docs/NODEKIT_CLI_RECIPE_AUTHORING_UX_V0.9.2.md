@@ -2866,10 +2866,10 @@ v0.9.2에서는 다음을 구현하지 않는다.
 
 ### Phase 2
 
-* [ ] AuthoringModeSelector 추가
-* [ ] 빠른 설정 모드 시작 화면 추가
-* [ ] 기존 6문항 설명 보강
-* [ ] method 추천 결과 화면 추가
+* [x] AuthoringModeSelector 추가 (Sprint R11: 3-choice 진입 화면, CI 모드 사용법 출력)
+* [x] 빠른 설정 모드 시작 화면 추가 (Sprint R11: Section 15.2 인트로)
+* [x] 기존 6문항 설명 보강 (Sprint R11: RecipeMethodQuestionDetailCatalog, 의미/예/영향 출력)
+* [x] method 추천 결과 화면 추가 (Sprint R11: MethodRecommendationPresenter, Section 16 형식)
 
 ### Phase 3
 
