@@ -21,6 +21,8 @@ legacy `BuildRequest` JSON`. gRPC 전송, NodeVault 조회, 이미지 빌드,
 ## 0. 빠른 시작
 
 recipe.json을 손으로 쓰지 않아도 된다. 이게 핵심이다.
+아래 명령은 **먼저 recipe.json을 생성**한다. 아직 파일이 없을 때
+`validate recipe.json`부터 실행하면 "recipe 파일을 읽을 수 없습니다" 오류가 난다.
 
 ```bash
 dotnet run --project src/NodeKit.Cli -- recipe create recipe.json
@@ -47,10 +49,16 @@ dotnet build NodeKit.sln
 # CLI만 빌드
 dotnet build src/NodeKit.Cli/NodeKit.Cli.csproj
 
-# 실행 방법 1: dotnet run
+# 1. recipe.json 생성
+dotnet run --project src/NodeKit.Cli -- recipe create recipe.json
+
+# 2. 생성 확인
+ls -l recipe.json
+
+# 3. 실행 방법 1: dotnet run
 dotnet run --project src/NodeKit.Cli -- validate recipe.json
 
-# 실행 방법 2: 빌드된 바이너리 직접 실행
+# 4. 실행 방법 2: 빌드된 바이너리 직접 실행
 ./src/NodeKit.Cli/bin/Debug/net10.0/NodeKit.Cli validate recipe.json
 ```
 
