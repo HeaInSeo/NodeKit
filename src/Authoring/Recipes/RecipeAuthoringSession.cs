@@ -21,6 +21,8 @@ namespace NodeKit.Authoring.Recipes
                 ["Script"] = new[] { "Script" },
                 ["ImageUri"] = new[] { "ImageRef", "ImageDigest" },
                 ["BioContainerImageUri"] = new[] { "ImageRef", "ImageDigest" },
+                ["ImageRef"] = new[] { "ImageRef", "ImageDigest" },
+                ["ImageDigest"] = new[] { "ImageRef", "ImageDigest" },
                 ["BaseImage"] = new[] { "ImageRef" },
                 ["Packages"] = new[] { "Packages" },
                 ["Channels"] = new[] { "Channels" },
@@ -36,6 +38,10 @@ namespace NodeKit.Authoring.Recipes
         private static readonly string[] _toolNameVersionFields = { "ToolName", "ToolVersion" };
 
         private static readonly string[] _inputsOutputsFields = { "Inputs", "Outputs" };
+
+        private static readonly string[] _sourceChecksumFields = { "SourceChecksum" };
+
+        private static readonly string[] _packageFields = { "Packages" };
 
         private readonly RecipeDocument _document = new();
         private readonly HashSet<string> _filledFields = new(StringComparer.Ordinal);
@@ -391,9 +397,7 @@ namespace NodeKit.Authoring.Recipes
                 }
                 else if (violation.Field != null && _renderedFieldToCatalogFields.TryGetValue(violation.Field, out var catalogFields))
                 {
-                    action = catalogFields.Length == 1
-                        ? EditSingleFieldAction(catalogFields[0])
-                        : EditRelatedFieldsAction(catalogFields);
+                    action = BuildMappedFieldAction(catalogFields);
                 }
                 else
                 {
@@ -523,6 +527,63 @@ namespace NodeKit.Authoring.Recipes
 
         private static LocalizedText Text(string ko, string en) =>
             new(new Dictionary<string, string> { ["ko"] = ko, ["en"] = en });
+
+        private static RecipeValidationRecoveryAction BuildMappedFieldAction(string[] fields)
+        {
+            if (fields.Length == 2
+                && fields.Contains("ImageRef", StringComparer.Ordinal)
+                && fields.Contains("ImageDigest", StringComparer.Ordinal))
+            {
+                return ImageDigestRecoveryAction(fields);
+            }
+
+            if (fields.Length == 1 && fields[0] == "SourceChecksum")
+            {
+                return SourceChecksumRecoveryAction();
+            }
+
+            if (fields.Length == 1 && fields[0] == "Packages")
+            {
+                return PackageVersionRecoveryAction();
+            }
+
+            return fields.Length == 1
+                ? EditSingleFieldAction(fields[0])
+                : EditRelatedFieldsAction(fields);
+        }
+
+        private static RecipeValidationRecoveryAction ImageDigestRecoveryAction(string[] fields) => new(
+            "이미지 digest 입력하기",
+            RecoveryActionKind.EditRelatedFields,
+            fields,
+            Text(
+                "컨테이너 이미지가 나중에 바뀌지 않도록 @sha256:... digest가 필요합니다.",
+                "A @sha256:... digest is required so the container image cannot change later."),
+            Text(
+                "Quay 또는 Harbor의 tag 상세 화면에서 sha256 digest를 복사하세요. 이미지 주소가 ubuntu:22.04처럼 tag만 있으면 나중에 다른 이미지로 바뀔 수 있습니다.",
+                "Copy the sha256 digest from the Quay or Harbor tag details page. A tag-only reference such as ubuntu:22.04 can point to a different image later."));
+
+        private static RecipeValidationRecoveryAction SourceChecksumRecoveryAction() => new(
+            "소스 코드 검증값 입력하기",
+            RecoveryActionKind.EditSingleField,
+            _sourceChecksumFields,
+            Text(
+                "source build는 같은 소스 코드로 다시 빌드할 수 있도록 sha256 checksum이 필요합니다.",
+                "Source builds need a sha256 checksum so the same source can be rebuilt later."),
+            Text(
+                "archive URL이 있다면 다음 명령으로 계산할 수 있습니다.\n\n  curl -fsSL \"<SourceUri>\" | sha256sum\n\n출력된 64자리 hex 값 앞에 sha256:을 붙여 입력하세요.",
+                "If you have an archive URL, calculate it with:\n\n  curl -fsSL \"<SourceUri>\" | sha256sum\n\nPrefix the 64 hex characters with sha256:."));
+
+        private static RecipeValidationRecoveryAction PackageVersionRecoveryAction() => new(
+            "패키지 버전 고정하기",
+            RecoveryActionKind.EditSingleField,
+            _packageFields,
+            Text(
+                "패키지는 이름만이 아니라 버전까지 고정해야 재현 가능한 recipe가 됩니다.",
+                "Packages must pin versions, not only names, for a reproducible recipe."),
+            Text(
+                "예: bwa=0.7.17 또는 가능하면 bwa=0.7.17=h7132678_9처럼 build string까지 포함하세요. bioconda 페이지에서 정확한 버전과 build string을 확인할 수 있습니다.",
+                "Example: bwa=0.7.17, or preferably bwa=0.7.17=h7132678_9 with the build string. Check the bioconda page for the exact version and build string."));
 
         private static RecipeValidationRecoveryAction EditSingleFieldAction(string field) => new(
             $"{field} 항목 수정",

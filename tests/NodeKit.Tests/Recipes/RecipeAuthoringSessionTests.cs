@@ -688,6 +688,53 @@ namespace NodeKit.Tests.Recipes
         }
 
         [Fact]
+        public void BuildRecoveryPlan_ForMissingImageDigest_IncludesBeginnerHint()
+        {
+            var session = new RecipeAuthoringSession();
+            session.SelectMethod(RecipeMethodId.Container);
+            var violations = new[] { new ValidationViolation("L1-IMG-004", "ImageUri에 digest가 없습니다.", "ImageUri") };
+
+            var plan = session.BuildRecoveryPlan(violations);
+
+            Assert.Single(plan.Actions);
+            Assert.Equal("이미지 digest 입력하기", plan.Actions[0].Label);
+            Assert.Contains("Quay 또는 Harbor", plan.Actions[0].BeginnerHint.Get("ko"));
+            Assert.Contains("ImageRef", plan.Actions[0].RelatedFields);
+            Assert.Contains("ImageDigest", plan.Actions[0].RelatedFields);
+        }
+
+        [Fact]
+        public void BuildRecoveryPlan_ForMissingSourceChecksum_IncludesCurlSha256sumHint()
+        {
+            var session = new RecipeAuthoringSession();
+            session.SelectMethod(RecipeMethodId.Source);
+            var violations = new[] { new ValidationViolation("L1-SRC-001", "SourceChecksum이 필요합니다.", "SourceChecksum") };
+
+            var plan = session.BuildRecoveryPlan(violations);
+
+            Assert.Single(plan.Actions);
+            Assert.Equal("소스 코드 검증값 입력하기", plan.Actions[0].Label);
+            Assert.Contains("curl -fsSL", plan.Actions[0].BeginnerHint.Get("ko"));
+            Assert.Contains("sha256sum", plan.Actions[0].BeginnerHint.Get("ko"));
+            Assert.Contains("SourceChecksum", plan.Actions[0].RelatedFields);
+        }
+
+        [Fact]
+        public void BuildRecoveryPlan_ForUnpinnedPackage_IncludesBiocondaVersionHint()
+        {
+            var session = CompletePackageSession();
+            var violations = new[] { new ValidationViolation("L1-PKG-001", "패키지 버전이 고정되지 않았습니다.", "Packages") };
+
+            var plan = session.BuildRecoveryPlan(violations);
+
+            Assert.Single(plan.Actions);
+            Assert.Equal("패키지 버전 고정하기", plan.Actions[0].Label);
+            Assert.Contains("bwa=0.7.17", plan.Actions[0].BeginnerHint.Get("ko"));
+            Assert.Contains("bioconda", plan.Actions[0].BeginnerHint.Get("ko"));
+            Assert.Contains("Packages", plan.Actions[0].RelatedFields);
+        }
+
+        [Fact]
         public void BuildRecoveryPlan_InputsOutputsViolation_ProducesReviewSectionAction()
         {
             var session = CompletePackageSession();

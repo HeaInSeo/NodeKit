@@ -382,7 +382,8 @@ namespace NodeKit.Cli.Tests
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
-            Assert.Contains("ImageRef, ImageDigest 항목 함께 수정", stdout.ToString());
+            Assert.Contains("이미지 digest 입력하기", stdout.ToString());
+            Assert.Contains("Quay 또는 Harbor", stdout.ToString());
             Assert.Empty(stderr.ToString());
 
             var json = File.ReadAllText(outPath);

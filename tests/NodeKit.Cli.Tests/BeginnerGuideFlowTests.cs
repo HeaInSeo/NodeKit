@@ -1,5 +1,8 @@
 using System;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+using NodeKit.Authoring.Recipes;
 using NodeKit.Cli;
 using Xunit;
 
@@ -48,7 +51,7 @@ namespace NodeKit.Cli.Tests
             {
                 "1",  // GuidedBeginner
                 "7",  // 잘 모르겠다 → NoClue flow
-                "5",  // 저장하지 않고 종료 → return null
+                "6",  // 저장하지 않고 종료 → return null
             };
 
             var exitCode = RunCli(outPath, transcript, out var stdout, out _);
@@ -68,7 +71,7 @@ namespace NodeKit.Cli.Tests
                 "1",    // clue: 도구 이름만 알고 있다
                 "bwa",  // 도구 이름
                 "6",    // 아무것도 모른다 → NoClue flow
-                "5",    // 저장하지 않고 종료
+                "6",    // 저장하지 않고 종료
             };
 
             var exitCode = RunCli(outPath, transcript, out _, out _);
@@ -86,14 +89,79 @@ namespace NodeKit.Cli.Tests
                 "1",    // GuidedBeginner
                 "7",    // 잘 모르겠다 → NoClue flow
                 "9",    // invalid — re-prompt
-                "5",    // 저장하지 않고 종료
+                "6",    // 저장하지 않고 종료
             };
 
             var exitCode = RunCli(outPath, transcript, out var stdout, out _);
 
             Assert.Equal(0, exitCode);
             Assert.False(File.Exists(outPath));
-            Assert.Contains("1–5 중에서 선택", stdout);
+            Assert.Contains("1–6 중에서 선택", stdout);
+        }
+
+        [Fact]
+        public void RunToolNameFlow_PrintsBiocondaAndBioContainersUrls()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "1",    // GuidedBeginner
+                "1",    // clue: 도구 이름만 알고 있다
+                "bwa",  // 도구 이름
+                "6",    // 아무것도 모른다 → NoClue flow
+                "6",    // 저장하지 않고 종료
+            };
+
+            var exitCode = RunCli(outPath, transcript, out var stdout, out _);
+
+            Assert.Equal(0, exitCode);
+            Assert.False(File.Exists(outPath));
+            Assert.Contains("https://anaconda.org/bioconda/bwa", stdout);
+            Assert.Contains("https://quay.io/repository/biocontainers/bwa?tab=tags", stdout);
+        }
+
+        [Fact]
+        public void RunToolNameFlow_EmptyToolName_AsksAgain()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "1",    // GuidedBeginner
+                "1",    // clue: 도구 이름만 알고 있다
+                "",     // empty → ask again
+                "bwa",
+                "6",    // 아무것도 모른다 → NoClue flow
+                "6",    // 저장하지 않고 종료
+            };
+
+            var exitCode = RunCli(outPath, transcript, out var stdout, out _);
+
+            Assert.Equal(0, exitCode);
+            Assert.False(File.Exists(outPath));
+            Assert.Contains("도구 이름을 입력해 주세요.", stdout);
+            Assert.Contains("https://anaconda.org/bioconda/bwa", stdout);
+        }
+
+        [Fact]
+        public void RunNoClueFlow_CanRouteToToolNameLookup()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "1",    // GuidedBeginner
+                "7",    // 잘 모르겠다 → NoClue flow
+                "1",    // tool-name lookup
+                "bwa",
+                "6",    // 아무것도 모른다 → NoClue flow
+                "6",    // 저장하지 않고 종료
+            };
+
+            var exitCode = RunCli(outPath, transcript, out var stdout, out _);
+
+            Assert.Equal(0, exitCode);
+            Assert.False(File.Exists(outPath));
+            Assert.Contains("https://anaconda.org/bioconda/bwa", stdout);
+            Assert.Contains("https://quay.io/repository/biocontainers/bwa?tab=tags", stdout);
         }
 
         // ── Install command clue ────────────────────────────────────────────────
@@ -307,7 +375,7 @@ namespace NodeKit.Cli.Tests
                 ContainerImageRef,  // no digest → MissingDigest
                 "3",                // 다른 작성 방식 → back to clue picker
                 "7",                // 잘 모르겠다 → NoClue
-                "5",                // exit
+                "6",                // exit
             };
 
             var exitCode = RunCli(outPath, transcript, out var stdout, out _);
@@ -346,6 +414,130 @@ namespace NodeKit.Cli.Tests
             Assert.True(File.Exists(outPath));
             var json = File.ReadAllText(outPath);
             Assert.Contains("\"BuildKind\": \"SourceBuild\"", json);
+        }
+
+        [Fact]
+        public void SourceFlow_MissingChecksum_PrintsCurlSha256sumGuidance()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var sourceUri = "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz";
+            var transcript = new[]
+            {
+                "1",       // GuidedBeginner
+                "4",       // source
+                sourceUri,
+                "",        // missing checksum
+                "1",       // show guidance
+                "4",       // 저장하지 않고 종료
+            };
+
+            var exitCode = RunCli(outPath, transcript, out var stdout, out _);
+
+            Assert.Equal(0, exitCode);
+            Assert.False(File.Exists(outPath));
+            Assert.Contains($"curl -fsSL \"{sourceUri}\" | sha256sum", stdout);
+            Assert.DoesNotContain("draft", stdout, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("나중에 추가", stdout);
+        }
+
+        [Fact]
+        public void ContainerImageFlow_WhenResolverReturnsDigest_AsksToUseDigest()
+        {
+            var session = new RecipeAuthoringSession();
+            var stdout = new StringWriter();
+            var stdin = new StringReader(string.Join("\n", new[]
+            {
+                "3",               // container image
+                ContainerImageRef, // no digest
+                "",                // accept resolved digest
+            }));
+
+            var method = BeginnerGuideFlow.Run(
+                session,
+                stdin,
+                stdout,
+                NoCancellation,
+                new FakeDigestResolver(ImageDigestResolutionResult.Resolved(Digest)));
+
+            Assert.Equal(RecipeMethodId.Container, method);
+            Assert.Contains("이 digest를 사용할까요", stdout.ToString());
+            var snapshot = session.Snapshot();
+            Assert.Contains(snapshot.Values, v => v.FieldName == "ImageDigest" && v.DisplayValue == Digest);
+        }
+
+        [Fact]
+        public void ContainerImageFlow_WhenResolverUnsupported_FallsBackToManualDigestInput()
+        {
+            var session = new RecipeAuthoringSession();
+            var stdout = new StringWriter();
+            var stdin = new StringReader(string.Join("\n", new[]
+            {
+                "3",               // container image
+                ContainerImageRef, // no digest
+                "2",               // manual digest
+                Digest,
+            }));
+
+            var method = BeginnerGuideFlow.Run(
+                session,
+                stdin,
+                stdout,
+                NoCancellation,
+                NullImageDigestResolver.Instance);
+
+            Assert.Equal(RecipeMethodId.Container, method);
+            Assert.Contains("현재 환경에서는 자동 조회를 사용할 수 없습니다", stdout.ToString());
+            Assert.Contains("ImageDigest:", stdout.ToString());
+        }
+
+        [Fact]
+        public void ContainerImageFlow_WhenResolverFails_PrintsHumanReadableReason()
+        {
+            var session = new RecipeAuthoringSession();
+            var stdout = new StringWriter();
+            var stdin = new StringReader(string.Join("\n", new[]
+            {
+                "3",               // container image
+                ContainerImageRef, // no digest
+                "2",               // manual digest
+                Digest,
+            }));
+
+            var method = BeginnerGuideFlow.Run(
+                session,
+                stdin,
+                stdout,
+                NoCancellation,
+                new FakeDigestResolver(ImageDigestResolutionResult.NotFound()));
+
+            Assert.Equal(RecipeMethodId.Container, method);
+            Assert.Contains("이미지를 찾을 수 없습니다", stdout.ToString());
+        }
+
+        [Fact]
+        public void ContainerImageFlow_WhenUserRejectsResolvedDigest_AsksManualDigest()
+        {
+            var session = new RecipeAuthoringSession();
+            var stdout = new StringWriter();
+            var stdin = new StringReader(string.Join("\n", new[]
+            {
+                "3",               // container image
+                ContainerImageRef, // no digest
+                "n",               // reject resolved digest
+                "2",               // manual digest
+                Digest,
+            }));
+
+            var method = BeginnerGuideFlow.Run(
+                session,
+                stdin,
+                stdout,
+                NoCancellation,
+                new FakeDigestResolver(ImageDigestResolutionResult.Resolved(Digest)));
+
+            Assert.Equal(RecipeMethodId.Container, method);
+            Assert.Contains("직접 digest를 입력합니다", stdout.ToString());
+            Assert.Contains("ImageDigest:", stdout.ToString());
         }
 
         // ── Dockerfile clue ───────────────────────────────────────────────────
@@ -390,7 +582,7 @@ namespace NodeKit.Cli.Tests
                 "./Dockerfile",
                 "N",           // reject warning → back to clue picker
                 "7",           // 잘 모르겠다 → NoClue flow
-                "5",           // exit
+                "6",           // exit
             };
 
             var exitCode = RunCli(outPath, transcript, out var stdout, out _);
@@ -441,7 +633,7 @@ namespace NodeKit.Cli.Tests
                 "8",    // invalid → re-prompt
                 "abc",  // invalid → re-prompt
                 "7",    // 잘 모르겠다
-                "5",    // exit
+                "6",    // exit
             };
 
             var exitCode = RunCli(outPath, transcript, out var stdout, out _);
@@ -470,6 +662,25 @@ namespace NodeKit.Cli.Tests
         private sealed class NoOpCancellationSource : IRecipeCreateCancellationSource
         {
             public bool IsCancellationRequested => false;
+        }
+
+        private sealed class FakeDigestResolver : IImageDigestResolver
+        {
+            private readonly ImageDigestResolutionResult _result;
+
+            public FakeDigestResolver(ImageDigestResolutionResult result)
+            {
+                _result = result;
+            }
+
+            public Task<ImageDigestResolutionResult> ResolveAsync(
+                string imageUri,
+                CancellationToken cancellationToken)
+            {
+                _ = imageUri;
+                _ = cancellationToken;
+                return Task.FromResult(_result);
+            }
         }
     }
 }

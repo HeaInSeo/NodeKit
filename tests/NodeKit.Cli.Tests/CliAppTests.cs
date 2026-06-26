@@ -71,6 +71,7 @@ namespace NodeKit.Cli.Tests
 
             Assert.Equal(1, exitCode);
             Assert.Contains("L1-SRC-001", stderr.ToString());
+            Assert.Contains("(SourceChecksum)", stderr.ToString());
         }
 
         [Fact]
@@ -105,6 +106,7 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(1, exitCode);
             Assert.False(File.Exists(outPath));
             Assert.Contains("L1-SRC-001", stderr.ToString());
+            Assert.Contains("(SourceChecksum)", stderr.ToString());
         }
 
         [Fact]

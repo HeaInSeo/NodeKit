@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading;
 using NodeKit.Authoring.Recipes;
 
 namespace NodeKit.Cli
@@ -21,14 +22,26 @@ namespace NodeKit.Cli
             TextWriter stdout,
             IRecipeCreateCancellationSource cancellation)
         {
-            return PromptCluePicker(session, stdin, stdout, cancellation);
+            return Run(session, stdin, stdout, cancellation, NullImageDigestResolver.Instance);
+        }
+
+        public static RecipeMethodId? Run(
+            RecipeAuthoringSession session,
+            TextReader stdin,
+            TextWriter stdout,
+            IRecipeCreateCancellationSource cancellation,
+            IImageDigestResolver digestResolver)
+        {
+            ArgumentNullException.ThrowIfNull(digestResolver);
+            return PromptCluePicker(session, stdin, stdout, cancellation, digestResolver);
         }
 
         private static RecipeMethodId? PromptCluePicker(
             RecipeAuthoringSession session,
             TextReader stdin,
             TextWriter stdout,
-            IRecipeCreateCancellationSource cancellation)
+            IRecipeCreateCancellationSource cancellation,
+            IImageDigestResolver digestResolver)
         {
             stdout.WriteLine("쉬운 안내 모드");
             stdout.WriteLine();
@@ -73,19 +86,19 @@ namespace NodeKit.Cli
                 switch (line)
                 {
                     case "1":
-                        return RunToolNameFlow(session, stdin, stdout, cancellation);
+                        return RunToolNameFlow(session, stdin, stdout, cancellation, digestResolver);
                     case "2":
-                        return RunInstallCommandFlow(session, stdin, stdout, cancellation);
+                        return RunInstallCommandFlow(session, stdin, stdout, cancellation, digestResolver);
                     case "3":
-                        return RunContainerImageFlow(session, stdin, stdout, cancellation);
+                        return RunContainerImageFlow(session, stdin, stdout, cancellation, digestResolver);
                     case "4":
-                        return RunSourceFlow(session, stdin, stdout, cancellation);
+                        return RunSourceFlow(session, stdin, stdout, cancellation, digestResolver);
                     case "5":
-                        return RunDockerfileFlow(session, stdin, stdout, cancellation);
+                        return RunDockerfileFlow(session, stdin, stdout, cancellation, digestResolver);
                     case "6":
                         return RunMirrorFlow(session, stdin, stdout, cancellation);
                     case "7":
-                        return RunNoClueFlow(session, stdin, stdout, cancellation);
+                        return RunNoClueFlow(session, stdin, stdout, cancellation, digestResolver);
                     default:
                         stdout.WriteLine("1–7 중에서 선택해 주세요.");
                         stdout.WriteLine("선택:");
@@ -99,19 +112,37 @@ namespace NodeKit.Cli
             RecipeAuthoringSession session,
             TextReader stdin,
             TextWriter stdout,
-            IRecipeCreateCancellationSource cancellation)
+            IRecipeCreateCancellationSource cancellation,
+            IImageDigestResolver digestResolver)
         {
-            stdout.WriteLine();
-            stdout.WriteLine("도구 이름을 입력해 주세요.");
-            stdout.WriteLine();
-            stdout.WriteLine("예:");
-            stdout.WriteLine("  bwa");
-            stdout.WriteLine("  samtools");
-            stdout.WriteLine("  fastqc");
-            stdout.WriteLine();
-            stdout.WriteLine("도구 이름:");
+            string name;
+            while (true)
+            {
+                if (cancellation.IsCancellationRequested)
+                {
+                    throw new RecipeCreateCancelledException();
+                }
 
-            var name = (stdin.ReadLine() ?? string.Empty).Trim();
+                stdout.WriteLine();
+                stdout.WriteLine("도구 이름을 입력해 주세요.");
+                stdout.WriteLine();
+                stdout.WriteLine("예:");
+                stdout.WriteLine("  bwa");
+                stdout.WriteLine("  samtools");
+                stdout.WriteLine("  fastqc");
+                stdout.WriteLine();
+                stdout.WriteLine("도구 이름:");
+
+                name = (stdin.ReadLine() ?? string.Empty).Trim();
+                if (name.Length > 0)
+                {
+                    break;
+                }
+
+                stdout.WriteLine("도구 이름을 입력해 주세요.");
+            }
+
+            PrintToolLookupGuidance(stdout, name);
 
             stdout.WriteLine();
             stdout.WriteLine($"'{name}' 도구를 설치하거나 실행하는 예시를 본 적 있나요?");
@@ -136,17 +167,17 @@ namespace NodeKit.Cli
                 switch (line)
                 {
                     case "1":
-                        return RunInstallCommandFlow(session, stdin, stdout, cancellation);
+                        return RunInstallCommandFlow(session, stdin, stdout, cancellation, digestResolver);
                     case "2":
-                        return RunContainerImageFlow(session, stdin, stdout, cancellation);
+                        return RunContainerImageFlow(session, stdin, stdout, cancellation, digestResolver);
                     case "3":
-                        return RunSourceFlow(session, stdin, stdout, cancellation);
+                        return RunSourceFlow(session, stdin, stdout, cancellation, digestResolver);
                     case "4":
-                        return RunDockerfileFlow(session, stdin, stdout, cancellation);
+                        return RunDockerfileFlow(session, stdin, stdout, cancellation, digestResolver);
                     case "5":
                         return RunMirrorFlow(session, stdin, stdout, cancellation);
                     case "6":
-                        return RunNoClueFlow(session, stdin, stdout, cancellation);
+                        return RunNoClueFlow(session, stdin, stdout, cancellation, digestResolver);
                     default:
                         stdout.WriteLine("1–6 중에서 선택해 주세요.");
                         stdout.WriteLine("선택:");
@@ -160,7 +191,8 @@ namespace NodeKit.Cli
             RecipeAuthoringSession session,
             TextReader stdin,
             TextWriter stdout,
-            IRecipeCreateCancellationSource cancellation)
+            IRecipeCreateCancellationSource cancellation,
+            IImageDigestResolver digestResolver)
         {
             while (true)
             {
@@ -196,7 +228,7 @@ namespace NodeKit.Cli
                         }
                         else if (choice == InstallParseChoice.SwitchMethod)
                         {
-                            return PromptCluePicker(session, stdin, stdout, cancellation);
+                            return PromptCluePicker(session, stdin, stdout, cancellation, digestResolver);
                         }
                         else
                         {
@@ -216,7 +248,7 @@ namespace NodeKit.Cli
                         }
                         else if (failChoice == InstallParseChoice.SwitchMethod)
                         {
-                            return PromptCluePicker(session, stdin, stdout, cancellation);
+                            return PromptCluePicker(session, stdin, stdout, cancellation, digestResolver);
                         }
                         else
                         {
@@ -416,7 +448,8 @@ namespace NodeKit.Cli
             RecipeAuthoringSession session,
             TextReader stdin,
             TextWriter stdout,
-            IRecipeCreateCancellationSource cancellation)
+            IRecipeCreateCancellationSource cancellation,
+            IImageDigestResolver digestResolver)
         {
             string? pendingRef = null;
 
@@ -458,6 +491,31 @@ namespace NodeKit.Cli
 
                 if (result.Status == ImageReferenceNormalizeStatus.MissingDigest)
                 {
+                    var resolvedDigest = TryResolveImageDigest(pendingRef, digestResolver, stdout, cancellation);
+                    if (resolvedDigest != null)
+                    {
+                        stdout.WriteLine();
+                        stdout.WriteLine("이미지 digest를 확인했습니다.");
+                        stdout.WriteLine();
+                        stdout.WriteLine($"  {resolvedDigest}");
+                        stdout.WriteLine();
+                        stdout.WriteLine("이 digest를 사용할까요? [Y/n]");
+                        var confirm = (stdin.ReadLine() ?? string.Empty).Trim().ToLowerInvariant();
+                        if (confirm.Length == 0 || confirm == "y")
+                        {
+                            var resolved = ImageReferenceNormalizer.Normalize(pendingRef, resolvedDigest);
+                            if (resolved.Status == ImageReferenceNormalizeStatus.Normalized)
+                            {
+                                session.SelectMethod(RecipeMethodId.Container);
+                                session.SetField("ImageRef", resolved.RepositoryAndTag);
+                                session.SetField("ImageDigest", resolved.Digest!);
+                                return RecipeMethodId.Container;
+                            }
+                        }
+
+                        stdout.WriteLine("직접 digest를 입력합니다.");
+                    }
+
                     stdout.WriteLine();
                     stdout.WriteLine("입력한 이미지 주소에는 digest가 없습니다.");
                     stdout.WriteLine();
@@ -483,7 +541,7 @@ namespace NodeKit.Cli
                     }
                     else if (choice == ContainerChoice.SwitchMethod)
                     {
-                        return PromptCluePicker(session, stdin, stdout, cancellation);
+                        return PromptCluePicker(session, stdin, stdout, cancellation, digestResolver);
                     }
                     else if (choice == ContainerChoice.Cancel)
                     {
@@ -549,7 +607,8 @@ namespace NodeKit.Cli
             RecipeAuthoringSession session,
             TextReader stdin,
             TextWriter stdout,
-            IRecipeCreateCancellationSource cancellation)
+            IRecipeCreateCancellationSource cancellation,
+            IImageDigestResolver digestResolver)
         {
             while (true)
             {
@@ -580,11 +639,7 @@ namespace NodeKit.Cli
                 }
 
                 stdout.WriteLine();
-                stdout.WriteLine("SourceChecksum은 다운로드한 소스 파일이 정확히 같은 파일인지 확인하기 위한 sha256 값입니다.");
-                stdout.WriteLine();
-                stdout.WriteLine("예:");
-                stdout.WriteLine("  sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
-                stdout.WriteLine();
+                PrintSourceChecksumGuidance(stdout, uri);
                 stdout.WriteLine("SourceChecksum:");
 
                 var checksum = (stdin.ReadLine() ?? string.Empty).Trim();
@@ -600,10 +655,10 @@ namespace NodeKit.Cli
                 stdout.WriteLine("SourceChecksum이 없으면 source 방식 recipe를 완성할 수 없습니다.");
                 stdout.WriteLine();
                 stdout.WriteLine("선택:");
-                stdout.WriteLine("[1] checksum을 입력한다");
-                stdout.WriteLine("[2] source 주소를 다시 입력한다");
+                stdout.WriteLine("[1] 계산 방법을 본다");
+                stdout.WriteLine("[2] 직접 입력한다");
                 stdout.WriteLine("[3] 다른 작성 방식으로 바꾼다");
-                stdout.WriteLine("[4] 취소한다");
+                stdout.WriteLine("[4] 저장하지 않고 종료한다");
                 stdout.WriteLine();
                 stdout.WriteLine("선택:");
 
@@ -618,6 +673,9 @@ namespace NodeKit.Cli
                     switch (line)
                     {
                         case "1":
+                            PrintSourceChecksumGuidance(stdout, uri);
+                            continue;
+                        case "2":
                             stdout.WriteLine("SourceChecksum:");
                             var newChecksum = (stdin.ReadLine() ?? string.Empty).Trim();
                             if (!string.IsNullOrEmpty(newChecksum))
@@ -629,12 +687,10 @@ namespace NodeKit.Cli
                             }
                             stdout.WriteLine("checksum이 비어 있습니다. 다시 시도합니다.");
                             continue;
-                        case "2":
-                            goto retrySource;
                         case "3":
-                            return PromptCluePicker(session, stdin, stdout, cancellation);
+                            return PromptCluePicker(session, stdin, stdout, cancellation, digestResolver);
                         case "4":
-                            throw new RecipeCreateCancelledException();
+                            return null;
                         default:
                             stdout.WriteLine("1–4 중에서 선택해 주세요.");
                             stdout.WriteLine("선택:");
@@ -642,7 +698,6 @@ namespace NodeKit.Cli
                     }
                 }
 
-                retrySource:;
             }
         }
 
@@ -651,7 +706,8 @@ namespace NodeKit.Cli
             RecipeAuthoringSession session,
             TextReader stdin,
             TextWriter stdout,
-            IRecipeCreateCancellationSource cancellation)
+            IRecipeCreateCancellationSource cancellation,
+            IImageDigestResolver digestResolver)
         {
             while (true)
             {
@@ -696,7 +752,7 @@ namespace NodeKit.Cli
                 var confirm = (stdin.ReadLine() ?? string.Empty).Trim().ToLowerInvariant();
                 if (confirm != "y")
                 {
-                    return PromptCluePicker(session, stdin, stdout, cancellation);
+                    return PromptCluePicker(session, stdin, stdout, cancellation, digestResolver);
                 }
 
                 session.SelectMethod(RecipeMethodId.Dockerfile);
@@ -752,7 +808,8 @@ namespace NodeKit.Cli
             RecipeAuthoringSession session,
             TextReader stdin,
             TextWriter stdout,
-            IRecipeCreateCancellationSource cancellation)
+            IRecipeCreateCancellationSource cancellation,
+            IImageDigestResolver digestResolver)
         {
             stdout.WriteLine();
             stdout.WriteLine("아직 recipe를 완성하기 위한 단서가 부족합니다.");
@@ -767,11 +824,12 @@ namespace NodeKit.Cli
             stdout.WriteLine("  - 내부 package mirror 주소");
             stdout.WriteLine();
             stdout.WriteLine("선택:");
-            stdout.WriteLine("[1] 설치 명령을 입력한다");
-            stdout.WriteLine("[2] 컨테이너 이미지 주소를 입력한다");
-            stdout.WriteLine("[3] 소스코드 주소를 입력한다");
-            stdout.WriteLine("[4] Dockerfile 경로를 입력한다");
-            stdout.WriteLine("[5] 저장하지 않고 종료한다");
+            stdout.WriteLine("[1] 도구 이름으로 bioconda/BioContainers 확인 방법을 본다");
+            stdout.WriteLine("[2] 설치 명령을 입력한다");
+            stdout.WriteLine("[3] 컨테이너 이미지 주소를 입력한다");
+            stdout.WriteLine("[4] 소스코드 주소를 입력한다");
+            stdout.WriteLine("[5] Dockerfile 경로를 입력한다");
+            stdout.WriteLine("[6] 저장하지 않고 종료한다");
             stdout.WriteLine();
             stdout.WriteLine("선택:");
 
@@ -786,21 +844,102 @@ namespace NodeKit.Cli
                 switch (line)
                 {
                     case "1":
-                        return RunInstallCommandFlow(session, stdin, stdout, cancellation);
+                        return RunToolNameFlow(session, stdin, stdout, cancellation, digestResolver);
                     case "2":
-                        return RunContainerImageFlow(session, stdin, stdout, cancellation);
+                        return RunInstallCommandFlow(session, stdin, stdout, cancellation, digestResolver);
                     case "3":
-                        return RunSourceFlow(session, stdin, stdout, cancellation);
+                        return RunContainerImageFlow(session, stdin, stdout, cancellation, digestResolver);
                     case "4":
-                        return RunDockerfileFlow(session, stdin, stdout, cancellation);
+                        return RunSourceFlow(session, stdin, stdout, cancellation, digestResolver);
                     case "5":
+                        return RunDockerfileFlow(session, stdin, stdout, cancellation, digestResolver);
+                    case "6":
                         return null;
                     default:
-                        stdout.WriteLine("1–5 중에서 선택해 주세요.");
+                        stdout.WriteLine("1–6 중에서 선택해 주세요.");
                         stdout.WriteLine("선택:");
                         break;
                 }
             }
         }
+
+        private static void PrintToolLookupGuidance(TextWriter output, string toolName)
+        {
+            output.WriteLine();
+            output.WriteLine("다음 위치에서 도구를 확인해보세요.");
+            output.WriteLine();
+            output.WriteLine("  bioconda 패키지:");
+            output.WriteLine($"    {BuildBiocondaUrl(toolName)}");
+            output.WriteLine();
+            output.WriteLine("  BioContainers 이미지:");
+            output.WriteLine($"    {BuildBioContainersUrl(toolName)}");
+            output.WriteLine();
+            output.WriteLine("bioconda 페이지에서 conda install 명령어를 찾았다면 package 방식으로 진행할 수 있습니다.");
+            output.WriteLine("BioContainers 페이지에서 이미지 주소를 찾았다면 container 방식으로 진행할 수 있습니다.");
+        }
+
+        private static string BuildBiocondaUrl(string toolName) =>
+            "https://anaconda.org/bioconda/" + Uri.EscapeDataString(toolName.Trim());
+
+        private static string BuildBioContainersUrl(string toolName) =>
+            "https://quay.io/repository/biocontainers/" + Uri.EscapeDataString(toolName.Trim()) + "?tab=tags";
+
+        private static void PrintSourceChecksumGuidance(TextWriter output, string sourceUri)
+        {
+            output.WriteLine("소스 코드 검증값이 필요합니다.");
+            output.WriteLine();
+            output.WriteLine("NodeKit은 같은 소스 코드로 다시 빌드할 수 있도록 sha256 checksum을 요구합니다.");
+            output.WriteLine();
+            output.WriteLine("소스 archive URL이 있다면 다음 명령으로 계산할 수 있습니다.");
+            output.WriteLine();
+            output.WriteLine($"  curl -fsSL \"{sourceUri}\" | sha256sum");
+            output.WriteLine();
+            output.WriteLine("출력 예:");
+            output.WriteLine("  3f2a1b9c...  -");
+            output.WriteLine();
+            output.WriteLine("앞의 64자리 hex 값에 sha256: prefix를 붙여 입력하세요.");
+            output.WriteLine("예:");
+            output.WriteLine("  sha256:3f2a1b9c...");
+            output.WriteLine();
+        }
+
+        private static string? TryResolveImageDigest(
+            string imageUri,
+            IImageDigestResolver digestResolver,
+            TextWriter stdout,
+            IRecipeCreateCancellationSource cancellation)
+        {
+            if (cancellation.IsCancellationRequested)
+            {
+                throw new RecipeCreateCancelledException();
+            }
+
+            var result = digestResolver.ResolveAsync(imageUri, CancellationToken.None).GetAwaiter().GetResult();
+            if (result.Status == ImageDigestResolutionStatus.Resolved && !string.IsNullOrWhiteSpace(result.Digest))
+            {
+                return result.Digest;
+            }
+
+            stdout.WriteLine();
+            stdout.WriteLine(DescribeDigestResolutionFailure(result));
+            if (!string.IsNullOrWhiteSpace(result.Message))
+            {
+                stdout.WriteLine(result.Message);
+            }
+
+            stdout.WriteLine("이미지 registry에서 digest를 복사해 입력하세요.");
+            return null;
+        }
+
+        private static string DescribeDigestResolutionFailure(ImageDigestResolutionResult result) => result.Status switch
+        {
+            ImageDigestResolutionStatus.NotFound => "이미지를 찾을 수 없습니다. 이미지 이름과 tag를 확인하세요.",
+            ImageDigestResolutionStatus.AuthenticationRequired => "registry 인증이 필요합니다. 현재 CLI는 인증 조회를 지원하지 않습니다.",
+            ImageDigestResolutionStatus.NetworkUnavailable => "네트워크 연결을 확인할 수 없습니다. 수동으로 digest를 입력하세요.",
+            ImageDigestResolutionStatus.InvalidReference => "이미지 주소 형식이 올바르지 않습니다.",
+            ImageDigestResolutionStatus.Unsupported => "현재 환경에서는 자동 조회를 사용할 수 없습니다.",
+            ImageDigestResolutionStatus.Resolved => "이미지 digest를 확인했습니다.",
+            _ => throw new ArgumentOutOfRangeException(nameof(result), result.Status, "Unsupported digest resolution status."),
+        };
     }
 }
