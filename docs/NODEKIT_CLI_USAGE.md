@@ -10,7 +10,11 @@ legacy `BuildRequest` JSON`. gRPC 전송, NodeVault 조회, 이미지 빌드,
 `submit`/`build` 명령은 이 CLI에 없다 (CLAUDE.md 1절, NodeKit 책임 경계).
 
 명령 설계 배경은 [`NODEKIT_CLI_RECIPE_SPEC_DRAFT.md`](NODEKIT_CLI_RECIPE_SPEC_DRAFT.md)
-§5/§6, recipe create 마법사의 전체 UX 설계는
+§5/§6, recipe create 마법사의 v1.0 UX 계약은
+[`NODEKIT_CLI_RECIPE_AUTHORING_UX_V1.0.md`](NODEKIT_CLI_RECIPE_AUTHORING_UX_V1.0.md),
+실행 계획은
+[`NODEKIT_CLI_RECIPE_AUTHORING_UX_V1.0_SPRINT_PLAN.md`](NODEKIT_CLI_RECIPE_AUTHORING_UX_V1.0_SPRINT_PLAN.md),
+초기 설계 배경은
 [`NODEKIT_CLI_RECIPE_AUTHORING_UX_BEGINNER_DESIGN.md`](NODEKIT_CLI_RECIPE_AUTHORING_UX_BEGINNER_DESIGN.md)
 참고.
 
@@ -34,8 +38,13 @@ dotnet run --project src/NodeKit.Cli -- render recipe.json --out build-request.j
 
 ## 1. 빌드/실행
 
+저장소 루트에서 실행한다.
+
 ```bash
-# 빌드
+# 전체 빌드
+dotnet build NodeKit.sln
+
+# CLI만 빌드
 dotnet build src/NodeKit.Cli/NodeKit.Cli.csproj
 
 # 실행 방법 1: dotnet run
@@ -45,10 +54,49 @@ dotnet run --project src/NodeKit.Cli -- validate recipe.json
 ./src/NodeKit.Cli/bin/Debug/net10.0/NodeKit.Cli validate recipe.json
 ```
 
+전체 테스트:
+
+```bash
+dotnet test --solution NodeKit.sln
+```
+
+Microsoft.Testing.Platform/xUnit v3를 사용하므로 특정 테스트 클래스만 돌릴 때는
+다음처럼 `--` 뒤에 xUnit 옵션을 넘긴다.
+
+```bash
+dotnet test --project tests/NodeKit.Cli.Tests/NodeKit.Cli.Tests.csproj -- \
+  --filter-class NodeKit.Cli.Tests.BeginnerGuideFlowTests
+```
+
 `NodeKit.Cli.csproj`는 NuGet 패키지를 전혀 참조하지 않는다 — `NodeKit.csproj`의
 Avalonia/Grpc.Net.Client/Google.Protobuf/Wasmtime/ReactiveUI 의존성을 전혀
 가져오지 않는다. 빌드 결과물(`bin/Debug/net10.0/`)에는
 `NodeKit.Cli.{dll,pdb,deps.json,runtimeconfig.json}`만 있다.
+
+### 1-1. UX 테스트용 빠른 실행
+
+v1.0 authoring UX를 직접 확인하려면 아래 명령으로 시작한다.
+
+```bash
+dotnet run --project src/NodeKit.Cli -- recipe create /tmp/nodekit-recipe.json
+```
+
+권장 확인 경로:
+
+| 확인할 UX | 입력 경로 |
+|---|---|
+| 도구 이름 lookup | `[1] 쉬운 안내 모드` → `[1] 도구 이름만 알고 있다` → `bwa` |
+| no-clue 회복 | `[1] 쉬운 안내 모드` → `[7] 잘 모르겠다` |
+| digest 안내 | `[1] 쉬운 안내 모드` → `[3] 컨테이너 이미지 주소` → `quay.io/biocontainers/bwa:0.7.17--h7132678_9` |
+| checksum 안내 | `[1] 쉬운 안내 모드` → `[4] GitHub 또는 소스코드 주소` → archive URL → checksum 빈 입력 |
+| final recovery 문구 | 빠른 설정 모드에서 container를 고르고 잘못된 digest(`sha256:bad`) 입력 |
+
+생성된 recipe가 있으면 다음으로 확인한다.
+
+```bash
+dotnet run --project src/NodeKit.Cli -- validate /tmp/nodekit-recipe.json
+dotnet run --project src/NodeKit.Cli -- render /tmp/nodekit-recipe.json --out /tmp/build-request.json
+```
 
 ## 2. `nodekit recipe create` — recipe 마법사
 
@@ -132,10 +180,26 @@ NodeKit recipe create
 | `[4]` GitHub/소스 주소 | `source` |
 | `[5]` Dockerfile | `dockerfile` |
 | `[6]` 내부 저장소 | `mirror` |
-| `[7]` 잘 모르겠다 | 최소 필요 단서 안내 후 종료 (파일 저장 없음, 종료 코드 0) |
+| `[7]` 잘 모르겠다 | 도구 이름 lookup, 설치 명령, 이미지 주소, 소스 주소, Dockerfile, 종료 중 선택 |
+
+**도구 이름만 아는 경우:** `[1]`을 선택하고 `bwa` 같은 도구 이름을 입력하면
+외부 API 호출 없이 확인 URL만 보여준다.
+
+```text
+bioconda 패키지:
+  https://anaconda.org/bioconda/bwa
+
+BioContainers 이미지:
+  https://quay.io/repository/biocontainers/bwa?tab=tags
+```
+
+bioconda 페이지에서 `conda install` 명령어를 찾으면 package 방식으로,
+BioContainers tag 페이지에서 이미지 주소를 찾으면 container 방식으로 이어가면 된다.
 
 **컨테이너 이미지 — digest 필수 처리:** `[3]`을 선택하면 이미지 주소를
-입력받는다. digest가 없으면 다음 중 하나를 선택해야 한다.
+입력받는다. v1.0에는 digest resolver seam이 있지만 기본 구현은
+`NullImageDigestResolver`라 실제 registry 네트워크 조회는 하지 않는다. digest가
+없으면 registry에서 직접 복사해 입력해야 한다.
 
 ```
 입력한 이미지 주소에는 digest가 없습니다.
@@ -150,6 +214,17 @@ NodeKit은 재현성을 위해 digest 고정을 요구합니다.
 digest가 이미지 주소에 포함된 경우(`repo:tag@sha256:...`)에는 이 프롬프트가
 나오지 않고 바로 다음 단계로 진행된다.
 
+**source build — checksum 필수 처리:** `[4]`를 선택하면 `SourceChecksum` 입력 전에
+계산 방법을 보여준다. CLI가 `curl`을 직접 실행하지는 않는다.
+
+```text
+curl -fsSL "<SourceUri>" | sha256sum
+```
+
+checksum이 비어 있으면 계산 방법을 다시 보거나, 직접 입력하거나, 다른 작성
+방식으로 바꾸거나, 저장하지 않고 종료할 수 있다. checksum 없이 진행하는
+경로는 없다.
+
 **Dockerfile — 기본값 N 경고:** `[5]`를 선택하면 재현성 경고가 나온다.
 Enter 또는 `n`을 입력하면 진행되지 않는다. `y`를 입력해야 계속된다.
 
@@ -160,9 +235,19 @@ Dockerfile 방식은 가장 자유롭지만 재현성 책임이 가장 큽니다
 계속하시겠습니까? [y/N]:
 ```
 
-**아무것도 모름 — 안전 종료:** `[7]`을 선택하면 recipe를 저장하지 않고
-종료 코드 0으로 끝난다. 최소로 필요한 단서(설치 명령, 이미지 주소 등)를
-안내한 뒤 강제로 method를 선택하게 하지 않는다.
+**아무것도 모름 — 회복 경로:** `[7]`을 선택하면 바로 종료하지 않고 다음
+선택지를 보여준다.
+
+```text
+[1] 도구 이름으로 bioconda/BioContainers 확인 방법을 본다
+[2] 설치 명령을 입력한다
+[3] 컨테이너 이미지 주소를 입력한다
+[4] 소스코드 주소를 입력한다
+[5] Dockerfile 경로를 입력한다
+[6] 저장하지 않고 종료한다
+```
+
+`[6]`을 선택하면 recipe를 저장하지 않고 종료 코드 0으로 끝난다.
 
 ### 2-3. 빠른 설정 모드
 
@@ -285,11 +370,19 @@ Output의 `Class` 허용값 위반) 때문에 여기서 막힐 수 있다. 입�
 
 ```
 최종 검증에 실패했습니다. 다음 중 수정할 항목을 선택하세요:
-  [1] ImageRef, ImageDigest 항목 함께 수정 — ...
-      힌트: ...
+  [1] 이미지 digest 입력하기 — 컨테이너 이미지가 나중에 바뀌지 않도록 @sha256:... digest가 필요합니다.
+      힌트: Quay 또는 Harbor의 tag 상세 화면에서 sha256 digest를 복사하세요...
 번호를 입력하세요 (취소하려면 빈 줄):
 1
 ```
+
+대표 recovery 문구:
+
+| 상황 | 표시되는 action |
+|---|---|
+| 이미지 digest 누락/오류 | `이미지 digest 입력하기` |
+| source checksum 누락/오류 | `소스 코드 검증값 입력하기` |
+| 패키지 버전 미고정 | `패키지 버전 고정하기` |
 
 `Inputs`/`Outputs`를 고치는 경우에는 기존 항목을 보여주고 `e<번호>`(수정),
 `d<번호>`(삭제), 빈 줄(계속/추가)로 다룬다. 다시 검증에 실패하면 같은
@@ -501,7 +594,7 @@ ls: cannot access 'build-request.json': No such file or directory
   않는다 (NodeVault Phase 1/2 게이트가 아직 열리지 않음 — CLAUDE.md 0절).
 - 5개 method가 생성하는 Dockerfile은 NodeKit L1 정적 검증만 통과했을 뿐,
   실제 `docker build`로 검증된 적은 없다.
-- `recipe create`의 escape hatch는 `/help`, `/change-method` 두 가지만
-  구현되어 있다. 설계 문서에 이름만 나오는 `/review`/`/cancel`/`/skip`은
-  아직 없다 — Ctrl+C로 중단하거나 끝까지 진행 후 recovery 화면에서 취소
-  (빈 줄)하는 것으로 대신한다.
+- `recipe create`의 escape hatch는 `/help`, `/review`, `/change-method`,
+  `/cancel`, `/quit`, `/exit`이다. `/back`과 draft 저장/resume은 v1.0 범위 밖이다.
+- digest resolver seam은 있지만 기본 구현은 네트워크 조회를 하지 않는
+  `NullImageDigestResolver`다. 실제 OCI/Harbor resolver는 v1.1 이후 범위다.

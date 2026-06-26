@@ -9,12 +9,13 @@
 ## 목차
 
 1. [설치 (Ubuntu)](#1-설치-ubuntu)
-2. [첫 실행 — 서버 주소 설정](#2-첫-실행--서버-주소-설정)
-3. [Tool 정의 및 빌드 요청](#3-tool-정의-및-빌드-요청)
-4. [등록된 Tool 목록 조회](#4-등록된-tool-목록-조회)
-5. [등록된 Data 목록 조회](#5-등록된-data-목록-조회)
-6. [정책 관리](#6-정책-관리)
-7. [트러블슈팅](#7-트러블슈팅)
+2. [CLI recipe authoring UX 테스트](#2-cli-recipe-authoring-ux-테스트)
+3. [첫 실행 — 서버 주소 설정](#3-첫-실행--서버-주소-설정)
+4. [Tool 정의 및 빌드 요청](#4-tool-정의-및-빌드-요청)
+5. [등록된 Tool 목록 조회](#5-등록된-tool-목록-조회)
+6. [등록된 Data 목록 조회](#6-등록된-data-목록-조회)
+7. [정책 관리](#7-정책-관리)
+8. [트러블슈팅](#8-트러블슈팅)
 
 ---
 
@@ -63,7 +64,40 @@ sudo apt-get install -y \
 
 ---
 
-## 2. 첫 실행 — 서버 주소 설정
+## 2. CLI recipe authoring UX 테스트
+
+`nodekit recipe create` 대화형 UX를 테스트하려면 GUI 앱을 실행할 필요가 없다.
+저장소 루트에서 CLI를 직접 실행한다.
+
+```bash
+cd /opt/dotnet/src/github.com/HeaInSeo/NodeKit
+dotnet build NodeKit.sln
+dotnet run --project src/NodeKit.Cli -- recipe create /tmp/nodekit-recipe.json
+```
+
+생성된 recipe 검증과 legacy BuildRequest 렌더링:
+
+```bash
+dotnet run --project src/NodeKit.Cli -- validate /tmp/nodekit-recipe.json
+dotnet run --project src/NodeKit.Cli -- render /tmp/nodekit-recipe.json --out /tmp/build-request.json
+```
+
+전체 CLI 사용법, v1.0 authoring UX 테스트 경로, 빌드/테스트 명령은
+[`NODEKIT_CLI_USAGE.md`](NODEKIT_CLI_USAGE.md)를 기준으로 한다.
+
+v1.0에서 직접 확인할 주요 UX:
+
+| 항목 | 확인 방법 |
+|------|-----------|
+| 도구 이름 lookup | 쉬운 안내 모드 → 도구 이름만 알고 있다 → `bwa` |
+| no-clue recovery | 쉬운 안내 모드 → 잘 모르겠다 |
+| digest 안내 | 컨테이너 이미지 주소에 digest 없이 tag만 입력 |
+| SourceChecksum 안내 | source URL 입력 후 checksum을 비워둠 |
+| final recovery 문구 | 잘못된 digest나 unpinned package를 입력해 최종 검증 recovery 확인 |
+
+---
+
+## 3. 첫 실행 — 서버 주소 설정
 
 앱을 처음 실행하면 기본 주소(seoy 서버)로 설정되어 있습니다.
 다른 환경에서 테스트하는 경우 서버 주소를 변경해야 합니다.
@@ -97,7 +131,7 @@ sudo apt-get install -y \
 
 ---
 
-## 3. Tool 정의 및 빌드 요청
+## 4. Tool 정의 및 빌드 요청
 
 좌측 네비게이션 **Tool 정의** 버튼을 클릭합니다.
 
@@ -197,7 +231,7 @@ Catalog에서 사용자에게 보이는 표시 정보입니다.
 
 ---
 
-## 4. 등록된 Tool 목록 조회
+## 5. 등록된 Tool 목록 조회
 
 좌측 네비게이션 **등록된 Tools** 버튼을 클릭합니다.
 
@@ -211,7 +245,7 @@ Catalog 서비스에서 `lifecycle_phase = Active` 상태인 Tool 목록을 불�
 
 ---
 
-## 5. 등록된 Data 목록 조회
+## 6. 등록된 Data 목록 조회
 
 좌측 네비게이션 **등록된 Data** 버튼을 클릭합니다.
 
@@ -223,7 +257,7 @@ Catalog 서비스에서 `lifecycle_phase = Active` 상태인 참조 데이터 �
 
 ---
 
-## 6. 정책 관리
+## 7. 정책 관리
 
 좌측 네비게이션 **정책 관리** 버튼을 클릭합니다.
 
@@ -239,7 +273,7 @@ NodeVault에 새 정책 번들이 배포된 경우 **번들 갱신** 버튼을 �
 
 ---
 
-## 7. 트러블슈팅
+## 8. 트러블슈팅
 
 ### 실행 시 화면이 나타나지 않거나 즉시 종료되는 경우
 

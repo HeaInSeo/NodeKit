@@ -33,7 +33,7 @@
 2. 명시적으로 경로 지정
 
 ```bash
-dotnet test NodeKit.sln /p:ApiProtosRoot=/opt/go/src/github.com/HeaInSeo/NodeVault/protos
+dotnet test --solution NodeKit.sln /p:ApiProtosRoot=/opt/go/src/github.com/HeaInSeo/NodeVault/protos
 dotnet build NodeKit.sln /p:ApiProtosRoot=/opt/go/src/github.com/HeaInSeo/NodeVault/protos
 ```
 
@@ -87,7 +87,7 @@ dotnet build NodeKit.sln
 make policy DOCKGUARD=/opt/dotnet/src/github.com/HeaInSeo/DockGuard/policy/dockerfile
 
 # 3. 테스트
-dotnet test NodeKit.sln
+dotnet test --solution NodeKit.sln
 ```
 
 현재 개발 환경 경로:
