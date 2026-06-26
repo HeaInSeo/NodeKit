@@ -700,18 +700,22 @@ namespace NodeKit.Cli.Tests
         }
 
         [Fact]
-        public void ModeSelector_GuidedBeginnerChoice_FallsBackToQuickSetupFlowWithNotice()
+        public void ModeSelector_GuidedBeginnerChoice_ShowsCluePickerAndRunsFlow()
         {
+            // GuidedBeginner mode (Sprint R13) now runs BeginnerGuideFlow (Section 8.2).
+            // Replaces the R11-era "FallsBackToQuickSetupFlowWithNotice" test.
             var outPath = Path.Combine(_workDir, "recipe.json");
             var transcript = new[]
             {
-                "1", // 쉬운 안내 모드 (아직 미구현 → 빠른 설정 모드로 폴백)
-                "n", "n", "n", "y", "n", "n", // Q&A -> recommend package
-                "", // accept recommended method
-                "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
-                "bwa=0.7.17=h5bf99c6_8", "",
-                "bioconda", "",
-                "",
+                "1",  // 쉬운 안내 모드
+                "2",  // clue: install command
+                "conda install -c bioconda bwa=0.7.17=h5bf99c6_8 -y",
+                "1",  // use understood values (Parsed result)
+                "bwa-mem", "0.7.17", "run.sh",
+                ImageRefWithDigest,  // ImageRef (BaseImage for Package method)
+                // Packages: pre-filled by BeginnerGuideFlow, skipped
+                // Channels: pre-filled by BeginnerGuideFlow, skipped
+                // PackageEngine: Defaulted, skipped
                 "reads", "1", "",
                 "bam", "1", "",
             };
@@ -726,8 +730,14 @@ namespace NodeKit.Cli.Tests
 
             Assert.Equal(0, exitCode);
             Assert.Empty(stderr.ToString());
-            Assert.Contains("쉬운 안내 모드는 아직 준비 중입니다", stdout.ToString());
+            var stdoutText = stdout.ToString();
+            Assert.Contains("쉬운 안내 모드", stdoutText);
+            Assert.DoesNotContain("아직 준비 중", stdoutText);
             Assert.True(File.Exists(outPath));
+
+            var json = File.ReadAllText(outPath);
+            Assert.Contains("\"PackageEngine\": \"conda\"", json);
+            Assert.Contains("bwa-mem", json);
         }
 
         [Fact]

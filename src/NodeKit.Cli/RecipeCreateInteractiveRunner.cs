@@ -53,37 +53,46 @@ namespace NodeKit.Cli
                 return 0;
             }
 
-            if (mode == AuthoringModeSelector.Mode.GuidedBeginner)
-            {
-                stdout.WriteLine("쉬운 안내 모드는 아직 준비 중입니다. 빠른 설정 모드로 진행합니다.");
-                stdout.WriteLine();
-            }
-
             var session = new RecipeAuthoringSession();
 
             try
             {
-                var method = SelectMethod(session, stdin, stdout);
-                if (method is null)
-                {
-                    stderr.WriteLine("method 선택이 완료되지 않아 종료합니다.");
-                    return 1;
-                }
+                RecipeMethodId? method;
 
-                if (method == RecipeMethodId.Dockerfile)
+                if (mode == AuthoringModeSelector.Mode.GuidedBeginner)
                 {
-                    if (parsed.AcceptDockerfileWarning)
+                    method = BeginnerGuideFlow.Run(session, stdin, stdout, cancellation);
+                    if (method is null)
                     {
-                        session.AcceptDockerfileWarning();
+                        stdout.WriteLine("단서가 부족합니다. recipe를 저장하지 않고 종료합니다.");
+                        return 0;
                     }
-                    else if (!ConfirmDockerfileWarning(stdin, stdout))
+                    // Dockerfile warning confirmation is handled inside BeginnerGuideFlow
+                }
+                else
+                {
+                    method = SelectMethod(session, stdin, stdout);
+                    if (method is null)
                     {
-                        stdout.WriteLine("Dockerfile 방법 진행이 취소되었습니다.");
+                        stderr.WriteLine("method 선택이 완료되지 않아 종료합니다.");
                         return 1;
                     }
-                    else
+
+                    if (method == RecipeMethodId.Dockerfile)
                     {
-                        session.AcceptDockerfileWarning();
+                        if (parsed.AcceptDockerfileWarning)
+                        {
+                            session.AcceptDockerfileWarning();
+                        }
+                        else if (!ConfirmDockerfileWarning(stdin, stdout))
+                        {
+                            stdout.WriteLine("Dockerfile 방법 진행이 취소되었습니다.");
+                            return 1;
+                        }
+                        else
+                        {
+                            session.AcceptDockerfileWarning();
+                        }
                     }
                 }
 

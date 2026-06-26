@@ -61,6 +61,12 @@
     <Compile Include="..\Authoring\Recipes\ChannelNormalizer.cs" Link="Authoring\Recipes\ChannelNormalizer.cs" />
     <Compile Include="..\Authoring\Recipes\RecipeValueNormalizationResult.cs" Link="Authoring\Recipes\RecipeValueNormalizationResult.cs" />
     <Compile Include="..\Authoring\Recipes\RecipeValueNormalizationAction.cs" Link="Authoring\Recipes\RecipeValueNormalizationAction.cs" />
+    <Compile Include="..\Authoring\Recipes\InstallCommandParseStatus.cs" Link="Authoring\Recipes\InstallCommandParseStatus.cs" />
+    <Compile Include="..\Authoring\Recipes\InstallCommandParseResult.cs" Link="Authoring\Recipes\InstallCommandParseResult.cs" />
+    <Compile Include="..\Authoring\Recipes\InstallCommandParser.cs" Link="Authoring\Recipes\InstallCommandParser.cs" />
+    <Compile Include="..\Authoring\Recipes\ImageReferenceNormalizeStatus.cs" Link="Authoring\Recipes\ImageReferenceNormalizeStatus.cs" />
+    <Compile Include="..\Authoring\Recipes\ImageReferenceNormalizeResult.cs" Link="Authoring\Recipes\ImageReferenceNormalizeResult.cs" />
+    <Compile Include="..\Authoring\Recipes\ImageReferenceNormalizer.cs" Link="Authoring\Recipes\ImageReferenceNormalizer.cs" />
 
     <Compile Include="..\Validation\IValidator.cs" Link="Validation\IValidator.cs" />
     <Compile Include="..\Validation\ValidationResult.cs" Link="Validation\ValidationResult.cs" />

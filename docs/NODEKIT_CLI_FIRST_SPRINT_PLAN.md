@@ -1202,6 +1202,48 @@ Done when:
   a method choice.
 ```
 
+**Progress (Sprint R13 완료):**
+
+```text
+완료:
+- ImageReferenceNormalizeStatus / ImageReferenceNormalizeResult / ImageReferenceNormalizer
+  (src/Authoring/Recipes/)
+  • Normalize(imageRef, imageDigest): Normalized / MissingDigest / DigestConflict 세 결과
+  • 임베디드 @sha256: 파싱, sha256: 접두어 자동 추가, 빈/공백 digest 처리
+
+- BeginnerGuideFlow (src/NodeKit.Cli/BeginnerGuideFlow.cs)
+  • 7-choice 단서 픽커 (Section 8.2)
+  • 설치 명령 서브플로 (Section 9): InstallCommandParser 재사용,
+    Parsed/PartiallyParsed/Failed 처리
+  • 컨테이너 이미지 서브플로 (Section 10): ImageReferenceNormalizer 적용,
+    MissingDigest 시 [1-4] 선택 프롬프트
+  • 소스/GitHub 서브플로 (Section 11)
+  • Dockerfile 서브플로 (Section 12): 기본-N 경고 + 확인
+  • 미러 서브플로 (Section 13)
+  • 아무것도 모름 서브플로 (Section 14): 최소 단서 안내 후 파일 저장 없이 exit 0
+
+- RecipeCreateInteractiveRunner: mode==GuidedBeginner → BeginnerGuideFlow.Run() 호출,
+  null 반환 시 "단서가 부족합니다." 출력 후 exit 0
+
+- NodeKit.Cli.csproj: InstallCommandParser+ImageReferenceNormalizer 관련
+  신규 파일 6개 소스 링크 추가
+
+테스트:
+- ImageReferenceNormalizerTests.cs: 12 unit + 2 integration (NodeKit.Tests)
+  • Session_SplitImageRefDigest_BuildProducesCanonicalBioContainerUri
+  • Session_SplitImageRefDigest_L1ValidationPasses_NoDigestViolation
+    (BuildKind = RecipeBuildKindResolver.Resolve() 포함)
+- BeginnerGuideFlowTests.cs: ~15 transcript 기반 테스트 (NodeKit.Cli.Tests)
+- RecipeCreateInteractiveTests.cs: GuidedBeginner 모드 transcript 갱신
+
+최종 테스트 결과: NodeKit.Tests 332/332, NodeKit.Cli.Tests 57/57 (0 failed)
+
+설계 비고:
+- DigestConflict 는 BeginnerGuideFlow 내에서 도달 불가
+  (임베디드 digest → 즉시 Normalized; SeparateDigest 분기는 MissingDigest에서만
+  진입 → 별도 digest 제공 시 항상 Normalized). 단위 테스트로만 커버.
+```
+
 ### Sprint R14. Phase 4 — Non-Interactive Contract Alignment
 
 Goal:
