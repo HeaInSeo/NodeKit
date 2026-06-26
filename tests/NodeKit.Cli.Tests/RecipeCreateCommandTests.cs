@@ -96,6 +96,51 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(2, exitCode);
         }
 
+        // --- Section 23: --field parsing contract regression tests ---
+
+        [Fact]
+        public void Field_EmbeddedEquals_PreservedAsValue_NotSplitAgain()
+        {
+            // TrySplitOnce uses IndexOf('='), so "Packages=bwa=0.7.17=h5bf99c6_8"
+            // splits into Name="Packages", Value="bwa=0.7.17=h5bf99c6_8".
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var exitCode = RunCreate(PackageArgs(engine: null), outPath);
+
+            Assert.Equal(0, exitCode);
+            Assert.Contains("bwa=0.7.17=h5bf99c6_8", File.ReadAllText(outPath));
+        }
+
+        [Fact]
+        public void Field_StringList_RepeatedField_AccumulatesAllValues()
+        {
+            // Repeated --field for StringList fields (Packages, Channels,
+            // SourceBuildCommands, BuildDependencies, Command) accumulates;
+            // the last value does not overwrite earlier ones.
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var args = new[]
+            {
+                "--non-interactive", "--method", "package",
+                "--field", "ToolName=bwa-mem",
+                "--field", "ToolVersion=0.7.17",
+                "--field", "Script=run.sh",
+                "--field", $"ImageRef={ImageRefWithDigest}",
+                "--field", "Packages=bwa=0.7.17=h5bf99c6_8",
+                "--field", "Packages=samtools=1.18=h50ea8bc_1",
+                "--field", "Channels=bioconda",
+                "--field", "Channels=conda-forge",
+                "--input", "reads=fastq-paired",
+                "--output", "bam=bam-primary",
+            };
+            var exitCode = RunCreate(args, outPath);
+
+            Assert.Equal(0, exitCode);
+            var json = File.ReadAllText(outPath);
+            Assert.Contains("bwa=0.7.17=h5bf99c6_8", json);
+            Assert.Contains("samtools=1.18=h50ea8bc_1", json);
+            Assert.Contains("bioconda", json);
+            Assert.Contains("conda-forge", json);
+        }
+
         // --- 31.2 non-interactive requirement tier tests ---
 
         [Fact]
