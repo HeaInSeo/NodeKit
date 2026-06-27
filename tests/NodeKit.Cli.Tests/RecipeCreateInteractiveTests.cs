@@ -616,7 +616,7 @@ namespace NodeKit.Cli.Tests
         }
 
         [Fact]
-        public void BackCommand_AtFieldPrompt_PrintsSupportedScopeAndContinues()
+        public void BackCommand_AtFieldPrompt_RepromptsPreviousField()
         {
             var outPath = Path.Combine(_workDir, "recipe.json");
             var transcript = new[]
@@ -624,8 +624,46 @@ namespace NodeKit.Cli.Tests
                 "2", // 빠른 설정 모드
                 "n", "n", "y", "n", "n", "n", // Q&A -> recommend container
                 "", // accept recommended method
-                "bwa-mem", // ToolName
-                "/back", // ToolVersion prompt: limited support message, ask again
+                "bwa-mem", // ToolName (first entry)
+                "/back", // ToolVersion prompt → back to ToolName
+                "bwa-mem2", // ToolName (re-entered)
+                "0.7.17", // ToolVersion
+                "bwa mem",
+                "condaforge/miniforge3:24.3.0-0",
+                DigestOnly,
+                "",
+                "reads", "1", "",
+                "bam", "1", "",
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.Empty(stderr.ToString());
+            Assert.True(File.Exists(outPath));
+            var stdoutText = stdout.ToString();
+            Assert.DoesNotContain("/back은 현재 v1.0에서 초기 선택", stdoutText);
+            Assert.Contains("[1 / ", stdoutText);
+            var json = File.ReadAllText(outPath);
+            Assert.Contains("\"ToolName\": \"bwa-mem2\"", json);
+        }
+
+        [Fact]
+        public void BackCommand_AtFirstFieldPrompt_ReturnsToModeSelector()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "2", // 빠른 설정 모드
+                "n", "n", "y", "n", "n", "n", // Q&A -> recommend container
+                "", // accept recommended method
+                "/back", // ToolName prompt (first field) → back to mode selector
+                "2", // 빠른 설정 모드 (re-selected)
+                "n", "n", "y", "n", "n", "n", // Q&A again
+                "", // accept recommended method
+                "bwa-mem",
                 "0.7.17",
                 "bwa mem",
                 "condaforge/miniforge3:24.3.0-0",
@@ -642,7 +680,6 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(0, exitCode);
             Assert.Empty(stderr.ToString());
             Assert.True(File.Exists(outPath));
-            Assert.Contains("/back은 현재 v1.0에서 초기 선택", stdout.ToString());
         }
 
         [Fact]

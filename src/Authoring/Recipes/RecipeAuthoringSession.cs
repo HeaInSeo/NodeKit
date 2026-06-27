@@ -279,6 +279,27 @@ namespace NodeKit.Authoring.Recipes
             _selectedMethod = nextMethod;
         }
 
+        public void ClearField(string fieldName)
+        {
+            EnsureMethodSelected();
+            var field = GetField(fieldName);
+            if (IsListType(field))
+            {
+                _completedListFields.Remove(fieldName);
+                _dirtyListFields.Remove(fieldName);
+                _listItems.Remove(fieldName);
+                _appliedListItemCounts.Remove(fieldName);
+                field.ClearList?.Invoke(_document);
+            }
+            else
+            {
+                _filledFields.Remove(fieldName);
+                _scalarValues.Remove(fieldName);
+                _skippedOptionalFields.Remove(fieldName);
+                _invalidatedFields.Remove(fieldName);
+            }
+        }
+
         public void ConfirmInvalidatedField(string fieldName)
         {
             EnsureMethodSelected();

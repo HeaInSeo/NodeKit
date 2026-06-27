@@ -109,7 +109,16 @@ namespace NodeKit.Cli
                     }
 
                     RecipeCreateScreen.ClearForNewStep(stdout);
-                    RunFieldLoop(session, stdin, stdout, cancellation);
+                    try
+                    {
+                        RunFieldLoop(session, stdin, stdout, cancellation);
+                    }
+                    catch (RecipeCreateBackRequestedException)
+                    {
+                        stdout.WriteLine("이전 화면으로 돌아갑니다.");
+                        RecipeCreateScreen.ClearForNewStep(stdout);
+                        continue;
+                    }
 
                     var document = session.Build();
                     document.BuildKind = RecipeBuildKindResolver.Resolve(session.Snapshot().SelectedMethod!.Value, document);
@@ -264,10 +273,33 @@ namespace NodeKit.Cli
 
         private static void RunFieldLoop(RecipeAuthoringSession session, TextReader stdin, TextWriter stdout, IRecipeCreateCancellationSource cancellation)
         {
+            var total = RecipeFieldCatalog.FieldsFor(session.Snapshot().SelectedMethod!.Value).Count;
+            var history = new System.Collections.Generic.List<RecipeFieldDescriptor>();
+
             RecipeFieldDescriptor? field;
             while ((field = session.NextField()) != null)
             {
-                PromptField(session, field, stdin, stdout, cancellation);
+                RecipeCreateScreen.ClearForNewStep(stdout);
+                stdout.WriteLine($"[{history.Count + 1} / {total}]");
+
+                try
+                {
+                    PromptField(session, field, stdin, stdout, cancellation);
+                    history.Add(field);
+                }
+                catch (RecipeCreateBackRequestedException)
+                {
+                    if (history.Count > 0)
+                    {
+                        var prev = history[history.Count - 1];
+                        history.RemoveAt(history.Count - 1);
+                        session.ClearField(prev.Name);
+                    }
+                    else
+                    {
+                        throw;
+                    }
+                }
             }
         }
 
@@ -317,10 +349,7 @@ namespace NodeKit.Cli
                     continue;
                 }
 
-                if (TryHandleBack(line, stdout))
-                {
-                    continue;
-                }
+                RecipeCreateEscapeCommands.ThrowIfBack(line);
 
                 if (TryHandleReview(session, line, stdout))
                 {
@@ -374,10 +403,7 @@ namespace NodeKit.Cli
                     continue;
                 }
 
-                if (TryHandleBack(line, stdout))
-                {
-                    continue;
-                }
+                RecipeCreateEscapeCommands.ThrowIfBack(line);
 
                 if (TryHandleReview(session, line, stdout))
                 {
@@ -438,10 +464,7 @@ namespace NodeKit.Cli
                     continue;
                 }
 
-                if (TryHandleBack(line, stdout))
-                {
-                    continue;
-                }
+                RecipeCreateEscapeCommands.ThrowIfBack(line);
 
                 if (TryHandleReview(session, line, stdout))
                 {
@@ -530,10 +553,7 @@ namespace NodeKit.Cli
                     continue;
                 }
 
-                if (TryHandleBack(name, stdout))
-                {
-                    continue;
-                }
+                RecipeCreateEscapeCommands.ThrowIfBack(name);
 
                 if (TryHandleReview(session, name, stdout))
                 {
@@ -581,10 +601,7 @@ namespace NodeKit.Cli
                     continue;
                 }
 
-                if (TryHandleBack(selection, stdout))
-                {
-                    continue;
-                }
+                RecipeCreateEscapeCommands.ThrowIfBack(selection);
 
                 string spec;
                 if (selection == InputOutputPresetCatalog.CustomPresetId)
