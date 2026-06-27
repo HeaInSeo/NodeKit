@@ -191,7 +191,7 @@ namespace NodeKit.Cli
             stdout.WriteLine("앞으로 입력할 항목:");
             foreach (var field in RecipeFieldCatalog.FieldsFor(method))
             {
-                stdout.WriteLine($"  - {field.Name}");
+                stdout.WriteLine($"  - {field.Label.Get("ko")}");
             }
 
             stdout.WriteLine();

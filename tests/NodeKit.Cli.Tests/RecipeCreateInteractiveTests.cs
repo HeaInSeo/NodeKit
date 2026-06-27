@@ -491,8 +491,8 @@ namespace NodeKit.Cli.Tests
             Assert.Empty(stderr.ToString());
 
             var stdoutText = stdout.ToString();
-            Assert.Contains("ToolName: bwa-mem", stdoutText);
-            Assert.Contains("ToolVersion: 아직 입력 안 함", stdoutText);
+            Assert.Contains("도구 이름 (ToolName): bwa-mem", stdoutText);
+            Assert.Contains("도구 버전 (ToolVersion): 아직 입력 안 함", stdoutText);
 
             var json = File.ReadAllText(outPath);
             Assert.Contains("\"Version\": \"0.7.17\"", json);

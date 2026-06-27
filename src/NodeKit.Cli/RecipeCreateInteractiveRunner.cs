@@ -702,7 +702,7 @@ namespace NodeKit.Cli
             foreach (var field in RecipeFieldCatalog.FieldsFor(snapshot.SelectedMethod!.Value))
             {
                 var value = valueByField.TryGetValue(field.Name, out var displayValue) ? displayValue : "아직 입력 안 함";
-                stdout.WriteLine($"  {field.Name}: {value}");
+                stdout.WriteLine($"  {field.Label.Get("ko")} ({field.Name}): {value}");
             }
         }
 
