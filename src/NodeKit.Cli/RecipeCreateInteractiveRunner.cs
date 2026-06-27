@@ -480,7 +480,7 @@ namespace NodeKit.Cli
                 session,
                 "Inputs",
                 "입력",
-                InputOutputPresetCatalog.InputPresets.Select(p => (p.Id, p.Label.Get("ko"))).ToList(),
+                InputOutputPresetCatalog.InputPresets.Select(p => (p.Id, p.Label.Get("ko"), p.Description.Get("ko"), p.Examples)).ToList(),
                 stdin,
                 stdout,
                 cancellation,
@@ -492,7 +492,7 @@ namespace NodeKit.Cli
                 session,
                 "Outputs",
                 "출력",
-                InputOutputPresetCatalog.OutputPresets.Select(p => (p.Id, p.Label.Get("ko"))).ToList(),
+                InputOutputPresetCatalog.OutputPresets.Select(p => (p.Id, p.Label.Get("ko"), p.Description.Get("ko"), p.Examples)).ToList(),
                 stdin,
                 stdout,
                 cancellation,
@@ -503,7 +503,7 @@ namespace NodeKit.Cli
             RecipeAuthoringSession session,
             string fieldName,
             string label,
-            IReadOnlyList<(string Id, string Label)> presets,
+            IReadOnlyList<(string Id, string Label, string Description, IReadOnlyList<string> Examples)> presets,
             TextReader stdin,
             TextWriter stdout,
             IRecipeCreateCancellationSource cancellation,
@@ -563,6 +563,15 @@ namespace NodeKit.Cli
                 for (var i = 0; i < presets.Count; i++)
                 {
                     stdout.WriteLine($"  [{i + 1}] {presets[i].Label}");
+                    if (!string.IsNullOrEmpty(presets[i].Description))
+                    {
+                        stdout.WriteLine($"       {presets[i].Description}");
+                    }
+
+                    if (presets[i].Examples.Count > 0)
+                    {
+                        stdout.WriteLine($"       예: {string.Join(", ", presets[i].Examples)}");
+                    }
                 }
 
                 stdout.WriteLine("프리셋 번호 또는 'custom':");
@@ -605,7 +614,7 @@ namespace NodeKit.Cli
         {
             var role = PromptNormalizedRole(stdin, stdout);
             var format = PromptNormalizedFormat(stdin, stdout);
-            stdout.WriteLine("shape (single/pair):");
+            stdout.WriteLine("쌍 구성 (single / pair):");
             var shape = (stdin.ReadLine() ?? "single").Trim();
             RecipeCreateEscapeCommands.ThrowIfCancel(shape);
             stdout.WriteLine("optional 입력입니까? [y/N]");
@@ -620,7 +629,7 @@ namespace NodeKit.Cli
         {
             var role = PromptNormalizedRole(stdin, stdout);
             var format = PromptNormalizedFormat(stdin, stdout);
-            stdout.WriteLine("class (primary/secondary):");
+            stdout.WriteLine("출력 분류 (primary / secondary / log / metrics / index):");
             var outputClass = (stdin.ReadLine() ?? "primary").Trim();
             RecipeCreateEscapeCommands.ThrowIfCancel(outputClass);
             _ = portName;
@@ -629,7 +638,7 @@ namespace NodeKit.Cli
 
         private static string PromptNormalizedRole(TextReader stdin, TextWriter stdout)
         {
-            stdout.WriteLine("role:");
+            stdout.WriteLine("파일 역할 (예: reads, alignment, variants, reference, log):");
             var input = stdin.ReadLine() ?? string.Empty;
             RecipeCreateEscapeCommands.ThrowIfCancel(input);
             var normalized = RoleNormalizer.Normalize(input);
@@ -643,7 +652,7 @@ namespace NodeKit.Cli
 
         private static string PromptNormalizedFormat(TextReader stdin, TextWriter stdout)
         {
-            stdout.WriteLine("format:");
+            stdout.WriteLine("파일 형식 (예: fastq, bam, vcf, fasta, txt):");
             var input = stdin.ReadLine() ?? string.Empty;
             RecipeCreateEscapeCommands.ThrowIfCancel(input);
             var normalized = FormatNormalizer.Normalize(input);
