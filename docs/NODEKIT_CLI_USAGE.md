@@ -851,11 +851,16 @@ linux-64/bwa-0.7.17-h5bf99c6_8.tar.bz2
 ```
 
 conda 패키지 파일명은 `<name>-<version>-<build>.tar.bz2` 형식이므로,
-위 파일명은 다음 package spec으로 입력한다.
+위 파일명에서 다음 두 가지 형식 중 하나로 입력할 수 있다.
 
 ```
-bwa=0.7.17=h5bf99c6_8
+bwa=0.7.17                  ← 버전만 고정 (NodeVault가 build string 결정)
+bwa=0.7.17=h5bf99c6_8       ← build string까지 직접 고정 (최대 재현성)
 ```
+
+현재는 NodeVault `ResolveToolSpec`이 아직 구현되지 않아, `bwa=0.7.17`로
+제출하면 build string이 Harbor에서 캐시된 경우 재사용되고 없으면 conda가
+빌드 시점에 결정한다. build string까지 고정하면 그 불확실성이 없어진다.
 
 **② base image digest** — 커맨드로 가져오기
 

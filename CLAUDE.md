@@ -89,7 +89,9 @@ The project's core philosophy is: **same data + same method = same result.**
 
 - `latest` image tags: block at L1 — no exceptions, no flags to relax this.
 - Image digest not pinned (`@sha256:` absent): block at L1.
-- Package install without version+build string: block at L1.
+- Package install without version: block at L1 (`bwa` alone is invalid; `bwa=0.7.17`
+  is valid). Build string (`=version=build`) is resolved by NodeVault `ResolveToolSpec`,
+  not enforced at L1 — see PLATFORM_MASTER_DESIGN.md §4.9.
 - Do not add bypass flags, fallback modes, or "allow-latest" toggles. Use pre-validated
   fixture/sample profiles for testing instead.
 

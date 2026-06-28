@@ -146,16 +146,16 @@ dependencies:
         }
 
         [Fact]
-        public void Fail_WhenCondaVersionOnly()
+        public void Pass_WhenCondaVersionOnly()
         {
+            // build string 결정은 NodeVault ResolveToolSpec 담당 — L1은 =version까지만 요구.
+            // PLATFORM_MASTER_DESIGN.md §4.9
             var def = DefWithSpec(@"
 name: myenv
 dependencies:
   - bwa=0.7.17
 ");
-            var result = _sut.Validate(def);
-            Assert.False(result.IsValid);
-            Assert.Contains(result.Violations, v => v.RuleId == "L1-PKG-002");
+            Assert.True(_sut.Validate(def).IsValid);
         }
 
         [Fact]
@@ -298,18 +298,16 @@ dependencies:
         }
 
         [Fact]
-        public void Fail_WhenCondaPackageHasEmptyBuildSegment()
+        public void Pass_WhenCondaVersionWithEmptyBuildSegment()
         {
+            // build string은 L1 요구사항이 아니므로 빈 build segment도 통과.
+            // PLATFORM_MASTER_DESIGN.md §4.9
             var def = DefWithSpec(@"
 name: myenv
 dependencies:
   - bwa=0.7.17=
 ");
-
-            var result = _sut.Validate(def);
-
-            Assert.False(result.IsValid);
-            Assert.Contains(result.Violations, v => v.RuleId == "L1-PKG-002");
+            Assert.True(_sut.Validate(def).IsValid);
         }
 
         private static ToolDefinition DefWithSpec(string spec) =>

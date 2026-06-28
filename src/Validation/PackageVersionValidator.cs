@@ -245,13 +245,9 @@ namespace NodeKit.Validation
                 return;
             }
 
-            if (segments.Length <= 2 || string.IsNullOrWhiteSpace(segments[2]))
-            {
-                violations.Add(new ValidationViolation(
-                    "L1-PKG-002",
-                    $"패키지 '{expression}'에 빌드 문자열이 없습니다. conda 형식: name=version=build_string",
-                    field));
-            }
+            // build string (=version=build) 결정은 NodeVault ResolveToolSpec 담당.
+            // NodeKit L1은 =version 형식(버전 고정)까지만 요구한다.
+            // 참조: PLATFORM_MASTER_DESIGN.md §4.9
         }
 
         private static void ValidatePipPackage(string packageExpression, List<ValidationViolation> violations)

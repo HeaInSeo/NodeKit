@@ -51,7 +51,8 @@ NodeKit 쪽 live 연동 테스트(`GrpcBuildClientIntegrationTests`)는 기본�
 │  Validation Layer (src/Validation/)                      │
 │  ├── RequiredFieldsValidator   필수 필드 확인            │
 │  ├── ImageUriValidator         @sha256: digest 필수, latest 차단 │
-│  ├── PackageVersionValidator   pip/conda 버전 고정 확인  │
+│  ├── PackageVersionValidator   pip/conda 버전 고정 확인 (=version 형식 요구; │
+│  │                             build string은 NodeVault ResolveToolSpec이 담당) │
 │  └── ValidatedDefinitionState  fingerprint 기반 검증 상태 추적 │
 ├──────────────────────────────────────────────────────────┤
 │  Policy Layer (src/Policy/)                              │
@@ -96,14 +97,21 @@ ToolDefinition (초안 모델)
   ├── Validation Layer
   │   ├── RequiredFieldsValidator
   │   ├── ImageUriValidator       → latest 차단, @sha256: 필수
-  │   └── PackageVersionValidator → pip/conda 버전 고정 확인
+  │   └── PackageVersionValidator → pip/conda 버전 고정 확인 (=version 형식만 요구)
   │
   ├── Policy Layer
   │   └── WasmPolicyChecker       → DockGuard .wasm (DFM/DSF/DGF 규칙)
   │
   │   L1 통과
   │
+  ├── [사전 조회] NodeVault ResolveRecipe 호출 (conda/micromamba/mirror/BioContainer)
+  │   ├── Harbor에 tool+version 이미지 있음 → artifact 후보 1개 반환 (자동 선택)
+  │   ├── 없음 + 열린망 → 외부 소스 조회 → 후보 목록 반환 → 사용자 선택
+  │   └── 없음 + 폐쇄망 → InvalidArgument (관리자 Harbor 사전 등록 필요)
+  │   ※ source build / Dockerfile fallback은 이미 고정 — 사전 조회 불필요
+  │
   ├── BuildRequestFactory.FromToolDefinition()
+  │   (artifact 고정된 상태로 BuildRequest 생성)
   │
   ▼
 BuildRequest (proto)

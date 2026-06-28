@@ -109,7 +109,7 @@ pseudo-channel for package mirror), then one `RUN <installer> install -y
 Channel/mirror configuration is deliberately rendered on its **own** `RUN`
 line, never combined with the `install` line. `PackageVersionValidator`
 scans every token after `install` as a package pin; a channel name like
-`bioconda` has no `=version=build` in it and would otherwise be misread as an
+`bioconda` has no `=version` in it and would otherwise be misread as an
 unpinned package and rejected. `conda config --add channels ...` /
 `micromamba config append channels ...` lines don't start with `install`, so
 the validator's `IsCondaInstallCommand` check skips them entirely — already
@@ -123,6 +123,15 @@ needed for any of these three variants. Verified by
 `Render_PackageMirror_UsesMirrorUriAsChannel`, which run the rendered
 `ToolDefinition` through the full existing L1 chain and assert zero
 violations.
+
+**Build string 정책 (2026-06-28 확정)**: `PackageVersionValidator`는
+`=version` 형식(버전 고정)까지만 요구한다. `=version=build` 형식의
+conda build string 고정은 NodeKit L1의 요구사항이 아니다. build string
+결정은 NodeVault `ResolveRecipe` RPC가 Harbor 조회를 통해 담당한다
+(PLATFORM_MASTER_DESIGN.md §4.9 참조). 사용자는 `bwa=0.7.17`처럼
+버전까지만 입력하면 되고, build string 후보는 NodeVault가 반환한다.
+후보가 복수이면 NodeKit이 목록을 표시하고 사용자가 선택한 뒤
+BuildRequest에 고정된다.
 
 ### 4.3 — existing BioContainer
 
@@ -150,6 +159,13 @@ so NodeVault's `BuildService` runs the same way for BioContainer as for every
 other variant. What NodeVault chooses to optimize internally (e.g.
 short-circuiting a single-`FROM` Dockerfile into a tag/copy instead of a real
 build) is NodeVault's call and out of scope here.
+
+**ResolveRecipe 연동 (2026-06-28 확정)**: BioContainer도 BuildRequest 생성 전
+NodeVault `ResolveRecipe` RPC를 통해 사전 조회한다. Harbor에 동일
+tool+version 이미지가 있으면 그 이미지를 재사용하고, 없으면 열린망에서
+BioContainers registry (quay.io/biocontainers)에서 후보를 조회하여 사용자에게
+표시한다. 폐쇄망에서 Harbor에 없으면 `InvalidArgument` 반환
+(PLATFORM_MASTER_DESIGN.md §4.9 참조).
 
 ### 4.4 — source build
 
@@ -299,6 +315,14 @@ layer; nothing here assumes that will happen or what it would look like.
    been run through an actual `docker build` — only through NodeKit's L1
    static validators. The shell syntax (`curl`/`sha256sum -c`/`conda
    config`/etc.) is reasonable but unverified against a real builder.
+8. ~~**build string 강제 여부 / recipe variant별 artifact 사전 결정 방법.**~~
+   **Resolved (2026-06-28)**: Dockerfile fallback(사용자 직접 작성)과 source
+   build(checksum 고정)를 제외한 4개 variant(conda, micromamba, package mirror,
+   BioContainer)는 BuildRequest 생성 전 NodeVault `ResolveRecipe` RPC로 사전 조회한다.
+   Harbor 명중 시 후보 1개 자동 선택, 외부 소스 조회 시 복수 후보를 NodeKit이 표시하고
+   사용자가 선택한다. 폐쇄망에서 Harbor 미존재 시 `InvalidArgument`.
+   NodeKit L1은 버전 고정(`=version`)만 요구하며 build string 강제는 하지 않는다
+   (PLATFORM_MASTER_DESIGN.md §4.9 참조).
 
 ## 8. 한국어 요약
 
