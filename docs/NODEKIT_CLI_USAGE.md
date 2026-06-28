@@ -187,8 +187,13 @@ NodeKit recipe create
 처음 사용하거나, 어떤 method를 써야 할지 모를 때 선택한다. 무엇을 알고
 있는지 고르면 그에 맞는 입력 흐름으로 바로 안내한다.
 
+**각 서브-화면은 이전 텍스트를 지우고 단독으로 표시된다.** 선택 후 나오는
+설치 명령 입력, 이미지 주소 입력, 소스 주소 입력 등 모든 화면이 동일하게
+한 화면씩 전환된다. 입력 프롬프트 바로 위에는 `/cancel: 종료` 힌트가 표시된다.
+
 ```
 쉬운 안내 모드
+/back: 이전 화면   /cancel: 종료
 
 정확히 몰라도 괜찮습니다.
 알고 있는 것만 선택하세요.
@@ -196,8 +201,14 @@ NodeKit recipe create
 무엇을 알고 있나요?
 
 [1] 도구 이름만 알고 있다
-[2] 설치 명령을 알고 있다     예: conda install -c bioconda bwa=0.7.17
-[3] 컨테이너 이미지 주소를 알고 있다   예: quay.io/biocontainers/bwa:0.7.17...
+    예: bwa, samtools, fastqc
+
+[2] 설치 명령을 알고 있다
+    예: conda install -c bioconda bwa=0.7.17
+
+[3] 컨테이너 이미지 주소를 알고 있다
+    예: quay.io/biocontainers/bwa:0.7.17--h7132678_9
+
 [4] GitHub 또는 소스코드 주소를 알고 있다
 [5] Dockerfile을 가지고 있다
 [6] 회사/학교 내부 저장소를 써야 한다
@@ -208,44 +219,73 @@ NodeKit recipe create
 
 | 선택 | 연결되는 method |
 |---|---|
-| `[1]` 도구 이름만 | 추가 질문으로 method 결정 |
-| `[2]` 설치 명령 | `package` (conda/micromamba) |
+| `[1]` 도구 이름만 | 도구 이름 입력 → bioconda/BioContainers URL 표시 → 추가 선택으로 method 결정 |
+| `[2]` 설치 명령 | install command 파싱 → `package` |
 | `[3]` 컨테이너 이미지 | `container` |
 | `[4]` GitHub/소스 주소 | `source` |
 | `[5]` Dockerfile | `dockerfile` |
 | `[6]` 내부 저장소 | `mirror` |
-| `[7]` 잘 모르겠다 | 도구 이름 lookup, 설치 명령, 이미지 주소, 소스 주소, Dockerfile, 종료 중 선택 |
+| `[7]` 잘 모르겠다 | 단서 부족 안내 → 1~6 중 선택 또는 종료 |
 
-**도구 이름만 아는 경우:** `[1]`을 선택하고 `bwa` 같은 도구 이름을 입력하면
-외부 API 호출 없이 확인 URL만 보여준다.
+**도구 이름만 아는 경우** (`[1]`): 도구 이름을 입력하면 별도 화면에서
+bioconda/BioContainers 확인 URL을 보여준 뒤, 찾은 것이 무엇인지(설치 명령/이미지/소스
+등)를 다시 선택한다.
 
-```text
-bioconda 패키지:
-  https://anaconda.org/bioconda/bwa
+```
+다음 위치에서 도구를 확인해보세요.
 
-BioContainers 이미지:
-  https://quay.io/repository/biocontainers/bwa?tab=tags
+  bioconda 패키지:
+    https://anaconda.org/bioconda/bwa
+
+  BioContainers 이미지:
+    https://quay.io/repository/biocontainers/bwa?tab=tags
+
+...
+'bwa' 도구를 설치하거나 실행하는 예시를 본 적 있나요?
+
+[1] conda install 또는 micromamba install 예시를 봤다
+[2] docker run 또는 컨테이너 이미지 주소를 봤다
+...
+선택:
 ```
 
-bioconda 페이지에서 `conda install` 명령어를 찾으면 package 방식으로,
-BioContainers tag 페이지에서 이미지 주소를 찾으면 container 방식으로 이어가면 된다.
+**설치 명령** (`[2]`): install command를 붙여 넣으면 파싱 후 확인 화면이 뜬다.
 
-**컨테이너 이미지 — digest 필수 처리:** `[3]`을 선택하면 이미지 주소를
-입력받는다. `NODEKIT_HARBOR_URL` 환경변수가 설정되어 있으면 내부 Harbor에서
-digest를 자동으로 조회한다. 환경변수가 없거나 다른 registry이면 registry에서
-직접 복사해 입력해야 한다.
+```
+설치 명령을 입력해 주세요.
 
-**Harbor 자동 digest 조회 (패쇄망 환경):**
+예:
+  conda install -c bioconda bwa=0.7.17
 
-```bash
-export NODEKIT_HARBOR_URL=https://harbor.lab.local
-export NODEKIT_HARBOR_CA_CERT=~/.config/infra-lab/certs/harbor-ca.crt  # 자체 서명 CA
-export NODEKIT_HARBOR_USER=admin
-export NODEKIT_HARBOR_PASSWORD=<password>  # harbor-secrets.env 참조
+/cancel: 종료
+설치 명령:
+> conda install -c bioconda bwa=0.7.17
 ```
 
-설정 후 이미지 주소를 tag까지만 입력하면 (`harbor.lab.local/project/bwa:0.7.17`)
-Harbor OCI Distribution API에서 `Docker-Content-Digest` 헤더를 읽어 확인을 물어본다.
+파싱에 성공하면 추출된 값을 보여주고 확인을 요청한다(별도 화면).
+
+```
+설치 명령을 이해했습니다.
+
+이해한 값:
+  PackageEngine: conda
+  Channels:
+    - bioconda
+  Packages:
+    - bwa=0.7.17
+
+선택:
+[1] 이해한 값을 사용하고 부족한 값을 직접 입력한다
+[2] 설치 명령을 다시 입력한다
+[3] 다른 작성 방식을 선택한다
+[4] 취소한다
+
+선택:
+```
+
+**컨테이너 이미지 — digest 처리** (`[3]`): 이미지 주소를 입력받는다.
+`NODEKIT_HARBOR_URL` 환경변수가 설정되어 있으면 내부 Harbor에서 digest를
+자동으로 조회한다. 자동 조회 성공 시 별도 화면에서 확인을 요청한다.
 
 ```
 이미지 digest를 확인했습니다.
@@ -255,75 +295,102 @@ Harbor OCI Distribution API에서 `Docker-Content-Digest` 헤더를 읽어 확�
 이 digest를 사용할까요? [Y/n]
 ```
 
-다른 registry 이미지(`quay.io/...`, `ghcr.io/...`)이거나 `NODEKIT_HARBOR_URL`이
-설정되지 않은 경우에는 기존과 같이 수동 입력으로 폴백된다.
+digest가 없거나 조회에 실패하면 별도 화면에서 선택지를 보여준다.
 
 ```
 입력한 이미지 주소에는 digest가 없습니다.
-NodeKit은 재현성을 위해 digest 고정을 요구합니다.
+
+현재 값:
+  quay.io/biocontainers/bwa:0.7.17--h7132678_9
 
 [1] digest가 포함된 이미지 주소를 다시 입력한다
 [2] ImageDigest를 따로 입력한다
 [3] 다른 작성 방식으로 바꾼다
 [4] 취소한다
+선택:
 ```
 
-digest가 이미지 주소에 포함된 경우(`repo:tag@sha256:...`)에는 이 프롬프트가
-나오지 않고 바로 다음 단계로 진행된다.
+**Harbor 자동 digest 조회 환경변수:**
 
-**source build — checksum 필수 처리:** `[4]`를 선택하면 `SourceChecksum` 입력 전에
-계산 방법을 보여준다. CLI가 `curl`을 직접 실행하지는 않는다.
-
-```text
-curl -fsSL "<SourceUri>" | sha256sum
+```bash
+export NODEKIT_HARBOR_URL=https://harbor.lab.local
+export NODEKIT_HARBOR_CA_CERT=~/.config/infra-lab/certs/harbor-ca.crt
+export NODEKIT_HARBOR_USER=admin
+export NODEKIT_HARBOR_PASSWORD=<password>
 ```
 
-checksum이 비어 있으면 계산 방법을 다시 보거나, 직접 입력하거나, 다른 작성
-방식으로 바꾸거나, 저장하지 않고 종료할 수 있다. checksum 없이 진행하는
+**source build — checksum 필수 처리** (`[4]`): 소스 URI를 입력받은 뒤
+별도 화면에서 checksum 계산 방법을 보여준다.
+
+```
+소스 코드 검증값이 필요합니다.
+
+  curl -fsSL "<SourceUri>" | sha256sum
+
+/cancel: 종료
+SourceChecksum:
+```
+
+checksum을 입력하지 않으면 다시 선택 화면이 뜬다. checksum 없이 넘어가는
 경로는 없다.
 
-**Dockerfile — 기본값 N 경고:** `[5]`를 선택하면 재현성 경고가 나온다.
-Enter 또는 `n`을 입력하면 진행되지 않는다. `y`를 입력해야 계속된다.
+**Dockerfile — 재현성 경고** (`[5]`): 경로 입력 후 별도 화면에서 경고가 나온다.
+Enter 또는 `n`이면 방식 선택으로 돌아간다. `y`를 입력해야 계속된다.
 
 ```
-Dockerfile 방식은 가장 자유롭지만 재현성 책임이 가장 큽니다.
-처음 사용하는 경우 package 또는 container 방식을 먼저 고려하세요.
-
-계속하시겠습니까? [y/N]:
+/cancel: 종료   아니오(Enter/n): 방식 선택으로 돌아가기
+계속 진행할까요? [y/N]
 ```
 
-**아무것도 모름 — 회복 경로:** `[7]`을 선택하면 바로 종료하지 않고 다음
-선택지를 보여준다.
+**아무것도 모름** (`[7]`): 별도 화면에서 다음 선택지를 보여준다.
 
-```text
+```
+아직 recipe를 완성하기 위한 단서가 부족합니다.
+
 [1] 도구 이름으로 bioconda/BioContainers 확인 방법을 본다
 [2] 설치 명령을 입력한다
 [3] 컨테이너 이미지 주소를 입력한다
 [4] 소스코드 주소를 입력한다
 [5] Dockerfile 경로를 입력한다
 [6] 저장하지 않고 종료한다
+선택:
 ```
 
-`[6]`을 선택하면 recipe를 저장하지 않고 종료 코드 0으로 끝난다.
-언제든 명령 입력 위치에서 `/cancel`, `/quit`, `/exit`를 입력하면 종료 코드
-130으로 취소된다.
+`[6]`은 종료 코드 0으로 끝난다. 어느 입력 프롬프트에서든 `/cancel`·`/quit`·`/exit`를
+입력하면 종료 코드 130으로 취소된다.
 
 ### 2-3. 빠른 설정 모드
 
-6개의 예/아니오 질문에 답하면 방법(method)을 추천해 준다. `y`/`n`/모르면
-그냥 Enter(`u`로 처리됨).
+6개의 예/아니오 질문에 답하면 방법(method)을 추천해 준다. **각 질문은 별도
+화면에 한 개씩 표시된다.** 매 화면 위에 진행도(`[1 / 6]`)와 탈출 힌트가
+나온다.
 
-| 질문 | 의미 |
-|---|---|
-| 내부망/폐쇄망 환경인가요? | public 인터넷에서 패키지/이미지를 받을 수 없는지 |
-| 내부 package mirror URI를 아시나요? | 내부 conda/pip mirror가 있는지 |
-| 기존 컨테이너 이미지 URI가 있나요? | 이미 쓸만한 이미지(BioContainer 등)가 있는지 |
-| public channel에 패키지가 있나요? | conda-forge/bioconda 같은 곳에 패키지가 있는지 |
-| source URL과 checksum이 있나요? | 소스를 직접 받아 빌드할 수 있는지 |
-| 기존 Dockerfile이 있나요? | 이미 작성된 Dockerfile이 있는지 |
+```
+빠른 설정 모드  [1 / 6]
+/back: 이전 질문   /cancel: 종료
 
-답을 마치면 5가지 method 중 하나를 추천해 준다. 추천을 그대로 쓰려면
-**Enter**, 다른 method를 고르려면 화면에 보이는 번호를 입력한다.
+Q. 내부망/폐쇄망 환경인가요?
+
+   서버나 워크스테이션에서 인터넷에 접속할 수 없거나
+   회사/학교 내부망만 사용할 수 있는 환경이면 y입니다.
+
+선택 [y/n/Enter]:
+```
+
+답을 모르면 그냥 Enter(`u`로 처리됨). `/back`을 입력하면 이전 질문으로
+돌아간다. 첫 번째 질문에서 `/back`을 입력하면 모드 선택 화면으로 돌아간다.
+
+| # | 질문 | 의미 |
+|---|---|---|
+| 1 | 내부망/폐쇄망 환경인가요? | public 인터넷에서 패키지/이미지를 받을 수 없는지 |
+| 2 | 내부 package mirror URI를 아시나요? | 내부 conda/pip mirror가 있는지 |
+| 3 | 기존 컨테이너 이미지 URI가 있나요? | 이미 쓸만한 이미지(BioContainer 등)가 있는지 |
+| 4 | public channel에 패키지가 있나요? | conda-forge/bioconda 같은 곳에 패키지가 있는지 |
+| 5 | source URL과 checksum이 있나요? | 소스를 직접 받아 빌드할 수 있는지 |
+| 6 | 기존 Dockerfile이 있나요? | 이미 작성된 Dockerfile이 있는지 |
+
+6번째 질문까지 답하면 별도 화면에서 추천 method와 이유를 보여준다. Enter로
+추천을 수락하거나 번호를 입력해 다른 method를 선택한다.
 
 | Method | 의미 | 준비물 |
 |---|---|---|
@@ -333,7 +400,7 @@ Dockerfile 방식은 가장 자유롭지만 재현성 책임이 가장 큽니다
 | `source` | 소스코드로 직접 빌드 | SourceUri + SourceChecksum(sha256) |
 | `dockerfile` | Dockerfile 직접 작성 | Dockerfile 경로 또는 내용 (최후의 수단) |
 
-`dockerfile`을 고르면 재현성 경고가 한 번 더 나온다 — `y`로 동의해야 진행된다.
+`dockerfile`을 고르면 재현성 경고 화면이 별도로 뜬다 — `y`로 동의해야 진행된다.
 
 ### 2-4. 공통 필드 입력
 
