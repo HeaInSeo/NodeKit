@@ -110,6 +110,18 @@ dotnet run --project src/NodeKit.Cli -- recipe create /tmp/nodekit-recipe.json
 | digest 안내 | `[1] 쉬운 안내 모드` → `[3] 컨테이너 이미지 주소` → `quay.io/biocontainers/bwa:0.7.17--h7132678_9` |
 | checksum 안내 | `[1] 쉬운 안내 모드` → `[4] GitHub 또는 소스코드 주소` → archive URL → checksum 빈 입력 |
 | final recovery 문구 | 빠른 설정 모드에서 container를 고르고 잘못된 digest(`sha256:bad`) 입력 |
+| **빌드 문자열 후보 선택 UX** | `NODEKIT_RESOLVE_RECIPE_STUB=1` 설정 후 package 방식으로 진행 (2-7절) |
+
+**패키지 빌드 문자열 후보 선택 UX 확인 방법:**
+
+```bash
+# 환경변수 한 개만 추가하면 된다 — 실제 NodeVault 연결 없이 동작
+NODEKIT_RESOLVE_RECIPE_STUB=1 \
+  dotnet run --project src/NodeKit.Cli -- recipe create /tmp/test-package.json
+```
+
+빠른 설정 모드(`[2]`) → `public channel에 패키지가 있나요?` → `y` → package 방식으로
+진행하면 Outputs 입력 완료 후 **빌드 문자열 선택** 화면이 자동으로 나온다.
 
 생성된 recipe가 있으면 다음으로 확인한다.
 
@@ -359,7 +371,7 @@ dry-run profile의 `runnerScriptDigest`/observed I/O 기록으로 더 명확히 
 | 필드 | 필수 여부 | 설명 |
 |---|---|---|
 | `ImageRef` | 필수 | 기반 이미지, digest 포함 필요 (예: `condaforge/miniforge3:24.3.0-0@sha256:...`) |
-| `Packages` | 필수, 최소 1개 | 설치할 패키지 (예: `bwa=0.7.17=h5bf99c6_8` — 버전+빌드 문자열까지 고정) |
+| `Packages` | 필수, 최소 1개 | 설치할 패키지. `bwa=0.7.17`(버전만)으로 충분하며, 빌드 문자열(`=h5bf99c6_8` 부분)은 저장 전 ResolveRecipe 단계(2-7절)에서 선택한다. 직접 고정하려면 `bwa=0.7.17=h5bf99c6_8` 형식을 쓰면 된다 |
 | `Channels` | 필수, 최소 1개 | conda channel (예: `bioconda`) |
 | `PackageEngine` | 비워두면 자동 | `conda`(기본) 또는 `micromamba` |
 
@@ -413,7 +425,59 @@ reads
 이름을 빈 줄로 두면 목록 입력이 끝난다(필수 목록은 최소 1개가 있어야
 끝낼 수 있다).
 
-### 2-7. recovery — 마지막 검증 실패 시 수정
+### 2-7. 패키지 빌드 문자열 선택 (ResolveRecipe)
+
+`package` 또는 `mirror` 방식으로 만든 레시피에서, Inputs/Outputs 입력을 마치면
+**빌드 문자열 후보 선택** 화면이 자동으로 나온다. 이 단계는 NodeVault
+`ResolveRecipe` API를 통해 패키지별 conda build string 후보를 받아 확정하는
+과정이다.
+
+**후보가 1개인 경우** — 자동 선택, 화면 출력 없이 넘어간다.
+
+**후보가 여러 개인 경우** — 번호 목록이 나온다.
+
+```
+패키지 빌드 문자열 선택
+
+bwa=0.7.17 에 대한 빌드 문자열 후보입니다.
+
+  [1] bwa=0.7.17=h5bf99c6_8
+      채널: bioconda
+  [2] bwa=0.7.17=h7132678_8
+      채널: conda-forge
+
+번호를 선택하세요 [1-2] (Enter = 1번):
+> (Enter)
+
+bwa → bwa=0.7.17=h5bf99c6_8
+```
+
+Enter만 치면 1번(첫 번째 후보)이 선택된다. 선택된 full pin이 recipe.json에 저장된다.
+
+**패키지를 찾지 못한 경우(`NotFound`)** — 폐쇄망 Harbor에 미리 등록이 필요하다는
+안내가 나온다.
+
+```
+'bwa=0.7.17' 패키지를 Harbor에서 찾을 수 없습니다.
+폐쇄망 환경에서는 Harbor에 패키지를 먼저 등록한 뒤 다시 시도하세요.
+```
+
+**지원하지 않는 경우(`Unsupported`)** — 실제 gRPC 클라이언트가 연결되기 전
+(`GrpcResolveRecipeClient` Sprint R17)이므로, 기본 상태에서는 이 단계가 건너뛰어지고
+입력한 패키지 문자열이 그대로 저장된다. 버전만 입력했으면(`bwa=0.7.17`) build string
+없이 저장된다.
+
+**UX 테스트 방법** — 실제 NodeVault 없이 후보 선택 UI를 확인하려면:
+
+```bash
+NODEKIT_RESOLVE_RECIPE_STUB=1 \
+  dotnet run --project src/NodeKit.Cli -- recipe create /tmp/test.json
+```
+
+stub 모드는 각 패키지에 대해 `bioconda` 채널 1개 + `conda-forge` 채널 1개 후보를
+자동 생성한다.
+
+### 2-8. recovery — 마지막 검증 실패 시 수정
 
 모든 필드를 채운 뒤 최종 검증을 한 번 더 돈다. 필드 하나씩 받을 때는
 못 잡아내는 교차 필드 규칙(예: Dockerfile 첫 `FROM`과 `ImageRef` 불일치,
@@ -440,7 +504,7 @@ Output의 `Class` 허용값 위반) 때문에 여기서 막힐 수 있다. 입�
 `d<번호>`(삭제), 빈 줄(계속/추가)로 다룬다. 다시 검증에 실패하면 같은
 화면이 반복된다. 빈 줄을 입력하면 저장하지 않고 종료한다(종료 코드 1).
 
-### 2-8. non-interactive 모드 (스크립트/CI용)
+### 2-9. non-interactive 모드 (스크립트/CI용)
 
 프롬프트가 전혀 나오지 않고 빠진 값이 있으면 즉시 에러로 끝난다.
 
@@ -475,7 +539,7 @@ nodekit recipe create recipe.json \
 필수 필드가 빠지거나 최종 검증에 실패하면 파일을 쓰지 않고 종료 코드 1을
 반환한다.
 
-### 2-9. 중간에 나가기 / review / method 변경
+### 2-10. 중간에 나가기 / review / method 변경
 
 필드를 입력하는 중 값 대신 아래 명령을 쓸 수 있다.
 
@@ -840,27 +904,21 @@ conda가 설치된 빌드 환경 이미지(condaforge/miniforge3 등)의 digest�
 https://anaconda.org/bioconda/bwa
 ```
 
-Overview 화면의 설치 명령에는 build string이 빠져 있는 경우가 많다.
-재현성을 위해 build string까지 고정하려면 **Files 탭**을 열고 대상 platform
-(보통 `linux-64`)의 파일명을 확인한다.
+패키지 문자열은 **버전만 입력하면 된다** — build string은 저장 직전에 나오는
+후보 선택 화면(2-7절)에서 결정한다.
+
+```
+bwa=0.7.17     ← 권장. 마법사 실행 중 ResolveRecipe 단계에서 build string 선택
+```
+
+build string까지 직접 고정하려면 `bwa=0.7.17=h5bf99c6_8` 형식을 써도 된다.
+이 경우 Files 탭에서 대상 platform(`linux-64`)의 파일명을 확인한다.
 
 ```
 linux-64/bwa-0.7.17-h5bf99c6_8.tar.bz2
          ^^^  ^^^^^^  ^^^^^^^^^^
          이름  버전    build string
 ```
-
-conda 패키지 파일명은 `<name>-<version>-<build>.tar.bz2` 형식이므로,
-위 파일명에서 다음 두 가지 형식 중 하나로 입력할 수 있다.
-
-```
-bwa=0.7.17                  ← 버전만 고정 (NodeVault가 build string 결정)
-bwa=0.7.17=h5bf99c6_8       ← build string까지 직접 고정 (최대 재현성)
-```
-
-현재는 NodeVault `ResolveToolSpec`이 아직 구현되지 않아, `bwa=0.7.17`로
-제출하면 build string이 Harbor에서 캐시된 경우 재사용되고 없으면 conda가
-빌드 시점에 결정한다. build string까지 고정하면 그 불확실성이 없어진다.
 
 **② base image digest** — 커맨드로 가져오기
 
@@ -931,7 +989,7 @@ n      ← Dockerfile 없음
 
 [5 / 7] 패키지 목록
 패키지 문자열 (완료하려면 빈 줄):
-> bwa=0.7.17=h5bf99c6_8
+> bwa=0.7.17
 > (Enter)
 
 [6 / 7] 채널 목록
@@ -946,6 +1004,30 @@ n      ← Dockerfile 없음
 ```
 
 그 다음 Inputs / Outputs를 시나리오 A와 동일하게 입력한다.
+
+Outputs 완료 후 **빌드 문자열 선택** 화면이 나온다.
+
+```
+패키지 빌드 문자열 선택
+
+bwa=0.7.17 에 대한 빌드 문자열 후보입니다.
+
+  [1] bwa=0.7.17=h5bf99c6_8
+      채널: bioconda
+  [2] bwa=0.7.17=h7132678_8
+      채널: conda-forge
+
+번호를 선택하세요 [1-2] (Enter = 1번):
+> 1
+
+bwa → bwa=0.7.17=h5bf99c6_8
+
+저장되었습니다: /tmp/bwa.json
+```
+
+> 위 출력은 `NODEKIT_RESOLVE_RECIPE_STUB=1` 환경변수를 켠 UX 테스트 결과다.
+> stub 없이 실행하면 (`GrpcResolveRecipeClient` Sprint R17 전) 이 화면이 나오지 않고
+> 입력한 `bwa=0.7.17`이 그대로 저장된다.
 
 ```bash
 dotnet run --project src/NodeKit.Cli -- validate /tmp/bwa.json
@@ -973,12 +1055,17 @@ dotnet run --project src/NodeKit.Cli -- validate /tmp/bwa.json
   실행 — 전부 이 CLI의 범위 밖이다.
 - `ToolSpecRequest`/`ResolveToolSpec`/`SubmitToolBuild` 계열은 구현하지
   않는다 (NodeVault Phase 1/2 게이트가 아직 열리지 않음 — CLAUDE.md 0절).
+- **`ResolveRecipe` 클라이언트 인터페이스(`IResolveRecipeClient`)는 구현 완료**,
+  UX 테스트용 stub(`NODEKIT_RESOLVE_RECIPE_STUB=1`)도 동작한다.
+  실제 gRPC 클라이언트(`GrpcResolveRecipeClient`)는 NodeVault proto에
+  `ResolveRecipe` RPC가 추가된 후 Sprint R17에서 연결한다. 그 전까지는
+  빌드 문자열 선택 화면이 나오지 않고 입력한 버전 문자열이 그대로 저장된다.
 - 5개 method가 생성하는 Dockerfile은 NodeKit L1 정적 검증만 통과했을 뿐,
   실제 `docker build`로 검증된 적은 없다.
 - `recipe create`의 escape hatch는 `/help`, `/review`, `/change-method`,
   `/back`, `/cancel`, `/quit`, `/exit`이다. `/cancel`/`/quit`/`/exit`는 시작 화면,
-  쉬운 안내 모드, 빠른 설정 질문, 필드 입력, recovery 화면에서 사용할 수 있다.
-  `/back`은 필드 입력 중 이전 필드로 돌아가거나, 첫 번째 필드에서 입력하면
-  모드 선택 화면으로 돌아간다. draft 저장/resume은 범위 밖이다.
+  쉬운 안내 모드, 빠른 설정 질문, 필드 입력, recovery 화면, 빌드 문자열 선택 화면에서
+  사용할 수 있다. `/back`은 필드 입력 중 이전 필드로 돌아가거나, 첫 번째 필드에서
+  입력하면 모드 선택 화면으로 돌아간다. draft 저장/resume은 범위 밖이다.
 - digest 자동 조회는 `NODEKIT_HARBOR_URL` 환경변수가 설정된 경우 내부 Harbor에
   한해 동작한다. 공개 registry(quay.io, ghcr.io 등) 자동 조회는 범위 밖이다.
