@@ -51,7 +51,9 @@ namespace NodeKit.Cli
         {
             using var harborResolver = HarborImageDigestResolver.TryCreate();
             IImageDigestResolver resolver = (IImageDigestResolver?)harborResolver ?? NullImageDigestResolver.Instance;
-            IResolveRecipeClient recipeResolver = resolveClient ?? NullResolveRecipeClient.Instance;
+            IResolveRecipeClient recipeResolver = resolveClient
+                ?? StubResolveRecipeClient.TryCreate()
+                ?? (IResolveRecipeClient)NullResolveRecipeClient.Instance;
 
             try
             {
