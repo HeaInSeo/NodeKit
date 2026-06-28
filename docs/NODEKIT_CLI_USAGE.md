@@ -829,17 +829,52 @@ dotnet run --project src/NodeKit.Cli -- validate /tmp/bwa-mem2.json
 
 bioconda에 패키지가 있는 경우의 빠른 설정 모드 흐름이다.
 
-**사전 준비 — 정보 수집**
+**사전 준비 — 두 가지 정보를 미리 구한다**
 
-bioconda 검색으로 정확한 패키지 문자열을 먼저 확인한다.
+package method에서 입력해야 하는 이미지는 **bwa 이미지가 아니다.**
+conda가 설치된 빌드 환경 이미지(condaforge/miniforge3 등)의 digest가 필요하다.
+
+**① 패키지 문자열** — anaconda.org에서 확인
 
 ```
 https://anaconda.org/bioconda/bwa
-→ 설치 명령: conda install -c bioconda bwa=0.7.17=h5bf99c6_8
 ```
 
-base image digest는 [conda-forge/miniforge3 releases](https://github.com/conda-forge/miniforge/releases)
-또는 Docker Hub에서 `condaforge/miniforge3:24.3.0-0` 태그의 digest를 복사한다.
+페이지 안의 `Files` 탭 또는 설치 명령 예시에서 build string이 포함된 정확한 버전을
+찾는다. 예: `bwa=0.7.17=h5bf99c6_8` (`h5bf99c6_8`이 build string).
+
+**② base image digest** — 커맨드로 가져오기
+
+miniforge3 이미지 digest를 가져오는 가장 간단한 방법:
+
+```bash
+# skopeo가 있는 경우 (권장)
+skopeo inspect docker://condaforge/miniforge3:24.3.0-0 | python3 -m json.tool | grep Digest
+# → "Digest": "sha256:xxxxxxxx..."
+
+# docker가 있는 경우
+docker pull condaforge/miniforge3:24.3.0-0
+docker inspect condaforge/miniforge3:24.3.0-0 \
+  --format='{{index .RepoDigests 0}}'
+# → condaforge/miniforge3@sha256:xxxxxxxx...
+
+# 아무것도 없을 때 — curl + Docker Hub API
+TOKEN=$(curl -sf \
+  "https://auth.docker.io/token?service=registry.docker.io&scope=repository:condaforge/miniforge3:pull" \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+curl -sI \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+  "https://registry-1.docker.io/v2/condaforge/miniforge3/manifests/24.3.0-0" \
+  | grep -i docker-content-digest
+# → docker-content-digest: sha256:xxxxxxxx...
+```
+
+digest를 구했으면 아래 형식으로 조합해 놓는다:
+
+```
+condaforge/miniforge3:24.3.0-0@sha256:<위에서 구한 64자 hex>
+```
 
 **실행**
 
