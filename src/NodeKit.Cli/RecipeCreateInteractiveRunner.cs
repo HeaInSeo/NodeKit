@@ -48,6 +48,9 @@ namespace NodeKit.Cli
             TextWriter stderr,
             IRecipeCreateCancellationSource cancellation)
         {
+            using var harborResolver = HarborImageDigestResolver.TryCreate();
+            IImageDigestResolver resolver = (IImageDigestResolver?)harborResolver ?? NullImageDigestResolver.Instance;
+
             try
             {
                 while (true)
@@ -66,7 +69,7 @@ namespace NodeKit.Cli
                         RecipeCreateScreen.ClearForNewStep(stdout);
                         if (mode == AuthoringModeSelector.Mode.GuidedBeginner)
                         {
-                            method = BeginnerGuideFlow.Run(session, stdin, stdout, cancellation);
+                            method = BeginnerGuideFlow.Run(session, stdin, stdout, cancellation, resolver);
                             if (method is null)
                             {
                                 stdout.WriteLine("단서가 부족합니다. recipe를 저장하지 않고 종료합니다.");
