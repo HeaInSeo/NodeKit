@@ -219,9 +219,32 @@ bioconda 페이지에서 `conda install` 명령어를 찾으면 package 방식�
 BioContainers tag 페이지에서 이미지 주소를 찾으면 container 방식으로 이어가면 된다.
 
 **컨테이너 이미지 — digest 필수 처리:** `[3]`을 선택하면 이미지 주소를
-입력받는다. v1.0에는 digest resolver seam이 있지만 기본 구현은
-`NullImageDigestResolver`라 실제 registry 네트워크 조회는 하지 않는다. digest가
-없으면 registry에서 직접 복사해 입력해야 한다.
+입력받는다. `NODEKIT_HARBOR_URL` 환경변수가 설정되어 있으면 내부 Harbor에서
+digest를 자동으로 조회한다. 환경변수가 없거나 다른 registry이면 registry에서
+직접 복사해 입력해야 한다.
+
+**Harbor 자동 digest 조회 (패쇄망 환경):**
+
+```bash
+export NODEKIT_HARBOR_URL=https://harbor.lab.local
+export NODEKIT_HARBOR_CA_CERT=~/.config/infra-lab/certs/harbor-ca.crt  # 자체 서명 CA
+export NODEKIT_HARBOR_USER=admin
+export NODEKIT_HARBOR_PASSWORD=<password>  # harbor-secrets.env 참조
+```
+
+설정 후 이미지 주소를 tag까지만 입력하면 (`harbor.lab.local/project/bwa:0.7.17`)
+Harbor OCI Distribution API에서 `Docker-Content-Digest` 헤더를 읽어 확인을 물어본다.
+
+```
+이미지 digest를 확인했습니다.
+
+  sha256:0123456789abcdef...
+
+이 digest를 사용할까요? [Y/n]
+```
+
+다른 registry 이미지(`quay.io/...`, `ghcr.io/...`)이거나 `NODEKIT_HARBOR_URL`이
+설정되지 않은 경우에는 기존과 같이 수동 입력으로 폴백된다.
 
 ```
 입력한 이미지 주소에는 digest가 없습니다.
@@ -627,7 +650,7 @@ ls: cannot access 'build-request.json': No such file or directory
 - `recipe create`의 escape hatch는 `/help`, `/review`, `/change-method`,
   `/back`, `/cancel`, `/quit`, `/exit`이다. `/cancel`/`/quit`/`/exit`는 시작 화면,
   쉬운 안내 모드, 빠른 설정 질문, 필드 입력, recovery 화면에서 사용할 수 있다.
-  `/back`은 초기 주요 화면 이동까지만 지원한다. 필드 단위 완전 rollback과
-  draft 저장/resume은 v1.0 범위 밖이다.
-- digest resolver seam은 있지만 기본 구현은 네트워크 조회를 하지 않는
-  `NullImageDigestResolver`다. 실제 OCI/Harbor resolver는 v1.1 이후 범위다.
+  `/back`은 필드 입력 중 이전 필드로 돌아가거나, 첫 번째 필드에서 입력하면
+  모드 선택 화면으로 돌아간다. draft 저장/resume은 범위 밖이다.
+- digest 자동 조회는 `NODEKIT_HARBOR_URL` 환경변수가 설정된 경우 내부 Harbor에
+  한해 동작한다. 공개 registry(quay.io, ghcr.io 등) 자동 조회는 범위 밖이다.
