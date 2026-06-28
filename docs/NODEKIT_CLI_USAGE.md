@@ -1035,6 +1035,181 @@ dotnet run --project src/NodeKit.Cli -- validate /tmp/bwa.json
 
 ---
 
+### 시나리오 C — 쉬운 안내 모드: 설치 명령으로 시작 (samtools)
+
+bioconda에서 설치하는 방법만 알고 있는 경우의 흐름이다.
+설치 명령을 붙여 넣으면 Packages/Channels/PackageEngine이 자동으로 채워지고,
+나머지 항목만 직접 입력하면 된다.
+
+**사전 준비 — base image digest만 있으면 된다**
+
+시나리오 B의 `condaforge/miniforge3` digest 획득 방법과 동일하다.
+이미 구해 놓은 경우 그대로 사용한다.
+
+```
+condaforge/miniforge3:24.3.0-0@sha256:<64자 hex>
+```
+
+**실행**
+
+```bash
+dotnet run --project src/NodeKit.Cli -- recipe create /tmp/samtools.json
+```
+
+**1. 모드 선택 — 쉬운 안내 모드**
+
+```
+[1] 쉬운 안내 모드
+[2] 빠른 설정 모드
+
+> 1
+```
+
+**2. 무엇을 알고 있나요?**
+
+```
+쉬운 안내 모드
+
+정확히 몰라도 괜찮습니다.
+알고 있는 것만 선택하세요.
+
+무엇을 알고 있나요?
+
+[1] 도구 이름만 알고 있다
+[2] 설치 명령을 알고 있다     예: conda install -c bioconda bwa=0.7.17
+[3] 컨테이너 이미지 주소를 알고 있다
+[4] GitHub 또는 소스코드 주소를 알고 있다
+[5] Dockerfile을 가지고 있다
+[6] 회사/학교 내부 저장소를 써야 한다
+[7] 잘 모르겠다
+
+선택:
+> 2
+```
+
+**3. 설치 명령 입력**
+
+```
+설치 명령을 입력해 주세요.
+
+예:
+  conda install -c bioconda bwa=0.7.17
+  micromamba install -c bioconda samtools=1.20
+
+설치 명령:
+> conda install -c bioconda samtools=1.17
+```
+
+**4. 파싱 결과 확인**
+
+```
+설치 명령을 이해했습니다.
+
+이해한 값:
+  PackageEngine: conda
+  Channels:
+    - bioconda
+  Packages:
+    - samtools=1.17
+
+선택:
+[1] 이해한 값을 사용하고 부족한 값을 직접 입력한다
+[2] 설치 명령을 다시 입력한다
+[3] 다른 작성 방식을 선택한다
+[4] 취소한다
+
+선택:
+> 1
+```
+
+**5. 필드 입력 — 9개 항목 중 3개(Packages·Channels·PackageEngine)는 자동 채워짐**
+
+```
+[1 / 9]
+도구 이름 — recipe에서 식별할 도구 이름입니다.
+> samtools
+
+[2 / 9]
+도구 버전 — 도구 버전 또는 고정된 release/version입니다.
+> 1.17
+
+[3 / 9]
+기본 실행 명령 — 도구 실행 시 사용할 기본 명령 또는 이미지 안의 스크립트 경로입니다.
+> samtools view
+
+[4 / 9]
+기반 이미지 — conda가 설치된 base 이미지입니다. digest 포함 필요.
+> condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef...
+```
+
+Packages/Channels/PackageEngine은 자동 채워졌으므로 `[5/9]`, `[6/9]`, `[7/9]`은
+건너뛴다.
+
+**6. Inputs 입력**
+
+```
+[5 / 9]
+입력 — 최소 1개 이상의 입력 정의가 필요합니다.
+
+입력 이름:
+> bam
+
+  [1] BAM alignment
+      시퀀스가 정렬된 BAM 파일입니다.
+      예: sample.bam
+  ...
+  [7] 직접 입력
+
+프리셋 번호 또는 'custom':
+> 1
+
+입력 이름 (완료하려면 빈 줄):
+> (Enter)
+```
+
+**7. Outputs 입력**
+
+```
+[6 / 9]
+출력 — 최소 1개 이상의 출력 정의가 필요합니다.
+
+출력 이름:
+> filtered
+
+  [1] BAM — primary alignment
+  ...
+
+프리셋 번호 또는 'custom':
+> 1
+
+출력 이름 (완료하려면 빈 줄):
+> (Enter)
+```
+
+**8. 저장 확인**
+
+```
+저장되었습니다: /tmp/samtools.json
+```
+
+생성된 `samtools.json`에는 Packages, Channels, PackageEngine이 이미 채워져 있다.
+
+```bash
+dotnet run --project src/NodeKit.Cli -- validate /tmp/samtools.json
+```
+
+```
+검증을 통과했습니다.
+```
+
+> **쉬운 안내 모드로 시작하는 이유:**
+> `[2] 설치 명령을 알고 있다`를 선택하면 채널과 패키지를 명령에서 자동으로
+> 추출한다. bioconda 페이지에서 복사한 `conda install` 명령을 그대로 붙여 넣으면
+> 된다. 버전이 없는 명령(`conda install samtools`)을 입력하면 경고가 표시되고
+> 버전 고정 후 계속할지 묻는다.
+
+---
+
 ### 공통 팁
 
 | 상황 | 입력 |
