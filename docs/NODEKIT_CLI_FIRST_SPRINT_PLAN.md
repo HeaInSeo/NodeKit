@@ -1403,5 +1403,116 @@ R15: 사용 가이드(NODEKIT_CLI_USAGE.md) recipe create 섹션 재구성
      (R9-R14 완료 후, 마지막)
 
 순서: R8 단독 선행 가능 -> (R9 -> R10) 및 R11은 서로 독립적으로 병행 가능 ->
-R12 -> R13 -> R14 -> R15.
+R12 -> R13 -> R14 -> R15 -> R16.
+```
+
+## 12. ResolveRecipe Client Seam (2026-06-28)
+
+Design source: `docs/PLATFORM_MASTER_DESIGN.md` §4.9 / §6,
+`NodeVault/docs/PLATFORM_SCHEDULE.md` 병렬 트랙 D.
+
+이 트랙은 NodeVault `ResolveRecipe` RPC가 proto에 추가되기 전에 NodeKit의
+UX 계층을 먼저 구현한다. proto 없이도 인터페이스 seam + Null 구현으로 전체
+흐름을 선제적으로 완성하고, proto가 준비되면 `GrpcResolveRecipeClient`만
+플러그인한다.
+
+### Sprint R16. ResolveRecipe Seam + Candidate Selection UX
+
+Goal:
+
+```text
+Build the NodeKit side of the ResolveRecipe pre-build step: define the
+interface, provide a no-op null implementation, implement the candidate
+selection UI, and wire it between L1 validation and recipe save.
+```
+
+Tasks:
+
+```text
+1. Define IResolveRecipeClient + result model types
+   (ResolveRecipeResult, PackageResolution, BuildStringCandidate,
+   RecipeResolutionSource enum).
+2. Implement NullResolveRecipeClient (returns Unsupported → step skipped).
+3. Implement PackageCandidatePresenter: show numbered candidate list for
+   multi-candidate packages; auto-select for single-candidate packages;
+   ApplySelections replaces version-only pins with full_pin strings.
+4. Wire into RecipeCreateInteractiveRunner.Run(): after L1 validation
+   passes and before SaveDocument, call IResolveRecipeClient.ResolveAsync
+   for Package-method recipes and present any returned candidates.
+5. Show polite guidance when resolution_source == NotFound (closed network
+   without Harbor pre-registration).
+```
+
+Done when:
+
+```text
+- Build: 0 warnings, 0 errors.
+- PackageCandidatePresenterTests: single-candidate auto-select, multi-candidate
+  prompt+pick, Enter=first, /cancel throws, invalid-then-valid reprompt,
+  ApplySelections replaces pin correctly.
+- NullResolveRecipeClient test: returns Unsupported.
+- All existing interactive tests still pass unchanged (Null client means
+  the resolve step is a no-op today).
+```
+
+**Progress (Sprint R16 완료, 2026-06-28):**
+
+```text
+완료:
+- src/NodeKit.Cli/IResolveRecipeClient.cs
+    IResolveRecipeClient interface, ResolveRecipeResult, PackageResolution,
+    BuildStringCandidate, RecipeResolutionSource enum
+- src/NodeKit.Cli/NullResolveRecipeClient.cs
+    Singleton no-op; returns Unsupported
+- src/NodeKit.Cli/PackageCandidatePresenter.cs
+    Present(): auto-select for 1 candidate; numbered prompt for N>1;
+    /cancel|/quit|/exit → RecipeCreateCancelledException; invalid input → reprompt
+    ApplySelections(): replaces version-only pin with full_pin by package name
+- RecipeCreateInteractiveRunner.Run(): optional IResolveRecipeClient param
+    (default = NullResolveRecipeClient); resolve step inserted after validation,
+    before SaveDocument. NotFound path prints폐쇄망 guidance without blocking.
+- tests/NodeKit.Cli.Tests/PackageCandidatePresenterTests.cs: 9 tests
+    (auto-select, pick-second, Enter=first, cancel-throws, invalid-then-valid,
+    ApplySelections-replaces, ApplySelections-empty, ApplySelections-full-pin,
+    NullClient-returns-unsupported)
+
+최종 결과: 336 NodeKit.Tests + 92 NodeKit.Cli.Tests = 428 / 428 통과, 0 warnings.
+```
+
+### Sprint R17. GrpcResolveRecipeClient (NodeVault proto 준비 후)
+
+Goal:
+
+```text
+Implement the real gRPC client once NodeVault adds ResolveRecipe to the proto.
+```
+
+Entry criteria:
+
+```text
+- NodeVault has added ResolveRecipe RPC + ResolveRecipeRequest /
+  ResolveRecipeResponse / PackageResolution / BuildStringCandidate messages
+  to protos/nodevault/v1/nodevault.proto.
+- Vendored proto in NodeKit is updated.
+```
+
+Tasks:
+
+```text
+1. Generate C# gRPC stubs from the updated proto.
+2. Implement GrpcResolveRecipeClient: call NodeVault ResolveRecipe, map
+   the response to NodeKit's ResolveRecipeResult model.
+3. Wire GrpcResolveRecipeClient into RecipeCreateInteractiveRunner.Run()
+   when NODEKIT_NODEVAULT_URL env var is set (same pattern as HarborImageDigestResolver).
+4. Add integration tests (opt-in, skipped without live NodeVault).
+```
+
+Done when:
+
+```text
+- bwa=0.7.17 + Harbor cache hit → one candidate auto-selected, full_pin
+  written to recipe.json.
+- bwa=0.7.17 + Harbor miss + open network → candidate list shown to user.
+- bwa=0.7.17 + Harbor miss + closed network → NotFound guidance shown,
+  recipe saved without build_string (NodeVault will resolve at submit time).
 ```

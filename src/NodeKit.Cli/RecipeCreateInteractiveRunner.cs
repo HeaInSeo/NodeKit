@@ -46,10 +46,12 @@ namespace NodeKit.Cli
             TextReader stdin,
             TextWriter stdout,
             TextWriter stderr,
-            IRecipeCreateCancellationSource cancellation)
+            IRecipeCreateCancellationSource cancellation,
+            IResolveRecipeClient? resolveClient = null)
         {
             using var harborResolver = HarborImageDigestResolver.TryCreate();
             IImageDigestResolver resolver = (IImageDigestResolver?)harborResolver ?? NullImageDigestResolver.Instance;
+            IResolveRecipeClient recipeResolver = resolveClient ?? NullResolveRecipeClient.Instance;
 
             try
             {
@@ -140,6 +142,42 @@ namespace NodeKit.Cli
                         document = session.Build();
                         document.BuildKind = RecipeBuildKindResolver.Resolve(session.Snapshot().SelectedMethod!.Value, document);
                         result = RecipeValidationPipeline.ValidateRecipe(document);
+                    }
+
+                    // ResolveRecipe 사전 조회 (트랙 D — proto 추가 전까지 NullResolveRecipeClient)
+                    if (document.Packages.Count > 0)
+                    {
+                        var resolveResult = recipeResolver
+                            .ResolveAsync(document.ToolName ?? string.Empty, document.Version ?? string.Empty,
+                                document.Packages, System.Threading.CancellationToken.None)
+                            .GetAwaiter().GetResult();
+
+                        if (resolveResult.Source != RecipeResolutionSource.Unsupported
+                            && resolveResult.Packages.Count > 0)
+                        {
+                            RecipeCreateScreen.ClearForNewStep(stdout);
+                            stdout.WriteLine("패키지 빌드 문자열 선택");
+                            stdout.WriteLine();
+
+                            var selections = PackageCandidatePresenter.Present(
+                                resolveResult.Packages, stdin, stdout, cancellation);
+                            if (selections is null)
+                            {
+                                stderr.WriteLine("패키지 선택이 완료되지 않아 저장하지 않습니다.");
+                                return 1;
+                            }
+
+                            document.Packages = new System.Collections.Generic.List<string>(
+                                PackageCandidatePresenter.ApplySelections(document.Packages, selections));
+                        }
+                        else if (resolveResult.Source == RecipeResolutionSource.NotFound)
+                        {
+                            stdout.WriteLine();
+                            stdout.WriteLine("⚠  Harbor에 동일 tool+version 이미지가 없습니다.");
+                            stdout.WriteLine("   폐쇄망 환경이라면 관리자가 Harbor에 이미지를 사전 등록해야 합니다.");
+                            stdout.WriteLine("   열린망이라면 빌드 서버가 외부 채널에서 직접 해소합니다.");
+                            stdout.WriteLine();
+                        }
                     }
 
                     RecipeCreateCommand.SaveDocument(document, outPath, stdout);
