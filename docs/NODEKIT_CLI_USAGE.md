@@ -834,14 +834,28 @@ bioconda에 패키지가 있는 경우의 빠른 설정 모드 흐름이다.
 package method에서 입력해야 하는 이미지는 **bwa 이미지가 아니다.**
 conda가 설치된 빌드 환경 이미지(condaforge/miniforge3 등)의 digest가 필요하다.
 
-**① 패키지 문자열** — anaconda.org에서 확인
+**① 패키지 문자열** — anaconda.org Files 탭에서 확인
 
 ```
 https://anaconda.org/bioconda/bwa
 ```
 
-페이지 안의 `Files` 탭 또는 설치 명령 예시에서 build string이 포함된 정확한 버전을
-찾는다. 예: `bwa=0.7.17=h5bf99c6_8` (`h5bf99c6_8`이 build string).
+Overview 화면의 설치 명령에는 build string이 빠져 있는 경우가 많다.
+재현성을 위해 build string까지 고정하려면 **Files 탭**을 열고 대상 platform
+(보통 `linux-64`)의 파일명을 확인한다.
+
+```
+linux-64/bwa-0.7.17-h5bf99c6_8.tar.bz2
+         ^^^  ^^^^^^  ^^^^^^^^^^
+         이름  버전    build string
+```
+
+conda 패키지 파일명은 `<name>-<version>-<build>.tar.bz2` 형식이므로,
+위 파일명은 다음 package spec으로 입력한다.
+
+```
+bwa=0.7.17=h5bf99c6_8
+```
 
 **② base image digest** — 커맨드로 가져오기
 
