@@ -639,6 +639,280 @@ ls: cannot access 'build-request.json': No such file or directory
 }
 ```
 
+## 8. 베스트 프랙티스 따라하기
+
+실제로 입력하며 따라갈 수 있는 완성 시나리오 두 가지다.
+`>` 로 시작하는 줄이 직접 입력하는 값이다.
+
+---
+
+### 시나리오 A — 패쇄망: Harbor container recipe (bwa-mem2)
+
+**전제 조건:**
+- `harbor.lab.local`에 `harbor.lab.local/bioinformatics/bwa-mem2:2.2.1` 이미지가 존재한다
+- Harbor CA cert와 admin 패스워드를 알고 있다
+- 실제 이미지/프로젝트 경로는 자신의 Harbor에 맞게 바꿔 입력한다
+
+**1. 환경변수 설정**
+
+```bash
+source ~/.config/infra-lab/harbor-secrets.env
+
+export NODEKIT_HARBOR_URL=https://harbor.lab.local
+export NODEKIT_HARBOR_CA_CERT=~/.config/infra-lab/certs/harbor-ca.crt
+export NODEKIT_HARBOR_USER=admin
+export NODEKIT_HARBOR_PASSWORD=$HARBOR_ADMIN_PASSWORD
+```
+
+**2. 마법사 실행**
+
+```bash
+dotnet run --project src/NodeKit.Cli -- recipe create /tmp/bwa-mem2.json
+```
+
+**3. 모드 선택 — 쉬운 안내 모드**
+
+```
+[1] 쉬운 안내 모드
+[2] 빠른 설정 모드
+
+> 1
+```
+
+**4. 도구 이름 입력**
+
+```
+도구 이름을 입력하세요.
+
+> bwa-mem2
+```
+
+**5. 도구를 이미 알고 있음 선택**
+
+```
+bwa-mem2 에 대해 얼마나 알고 계신가요?
+[1] 이름만 안다
+[2] 설치 방법을 안다 (conda 패키지명, 컨테이너 이미지 등)
+[3] 아무것도 모른다
+
+> 2
+```
+
+**6. 컨테이너 이미지 경로 선택**
+
+```
+bwa-mem2 의 배포 방식을 선택하세요.
+[1] 설치 명령 (conda install / pip install 등)
+[2] 컨테이너 이미지
+[3] 소스코드 빌드
+[4] Dockerfile
+[5] 저장하지 않고 종료
+
+> 2
+```
+
+**7. 이미지 주소 입력 — tag까지만 입력**
+
+```
+컨테이너 이미지 주소를 입력해 주세요.
+
+이미지 주소:
+> harbor.lab.local/bioinformatics/bwa-mem2:2.2.1
+```
+
+Harbor가 digest를 응답하면:
+
+```
+이미지 digest를 확인했습니다.
+
+  sha256:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+이 digest를 사용할까요? [Y/n]
+> (Enter)
+```
+
+> digest를 확인할 수 없거나 Harbor에 연결되지 않으면 "자동 조회를 사용할 수 없습니다"
+> 메시지가 나오고 수동 입력으로 넘어간다. 이 경우 Harbor UI에서 이미지 → 태그를
+> 클릭하면 `sha256:...` digest를 복사할 수 있다.
+
+**8. 이후 필드 입력 (빠른 설정 모드로 method 선택 후 진행됨)**
+
+method가 `container`로 확정되면 공통/method 필드를 순서대로 입력한다.
+
+```
+[1 / 8]
+도구 이름 — recipe에서 식별할 도구 이름입니다.
+> bwa-mem2
+
+[2 / 8]
+도구 버전 — 도구 버전 또는 고정된 release/version입니다.
+> 2.2.1
+
+[3 / 8]
+기본 실행 명령 — 도구 실행 시 사용할 기본 명령 또는 이미지 안의 스크립트 경로입니다.
+> bwa-mem2 mem
+
+[4 / 8]
+이미지 참조 — ...
+> harbor.lab.local/bioinformatics/bwa-mem2:2.2.1
+
+[5 / 8]
+이미지 digest — ...
+> sha256:xxxxxxxx...
+
+[6 / 8]
+실행 명령 — (선택) 기본 entrypoint를 바꾸지 않으면 그냥 Enter
+> (Enter)
+```
+
+**9. Inputs 입력**
+
+```
+[7 / 8]
+입력 — 최소 1개 이상의 입력 정의가 필요합니다.
+
+입력 이름:
+> reads
+
+  [1] FASTQ paired-end reads
+      쌍을 이루는 FASTQ 시퀀싱 리드입니다.
+      예: sample_R1.fastq.gz, sample_R2.fastq.gz
+  [2] FASTQ single-end reads
+  ...
+  [7] 직접 입력
+
+프리셋 번호 또는 'custom':
+> 1
+
+입력 이름 (완료하려면 빈 줄):
+> (Enter)
+```
+
+**10. Outputs 입력**
+
+```
+[8 / 8]
+출력 — 최소 1개 이상의 출력 정의가 필요합니다.
+
+출력 이름:
+> aligned
+
+  [1] BAM — primary alignment
+  ...
+
+프리셋 번호 또는 'custom':
+> 1
+
+출력 이름 (완료하려면 빈 줄):
+> (Enter)
+```
+
+**11. 저장 확인**
+
+```
+저장되었습니다: /tmp/bwa-mem2.json
+```
+
+**12. 검증**
+
+```bash
+dotnet run --project src/NodeKit.Cli -- validate /tmp/bwa-mem2.json
+```
+
+```
+검증을 통과했습니다.
+```
+
+---
+
+### 시나리오 B — 공개망: bioconda package recipe (bwa)
+
+bioconda에 패키지가 있는 경우의 빠른 설정 모드 흐름이다.
+
+**사전 준비 — 정보 수집**
+
+bioconda 검색으로 정확한 패키지 문자열을 먼저 확인한다.
+
+```
+https://anaconda.org/bioconda/bwa
+→ 설치 명령: conda install -c bioconda bwa=0.7.17=h5bf99c6_8
+```
+
+base image digest는 [conda-forge/miniforge3 releases](https://github.com/conda-forge/miniforge/releases)
+또는 Docker Hub에서 `condaforge/miniforge3:24.3.0-0` 태그의 digest를 복사한다.
+
+**실행**
+
+```bash
+dotnet run --project src/NodeKit.Cli -- recipe create /tmp/bwa.json
+```
+
+```
+> 2    ← 빠른 설정 모드
+
+n      ← 내부망 아님
+n      ← 내부 package mirror 없음
+n      ← 기존 컨테이너 이미지 없음
+y      ← public channel에 패키지 있음 (bioconda)
+n      ← source build 불필요
+n      ← Dockerfile 없음
+
+(Enter) ← 추천 method(package) 수락
+```
+
+필드 입력:
+
+```
+[1 / 7] 도구 이름
+> bwa
+
+[2 / 7] 도구 버전
+> 0.7.17
+
+[3 / 7] 기본 실행 명령
+> bwa mem
+
+[4 / 7] 기반 이미지 — digest 포함 필요
+> condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef...
+
+[5 / 7] 패키지 목록
+패키지 문자열 (완료하려면 빈 줄):
+> bwa=0.7.17=h5bf99c6_8
+> (Enter)
+
+[6 / 7] 채널 목록
+채널 (완료하려면 빈 줄):
+> bioconda
+> conda-forge
+> defaults
+> (Enter)
+
+[7 / 7] 패키지 엔진 — conda / micromamba 중 선택. 기본값: conda
+> (Enter)
+```
+
+그 다음 Inputs / Outputs를 시나리오 A와 동일하게 입력한다.
+
+```bash
+dotnet run --project src/NodeKit.Cli -- validate /tmp/bwa.json
+```
+
+---
+
+### 공통 팁
+
+| 상황 | 입력 |
+|---|---|
+| 방금 입력한 값이 틀렸다 | `/back` → 이전 필드로 돌아감 |
+| 지금까지 입력한 값을 보고 싶다 | `/review` |
+| method를 바꾸고 싶다 | `/change-method` |
+| 처음부터 다시 시작 | 첫 번째 필드에서 `/back` → 모드 선택 화면 |
+| 그냥 나가기 | `/cancel` (파일 저장 안 됨, 종료 코드 130) |
+
+> **digest 없이 저장하려 하면 막힌다.** validate에서 `L1-IMG-003` 또는
+> `L1-IMG-006`이 나오면 `imageRef`에 `@sha256:` 부분이 빠진 것이다.
+> `/review`로 현재 값을 확인하고, 해당 필드에서 `/back`으로 돌아가서 수정한다.
+
 ## 7. 범위 / 제한사항
 
 - gRPC 전송, NodeVault 조회, 이미지 레지스트리 push, 로컬 docker/buildah/buildkit
