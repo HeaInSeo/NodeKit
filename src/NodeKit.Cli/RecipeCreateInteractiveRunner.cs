@@ -218,25 +218,19 @@ namespace NodeKit.Cli
 
         private static RecipeMethodAnswers AskRecommenderQuestions(TextReader stdin, TextWriter stdout)
         {
-            stdout.WriteLine("빠른 설정 모드");
-            stdout.WriteLine();
-            stdout.WriteLine("이 모드는 도구의 배포 방식이나 빌드 방식을 어느 정도 알고 있는 사용자를 위한 모드입니다.");
-            stdout.WriteLine();
-            stdout.WriteLine("각 질문에는 y/n/Enter로 답할 수 있습니다.");
-            stdout.WriteLine();
-            stdout.WriteLine("  y      예");
-            stdout.WriteLine("  n      아니오");
-            stdout.WriteLine("  Enter  잘 모르겠음");
-            stdout.WriteLine();
-            stdout.WriteLine("잘못 선택해도 괜찮습니다.");
-            stdout.WriteLine("이전 화면으로 돌아가려면 /back을 입력하세요.");
-            stdout.WriteLine("입력 중 언제든지 /change-method로 작성 방식을 다시 선택할 수 있습니다.");
-            stdout.WriteLine("저장하지 않고 종료하려면 /cancel을 입력하세요.");
-            stdout.WriteLine();
-
+            var questions = RecipeMethodQuestionCatalog.Questions;
             var byField = new Dictionary<string, Answer>(StringComparer.Ordinal);
-            foreach (var question in RecipeMethodQuestionCatalog.Questions)
+            var index = 0;
+
+            while (index < questions.Count)
             {
+                var question = questions[index];
+                RecipeCreateScreen.ClearForNewStep(stdout);
+
+                stdout.WriteLine($"빠른 설정 모드  [{index + 1} / {questions.Count}]");
+                stdout.WriteLine("/back: 이전 질문   /cancel: 종료");
+                stdout.WriteLine();
+
                 if (RecipeMethodQuestionDetailCatalog.ByKey.TryGetValue(question.Key, out var detail))
                 {
                     stdout.WriteLine(detail.Header);
@@ -280,8 +274,22 @@ namespace NodeKit.Cli
                 }
 
                 stdout.WriteLine("선택 [y/n/Enter]:");
-                byField[question.Key] = ReadAnswer(stdin);
-                stdout.WriteLine();
+                try
+                {
+                    byField[question.Key] = ReadAnswer(stdin);
+                    index++;
+                }
+                catch (RecipeCreateBackRequestedException)
+                {
+                    if (index > 0)
+                    {
+                        index--;
+                    }
+                    else
+                    {
+                        throw;
+                    }
+                }
             }
 
             return new RecipeMethodAnswers(
