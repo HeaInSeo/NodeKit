@@ -43,6 +43,7 @@ namespace NodeKit.Cli
             IRecipeCreateCancellationSource cancellation,
             IImageDigestResolver digestResolver)
         {
+            RecipeCreateScreen.ClearForNewStep(stdout);
             stdout.WriteLine("쉬운 안내 모드");
             stdout.WriteLine();
             stdout.WriteLine("정확히 몰라도 괜찮습니다.");
@@ -125,7 +126,7 @@ namespace NodeKit.Cli
                     throw new RecipeCreateCancelledException();
                 }
 
-                stdout.WriteLine();
+                RecipeCreateScreen.ClearForNewStep(stdout);
                 stdout.WriteLine("도구 이름을 입력해 주세요.");
                 stdout.WriteLine();
                 stdout.WriteLine("예:");
@@ -133,6 +134,7 @@ namespace NodeKit.Cli
                 stdout.WriteLine("  samtools");
                 stdout.WriteLine("  fastqc");
                 stdout.WriteLine();
+                stdout.WriteLine("/cancel: 종료");
                 stdout.WriteLine("도구 이름:");
 
                 name = ReadTrimmedLine(stdin);
@@ -144,6 +146,7 @@ namespace NodeKit.Cli
                 stdout.WriteLine("도구 이름을 입력해 주세요.");
             }
 
+            RecipeCreateScreen.ClearForNewStep(stdout);
             PrintToolLookupGuidance(stdout, name);
 
             stdout.WriteLine();
@@ -203,7 +206,7 @@ namespace NodeKit.Cli
                     throw new RecipeCreateCancelledException();
                 }
 
-                stdout.WriteLine();
+                RecipeCreateScreen.ClearForNewStep(stdout);
                 stdout.WriteLine("설치 명령을 입력해 주세요.");
                 stdout.WriteLine();
                 stdout.WriteLine("예:");
@@ -272,7 +275,7 @@ namespace NodeKit.Cli
             TextWriter stdout,
             IRecipeCreateCancellationSource cancellation)
         {
-            stdout.WriteLine();
+            RecipeCreateScreen.ClearForNewStep(stdout);
             if (parsed.Status == InstallCommandParseStatus.Parsed)
             {
                 stdout.WriteLine("설치 명령을 이해했습니다.");
@@ -364,7 +367,7 @@ namespace NodeKit.Cli
             TextWriter stdout,
             IRecipeCreateCancellationSource cancellation)
         {
-            stdout.WriteLine();
+            RecipeCreateScreen.ClearForNewStep(stdout);
             stdout.WriteLine("설치 명령을 자동으로 이해하지 못했습니다.");
             stdout.WriteLine();
             stdout.WriteLine("괜찮습니다. 필요한 값을 하나씩 입력하면 됩니다.");
@@ -465,7 +468,7 @@ namespace NodeKit.Cli
 
                 if (pendingRef is null)
                 {
-                    stdout.WriteLine();
+                    RecipeCreateScreen.ClearForNewStep(stdout);
                     stdout.WriteLine("컨테이너 이미지 주소를 입력해 주세요.");
                     stdout.WriteLine();
                     stdout.WriteLine("예:");
@@ -498,7 +501,7 @@ namespace NodeKit.Cli
                     var resolvedDigest = TryResolveImageDigest(pendingRef, digestResolver, stdout, cancellation);
                     if (resolvedDigest != null)
                     {
-                        stdout.WriteLine();
+                        RecipeCreateScreen.ClearForNewStep(stdout);
                         stdout.WriteLine("이미지 digest를 확인했습니다.");
                         stdout.WriteLine();
                         stdout.WriteLine($"  {resolvedDigest}");
@@ -520,7 +523,7 @@ namespace NodeKit.Cli
                         stdout.WriteLine("직접 digest를 입력합니다.");
                     }
 
-                    stdout.WriteLine();
+                    RecipeCreateScreen.ClearForNewStep(stdout);
                     stdout.WriteLine("입력한 이미지 주소에는 digest가 없습니다.");
                     stdout.WriteLine();
                     stdout.WriteLine("현재 값:");
@@ -621,7 +624,7 @@ namespace NodeKit.Cli
                     throw new RecipeCreateCancelledException();
                 }
 
-                stdout.WriteLine();
+                RecipeCreateScreen.ClearForNewStep(stdout);
                 stdout.WriteLine("소스코드 주소를 입력해 주세요.");
                 stdout.WriteLine();
                 stdout.WriteLine("예:");
@@ -643,8 +646,9 @@ namespace NodeKit.Cli
                     continue;
                 }
 
-                stdout.WriteLine();
+                RecipeCreateScreen.ClearForNewStep(stdout);
                 PrintSourceChecksumGuidance(stdout, uri);
+                stdout.WriteLine("/cancel: 종료");
                 stdout.WriteLine("SourceChecksum:");
 
                 var checksum = ReadTrimmedLine(stdin);
@@ -656,7 +660,7 @@ namespace NodeKit.Cli
                     return RecipeMethodId.Source;
                 }
 
-                stdout.WriteLine();
+                RecipeCreateScreen.ClearForNewStep(stdout);
                 stdout.WriteLine("SourceChecksum이 없으면 source 방식 recipe를 완성할 수 없습니다.");
                 stdout.WriteLine();
                 stdout.WriteLine("선택:");
@@ -721,7 +725,7 @@ namespace NodeKit.Cli
                     throw new RecipeCreateCancelledException();
                 }
 
-                stdout.WriteLine();
+                RecipeCreateScreen.ClearForNewStep(stdout);
                 stdout.WriteLine("Dockerfile 경로를 입력해 주세요.");
                 stdout.WriteLine();
                 stdout.WriteLine("예:");
@@ -753,6 +757,7 @@ namespace NodeKit.Cli
                 stdout.WriteLine();
                 stdout.WriteLine("처음 사용하는 경우에는 package 또는 container 방식을 먼저 고려하는 것을 권장합니다.");
                 stdout.WriteLine();
+                stdout.WriteLine("/cancel: 종료   아니오(Enter/n): 방식 선택으로 돌아가기");
                 stdout.WriteLine("계속 진행할까요? [y/N]");
 
                 var confirm = ReadTrimmedLine(stdin).ToLowerInvariant();
@@ -782,7 +787,7 @@ namespace NodeKit.Cli
                     throw new RecipeCreateCancelledException();
                 }
 
-                stdout.WriteLine();
+                RecipeCreateScreen.ClearForNewStep(stdout);
                 stdout.WriteLine("내부 저장소 주소를 입력해 주세요.");
                 stdout.WriteLine();
                 stdout.WriteLine("예:");
@@ -818,7 +823,7 @@ namespace NodeKit.Cli
             IRecipeCreateCancellationSource cancellation,
             IImageDigestResolver digestResolver)
         {
-            stdout.WriteLine();
+            RecipeCreateScreen.ClearForNewStep(stdout);
             stdout.WriteLine("아직 recipe를 완성하기 위한 단서가 부족합니다.");
             stdout.WriteLine();
             stdout.WriteLine("현재 NodeKit CLI는 외부 검색이나 NodeVault 조회를 하지 않습니다.");
