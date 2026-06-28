@@ -79,6 +79,7 @@ namespace NodeKit.Cli
                 }
 
                 stdout.WriteLine();
+                stdout.WriteLine("/cancel: 저장하지 않고 종료");
                 stdout.Write($"번호를 선택하세요 [1-{pkg.Candidates.Count}] (Enter = 1번): ");
 
                 var line = stdin.ReadLine();

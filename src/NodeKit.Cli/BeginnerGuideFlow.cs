@@ -210,6 +210,7 @@ namespace NodeKit.Cli
                 stdout.WriteLine("  conda install -c bioconda bwa=0.7.17");
                 stdout.WriteLine("  micromamba install -c bioconda samtools=1.20");
                 stdout.WriteLine();
+                stdout.WriteLine("/cancel: 종료");
                 stdout.WriteLine("설치 명령:");
 
                 var command = ReadRawLine(stdin);
@@ -476,6 +477,7 @@ namespace NodeKit.Cli
                     stdout.WriteLine("  - 이미 만들어진 이미지를 그대로 사용합니다.");
                     stdout.WriteLine("  - digest가 없으면 재현성을 보장할 수 없어 validate에서 실패합니다.");
                     stdout.WriteLine();
+                    stdout.WriteLine("/cancel: 종료");
                     stdout.WriteLine("이미지 주소:");
 
                     pendingRef = ReadTrimmedLine(stdin);
@@ -631,6 +633,7 @@ namespace NodeKit.Cli
                 stdout.WriteLine("  - 이후 SourceUri, SourceChecksum, SourceBuildCommands를 입력하게 됩니다.");
                 stdout.WriteLine("  - checksum이 없으면 같은 소스인지 확인할 수 없어 validate에서 실패합니다.");
                 stdout.WriteLine();
+                stdout.WriteLine("/cancel: 종료");
                 stdout.WriteLine("소스코드 주소:");
 
                 var uri = ReadTrimmedLine(stdin);
@@ -729,6 +732,7 @@ namespace NodeKit.Cli
                 stdout.WriteLine("  FROM 이미지가 digest로 고정되어 있지 않거나 latest 태그를 사용하면 validate에서 실패합니다.");
                 stdout.WriteLine("  처음 사용하는 경우에는 package 또는 container 방식이 더 쉽습니다.");
                 stdout.WriteLine();
+                stdout.WriteLine("/cancel: 종료");
                 stdout.WriteLine("Dockerfile 경로:");
 
                 var path = ReadTrimmedLine(stdin);
@@ -790,6 +794,7 @@ namespace NodeKit.Cli
                 stdout.WriteLine("  - 이후 PackageMirrorUri를 입력하게 됩니다.");
                 stdout.WriteLine("  - 다른 사용자가 같은 recipe를 실행하려면 동일한 내부 저장소에 접근할 수 있어야 합니다.");
                 stdout.WriteLine();
+                stdout.WriteLine("/cancel: 종료");
                 stdout.WriteLine("내부 저장소 주소:");
 
                 var uri = ReadTrimmedLine(stdin);

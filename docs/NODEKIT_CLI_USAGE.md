@@ -1122,22 +1122,38 @@ dotnet run --project src/NodeKit.Cli -- recipe create /tmp/samtools.json
 > 1
 ```
 
-**5. 필드 입력 — 9개 항목 중 3개(Packages·Channels·PackageEngine)는 자동 채워짐**
+**5. 필드 입력**
+
+install command에서 자동 채워진 항목: **Packages, Channels, PackageEngine** (3개)
+
+직접 입력이 필요한 항목: **ToolName, ToolVersion, 실행 명령, 기반 이미지, Inputs, Outputs** (6개)
+
+> **기반 이미지(ImageRef)는 install command에서 알 수 없어 항상 직접 입력해야 한다.**
+> install 명령에는 `samtools=1.17` 패키지 정보만 있고, 어떤 conda base 이미지를
+> 쓸지는 포함되지 않기 때문이다.
 
 ```
 [1 / 9]
+/back: 이전 필드   /cancel: 종료   /review: 현재 값   /change-method: 작성 방식 변경
+
 도구 이름 — recipe에서 식별할 도구 이름입니다.
 > samtools
 
 [2 / 9]
+/back: 이전 필드   /cancel: 종료   /review: 현재 값   /change-method: 작성 방식 변경
+
 도구 버전 — 도구 버전 또는 고정된 release/version입니다.
 > 1.17
 
 [3 / 9]
+/back: 이전 필드   /cancel: 종료   /review: 현재 값   /change-method: 작성 방식 변경
+
 기본 실행 명령 — 도구 실행 시 사용할 기본 명령 또는 이미지 안의 스크립트 경로입니다.
 > samtools view
 
 [4 / 9]
+/back: 이전 필드   /cancel: 종료   /review: 현재 값   /change-method: 작성 방식 변경
+
 기반 이미지 — conda가 설치된 base 이미지입니다. digest 포함 필요.
 > condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef...
 ```
@@ -1149,6 +1165,8 @@ Packages/Channels/PackageEngine은 자동 채워졌으므로 `[5/9]`, `[6/9]`, `
 
 ```
 [5 / 9]
+/back: 이전 필드   /cancel: 종료   /review: 현재 값   /change-method: 작성 방식 변경
+
 입력 — 최소 1개 이상의 입력 정의가 필요합니다.
 
 입력 이름:
@@ -1171,6 +1189,8 @@ Packages/Channels/PackageEngine은 자동 채워졌으므로 `[5/9]`, `[6/9]`, `
 
 ```
 [6 / 9]
+/back: 이전 필드   /cancel: 종료   /review: 현재 값   /change-method: 작성 방식 변경
+
 출력 — 최소 1개 이상의 출력 정의가 필요합니다.
 
 출력 이름:

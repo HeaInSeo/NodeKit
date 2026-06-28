@@ -332,6 +332,8 @@ namespace NodeKit.Cli
             {
                 RecipeCreateScreen.ClearForNewStep(stdout);
                 stdout.WriteLine($"[{history.Count + 1} / {total}]");
+                stdout.WriteLine("/back: 이전 필드   /cancel: 종료   /review: 현재 값   /change-method: 작성 방식 변경");
+                stdout.WriteLine();
 
                 try
                 {
@@ -873,7 +875,9 @@ namespace NodeKit.Cli
                 stdout.WriteLine($"      힌트: {action.BeginnerHint.Get("ko")}");
             }
 
-            stdout.WriteLine("번호를 입력하세요 (취소하려면 빈 줄):");
+            stdout.WriteLine();
+            stdout.WriteLine("/cancel: 저장하지 않고 종료");
+            stdout.WriteLine("번호를 입력하세요 (빈 줄 = 저장 없이 종료):");
             var selection = (stdin.ReadLine() ?? string.Empty).Trim();
             RecipeCreateEscapeCommands.ThrowIfCancel(selection);
             if (selection.Length == 0)
