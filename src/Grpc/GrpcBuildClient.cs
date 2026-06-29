@@ -1,12 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text.Json;
 using System.Threading;
 using Grpc.Core;
 using Grpc.Net.Client;
-using NodeKit.Authoring;
 using Nodevault.V1;
 
 namespace NodeKit.Grpc
@@ -56,7 +53,7 @@ namespace NodeKit.Grpc
 
         internal static Nodevault.V1.BuildRequest ToProto(BuildRequest r)
         {
-            var proto = new Nodevault.V1.BuildRequest
+            return new Nodevault.V1.BuildRequest
             {
                 RequestId = r.RequestId,
                 ToolDefinitionId = r.ToolDefinitionId.ToString(),
@@ -66,42 +63,9 @@ namespace NodeKit.Grpc
                 DockerfileContent = r.DockerfileContent,
                 Script = r.Script,
                 EnvironmentSpec = r.EnvironmentSpec,
-                Display = new DisplaySpec
-                {
-                    Label = r.DisplayLabel,
-                    Description = r.DisplayDescription,
-                    Category = r.DisplayCategory,
-                },
+                Kind = BuildKind.Toolspec,
             };
-
-            proto.Display.Tags.AddRange(r.DisplayTags);
-            proto.Inputs.AddRange(r.Inputs.Select(ToPortSpec));
-            proto.Outputs.AddRange(r.Outputs.Select(ToPortSpec));
-            if (r.Command.Count > 0)
-            {
-                proto.Command = JsonSerializer.Serialize(r.Command);
-            }
-
-            return proto;
         }
-
-        internal static PortSpec ToPortSpec(ToolInput i) => new()
-        {
-            Name = i.Name,
-            Role = i.Role,
-            Format = i.Format,
-            Shape = i.Shape,
-            Required = i.Required,
-        };
-
-        internal static PortSpec ToPortSpec(ToolOutput o) => new()
-        {
-            Name = o.Name,
-            Role = o.Role,
-            Format = o.Format,
-            Shape = o.Shape,
-            Class = o.Class,
-        };
 
         internal static BuildEvent FromProto(Nodevault.V1.BuildEvent ev)
         {

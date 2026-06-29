@@ -62,12 +62,114 @@ message ListPoliciesResponse {
   string bundle_version = 2;
 }
 
+// BuildKind identifies which image type a build produces.
+// TOOLSPEC builds a base image from a build recipe (dockerfile_content + environment_spec).
+// TOOLFUNCTIONSPEC builds a function image on top of a base image (base_image_digest + script + nan shim).
+enum BuildKind {
+  BUILD_KIND_UNSPECIFIED = 0;
+  BUILD_KIND_TOOLSPEC = 1;
+  BUILD_KIND_TOOLFUNCTIONSPEC = 2;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
-// BuildService — builder Job orchestration
+// BuildService — in-Pod podbridge5/Buildah orchestration
 // ─────────────────────────────────────────────────────────────────────────────
 
 service BuildService {
   rpc BuildAndRegister(BuildRequest) returns (stream BuildEvent);
+  rpc ResolveToolSpec(ToolSpecRequest) returns (ResolvedToolSpecResponse);
+  rpc SubmitToolBuild(SubmitToolBuildRequest) returns (SubmitToolBuildResponse);
+  rpc WatchToolBuild(WatchToolBuildRequest) returns (stream BuildEvent);
+  rpc CancelToolBuild(CancelToolBuildRequest) returns (CancelToolBuildResponse);
+  rpc ResolveRecipe(ResolveRecipeRequest) returns (ResolveRecipeResponse);
+}
+
+message ToolSpecRequest {
+  string tool_name = 1;
+  string version = 2;
+  string raw_spec = 3;
+  int64 requested_at = 4;
+}
+
+message ResolvedToolSpecResponse {
+  string tool_spec_digest = 1;
+  string tool_name = 2;
+  string version = 3;
+  int64 resolved_at = 4;
+}
+
+message SubmitToolBuildRequest {
+  string request_id = 1;
+  string tool_spec_digest = 2;
+}
+
+message SubmitToolBuildResponse {
+  string build_id = 1;
+  string tool_spec_digest = 2;
+  string status = 3;
+  int64 submitted_at = 4;
+}
+
+message WatchToolBuildRequest {
+  string build_id = 1;
+}
+
+message CancelToolBuildRequest {
+  string build_id = 1;
+  string reason = 2;
+}
+
+message CancelToolBuildResponse {
+  string build_id = 1;
+  string status = 2;
+  int64 cancelled_at = 3;
+}
+
+// ── ResolveRecipe — 빌드 전 artifact 후보 조회 ──────────────────────────────
+
+enum RecipeVariant {
+  RECIPE_VARIANT_UNSPECIFIED = 0;
+  RECIPE_VARIANT_CONDA = 1;
+  RECIPE_VARIANT_MICROMAMBA = 2;
+  RECIPE_VARIANT_PACKAGE_MIRROR = 3;
+  RECIPE_VARIANT_BIOCONTAINER = 4;
+}
+
+message PackageSpec {
+  string name = 1;
+  string version = 2;
+}
+
+// BuildStringCandidate is a single resolved artifact option for a package.
+message BuildStringCandidate {
+  string build_string = 1;
+  string full_pin = 2;
+  string channel = 3;
+}
+
+// PackageResolution groups candidates for a single package.
+message PackageResolution {
+  string name = 1;
+  string version = 2;
+  repeated BuildStringCandidate candidates = 3;
+}
+
+message ResolveRecipeRequest {
+  string tool_name = 1;
+  string version = 2;
+  RecipeVariant variant = 3;
+  repeated PackageSpec packages = 4;
+  repeated string channels = 5;
+  string package_mirror_uri = 6;
+  string bio_container_image_uri = 7;
+  bool closed_network = 8;
+}
+
+// ResolveRecipeResponse returns artifact candidates for each requested package.
+// resolution_source: "harbor_cache" | "external_source" | "not_found"
+message ResolveRecipeResponse {
+  string resolution_source = 1;
+  repeated PackageResolution packages = 2;
 }
 
 message BuildRequest {
@@ -75,17 +177,19 @@ message BuildRequest {
   string tool_definition_id = 2;
   string tool_name = 3;
   string image_uri = 4;
-  string dockerfile_content = 5;
-  string script = 6;
-  string environment_spec = 9;
   string version = 10;
-  repeated PortSpec inputs = 12;
-  repeated PortSpec outputs = 13;
-  DisplaySpec display = 14;
-  string command = 15;
+  BuildKind kind = 16;
 
-  reserved 7, 8;
-  reserved "input_names", "output_names";
+  // BUILD_KIND_TOOLSPEC: base image from build recipe
+  string dockerfile_content = 5;
+  string environment_spec = 9;
+
+  // BUILD_KIND_TOOLFUNCTIONSPEC: function image on top of base image
+  string script = 6;
+  string base_image_digest = 17;
+
+  reserved 7, 8, 12, 13, 14, 15;
+  reserved "input_names", "output_names", "inputs", "outputs", "display", "command";
 }
 
 enum BuildEventKind {
@@ -104,6 +208,8 @@ message BuildEvent {
   string message = 2;
   int64 timestamp = 3;
   string digest = 4;
+  string build_id = 5;
+  string status = 6;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -158,13 +264,10 @@ message RegisterToolRequest {
   string environment_spec = 8;
   string version = 9;
   string stable_ref = 10;
-  repeated PortSpec inputs = 11;
-  repeated PortSpec outputs = 12;
-  DisplaySpec display = 13;
-  string command = 14;
+  BuildKind build_kind = 15;
 
-  reserved 6, 7;
-  reserved "input_names", "output_names";
+  reserved 6, 7, 11, 12, 13, 14;
+  reserved "input_names", "output_names", "inputs", "outputs", "display", "command";
 }
 
 message RegisterToolResponse {
@@ -195,13 +298,17 @@ message RegisteredToolDefinition {
   string environment_spec = 9;
   string version = 10;
   string stable_ref = 11;
+  string lifecycle_phase = 15;
+  ValidationStatus validation = 16;
+  string integrity_health = 18;
+  BuildKind build_kind = 19;
+
+  // ToolFunctionSpec fields — populated after dry-run validation, not at build time.
+  // inputs (12), outputs (13), display (14), command (17) are reserved for ToolFunctionSpec.
   repeated PortSpec inputs = 12;
   repeated PortSpec outputs = 13;
   DisplaySpec display = 14;
-  string lifecycle_phase = 15;
-  ValidationStatus validation = 16;
   string command = 17;
-  string integrity_health = 18;
 
   reserved 6, 7;
   reserved "input_names", "output_names";
@@ -281,6 +388,109 @@ message RegisteredDataDefinition {
   int64 registered_at = 11;
   string lifecycle_phase = 12;
   string integrity_health = 13;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ValidationResultService — NodeSentinel → NodeVault validation record push
+// ─────────────────────────────────────────────────────────────────────────────
+
+service ValidationResultService {
+  // SubmitToolCheckRecord receives a L5-a functional validation result from NodeSentinel.
+  rpc SubmitToolCheckRecord(ToolCheckRecordRequest) returns (SubmitRecordResponse);
+  // SubmitToolScanRecord receives a L5-b trivy security scan result from NodeSentinel.
+  rpc SubmitToolScanRecord(ToolScanRecordRequest) returns (SubmitRecordResponse);
+  // ListCertifiedTools returns all active certified tool catalog entries.
+  rpc ListCertifiedTools(ListCertifiedToolsRequest) returns (ListCertifiedToolsResponse);
+}
+
+message PortObservation {
+  string port       = 1;
+  int32  file_count = 2;
+  bool   non_empty  = 3;
+}
+
+message ObservedIoProfile {
+  repeated PortObservation inputs  = 1;
+  repeated PortObservation outputs = 2;
+}
+
+message ObservedResourceProfile {
+  int64 peak_cpu_millicores = 1;
+  int64 peak_memory_mib     = 2;
+  int64 duration_seconds    = 3;
+  int64 disk_read_mib       = 4;
+  int64 disk_write_mib      = 5;
+  bool  timeout             = 6;
+  int64 timeout_seconds     = 7;
+}
+
+message ContractCheck {
+  bool   all_outputs_present = 1;
+  string result              = 2; // "pass" | "fail" | "unknown"
+}
+
+message ToolCheckRecordRequest {
+  string check_id         = 1;
+  string tool_spec_digest = 2;
+  string image_digest     = 3;
+  string tool_name        = 4;
+  string version          = 5;
+  // validation_status: "succeeded" | "infra_failed" | "app_failed"
+  string validation_status  = 6;
+  string validation_hash    = 7;
+  string command            = 8;
+  int32  exit_code          = 9;
+  ObservedIoProfile        observed_io_profile       = 10;
+  ObservedResourceProfile  observed_resource_profile = 11;
+  ContractCheck            contract_check            = 12;
+  string failure_reason     = 13;
+  int64  checked_at         = 14;
+  string platform           = 15;
+}
+
+message ToolScanRecordRequest {
+  string scan_id          = 1;
+  string image_digest     = 2;
+  string tool_name        = 3;
+  string scanner          = 4;
+  string scanner_version  = 5;
+  string source           = 6;
+  int32  critical_count   = 7;
+  int32  high_count       = 8;
+  int32  medium_count     = 9;
+  int32  low_count        = 10;
+  string policy_mode      = 11;
+  string policy_result    = 12;
+  int64  scanned_at       = 13;
+  string db_digest        = 14;
+  string platform         = 15;
+}
+
+message SubmitRecordResponse {
+  string record_id         = 1;
+  string certification_status = 2; // "certified" | "pending" | "failed"
+}
+
+message ListCertifiedToolsRequest {
+  string promotion_status = 1; // "" = all active
+}
+
+message CertifiedToolEntry {
+  string cas_hash          = 1;
+  string tool_name         = 2;
+  string version           = 3;
+  string stable_ref        = 4;
+  string image_digest      = 5;
+  string image_ref         = 6;
+  string display_label     = 7;
+  string display_category  = 8;
+  string promotion_status  = 9;
+  int64  certified_at      = 10;
+  string validation_hash   = 11;
+}
+
+message ListCertifiedToolsResponse {
+  repeated CertifiedToolEntry tools = 1;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
