@@ -52,13 +52,6 @@ namespace NodeKit.Cli.Tests
                 "", // complete Packages
                 "bioconda", // Channels item
                 "", // complete Channels
-                "", // PackageEngine defaulted — skip, defaults to conda
-                "reads", // Inputs item name
-                "1", // fastq-paired preset
-                "", // complete Inputs
-                "bam", // Outputs item name
-                "1", // bam-primary preset
-                "", // complete Outputs
             };
 
             var stdout = new StringWriter();
@@ -95,13 +88,6 @@ namespace NodeKit.Cli.Tests
                 ImageRefWithDigest, // ImageRef
                 "./Dockerfile", // DockerfilePath
                 $"FROM {ImageRefWithDigest}", // DockerfileContent
-                "", // BuildContext defaulted — skip, defaults to "."
-                "reads", // Inputs item name
-                "1", // fastq-paired preset
-                "", // complete Inputs
-                "bam", // Outputs item name
-                "1", // bam-primary preset
-                "", // complete Outputs
             };
 
             var stdout = new StringWriter();
@@ -199,8 +185,6 @@ namespace NodeKit.Cli.Tests
                 "https://mirror.internal/conda-channel", // MirrorUri
                 "bwa=0.7.17=h5bf99c6_8", "", // Packages item + complete
                 "", // MirrorKind optional — skip
-                "reads", "1", "", // Inputs
-                "bam", "1", "", // Outputs
             };
 
             var stdout = new StringWriter();
@@ -231,9 +215,6 @@ namespace NodeKit.Cli.Tests
                 "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
                 "bwa=0.7.17=h5bf99c6_8", "",
                 "bioconda", "",
-                "", // PackageEngine defaulted — skip
-                "reads", "1", "",
-                "bam", "1", "",
             };
 
             var stdout = new StringWriter();
@@ -265,9 +246,6 @@ namespace NodeKit.Cli.Tests
                 "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
                 "bwa=0.7.17=h5bf99c6_8", "",
                 "bioconda", "",
-                "",
-                "reads", "1", "",
-                "bam", "1", "",
             };
 
             var stdout = new StringWriter();
@@ -299,9 +277,7 @@ namespace NodeKit.Cli.Tests
                 "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz", // SourceUri
                 DigestOnly, // SourceChecksum
                 "make", "make install", "", // SourceBuildCommands + complete
-                "", // BuildDependencies — leave empty, complete
-                "reads", "1", "", // Inputs
-                "bam", "1", "", // Outputs
+                "", // BuildDependencies — leave empty (Recommended, always complete), skipped
             };
 
             var stdout = new StringWriter();
@@ -392,8 +368,6 @@ namespace NodeKit.Cli.Tests
                 "condaforge/miniforge3:24.3.0-0", // ImageRef
                 DigestOnly, // ImageDigest
                 "", // Command optional list — skip
-                "reads", "1", "", // Inputs
-                "bam", "1", "", // Outputs
             };
 
             var stdout = new StringWriter();
@@ -428,8 +402,6 @@ namespace NodeKit.Cli.Tests
                 "condaforge/miniforge3:24.3.0-0", // ImageRef
                 DigestOnly, // ImageDigest
                 "", // Command optional list — skip
-                "reads", "1", "", // Inputs
-                "bam", "1", "", // Outputs
             };
 
             var stdout = new StringWriter();
@@ -549,9 +521,7 @@ namespace NodeKit.Cli.Tests
                 "run.sh",
                 "condaforge/miniforge3:24.3.0-0",
                 DigestOnly,
-                "",
-                "reads", "1", "",
-                "bam", "1", "",
+                "", // Command optional list — skip
             };
 
             var stdout = new StringWriter();
@@ -580,9 +550,7 @@ namespace NodeKit.Cli.Tests
                 "bwa mem",
                 "condaforge/miniforge3:24.3.0-0",
                 DigestOnly,
-                "",
-                "reads", "1", "",
-                "bam", "1", "",
+                "", // Command optional list — skip
             };
 
             var stdout = new StringWriter();
@@ -617,9 +585,7 @@ namespace NodeKit.Cli.Tests
                 "bwa mem",
                 "condaforge/miniforge3:24.3.0-0",
                 DigestOnly,
-                "",
-                "reads", "1", "",
-                "bam", "1", "",
+                "", // Command optional list — skip
             };
 
             var stdout = new StringWriter();
@@ -816,11 +782,8 @@ namespace NodeKit.Cli.Tests
                 "1",  // use understood values (Parsed result)
                 "bwa-mem", "0.7.17", "run.sh",
                 ImageRefWithDigest,  // ImageRef (BaseImage for Package method)
-                // Packages: pre-filled by BeginnerGuideFlow, skipped
-                // Channels: pre-filled by BeginnerGuideFlow, skipped
+                // Packages/Channels: pre-filled by BeginnerGuideFlow, skipped
                 // PackageEngine: Defaulted, skipped
-                "reads", "1", "",
-                "bam", "1", "",
             };
 
             var stdout = new StringWriter();
@@ -857,8 +820,6 @@ namespace NodeKit.Cli.Tests
                 "condaforge/miniforge3:24.3.0-0", // ImageRef
                 DigestOnly, // ImageDigest
                 "", // Command optional list — skip
-                "reads", "1", "",
-                "bam", "1", "",
             };
 
             var stdout = new StringWriter();
@@ -874,6 +835,79 @@ namespace NodeKit.Cli.Tests
             var stdoutText = stdout.ToString();
             Assert.Contains("추천 작성 방식:", stdoutText);
             Assert.Contains("다른 작성 방식을 선택하세요", stdoutText);
+
+            var json = File.ReadAllText(outPath);
+            Assert.Contains("\"BuildKind\": \"BioContainer\"", json);
+        }
+
+        [Fact]
+        public void BackCommand_AtListFieldPrompt_ClearsStaleItemsAndRepromptsPreviousField()
+        {
+            // Regression: items typed before /back inside a list field must not
+            // survive to the next pass of the same field. Without the fix,
+            // "samtools=1.18" would appear alongside "bwa=0.7.17=h5bf99c6_8".
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "2", // 빠른 설정 모드
+                "n", "n", "n", "y", "n", "n", // Q&A -> recommend package
+                "", // accept recommended method
+                "bwa-mem", // ToolName
+                "0.7.17",  // ToolVersion
+                "run.sh",  // Script
+                ImageRefWithDigest,   // ImageRef (first time)
+                "samtools=1.18",      // Packages: partial entry before /back
+                "/back",              // /back mid-list → clears in-progress items, back to ImageRef
+                ImageRefWithDigest,   // ImageRef (re-entered)
+                "bwa=0.7.17=h5bf99c6_8", // Packages: correct entry
+                "",                   // complete Packages
+                "bioconda",           // Channels
+                "",                   // complete Channels
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.Empty(stderr.ToString());
+
+            var json = File.ReadAllText(outPath);
+            Assert.Contains("bwa=0.7.17=h5bf99c6_8", json);
+            Assert.DoesNotContain("samtools", json);
+        }
+
+        [Fact]
+        public void BackCommand_DuringRecovery_ShowsNotSupportedMessageAndAllowsContinuation()
+        {
+            // Regression: /back inside a recovery re-edit field previously propagated
+            // as an unhandled exception. Now it prints a message and re-shows the menu.
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "2", // 빠른 설정 모드
+                "n", "n", "y", "n", "n", "n", // Q&A -> recommend container
+                "", // accept recommended method
+                "bwa-mem", "0.7.17", "bwa mem",
+                "condaforge/miniforge3:24.3.0-0", // ImageRef
+                "sha256:bad",   // ImageDigest — malformed, fails final validation
+                "",             // Command optional list — skip
+                "1",            // select recovery action (edit ImageRef + ImageDigest)
+                "/back",        // /back during recovery → shows not-supported message, returns true
+                // session still invalid → recovery menu shown again
+                "1",            // select recovery action again
+                "condaforge/miniforge3:24.3.0-0", // re-enter ImageRef
+                DigestOnly,     // re-enter ImageDigest, corrected
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.Empty(stderr.ToString());
+            var stdoutText = stdout.ToString();
+            Assert.Contains("/back은 수정 단계에서 지원하지 않습니다", stdoutText);
 
             var json = File.ReadAllText(outPath);
             Assert.Contains("\"BuildKind\": \"BioContainer\"", json);

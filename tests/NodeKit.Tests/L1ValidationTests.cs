@@ -222,6 +222,49 @@ dependencies:
         }
 
         [Fact]
+        public void Pass_WhenDockerfileCondaInstallUsesChannelFlag()
+        {
+            // Regression test: -c bioconda was previously extracted as a package name,
+            // causing a false positive L1-PKG-001 violation for the channel argument.
+            var def = new ToolDefinition
+            {
+                ImageUri = "reg/img:1.0@sha256:abc",
+                DockerfileContent = "FROM ubuntu:22.04\nRUN conda install -c bioconda bwa=0.7.17=h5bf99c6_8 -y\n",
+            };
+
+            Assert.True(_sut.Validate(def).IsValid);
+        }
+
+        [Fact]
+        public void Pass_WhenDockerfileMicromambaInstallUsesMultipleChannelFlags()
+        {
+            var def = new ToolDefinition
+            {
+                ImageUri = "reg/img:1.0@sha256:abc",
+                DockerfileContent = "FROM ubuntu:22.04\nRUN micromamba install -c conda-forge -c bioconda bwa=0.7.17=h5bf99c6_8 samtools=1.18=h50ea8bc_1 -y\n",
+            };
+
+            Assert.True(_sut.Validate(def).IsValid);
+        }
+
+        [Fact]
+        public void Fail_WhenDockerfileCondaInstallWithChannelFlagHasUnpinnedPackage()
+        {
+            // Channel name must not be flagged; only the unpinned package name must be.
+            var def = new ToolDefinition
+            {
+                ImageUri = "reg/img:1.0@sha256:abc",
+                DockerfileContent = "FROM ubuntu:22.04\nRUN conda install -c bioconda bwa -y\n",
+            };
+
+            var result = _sut.Validate(def);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-PKG-001" && v.Message.Contains("bwa", System.StringComparison.Ordinal));
+            Assert.DoesNotContain(result.Violations, v => v.Message.Contains("bioconda", System.StringComparison.Ordinal));
+        }
+
+        [Fact]
         public void Fail_WhenCondaPipSubsectionContainsUnpinnedPackage()
         {
             var def = DefWithSpec(@"
