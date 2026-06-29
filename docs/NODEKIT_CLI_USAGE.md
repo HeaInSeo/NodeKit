@@ -110,7 +110,7 @@ dotnet run --project src/NodeKit.Cli -- recipe create /tmp/nodekit-recipe.json
 | digest 안내 | `[1] 쉬운 안내 모드` → `[3] 컨테이너 이미지 주소` → `quay.io/biocontainers/bwa:0.7.17--h7132678_9` |
 | checksum 안내 | `[1] 쉬운 안내 모드` → `[4] GitHub 또는 소스코드 주소` → archive URL → checksum 빈 입력 |
 | final recovery 문구 | 빠른 설정 모드에서 container를 고르고 잘못된 digest(`sha256:bad`) 입력 |
-| **빌드 문자열 후보 선택 UX** | `NODEKIT_RESOLVE_RECIPE_STUB=1` 설정 후 package 방식으로 진행 (2-7절) |
+| **빌드 문자열 후보 선택 UX** | `NODEKIT_RESOLVE_RECIPE_STUB=1` 설정 후 package 방식으로 진행 (2-6절) |
 
 **패키지 빌드 문자열 후보 선택 UX 확인 방법:**
 
@@ -121,7 +121,7 @@ NODEKIT_RESOLVE_RECIPE_STUB=1 \
 ```
 
 빠른 설정 모드(`[2]`) → `public channel에 패키지가 있나요?` → `y` → package 방식으로
-진행하면 Outputs 입력 완료 후 **빌드 문자열 선택** 화면이 자동으로 나온다.
+진행하면 모든 필드 입력 완료 후 **빌드 문자열 선택** 화면이 자동으로 나온다.
 
 생성된 recipe가 있으면 다음으로 확인한다.
 
@@ -438,7 +438,7 @@ dry-run profile의 `runnerScriptDigest`/observed I/O 기록으로 더 명확히 
 | 필드 | 필수 여부 | 설명 |
 |---|---|---|
 | `ImageRef` | 필수 | 기반 이미지, digest 포함 필요 (예: `condaforge/miniforge3:24.3.0-0@sha256:...`) |
-| `Packages` | 필수, 최소 1개 | 설치할 패키지. `bwa=0.7.17`(버전만)으로 충분하며, 빌드 문자열(`=h5bf99c6_8` 부분)은 저장 전 ResolveRecipe 단계(2-7절)에서 선택한다. 직접 고정하려면 `bwa=0.7.17=h5bf99c6_8` 형식을 쓰면 된다 |
+| `Packages` | 필수, 최소 1개 | 설치할 패키지. `bwa=0.7.17`(버전만)으로 충분하며, 빌드 문자열(`=version=build` 부분)은 저장 전 ResolveRecipe 단계(2-6절)에서 선택한다. 직접 고정하려면 `bwa=0.7.17=h5bf99c6_8` 형식을 쓰면 된다 |
 | `Channels` | 필수, 최소 1개 | conda channel (예: `bioconda`) |
 | `PackageEngine` | 비워두면 자동 | `conda`(기본) 또는 `micromamba` |
 
@@ -469,32 +469,9 @@ dry-run profile의 `runnerScriptDigest`/observed I/O 기록으로 더 명확히 
 | `DockerfilePath` 또는 `DockerfileContent` | 필수 (둘 중 하나) | Dockerfile 경로 또는 내용 |
 | `BuildContext` | 비워두면 자동 | 비어 있으면 현재 디렉터리(`.`) |
 
-### 2-6. Inputs/Outputs 입력
+### 2-6. 패키지 빌드 문자열 선택 (ResolveRecipe)
 
-`Inputs`/`Outputs`는 프리셋을 고르거나 직접 입력(`custom`)할 수 있다.
-
-```
-입력 항목을 추가하세요 (빈 줄 입력 시 종료)
-이름:
-reads
-  [1] FASTQ paired-end reads
-  [2] FASTQ single-end reads
-  [3] BAM alignment
-  [4] FASTA reference
-  [5] VCF variants
-  [6] 직접 입력
-프리셋 번호 또는 'custom':
-1
-```
-
-번호를 고르면 Role/Format/Shape(또는 Class)가 프리셋 값으로 자동 채워진다.
-`custom`을 고르면 Role/Format/Shape(Outputs는 Class)를 직접 입력한다.
-이름을 빈 줄로 두면 목록 입력이 끝난다(필수 목록은 최소 1개가 있어야
-끝낼 수 있다).
-
-### 2-7. 패키지 빌드 문자열 선택 (ResolveRecipe)
-
-`package` 또는 `mirror` 방식으로 만든 레시피에서, Inputs/Outputs 입력을 마치면
+`package` 또는 `mirror` 방식으로 만든 레시피에서, 모든 필드 입력을 마치면
 **빌드 문자열 후보 선택** 화면이 자동으로 나온다. 이 단계는 NodeVault
 `ResolveRecipe` API를 통해 패키지별 conda build string 후보를 받아 확정하는
 과정이다.
@@ -544,7 +521,7 @@ NODEKIT_RESOLVE_RECIPE_STUB=1 \
 stub 모드는 각 패키지에 대해 `bioconda` 채널 1개 + `conda-forge` 채널 1개 후보를
 자동 생성한다.
 
-### 2-8. recovery — 마지막 검증 실패 시 수정
+### 2-7. recovery — 마지막 검증 실패 시 수정
 
 모든 필드를 채운 뒤 최종 검증을 한 번 더 돈다. 필드 하나씩 받을 때는
 못 잡아내는 교차 필드 규칙(예: Dockerfile 첫 `FROM`과 `ImageRef` 불일치,
@@ -567,11 +544,10 @@ Output의 `Class` 허용값 위반) 때문에 여기서 막힐 수 있다. 입�
 | source checksum 누락/오류 | `소스 코드 검증값 입력하기` |
 | 패키지 버전 미고정 | `패키지 버전 고정하기` |
 
-`Inputs`/`Outputs`를 고치는 경우에는 기존 항목을 보여주고 `e<번호>`(수정),
-`d<번호>`(삭제), 빈 줄(계속/추가)로 다룬다. 다시 검증에 실패하면 같은
-화면이 반복된다. 빈 줄을 입력하면 저장하지 않고 종료한다(종료 코드 1).
+다시 검증에 실패하면 같은 화면이 반복된다. 빈 줄을 입력하면 저장하지 않고
+종료한다(종료 코드 1).
 
-### 2-9. non-interactive 모드 (스크립트/CI용)
+### 2-8. non-interactive 모드 (스크립트/CI용)
 
 프롬프트가 전혀 나오지 않고 빠진 값이 있으면 즉시 에러로 끝난다.
 
@@ -583,9 +559,7 @@ nodekit recipe create recipe.json \
   --field "Script=bwa mem" \
   --field "ImageRef=condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" \
   --field Packages=bwa=0.7.17=h5bf99c6_8 \
-  --field Channels=bioconda \
-  --input reads=fastq-paired \
-  --output bam=bam-primary
+  --field Channels=bioconda
 ```
 
 옵션 정리:
@@ -596,8 +570,6 @@ nodekit recipe create recipe.json \
 | `--method <container\|package\|mirror\|source\|dockerfile>` | 필수. 사용자용 method 이름 (내부 build-kind 이름인 `conda`/`micromamba`/`source-build`/`dockerfile-fallback`은 받지 않는다) |
 | `--field Name=Value` | scalar/choice/list 필드 하나씩 지정. **첫 번째 `=`만 구분자** — `Packages=bwa=0.7.17=h5bf99c6_8`처럼 value 안에 `=`가 있어도 그대로 보존된다 |
 | `--field Name=Value` (반복) | 목록 필드(`Packages`, `Channels`, `Command`, `SourceBuildCommands`, `BuildDependencies`)는 같은 이름의 `--field`를 반복해 항목을 누적한다 |
-| `--input Name=Spec` | Inputs 항목 하나. `Spec`은 프리셋 id(`fastq-paired` 등) 또는 `custom,role,format,shape[,optional]` |
-| `--output Name=Spec` | Outputs 항목 하나. `Spec`은 프리셋 id(`bam-primary` 등) 또는 `custom,role,format,class` |
 | `--engine <conda\|micromamba>` | `--method package`에만 사용 가능 |
 | `--accept-dockerfile-warning` | `--method dockerfile`을 non-interactive로 쓸 때 필수 (대화형의 경고 동의를 대신함) |
 
@@ -606,7 +578,7 @@ nodekit recipe create recipe.json \
 필수 필드가 빠지거나 최종 검증에 실패하면 파일을 쓰지 않고 종료 코드 1을
 반환한다.
 
-### 2-10. 중간에 나가기 / review / method 변경
+### 2-9. 중간에 나가기 / review / method 변경
 
 필드를 입력하는 중 값 대신 아래 명령을 쓸 수 있다.
 
@@ -680,8 +652,6 @@ $ cat build-request.json
   "Script": "bwa mem",
   "Command": [],
   "EnvironmentSpec": "",
-  "Inputs": [ { "Name": "reads", "Role": "sample-fastq", "Format": "fastq", "Shape": "pair", "Required": true } ],
-  "Outputs": [ { "Name": "aligned", "Role": "aligned-bam", "Format": "bam", "Shape": "single", "Class": "primary" } ],
   "DisplayLabel": "",
   "DisplayDescription": "",
   "DisplayCategory": "",
@@ -728,8 +698,6 @@ ls: cannot access 'build-request.json': No such file or directory
 | `ToolName` | string | 필수 |
 | `Version` | string | 필수 |
 | `Script` | string | 필수 |
-| `Inputs` | `[{ Name, Role, Format, Shape }]` | 최소 1개, `Shape`는 `single`\|`pair` |
-| `Outputs` | `[{ Name, Role, Format, Shape, Class }]` | 최소 1개, `Class`는 `primary`\|`secondary` |
 | `Command` | string[] | 선택, K8s 런타임 커맨드 오버라이드 |
 | `DisplayLabel`/`DisplayDescription`/`DisplayCategory`/`DisplayTags` | string/string[] | 선택, UI 팔레트 표시용 |
 
@@ -764,9 +732,7 @@ ls: cannot access 'build-request.json': No such file or directory
   "Version": "0.7.17",
   "BaseImage": "registry.example.com/bwa:0.7.17@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
   "DockerfileContent": "FROM registry.example.com/bwa:0.7.17@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\nRUN echo ok\n",
-  "Script": "bwa mem",
-  "Inputs": [ { "Name": "reads", "Role": "sample-fastq", "Format": "fastq", "Shape": "pair" } ],
-  "Outputs": [ { "Name": "aligned", "Role": "aligned-bam", "Format": "bam", "Shape": "single", "Class": "primary" } ]
+  "Script": "bwa mem"
 }
 ```
 
@@ -871,80 +837,38 @@ Harbor가 digest를 응답하면:
 method가 `container`로 확정되면 공통/method 필드를 순서대로 입력한다.
 
 ```
-[1 / 8]
+[1 / 6]
 도구 이름 — recipe에서 식별할 도구 이름입니다.
 > bwa-mem2
 
-[2 / 8]
+[2 / 6]
 도구 버전 — 도구 버전 또는 고정된 release/version입니다.
 > 2.2.1
 
-[3 / 8]
+[3 / 6]
 기본 실행 명령 — 도구 실행 시 사용할 기본 명령 또는 이미지 안의 스크립트 경로입니다.
 > bwa-mem2 mem
 
-[4 / 8]
+[4 / 6]
 이미지 참조 — ...
 > harbor.lab.local/bioinformatics/bwa-mem2:2.2.1
 
-[5 / 8]
+[5 / 6]
 이미지 digest — ...
 > sha256:xxxxxxxx...
 
-[6 / 8]
+[6 / 6]
 실행 명령 — (선택) 기본 entrypoint를 바꾸지 않으면 그냥 Enter
 > (Enter)
 ```
 
-**9. Inputs 입력**
-
-```
-[7 / 8]
-입력 — 최소 1개 이상의 입력 정의가 필요합니다.
-
-입력 이름:
-> reads
-
-  [1] FASTQ paired-end reads
-      쌍을 이루는 FASTQ 시퀀싱 리드입니다.
-      예: sample_R1.fastq.gz, sample_R2.fastq.gz
-  [2] FASTQ single-end reads
-  ...
-  [7] 직접 입력
-
-프리셋 번호 또는 'custom':
-> 1
-
-입력 이름 (완료하려면 빈 줄):
-> (Enter)
-```
-
-**10. Outputs 입력**
-
-```
-[8 / 8]
-출력 — 최소 1개 이상의 출력 정의가 필요합니다.
-
-출력 이름:
-> aligned
-
-  [1] BAM — primary alignment
-  ...
-
-프리셋 번호 또는 'custom':
-> 1
-
-출력 이름 (완료하려면 빈 줄):
-> (Enter)
-```
-
-**11. 저장 확인**
+**9. 저장 확인**
 
 ```
 저장되었습니다: /tmp/bwa-mem2.json
 ```
 
-**12. 검증**
+**10. 검증**
 
 ```bash
 dotnet run --project src/NodeKit.Cli -- validate /tmp/bwa-mem2.json
@@ -972,7 +896,7 @@ https://anaconda.org/bioconda/bwa
 ```
 
 패키지 문자열은 **버전만 입력하면 된다** — build string은 저장 직전에 나오는
-후보 선택 화면(2-7절)에서 결정한다.
+후보 선택 화면(2-6절)에서 결정한다.
 
 ```
 bwa=0.7.17     ← 권장. 마법사 실행 중 ResolveRecipe 단계에서 build string 선택
@@ -1070,9 +994,7 @@ n      ← Dockerfile 없음
 > (Enter)
 ```
 
-그 다음 Inputs / Outputs를 시나리오 A와 동일하게 입력한다.
-
-Outputs 완료 후 **빌드 문자열 선택** 화면이 나온다.
+모든 필드 완료 후 **빌드 문자열 선택** 화면이 나온다.
 
 ```
 패키지 빌드 문자열 선택
@@ -1193,87 +1115,42 @@ dotnet run --project src/NodeKit.Cli -- recipe create /tmp/samtools.json
 
 install command에서 자동 채워진 항목: **Packages, Channels, PackageEngine** (3개)
 
-직접 입력이 필요한 항목: **ToolName, ToolVersion, 실행 명령, 기반 이미지, Inputs, Outputs** (6개)
+직접 입력이 필요한 항목: **ToolName, ToolVersion, 실행 명령, 기반 이미지** (4개)
 
 > **기반 이미지(ImageRef)는 install command에서 알 수 없어 항상 직접 입력해야 한다.**
 > install 명령에는 `samtools=1.17` 패키지 정보만 있고, 어떤 conda base 이미지를
 > 쓸지는 포함되지 않기 때문이다.
 
 ```
-[1 / 9]
+[1 / 7]
 /back: 이전 필드   /cancel: 종료   /review: 현재 값   /change-method: 작성 방식 변경
 
 도구 이름 — recipe에서 식별할 도구 이름입니다.
 > samtools
 
-[2 / 9]
+[2 / 7]
 /back: 이전 필드   /cancel: 종료   /review: 현재 값   /change-method: 작성 방식 변경
 
 도구 버전 — 도구 버전 또는 고정된 release/version입니다.
 > 1.17
 
-[3 / 9]
+[3 / 7]
 /back: 이전 필드   /cancel: 종료   /review: 현재 값   /change-method: 작성 방식 변경
 
 기본 실행 명령 — 도구 실행 시 사용할 기본 명령 또는 이미지 안의 스크립트 경로입니다.
 > samtools view
 
-[4 / 9]
+[4 / 7]
 /back: 이전 필드   /cancel: 종료   /review: 현재 값   /change-method: 작성 방식 변경
 
 기반 이미지 — conda가 설치된 base 이미지입니다. digest 포함 필요.
 > condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef...
 ```
 
-Packages/Channels/PackageEngine은 자동 채워졌으므로 `[5/9]`, `[6/9]`, `[7/9]`은
+Packages/Channels/PackageEngine은 자동 채워졌으므로 `[5/7]`, `[6/7]`, `[7/7]`은
 건너뛴다.
 
-**6. Inputs 입력**
-
-```
-[5 / 9]
-/back: 이전 필드   /cancel: 종료   /review: 현재 값   /change-method: 작성 방식 변경
-
-입력 — 최소 1개 이상의 입력 정의가 필요합니다.
-
-입력 이름:
-> bam
-
-  [1] BAM alignment
-      시퀀스가 정렬된 BAM 파일입니다.
-      예: sample.bam
-  ...
-  [7] 직접 입력
-
-프리셋 번호 또는 'custom':
-> 1
-
-입력 이름 (완료하려면 빈 줄):
-> (Enter)
-```
-
-**7. Outputs 입력**
-
-```
-[6 / 9]
-/back: 이전 필드   /cancel: 종료   /review: 현재 값   /change-method: 작성 방식 변경
-
-출력 — 최소 1개 이상의 출력 정의가 필요합니다.
-
-출력 이름:
-> filtered
-
-  [1] BAM — primary alignment
-  ...
-
-프리셋 번호 또는 'custom':
-> 1
-
-출력 이름 (완료하려면 빈 줄):
-> (Enter)
-```
-
-**8. 저장 확인**
+**6. 저장 확인**
 
 ```
 저장되었습니다: /tmp/samtools.json
