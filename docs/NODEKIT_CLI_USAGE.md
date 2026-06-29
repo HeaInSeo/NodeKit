@@ -440,7 +440,7 @@ dry-run profile의 `runnerScriptDigest`/observed I/O 기록으로 더 명확히 
 | `ImageRef` | 필수 | 기반 이미지, digest 포함 필요 (예: `condaforge/miniforge3:24.3.0-0@sha256:...`) |
 | `Packages` | 필수, 최소 1개 | 설치할 패키지. `bwa=0.7.17`(버전만)으로 충분하며, 빌드 문자열(`=version=build` 부분)은 저장 전 ResolveRecipe 단계(2-6절)에서 선택한다. 직접 고정하려면 `bwa=0.7.17=h5bf99c6_8` 형식을 쓰면 된다 |
 | `Channels` | 필수, 최소 1개 | conda channel (예: `bioconda`) |
-| `PackageEngine` | 비워두면 자동 | `conda`(기본) 또는 `micromamba` |
+| `PackageEngine` | 자동 적용 | `conda`(기본) 또는 `micromamba`. `Defaulted` 필드로, 마법사에서 프롬프트 없이 기본값이 자동 적용됨 — 변경하려면 `--field PackageEngine=micromamba` (non-interactive) 또는 `/change-method` 후 재입력 |
 
 **`mirror`**
 
@@ -989,12 +989,9 @@ n      ← Dockerfile 없음
 > conda-forge
 > defaults
 > (Enter)
-
-[7 / 7] 패키지 엔진 — conda / micromamba 중 선택. 기본값: conda
-> (Enter)
 ```
 
-모든 필드 완료 후 **빌드 문자열 선택** 화면이 나온다.
+PackageEngine(conda/micromamba 선택)은 `Defaulted` 필드이므로 `NextField()`가 반환하지 않는다. 빈 줄로 Channels를 완료하면 세션이 바로 종료 판정되어 **빌드 문자열 선택** 화면으로 넘어간다.
 
 ```
 패키지 빌드 문자열 선택
