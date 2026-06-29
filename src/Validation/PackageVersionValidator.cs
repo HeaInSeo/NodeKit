@@ -202,11 +202,21 @@ namespace NodeKit.Validation
                     continue;
                 }
 
+                var skipNext = false;
                 for (var index = 2; index < tokens.Count; index++)
                 {
                     var token = tokens[index];
+                    if (skipNext)
+                    {
+                        skipNext = false;
+                        continue;
+                    }
+
                     if (token.StartsWith('-'))
                     {
+                        // Options that consume the next token as their argument:
+                        // -c/--channel (channel name), -n/--name (env name), -p/--prefix (path)
+                        skipNext = token is "-c" or "--channel" or "-n" or "--name" or "-p" or "--prefix";
                         continue;
                     }
 

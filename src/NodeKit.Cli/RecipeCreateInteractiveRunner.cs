@@ -342,6 +342,10 @@ namespace NodeKit.Cli
                 }
                 catch (RecipeCreateBackRequestedException)
                 {
+                    // Clear any in-progress list items for the current field before
+                    // going back — without this, items typed before /back would
+                    // survive to the next pass of the same list field.
+                    session.ClearField(field.Name);
                     if (history.Count > 0)
                     {
                         var prev = history[history.Count - 1];
@@ -611,18 +615,6 @@ namespace NodeKit.Cli
             throw new RecipeCreateCancelledException();
         }
 
-        private static bool TryHandleBack(string line, TextWriter stdout)
-        {
-            if (line.Trim() != BackCommand)
-            {
-                return false;
-            }
-
-            stdout.WriteLine("/back은 현재 v1.0에서 초기 선택, 쉬운 안내, 빠른 설정 화면 사이에서 지원합니다.");
-            stdout.WriteLine("현재 입력 단계에서는 /review로 값을 확인하거나 /change-method로 작성 방식을 다시 선택하세요.");
-            return true;
-        }
-
         private static string DescribeRequirement(RecipeFieldRequirement requirement) => requirement switch
         {
             RecipeFieldRequirement.Required => "필수 항목입니다. 값이 없으면 최종 검증을 통과하지 못합니다.",
@@ -696,9 +688,16 @@ namespace NodeKit.Cli
             }
 
             var chosen = plan.Actions[index - 1];
-            foreach (var fieldName in chosen.RelatedFields)
+            try
             {
-                ReEditField(session, fieldName, stdin, stdout, cancellation);
+                foreach (var fieldName in chosen.RelatedFields)
+                {
+                    ReEditField(session, fieldName, stdin, stdout, cancellation);
+                }
+            }
+            catch (RecipeCreateBackRequestedException)
+            {
+                stdout.WriteLine("/back은 수정 단계에서 지원하지 않습니다. /cancel로 종료하거나 값을 입력하세요.");
             }
 
             return true;
