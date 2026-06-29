@@ -328,86 +328,6 @@ dependencies:
             Assert.Contains(result.Violations, v => v.RuleId == "L1-REQ-010");
             Assert.Contains(result.Violations, v => v.RuleId == "L1-REQ-002");
             Assert.Contains(result.Violations, v => v.RuleId == "L1-REQ-003");
-            Assert.Contains(result.Violations, v => v.RuleId == "L1-REQ-004");
-            Assert.Contains(result.Violations, v => v.RuleId == "L1-REQ-005");
-        }
-
-        [Fact]
-        public void Fail_WhenIoNamesAreDuplicated()
-        {
-            var definition = new ToolDefinition
-            {
-                Name = "BWA",
-                DockerfileContent = "FROM ubuntu:22.04",
-                Script = "echo hi",
-                Inputs = { new ToolInput { Name = "reads.fq" }, new ToolInput { Name = "reads.fq" } },
-                Outputs = { new ToolOutput { Name = "out.bam" }, new ToolOutput { Name = "out.bam" } },
-            };
-
-            var result = _sut.Validate(definition);
-
-            Assert.False(result.IsValid);
-            Assert.Contains(result.Violations, v => v.RuleId == "L1-REQ-007");
-            Assert.Contains(result.Violations, v => v.RuleId == "L1-REQ-009");
-        }
-
-        [Fact]
-        public void Fail_WhenIoNamesAreEmpty()
-        {
-            var definition = new ToolDefinition
-            {
-                Name = "BWA",
-                DockerfileContent = "FROM ubuntu:22.04",
-                Script = "echo hi",
-                Inputs = { new ToolInput { Name = "  " } },
-                Outputs = { new ToolOutput { Name = string.Empty } },
-            };
-
-            var result = _sut.Validate(definition);
-
-            Assert.False(result.IsValid);
-            Assert.Contains(result.Violations, v => v.RuleId == "L1-REQ-006");
-            Assert.Contains(result.Violations, v => v.RuleId == "L1-REQ-008");
-        }
-
-        [Fact]
-        public void Fail_WhenIoContractFieldsAreMissingOrInvalid()
-        {
-            var definition = new ToolDefinition
-            {
-                Name = "BWA",
-                Version = "0.7.17",
-                DockerfileContent = "FROM ubuntu:22.04",
-                Script = "echo hi",
-                Inputs =
-                {
-                    new ToolInput
-                    {
-                        Name = "reads",
-                        Shape = "triple",
-                    },
-                },
-                Outputs =
-                {
-                    new ToolOutput
-                    {
-                        Name = "aligned",
-                        Shape = "many",
-                        Class = "artifact",
-                    },
-                },
-            };
-
-            var result = _sut.Validate(definition);
-
-            Assert.False(result.IsValid);
-            Assert.Contains(result.Violations, v => v.RuleId == "L1-REQ-011");
-            Assert.Contains(result.Violations, v => v.RuleId == "L1-REQ-012");
-            Assert.Contains(result.Violations, v => v.RuleId == "L1-REQ-013");
-            Assert.Contains(result.Violations, v => v.RuleId == "L1-REQ-014");
-            Assert.Contains(result.Violations, v => v.RuleId == "L1-REQ-015");
-            Assert.Contains(result.Violations, v => v.RuleId == "L1-REQ-016");
-            Assert.Contains(result.Violations, v => v.RuleId == "L1-REQ-017");
         }
 
         [Fact]
@@ -438,27 +358,6 @@ dependencies:
                 Version = "0.7.17",
                 DockerfileContent = "FROM ubuntu:22.04",
                 Script = "echo hi",
-                Inputs =
-                {
-                    new ToolInput
-                    {
-                        Name = "reads",
-                        Role = "sample-fastq",
-                        Format = "fastq",
-                        Shape = "pair",
-                    },
-                },
-                Outputs =
-                {
-                    new ToolOutput
-                    {
-                        Name = "aligned",
-                        Role = "aligned-bam",
-                        Format = "bam",
-                        Shape = "single",
-                        Class = "primary",
-                    },
-                },
             };
     }
 

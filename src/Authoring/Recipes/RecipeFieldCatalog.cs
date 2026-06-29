@@ -56,30 +56,6 @@ namespace NodeKit.Authoring.Recipes
                 Apply: (recipe, value) => recipe.Script = (string)value),
         };
 
-        public static RecipeFieldDescriptor InputsField { get; } = new(
-            Name: "Inputs",
-            Type: RecipeFieldType.InputList,
-            Requirement: RecipeFieldRequirement.Required,
-            DefaultValue: null,
-            Label: Text("입력", "Inputs"),
-            Help: Text("최소 1개 이상의 입력 정의가 필요합니다.", "At least one input definition is required."),
-            Examples: Array.Empty<string>(),
-            Choices: Array.Empty<RecipeChoice>(),
-            Apply: (recipe, value) => recipe.Inputs.Add((ToolInput)value),
-            ClearList: recipe => recipe.Inputs.Clear());
-
-        public static RecipeFieldDescriptor OutputsField { get; } = new(
-            Name: "Outputs",
-            Type: RecipeFieldType.OutputList,
-            Requirement: RecipeFieldRequirement.Required,
-            DefaultValue: null,
-            Label: Text("출력", "Outputs"),
-            Help: Text("최소 1개 이상의 출력 정의가 필요합니다.", "At least one output definition is required."),
-            Examples: Array.Empty<string>(),
-            Choices: Array.Empty<RecipeChoice>(),
-            Apply: (recipe, value) => recipe.Outputs.Add((ToolOutput)value),
-            ClearList: recipe => recipe.Outputs.Clear());
-
         public static IReadOnlyDictionary<RecipeMethodId, IReadOnlyList<RecipeFieldDescriptor>> MethodFields { get; } =
             new Dictionary<RecipeMethodId, IReadOnlyList<RecipeFieldDescriptor>>
             {
@@ -295,8 +271,6 @@ namespace NodeKit.Authoring.Recipes
         public static IReadOnlyList<RecipeFieldDescriptor> FieldsFor(RecipeMethodId method) =>
             CommonScalarFields
                 .Concat(MethodFields[method])
-                .Append(InputsField)
-                .Append(OutputsField)
                 .ToList();
 
         public static IReadOnlyList<RecipeFieldDescriptor> BlockingRequiredFieldsFor(RecipeMethodId method) =>

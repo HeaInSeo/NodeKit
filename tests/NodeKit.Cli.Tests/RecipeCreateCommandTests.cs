@@ -128,8 +128,6 @@ namespace NodeKit.Cli.Tests
                 "--field", "Packages=samtools=1.18=h50ea8bc_1",
                 "--field", "Channels=bioconda",
                 "--field", "Channels=conda-forge",
-                "--input", "reads=fastq-paired",
-                "--output", "bam=bam-primary",
             };
             var exitCode = RunCreate(args, outPath);
 
@@ -166,8 +164,6 @@ namespace NodeKit.Cli.Tests
                     "--field", "ToolVersion=0.7.17",
                     "--field", "Script=run.sh",
                     "--field", "ImageRef=condaforge/miniforge3:24.3.0-0",
-                    "--input", "reads=fastq-paired",
-                    "--output", "bam=bam-primary",
                 },
                 outPath,
                 stderr: stderr);
@@ -250,8 +246,6 @@ namespace NodeKit.Cli.Tests
                     "--field", $"ImageRef={ImageRefWithDigest}",
                     "--field", "Packages=bwa=0.7.17=h5bf99c6_8",
                     "--field", "Channels=bioconda",
-                    "--input", "reads=fastq-paired",
-                    "--output", "bam=bam-primary",
                 }
                 : new[]
                 {
@@ -262,8 +256,6 @@ namespace NodeKit.Cli.Tests
                     "--field", $"ImageRef={ImageRefWithDigest}",
                     "--field", "Packages=bwa=0.7.17=h5bf99c6_8",
                     "--field", "Channels=bioconda",
-                    "--input", "reads=fastq-paired",
-                    "--output", "bam=bam-primary",
                 };
 
         private static string[] DockerfileArgs() => new[]
@@ -275,8 +267,6 @@ namespace NodeKit.Cli.Tests
             "--field", $"ImageRef={ImageRefWithDigest}",
             "--field", $"DockerfileContent=FROM {ImageRefWithDigest}\nRUN echo ok\n",
             "--field", "DockerfilePath=./Dockerfile",
-            "--input", "reads=fastq-paired",
-            "--output", "bam=bam-primary",
         };
 
         private static string[] SourceArgs(bool includeBuildDependencies)
@@ -292,8 +282,6 @@ namespace NodeKit.Cli.Tests
                 "--field", $"SourceChecksum={DigestOnly}",
                 "--field", "SourceBuildCommands=make",
                 "--field", "SourceBuildCommands=make install",
-                "--input", "reads=fastq-paired",
-                "--output", "bam=bam-primary",
             };
 
             if (includeBuildDependencies)
@@ -314,8 +302,6 @@ namespace NodeKit.Cli.Tests
             "--field", $"ImageRef={ImageRefWithDigest}",
             "--field", "MirrorUri=https://mirror.internal/conda-channel",
             "--field", "Packages=bwa=0.7.17=h5bf99c6_8",
-            "--input", "reads=fastq-paired",
-            "--output", "bam=bam-primary",
         };
 
         private int Run(params string[] options)

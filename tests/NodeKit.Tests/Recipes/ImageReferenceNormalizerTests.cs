@@ -172,10 +172,6 @@ namespace NodeKit.Tests.Recipes
             session.SetField("ImageRef", imageRef);
             session.SetField("ImageDigest", imageDigest);
             session.CompleteListField("Command");
-            session.AppendListItem("Inputs", new ToolInput { Name = "reads", Role = "reads", Format = "fastq", Shape = "pair", Required = true });
-            session.CompleteListField("Inputs");
-            session.AppendListItem("Outputs", new ToolOutput { Name = "out", Role = "alignment", Format = "bam", Class = "primary" });
-            session.CompleteListField("Outputs");
             var doc = session.Build();
             doc.BuildKind = RecipeBuildKindResolver.Resolve(RecipeMethodId.Container, doc);
             return doc;

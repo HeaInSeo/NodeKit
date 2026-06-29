@@ -129,9 +129,6 @@ namespace NodeKit.Cli.Tests
                 "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
                 "bwa=0.7.17=h5bf99c6_8", "",
                 "bioconda", "",
-                "", // PackageEngine defaulted
-                "reads", "1", "",
-                "bam", "1", "",
             };
             var interactiveExitCode = CliApp.Run(
                 new[] { "recipe", "create", interactiveOutPath },
@@ -151,8 +148,6 @@ namespace NodeKit.Cli.Tests
                     "--field", $"ImageRef={ImageRefWithDigest}",
                     "--field", "Packages=bwa=0.7.17=h5bf99c6_8",
                     "--field", "Channels=bioconda",
-                    "--input", "reads=fastq-paired",
-                    "--output", "bam=bam-primary",
                 },
                 new StringWriter(),
                 new StringWriter());
@@ -323,7 +318,7 @@ namespace NodeKit.Cli.Tests
         }
 
         [Fact]
-        public void ChangeMethodAfterInputsCompleted_PackageToMirror_InvalidatedInputsDoNotBlockBuild()
+        public void ChangeMethodAfterCommonFieldsFilled_PackageToMirror_InvalidatedImageRefDoesNotBlockBuild()
         {
             var outPath = Path.Combine(_workDir, "recipe.json");
             var transcript = new[]
@@ -332,16 +327,12 @@ namespace NodeKit.Cli.Tests
                 "n", "n", "n", "y", "n", "n", // Q&A -> recommend package
                 "", // accept recommended method
                 "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
-                "bwa=0.7.17=h5bf99c6_8", "",
-                "bioconda", "",
-                "",
-                "reads", "1", "", // Inputs completed under package
-                "/change-method", // at the first Outputs "이름:" prompt
+                "/change-method", // at the Packages prompt — ImageRef is preserved but invalidated
                 "3", // mirror
                 "y", // confirm change
                 "https://mirror.internal/conda-channel", // MirrorUri, now under mirror
+                "bwa=0.7.17=h5bf99c6_8", "", // Packages, fresh under mirror
                 "", // MirrorKind optional — skip
-                "bam", "1", "", // Outputs, fresh under mirror
             };
 
             var stdout = new StringWriter();
@@ -353,8 +344,6 @@ namespace NodeKit.Cli.Tests
 
             var json = File.ReadAllText(outPath);
             Assert.Contains("\"BuildKind\": \"PackageMirror\"", json);
-            Assert.Contains("reads", json);
-            Assert.Contains("bam", json);
         }
 
         [Fact]
@@ -370,8 +359,6 @@ namespace NodeKit.Cli.Tests
                 "condaforge/miniforge3:24.3.0-0", // ImageRef
                 "sha256:bad", // ImageDigest — malformed, passes authoring but fails final validation
                 "", // Command optional list — skip
-                "reads", "1", "", // Inputs
-                "bam", "1", "", // Outputs
                 "1", // recovery: the only action, editing ImageRef+ImageDigest together
                 "condaforge/miniforge3:24.3.0-0", // re-enter ImageRef unchanged
                 DigestOnly, // re-enter ImageDigest, corrected
@@ -388,44 +375,6 @@ namespace NodeKit.Cli.Tests
 
             var json = File.ReadAllText(outPath);
             Assert.Contains("\"BuildKind\": \"BioContainer\"", json);
-        }
-
-        [Fact]
-        public void OutputClassViolation_EditInPlaceFixesRecovery_SavesValidRecipe()
-        {
-            var outPath = Path.Combine(_workDir, "recipe.json");
-            var transcript = new[]
-            {
-                "2", // 빠른 설정 모드
-                "n", "n", "y", "n", "n", "n", // Q&A -> recommend container
-                "", // accept recommended method
-                "bwa-mem", "0.7.17", "run.sh",
-                "condaforge/miniforge3:24.3.0-0", // ImageRef
-                DigestOnly, // ImageDigest
-                "", // Command optional list — skip
-                "reads", "1", "", // Inputs
-                "bam", "custom", "alignment", "bam", "bogus", "", // Outputs: custom with invalid Class
-                "1", // recovery: the only action, reviewing Inputs/Outputs
-                "", // ReviewListSection(Inputs): no edit/delete, continue
-                "", // PromptInputListField(Inputs): blank name completes the list again
-                "e0", // ReviewListSection(Outputs): edit item 0
-                "", // keep existing name "bam"
-                "1", // bam-primary preset, fixes Class
-                "", // ReviewListSection(Outputs): no further edit/delete, continue
-                "", // PromptOutputListField(Outputs): blank name completes the list again
-            };
-
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
-            var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
-
-            Assert.Equal(0, exitCode);
-            Assert.Empty(stderr.ToString());
-
-            var json = File.ReadAllText(outPath);
-            Assert.Contains("\"BuildKind\": \"BioContainer\"", json);
-            Assert.Contains("\"Class\": \"primary\"", json);
-            Assert.DoesNotContain("bogus", json);
         }
 
         [Fact]
@@ -766,7 +715,7 @@ namespace NodeKit.Cli.Tests
             var cancellation = new SequencedCancellationSource(checksBeforeCancellation: 0);
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 outPath,
-                new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), Array.Empty<(string, string)>(), Array.Empty<(string, string)>(), null),
+                new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
                 new StringReader(string.Join("\n", transcript)),
                 stdout,
                 stderr,
@@ -812,7 +761,7 @@ namespace NodeKit.Cli.Tests
             var ctrlCStdout = new StringWriter();
             var ctrlCExitCode = RecipeCreateInteractiveRunner.Run(
                 ctrlCOutPath,
-                new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), Array.Empty<(string, string)>(), Array.Empty<(string, string)>(), null),
+                new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
                 new StringReader(string.Join("\n", ctrlCTranscript)),
                 ctrlCStdout,
                 new StringWriter(),

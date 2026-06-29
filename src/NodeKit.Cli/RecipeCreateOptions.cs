@@ -10,7 +10,5 @@ namespace NodeKit.Cli
         bool AcceptDockerfileWarning,
         bool NonInteractive,
         IReadOnlyList<(string Name, string Value)> Fields,
-        IReadOnlyList<(string Name, string Spec)> Inputs,
-        IReadOnlyList<(string Name, string Spec)> Outputs,
         string? Error);
 }

@@ -37,8 +37,6 @@ namespace NodeKit.Authoring.Recipes
 
         private static readonly string[] _toolNameVersionFields = { "ToolName", "ToolVersion" };
 
-        private static readonly string[] _inputsOutputsFields = { "Inputs", "Outputs" };
-
         private static readonly string[] _sourceChecksumFields = { "SourceChecksum" };
 
         private static readonly string[] _packageFields = { "Packages" };
@@ -233,15 +231,22 @@ namespace NodeKit.Authoring.Recipes
             EnsureMethodSelected();
             var currentMethod = _selectedMethod!.Value;
 
-            var discarded = MethodSpecificFieldNames(currentMethod)
-                .Except(MethodSpecificFieldNames(nextMethod), StringComparer.Ordinal)
+            var currentMethodFields = MethodSpecificFieldNames(currentMethod);
+            var nextMethodFields = MethodSpecificFieldNames(nextMethod);
+
+            var discarded = currentMethodFields
+                .Except(nextMethodFields, StringComparer.Ordinal)
+                .ToList();
+
+            var fieldsRequiringRevalidation = currentMethodFields
+                .Intersect(nextMethodFields, StringComparer.Ordinal)
                 .ToList();
 
             return new ChangeMethodPreview(
                 currentMethod,
                 nextMethod,
                 _toolNameVersionFields,
-                _inputsOutputsFields,
+                fieldsRequiringRevalidation,
                 discarded,
                 MetadataFieldNamesFor(currentMethod));
         }
@@ -412,11 +417,7 @@ namespace NodeKit.Authoring.Recipes
             {
                 RecipeValidationRecoveryAction action;
 
-                if (violation.Field is "Inputs" or "Outputs")
-                {
-                    action = ReviewSectionAction();
-                }
-                else if (violation.Field != null && _renderedFieldToCatalogFields.TryGetValue(violation.Field, out var catalogFields))
+                if (violation.Field != null && _renderedFieldToCatalogFields.TryGetValue(violation.Field, out var catalogFields))
                 {
                     action = BuildMappedFieldAction(catalogFields);
                 }
@@ -632,22 +633,11 @@ namespace NodeKit.Authoring.Recipes
                     $"The {joined} values must agree with each other."));
         }
 
-        private static RecipeValidationRecoveryAction ReviewSectionAction() => new(
-            "입력/출력 섹션 확인",
-            RecoveryActionKind.ReviewSection,
-            _inputsOutputsFields,
-            Text(
-                "입력/출력 정의가 렌더링된 build request와 맞지 않습니다.",
-                "The input/output definitions don't match the rendered build request."),
-            Text(
-                "직접 입력한 role/format/shape/class가 특수하면 기본 preset으로 다시 선택해보세요.",
-                "If the role/format/shape/class you entered manually is unusual, try reselecting a default preset."));
-
         private RecipeValidationRecoveryAction ShowExplanationOnlyAction()
         {
             var relatedFields = _selectedMethod.HasValue
-                ? MethodSpecificFieldNames(_selectedMethod.Value).Concat(_inputsOutputsFields).ToList()
-                : new List<string>(_inputsOutputsFields);
+                ? MethodSpecificFieldNames(_selectedMethod.Value).ToList()
+                : new List<string>();
 
             return new RecipeValidationRecoveryAction(
                 "전체 recipe 구조 확인",

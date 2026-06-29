@@ -58,31 +58,26 @@ namespace NodeKit.Cli
                 [RecipeMethodId.Container] = new[]
                 {
                     "ImageRef는 digest로 고정되어야 합니다.",
-                    "Inputs와 Outputs는 최소 1개 이상 필요합니다.",
-                },
+                    },
                 [RecipeMethodId.Package] = new[]
                 {
                     "BaseImage(ImageRef)는 digest로 고정되어야 합니다.",
                     "Packages는 버전이 고정되어야 합니다.",
-                    "Inputs와 Outputs는 최소 1개 이상 필요합니다.",
-                },
+                    },
                 [RecipeMethodId.Mirror] = new[]
                 {
                     "BaseImage(ImageRef)는 digest로 고정되어야 합니다.",
                     "Packages는 버전이 고정되어야 합니다.",
-                    "Inputs와 Outputs는 최소 1개 이상 필요합니다.",
-                },
+                    },
                 [RecipeMethodId.Source] = new[]
                 {
                     "BaseImage(ImageRef)는 digest로 고정되어야 합니다.",
                     "SourceChecksum은 sha256 형식이어야 합니다.",
-                    "Inputs와 Outputs는 최소 1개 이상 필요합니다.",
-                },
+                    },
                 [RecipeMethodId.Dockerfile] = new[]
                 {
                     "Dockerfile 내 모든 FROM 이미지는 latest 태그 없이 digest로 고정되어야 합니다.",
-                    "Inputs와 Outputs는 최소 1개 이상 필요합니다.",
-                },
+                    },
             };
 
         /// <summary>

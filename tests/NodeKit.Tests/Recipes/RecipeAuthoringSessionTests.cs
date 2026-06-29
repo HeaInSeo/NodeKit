@@ -43,9 +43,7 @@ namespace NodeKit.Tests.Recipes
             session.CompleteListField("Channels");
 
             // PackageEngine (Defaulted) must never surface even though unset.
-            var next = session.NextField();
-
-            Assert.Equal("Inputs", next!.Name);
+            Assert.Null(session.NextField());
         }
 
         [Fact]
@@ -63,7 +61,7 @@ namespace NodeKit.Tests.Recipes
 
             session.CompleteListField("Command");
 
-            Assert.Equal("Inputs", session.NextField()!.Name);
+            Assert.Null(session.NextField());
         }
 
         [Fact]
@@ -249,14 +247,6 @@ namespace NodeKit.Tests.Recipes
             Assert.False(session.IsComplete);
 
             session.CompleteListField("Command");
-            Assert.False(session.IsComplete);
-
-            session.AppendListItem("Inputs", new ToolInput { Name = "reads", Role = "reads", Format = "fastq", Shape = "pair", Required = true });
-            session.CompleteListField("Inputs");
-            Assert.False(session.IsComplete);
-
-            session.AppendListItem("Outputs", new ToolOutput { Name = "bam", Role = "alignment", Format = "bam", Shape = "single", Class = "primary" });
-            session.CompleteListField("Outputs");
             Assert.True(session.IsComplete);
         }
 
@@ -294,10 +284,6 @@ namespace NodeKit.Tests.Recipes
             session.CompleteListField("Packages");
             session.AppendListItem("Channels", "bioconda");
             session.CompleteListField("Channels");
-            session.AppendListItem("Inputs", new ToolInput { Name = "reads", Role = "reads", Format = "fastq", Shape = "pair", Required = true });
-            session.CompleteListField("Inputs");
-            session.AppendListItem("Outputs", new ToolOutput { Name = "bam", Role = "alignment", Format = "bam", Shape = "single", Class = "primary" });
-            session.CompleteListField("Outputs");
 
             var document = session.Build();
 
@@ -419,10 +405,6 @@ namespace NodeKit.Tests.Recipes
             session.SetField("ImageRef", "condaforge/miniforge3:24.3.0-0");
             session.SetField("ImageDigest", "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
             session.CompleteListField("Command");
-            session.AppendListItem("Inputs", new ToolInput { Name = "reads", Role = "reads", Format = "fastq", Shape = "pair", Required = true });
-            session.CompleteListField("Inputs");
-            session.AppendListItem("Outputs", new ToolOutput { Name = "bam", Role = "alignment", Format = "bam", Shape = "single", Class = "primary" });
-            session.CompleteListField("Outputs");
 
             Assert.True(session.IsComplete);
 
@@ -448,10 +430,6 @@ namespace NodeKit.Tests.Recipes
             session.SetField("Script", "run.sh");
             session.SetField("ImageRef", "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
             session.CompleteListField("Command");
-            session.AppendListItem("Inputs", new ToolInput { Name = "reads", Role = "reads", Format = "fastq", Shape = "pair", Required = true });
-            session.CompleteListField("Inputs");
-            session.AppendListItem("Outputs", new ToolOutput { Name = "bam", Role = "alignment", Format = "bam", Shape = "single", Class = "primary" });
-            session.CompleteListField("Outputs");
 
             Assert.False(session.IsComplete);
             Assert.Throws<InvalidOperationException>(() => session.Build());
@@ -544,27 +522,25 @@ namespace NodeKit.Tests.Recipes
         }
 
         [Fact]
-        public void ChangeMethod_Proceed_PreservesSharedFieldsButInvalidatesThem()
+        public void ChangeMethod_Proceed_PreservesSharedFields()
         {
             var session = new RecipeAuthoringSession();
             session.SelectMethod(RecipeMethodId.Package);
             session.SetField("ToolName", "bwa-mem");
             session.SetField("ToolVersion", "0.7.17");
             session.SetField("Script", "run.sh");
-            session.AppendListItem("Inputs", new ToolInput { Name = "reads", Role = "reads", Format = "fastq", Shape = "pair", Required = true });
-            session.CompleteListField("Inputs");
+            session.SetField("ImageRef", "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
 
             session.ChangeMethod(RecipeMethodId.Source, ChangeMethodDecision.Proceed);
 
             var snapshot = session.Snapshot();
             Assert.Contains(snapshot.Values, v => v.FieldName == "ToolName");
-            Assert.Contains(snapshot.Values, v => v.FieldName == "Inputs");
-            Assert.Contains("Inputs", snapshot.InvalidatedFields);
+            Assert.Contains(snapshot.Values, v => v.FieldName == "ImageRef");
             Assert.DoesNotContain("ToolName", snapshot.InvalidatedFields);
         }
 
         [Fact]
-        public void ChangeMethod_Proceed_DoesNotBlockIsCompleteForInvalidatedFields()
+        public void ChangeMethod_Proceed_PreservedSharedFieldDoesNotBlockIsComplete()
         {
             var session = new RecipeAuthoringSession();
             session.SelectMethod(RecipeMethodId.Container);
@@ -574,17 +550,13 @@ namespace NodeKit.Tests.Recipes
             session.SetField("ImageRef", "condaforge/miniforge3:24.3.0-0");
             session.SetField("ImageDigest", "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
             session.CompleteListField("Command");
-            session.AppendListItem("Inputs", new ToolInput { Name = "reads", Role = "reads", Format = "fastq", Shape = "pair", Required = true });
-            session.CompleteListField("Inputs");
-            session.AppendListItem("Outputs", new ToolOutput { Name = "bam", Role = "alignment", Format = "bam", Shape = "single", Class = "primary" });
-            session.CompleteListField("Outputs");
 
             session.ChangeMethod(RecipeMethodId.Dockerfile, ChangeMethodDecision.Proceed);
             session.SetField("DockerfilePath", "./Dockerfile");
             session.SetField("DockerfileContent", "FROM scratch");
 
             Assert.True(session.IsComplete);
-            Assert.Contains("Inputs", session.Snapshot().InvalidatedFields);
+            Assert.Contains(session.Snapshot().Values, v => v.FieldName == "ImageRef");
         }
 
         [Fact]
@@ -619,14 +591,13 @@ namespace NodeKit.Tests.Recipes
         {
             var session = new RecipeAuthoringSession();
             session.SelectMethod(RecipeMethodId.Package);
-            session.AppendListItem("Inputs", new ToolInput { Name = "reads", Role = "reads", Format = "fastq", Shape = "pair", Required = true });
-            session.CompleteListField("Inputs");
+            session.SetField("ImageRef", "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
             session.ChangeMethod(RecipeMethodId.Source, ChangeMethodDecision.Proceed);
-            Assert.Contains("Inputs", session.Snapshot().InvalidatedFields);
+            Assert.Contains("ImageRef", session.Snapshot().InvalidatedFields);
 
-            session.ConfirmInvalidatedField("Inputs");
+            session.ConfirmInvalidatedField("ImageRef");
 
-            Assert.DoesNotContain("Inputs", session.Snapshot().InvalidatedFields);
+            Assert.DoesNotContain("ImageRef", session.Snapshot().InvalidatedFields);
         }
 
         [Fact]
@@ -634,13 +605,13 @@ namespace NodeKit.Tests.Recipes
         {
             var session = new RecipeAuthoringSession();
             session.SelectMethod(RecipeMethodId.Package);
-            session.AppendListItem("Inputs", new ToolInput { Name = "reads", Role = "reads", Format = "fastq", Shape = "pair", Required = true });
-            session.CompleteListField("Inputs");
-            session.ChangeMethod(RecipeMethodId.Source, ChangeMethodDecision.Proceed);
+            session.AppendListItem("Packages", "bwa=0.7.17=h5bf99c6_8");
+            session.CompleteListField("Packages");
+            session.ChangeMethod(RecipeMethodId.Mirror, ChangeMethodDecision.Proceed);
 
-            session.EditListItem("Inputs", 0, new ToolInput { Name = "reads2", Role = "reads", Format = "fastq", Shape = "pair", Required = true });
+            session.EditListItem("Packages", 0, "bwa=0.7.17=h5bf99c6_9");
 
-            Assert.DoesNotContain("Inputs", session.Snapshot().InvalidatedFields);
+            Assert.DoesNotContain("Packages", session.Snapshot().InvalidatedFields);
         }
 
         [Fact]
@@ -735,19 +706,6 @@ namespace NodeKit.Tests.Recipes
         }
 
         [Fact]
-        public void BuildRecoveryPlan_InputsOutputsViolation_ProducesReviewSectionAction()
-        {
-            var session = CompletePackageSession();
-            var violations = new[] { new ValidationViolation("L1-RCP-010", "Inputs와 렌더링된 build request가 맞지 않습니다.", "Inputs") };
-
-            var plan = session.BuildRecoveryPlan(violations);
-
-            Assert.Single(plan.Actions);
-            Assert.Equal(RecoveryActionKind.ReviewSection, plan.Actions[0].Kind);
-            Assert.Empty(plan.UnmappedViolations);
-        }
-
-        [Fact]
         public void BuildRecoveryPlan_UnmappedField_ProducesShowExplanationOnlyActionAndUnmappedViolation()
         {
             var session = CompletePackageSession();
@@ -786,10 +744,6 @@ namespace NodeKit.Tests.Recipes
             session.CompleteListField("Packages");
             session.AppendListItem("Channels", "bioconda");
             session.CompleteListField("Channels");
-            session.AppendListItem("Inputs", new ToolInput { Name = "reads", Role = "reads", Format = "fastq", Shape = "pair", Required = true });
-            session.CompleteListField("Inputs");
-            session.AppendListItem("Outputs", new ToolOutput { Name = "bam", Role = "alignment", Format = "bam", Shape = "single", Class = "primary" });
-            session.CompleteListField("Outputs");
             return session;
         }
     }

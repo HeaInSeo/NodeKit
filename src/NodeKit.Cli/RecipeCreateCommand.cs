@@ -66,7 +66,7 @@ namespace NodeKit.Cli
         }
 
         internal static bool IsListType(RecipeFieldDescriptor field) =>
-            field.Type is RecipeFieldType.StringList or RecipeFieldType.InputList or RecipeFieldType.OutputList;
+            field.Type is RecipeFieldType.StringList;
 
         internal static void SaveDocument(RecipeDocument document, string outPath, TextWriter stdout)
         {
@@ -117,7 +117,7 @@ namespace NodeKit.Cli
                 }
             }
 
-            foreach (var field in catalogFields.Where(f => IsListType(f) && f.Name is not ("Inputs" or "Outputs")))
+            foreach (var field in catalogFields.Where(f => IsListType(f)))
             {
                 session.CompleteListField(field.Name);
             }
@@ -130,30 +130,6 @@ namespace NodeKit.Cli
                     session.SkipOptionalField(field.Name);
                 }
             }
-
-            foreach (var (name, spec) in parsed.Inputs)
-            {
-                var violations = RecipeCreateInputOutputSpec.ApplyInput(session, name, spec);
-                if (violations.Count > 0)
-                {
-                    CliApp.PrintViolations(violations, stderr);
-                    return 1;
-                }
-            }
-
-            session.CompleteListField("Inputs");
-
-            foreach (var (name, spec) in parsed.Outputs)
-            {
-                var violations = RecipeCreateInputOutputSpec.ApplyOutput(session, name, spec);
-                if (violations.Count > 0)
-                {
-                    CliApp.PrintViolations(violations, stderr);
-                    return 1;
-                }
-            }
-
-            session.CompleteListField("Outputs");
 
             foreach (var warningField in session.Snapshot().RecommendedWarnings)
             {
@@ -187,8 +163,6 @@ namespace NodeKit.Cli
             var acceptDockerfileWarning = false;
             var nonInteractive = false;
             var fields = new List<(string Name, string Value)>();
-            var inputs = new List<(string Name, string Spec)>();
-            var outputs = new List<(string Name, string Spec)>();
 
             for (var i = 0; i < options.Length; i++)
             {
@@ -221,22 +195,6 @@ namespace NodeKit.Cli
                         }
 
                         fields.Add(fieldEntry);
-                        break;
-                    case "--input":
-                        if (!TryTakeNext(options, ref i, out var inputSpec) || !TrySplitOnce(inputSpec, out var inputEntry))
-                        {
-                            return Error("--input 옵션은 --input Name=preset 형식이어야 합니다.");
-                        }
-
-                        inputs.Add(inputEntry);
-                        break;
-                    case "--output":
-                        if (!TryTakeNext(options, ref i, out var outputSpec) || !TrySplitOnce(outputSpec, out var outputEntry))
-                        {
-                            return Error("--output 옵션은 --output Name=preset 형식이어야 합니다.");
-                        }
-
-                        outputs.Add(outputEntry);
                         break;
                     default:
                         return Error($"알 수 없는 옵션입니다: {options[i]}");
@@ -279,7 +237,7 @@ namespace NodeKit.Cli
                 return Error("--method dockerfile은 --non-interactive 모드에서 --accept-dockerfile-warning이 필요합니다.");
             }
 
-            return new RecipeCreateOptions(method, engine, acceptDockerfileWarning, nonInteractive, fields, inputs, outputs, Error: null);
+            return new RecipeCreateOptions(method, engine, acceptDockerfileWarning, nonInteractive, fields, Error: null);
         }
 
         private static bool TryTakeNext(string[] options, ref int i, out string value)
@@ -309,6 +267,6 @@ namespace NodeKit.Cli
         }
 
         private static RecipeCreateOptions Error(string message) =>
-            new(null, null, false, false, Array.Empty<(string, string)>(), Array.Empty<(string, string)>(), Array.Empty<(string, string)>(), message);
+            new(null, null, false, false, Array.Empty<(string, string)>(), message);
     }
 }
