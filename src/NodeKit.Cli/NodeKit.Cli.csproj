@@ -13,11 +13,25 @@
     </AssemblyAttribute>
   </ItemGroup>
 
+  <!-- Sprint R17: GrpcResolveRecipeClient를 위해 gRPC 패키지를 직접 추가. -->
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" Version="3.34.1" />
+    <PackageReference Include="Grpc.Net.Client" Version="2.76.0" />
+    <PackageReference Include="Grpc.Tools" Version="2.80.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Protobuf Include="$(ApiProtosRoot)/nodevault/v1/nodevault.proto" GrpcServices="Client" Access="Internal" ProtoRoot="$(ApiProtosRoot)" />
+  </ItemGroup>
+
   <ItemGroup>
     <!--
       ProjectReference to ../../NodeKit.csproj 의도적으로 사용 안 함:
-      해당 프로젝트는 Avalonia/SkiaSharp/Grpc.Net.Client/Google.Protobuf/Wasmtime를
-      참조하며, CLI는 legacy BuildRequest 렌더링/검증 경로만 필요하다.
+      해당 프로젝트는 Avalonia/SkiaSharp/Wasmtime를 참조하며,
+      CLI는 gRPC + 검증/직렬화 경로만 필요하다.
       아래 파일들은 모두 System.* 외 의존성이 없는 순수 POCO/로직 코드이므로
       소스 링크로만 가져온다.
     -->

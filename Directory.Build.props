@@ -3,4 +3,12 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
+  <!-- 1순위: NodeKit 저장소 내 벤더링된 proto (독립 빌드 — NodeVault 불필요) -->
+  <PropertyGroup Condition="'$(ApiProtosRoot)' == '' and Exists('$(MSBuildProjectDirectory)/protos')">
+    <ApiProtosRoot>$(MSBuildProjectDirectory)/protos</ApiProtosRoot>
+  </PropertyGroup>
+  <!-- 2순위: 개발 장비에 NodeVault 저장소가 함께 있는 경우 -->
+  <PropertyGroup Condition="'$(ApiProtosRoot)' == '' and Exists('/opt/go/src/github.com/HeaInSeo/NodeVault/protos')">
+    <ApiProtosRoot>/opt/go/src/github.com/HeaInSeo/NodeVault/protos</ApiProtosRoot>
+  </PropertyGroup>
 </Project>

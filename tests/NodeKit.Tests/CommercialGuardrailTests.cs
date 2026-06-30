@@ -120,7 +120,9 @@ namespace NodeKit.Tests
                 .ToArray();
 
         private static string[] SourceFiles() =>
-            Directory.GetFiles(Path.Combine(RepoRoot, "src"), "*.cs", SearchOption.AllDirectories);
+            Directory.GetFiles(Path.Combine(RepoRoot, "src"), "*.cs", SearchOption.AllDirectories)
+                .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+                .ToArray();
 
         private static string RepoRoot
         {

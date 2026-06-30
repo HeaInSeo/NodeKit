@@ -50,10 +50,12 @@ namespace NodeKit.Cli
             IResolveRecipeClient? resolveClient = null)
         {
             using var harborResolver = HarborImageDigestResolver.TryCreate();
+            using var grpcResolver = GrpcResolveRecipeClient.TryCreate();
             IImageDigestResolver resolver = (IImageDigestResolver?)harborResolver ?? NullImageDigestResolver.Instance;
             IResolveRecipeClient recipeResolver = resolveClient
                 ?? StubResolveRecipeClient.TryCreate()
-                ?? (IResolveRecipeClient)NullResolveRecipeClient.Instance;
+                ?? (IResolveRecipeClient?)grpcResolver
+                ?? NullResolveRecipeClient.Instance;
 
             try
             {
@@ -146,12 +148,12 @@ namespace NodeKit.Cli
                         result = RecipeValidationPipeline.ValidateRecipe(document);
                     }
 
-                    // ResolveRecipe 사전 조회 (트랙 D — proto 추가 전까지 NullResolveRecipeClient)
+                    // ResolveRecipe 사전 조회 (트랙 D)
                     if (document.Packages.Count > 0)
                     {
                         var resolveResult = recipeResolver
                             .ResolveAsync(document.ToolName ?? string.Empty, document.Version ?? string.Empty,
-                                document.Packages, System.Threading.CancellationToken.None)
+                                document.Packages, System.Threading.CancellationToken.None, document.BuildKind)
                             .GetAwaiter().GetResult();
 
                         if (resolveResult.Source != RecipeResolutionSource.Unsupported

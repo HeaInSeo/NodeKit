@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using NodeKit.Authoring.Recipes;
 
 namespace NodeKit.Cli
 {
@@ -16,12 +17,14 @@ namespace NodeKit.Cli
             string toolName,
             string version,
             IReadOnlyList<string> packages,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            RecipeBuildKind? buildKind = null)
         {
             _ = toolName;
             _ = version;
             _ = packages;
             _ = cancellationToken;
+            _ = buildKind;
             return Task.FromResult(ResolveRecipeResult.Unsupported());
         }
     }

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using NodeKit.Authoring.Recipes;
 
 namespace NodeKit.Cli
 {
@@ -35,14 +36,15 @@ namespace NodeKit.Cli
     }
 
     // Seam for NodeVault ResolveRecipe RPC (병렬 트랙 D).
-    // NullResolveRecipeClient is the default until the proto is added to NodeVault
-    // and GrpcResolveRecipeClient can be wired in.
+    // GrpcResolveRecipeClient is activated when NODEKIT_NODEVAULT_URL is set;
+    // NullResolveRecipeClient is the fallback.
     internal interface IResolveRecipeClient
     {
         Task<ResolveRecipeResult> ResolveAsync(
             string toolName,
             string version,
             IReadOnlyList<string> packages,
-            CancellationToken cancellationToken);
+            CancellationToken cancellationToken,
+            RecipeBuildKind? buildKind = null);
     }
 }

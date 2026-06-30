@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using NodeKit.Authoring.Recipes;
 
 namespace NodeKit.Cli
 {
@@ -20,7 +21,8 @@ namespace NodeKit.Cli
             string toolName,
             string version,
             IReadOnlyList<string> packages,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            RecipeBuildKind? buildKind = null)
         {
             var resolutions = new List<PackageResolution>();
             foreach (var pkg in packages)
