@@ -1175,6 +1175,142 @@ namespace NodeKit.Cli.Tests
             Assert.Contains("\"BuildKind\": \"Conda\"", json);
         }
 
+        [Fact]
+        public void ResolveRecipe_ExternalSourceWithCandidates_AppliesSelectedFullPinAndSaves()
+        {
+            // Sprint R17: when resolver returns ExternalSource + multiple candidates,
+            // PackageCandidatePresenter prompts the user; "1" picks the first candidate's
+            // FullPin and that replaces the version-only pin in the saved document.
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var resolveResult = new ResolveRecipeResult(
+                RecipeResolutionSource.ExternalSource,
+                new[]
+                {
+                    new PackageResolution("bwa", "0.7.17", new[]
+                    {
+                        new BuildStringCandidate("h5bf99c6_8", "bwa=0.7.17=h5bf99c6_8", "bioconda"),
+                        new BuildStringCandidate("h6a6fa10_8", "bwa=0.7.17=h6a6fa10_8", "conda-forge"),
+                    }),
+                });
+            var transcript = new[]
+            {
+                "2", "n", "n", "n", "y", "n", "n", "",
+                "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
+                "bwa=0.7.17", "",  // version-only pin
+                "bioconda", "",
+                "1",               // PackageCandidatePresenter: pick first candidate
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = RecipeCreateInteractiveRunner.Run(
+                outPath,
+                new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
+                new StringReader(string.Join("\n", transcript)),
+                stdout,
+                stderr,
+                new SequencedCancellationSource(checksBeforeCancellation: 1000),
+                resolveClient: new FixedResolveRecipeClient(resolveResult));
+
+            Assert.Equal(0, exitCode);
+            Assert.Empty(stderr.ToString());
+            Assert.True(File.Exists(outPath));
+            Assert.Contains("패키지 빌드 문자열 선택", stdout.ToString());
+            var json = File.ReadAllText(outPath);
+            Assert.Contains("bwa=0.7.17=h5bf99c6_8", json);
+        }
+
+        [Fact]
+        public void ResolveRecipe_NotFound_PrintsWarningAndSavesOriginalPins()
+        {
+            // Sprint R17: when resolver returns NotFound with no candidates,
+            // a ⚠ advisory is printed but the file is still saved with the
+            // original version-only pins (no candidate picker is shown).
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var resolveResult = new ResolveRecipeResult(
+                RecipeResolutionSource.NotFound,
+                Array.Empty<PackageResolution>());
+            var transcript = new[]
+            {
+                "2", "n", "n", "n", "y", "n", "n", "",
+                "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
+                "bwa=0.7.17", "",
+                "bioconda", "",
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = RecipeCreateInteractiveRunner.Run(
+                outPath,
+                new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
+                new StringReader(string.Join("\n", transcript)),
+                stdout,
+                stderr,
+                new SequencedCancellationSource(checksBeforeCancellation: 1000),
+                resolveClient: new FixedResolveRecipeClient(resolveResult));
+
+            Assert.Equal(0, exitCode);
+            Assert.True(File.Exists(outPath));
+            Assert.Contains("Harbor에 동일 tool+version 이미지가 없습니다.", stdout.ToString());
+            var json = File.ReadAllText(outPath);
+            Assert.Contains("bwa=0.7.17", json);
+        }
+
+        [Fact]
+        public void ResolveRecipe_CancelDuringCandidateSelection_ExitsWithCode130()
+        {
+            // Sprint R17: /cancel inside PackageCandidatePresenter throws
+            // RecipeCreateCancelledException → caught by outer handler → exit 130.
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var resolveResult = new ResolveRecipeResult(
+                RecipeResolutionSource.ExternalSource,
+                new[]
+                {
+                    new PackageResolution("bwa", "0.7.17", new[]
+                    {
+                        new BuildStringCandidate("h5bf99c6_8", "bwa=0.7.17=h5bf99c6_8", "bioconda"),
+                        new BuildStringCandidate("h6a6fa10_8", "bwa=0.7.17=h6a6fa10_8", "conda-forge"),
+                    }),
+                });
+            var transcript = new[]
+            {
+                "2", "n", "n", "n", "y", "n", "n", "",
+                "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
+                "bwa=0.7.17", "",
+                "bioconda", "",
+                "/cancel",         // during PackageCandidatePresenter → exit 130
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = RecipeCreateInteractiveRunner.Run(
+                outPath,
+                new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
+                new StringReader(string.Join("\n", transcript)),
+                stdout,
+                stderr,
+                new SequencedCancellationSource(checksBeforeCancellation: 1000),
+                resolveClient: new FixedResolveRecipeClient(resolveResult));
+
+            Assert.Equal(130, exitCode);
+            Assert.False(File.Exists(outPath));
+            Assert.Contains("recipe 생성을 취소했습니다.", stdout.ToString());
+        }
+
+        private sealed class FixedResolveRecipeClient : IResolveRecipeClient
+        {
+            private readonly ResolveRecipeResult _result;
+            internal FixedResolveRecipeClient(ResolveRecipeResult result) => _result = result;
+
+            public System.Threading.Tasks.Task<ResolveRecipeResult> ResolveAsync(
+                string toolName,
+                string version,
+                System.Collections.Generic.IReadOnlyList<string> packages,
+                System.Threading.CancellationToken cancellationToken,
+                NodeKit.Authoring.Recipes.RecipeBuildKind? buildKind = null)
+                => System.Threading.Tasks.Task.FromResult(_result);
+        }
+
         /// <summary>
         /// Fake IRecipeCreateCancellationSource for design doc Section 18.5
         /// tests — simulates Ctrl+C without a real signal by returning false
