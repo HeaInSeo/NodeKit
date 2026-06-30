@@ -3,6 +3,7 @@
 ## 0. Active planning memory
 
 Read `docs/NODEKIT_CLI_FIRST_SPRINT_PLAN.md` before resuming NodeKit work.
+Read `docs/NODEKIT_CLI_UX_IMPROVEMENT_SPRINT_PLAN.md` for the active CLI UX improvement sprints (U1-U5).
 
 Current planning source of truth:
 
