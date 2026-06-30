@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 
 namespace NodeKit.Cli
@@ -16,8 +15,7 @@ namespace NodeKit.Cli
         // Packages with multiple candidates prompt the user to pick.
         internal static IReadOnlyDictionary<string, string>? Present(
             IReadOnlyList<PackageResolution> packages,
-            TextReader stdin,
-            TextWriter stdout,
+            IRecipeConsole console,
             IRecipeCreateCancellationSource cancellation)
         {
             var selections = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -40,7 +38,7 @@ namespace NodeKit.Cli
                     continue;
                 }
 
-                var chosen = PromptCandidateSelection(pkg, stdin, stdout, cancellation);
+                var chosen = PromptCandidateSelection(pkg, console, cancellation);
                 if (chosen is null)
                 {
                     return null;
@@ -54,8 +52,7 @@ namespace NodeKit.Cli
 
         private static string? PromptCandidateSelection(
             PackageResolution pkg,
-            TextReader stdin,
-            TextWriter stdout,
+            IRecipeConsole console,
             IRecipeCreateCancellationSource cancellation)
         {
             while (true)
@@ -65,24 +62,24 @@ namespace NodeKit.Cli
                     throw new RecipeCreateCancelledException();
                 }
 
-                stdout.WriteLine($"패키지 '{pkg.Name}={pkg.Version}'에 대해 여러 빌드 문자열 후보가 있습니다.");
-                stdout.WriteLine();
+                console.WriteLine($"패키지 '{pkg.Name}={pkg.Version}'에 대해 여러 빌드 문자열 후보가 있습니다.");
+                console.WriteLine();
 
                 for (var i = 0; i < pkg.Candidates.Count; i++)
                 {
                     var c = pkg.Candidates[i];
-                    stdout.WriteLine($"  [{i + 1}] {c.FullPin}");
+                    console.WriteLine($"  [{i + 1}] {c.FullPin}");
                     if (!string.IsNullOrWhiteSpace(c.Channel))
                     {
-                        stdout.WriteLine($"      채널: {c.Channel}");
+                        console.WriteLine($"      채널: {c.Channel}");
                     }
                 }
 
-                stdout.WriteLine();
-                stdout.WriteLine("/cancel: 저장하지 않고 종료");
-                stdout.Write($"번호를 선택하세요 [1-{pkg.Candidates.Count}] (Enter = 1번): ");
+                console.WriteLine();
+                console.WriteHints("/cancel: 저장하지 않고 종료");
+                console.Write($"번호를 선택하세요 [1-{pkg.Candidates.Count}] (Enter = 1번): ");
 
-                var line = stdin.ReadLine();
+                var line = console.ReadLine();
 
                 if (cancellation.IsCancellationRequested)
                 {
@@ -107,8 +104,8 @@ namespace NodeKit.Cli
                     return pkg.Candidates[index - 1].FullPin;
                 }
 
-                stdout.WriteLine($"1부터 {pkg.Candidates.Count} 사이의 번호를 입력하세요.");
-                stdout.WriteLine();
+                console.WriteLine($"1부터 {pkg.Candidates.Count} 사이의 번호를 입력하세요.");
+                console.WriteLine();
             }
         }
 

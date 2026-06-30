@@ -13,6 +13,11 @@
     </AssemblyAttribute>
   </ItemGroup>
 
+  <!-- U1: TUI 렌더링 -->
+  <ItemGroup>
+    <PackageReference Include="Spectre.Console" Version="0.57.1" />
+  </ItemGroup>
+
   <!-- Sprint R17: GrpcResolveRecipeClient를 위해 gRPC 패키지를 직접 추가. -->
   <ItemGroup>
     <PackageReference Include="Google.Protobuf" Version="3.34.1" />

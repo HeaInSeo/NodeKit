@@ -13,6 +13,15 @@
           "Microsoft.Testing.Platform": "1.8.4"
         }
       },
+      "Spectre.Console.Testing": {
+        "type": "Direct",
+        "requested": "[0.57.1, )",
+        "resolved": "0.57.1",
+        "contentHash": "v4ieV1aE9QS/XqRI27/It1ju7HcvBAgWxxtDQcJFc2reTmKG8oSfJhkaQwMHm13g0GK91JjKZFMS3/sJxI1MCA==",
+        "dependencies": {
+          "Spectre.Console": "0.57.1"
+        }
+      },
       "xunit.v3": {
         "type": "Direct",
         "requested": "[3.2.2, )",
@@ -117,6 +126,19 @@
         "resolved": "5.0.0",
         "contentHash": "dDoKi0PnDz31yAyETfRntsLArTlVAVzUzCIvvEDsDsucrl33Dl8pIJG06ePTJTI3tGpeyHS9Cq7Foc/s4EeKcg=="
       },
+      "Spectre.Console": {
+        "type": "Transitive",
+        "resolved": "0.57.1",
+        "contentHash": "h/B0CJLR5Ba8yq+iVjjZR9JXMS+8a1syHmHhyZ6w5m8rHDWLGOlaKAhzJanHJL62rZxynLeVOx+43MKvskJ1lA==",
+        "dependencies": {
+          "Spectre.Console.Ansi": "0.57.1"
+        }
+      },
+      "Spectre.Console.Ansi": {
+        "type": "Transitive",
+        "resolved": "0.57.1",
+        "contentHash": "IFlXdGXOGD4XCK5ybZsXgQo7PE0ZE/pt9YFFWo2cECTipS8DrViLFazx+K00/A+fY1PlHYt1Vqwrjfod4EEckw=="
+      },
       "xunit.analyzers": {
         "type": "Transitive",
         "resolved": "1.27.0",
@@ -188,7 +210,8 @@
         "type": "Project",
         "dependencies": {
           "Google.Protobuf": "[3.34.1, )",
-          "Grpc.Net.Client": "[2.76.0, )"
+          "Grpc.Net.Client": "[2.76.0, )",
+          "Spectre.Console": "[0.57.1, )"
         }
       }
     }

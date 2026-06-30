@@ -52,7 +52,11 @@ namespace NodeKit.Cli
                 return 2;
             }
 
-            return RecipeCreateCommand.Run(args[2], args[3..], stdin, stdout, stderr);
+            IRecipeConsole console = (!Console.IsOutputRedirected && !Console.IsInputRedirected)
+                ? new AnsiRecipeConsole()
+                : new PlainTextRecipeConsole(stdin, stdout);
+
+            return RecipeCreateCommand.Run(args[2], args[3..], console, stdout, stderr);
         }
 
         private static int Unknown(string command, TextWriter stderr)

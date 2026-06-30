@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.IO;
 using NodeKit.Authoring.Recipes;
 
 namespace NodeKit.Cli
@@ -84,36 +83,36 @@ namespace NodeKit.Cli
         /// Shows the Section 16 recommendation result and returns the confirmed method.
         /// Loops internally until the user accepts or picks manually.
         /// </summary>
-        public static RecipeMethodId Present(RecipeMethodRecommendation recommendation, TextReader stdin, TextWriter stdout)
+        public static RecipeMethodId Present(RecipeMethodRecommendation recommendation, IRecipeConsole console)
         {
             while (true)
             {
                 if (recommendation.RecommendedMethod is { } recommended)
                 {
-                    PrintRecommendedSummary(recommended, recommendation, stdout);
-                    stdout.WriteLine("이 방식으로 진행할까요? [Y/n]");
-                    stdout.WriteLine("이전 질문 화면으로 돌아가려면 /back을 입력하세요.");
-                    var response = (stdin.ReadLine() ?? string.Empty).Trim().ToLowerInvariant();
+                    PrintRecommendedSummary(recommended, recommendation, console);
+                    console.WriteLine("이 방식으로 진행할까요? [Y/n]");
+                    console.WriteHints("이전 질문 화면으로 돌아가려면 /back을 입력하세요.");
+                    var response = (console.ReadLine() ?? string.Empty).Trim().ToLowerInvariant();
                     RecipeCreateEscapeCommands.ThrowIfEscape(response);
                     if (response != "n")
                     {
                         return recommended;
                     }
 
-                    stdout.WriteLine();
+                    console.WriteLine();
                 }
                 else
                 {
-                    stdout.WriteLine($"추천 보류: {recommendation.Reason}");
+                    console.WriteLine($"추천 보류: {recommendation.Reason}");
                     foreach (var mi in recommendation.MissingInformation)
                     {
-                        stdout.WriteLine($"  추가로 필요한 정보: {mi}");
+                        console.WriteLine($"  추가로 필요한 정보: {mi}");
                     }
 
-                    stdout.WriteLine();
+                    console.WriteLine();
                 }
 
-                var method = PromptManualMethodChoice(stdin, stdout);
+                var method = PromptManualMethodChoice(console);
                 if (method is not null)
                 {
                     return method.Value;
@@ -158,69 +157,69 @@ namespace NodeKit.Cli
         private static void PrintRecommendedSummary(
             RecipeMethodId method,
             RecipeMethodRecommendation recommendation,
-            TextWriter stdout)
+            IRecipeConsole console)
         {
-            stdout.WriteLine();
-            stdout.WriteLine($"추천 작성 방식: {RecipeMethodCatalog.For(method).Label.Get("ko")}");
-            stdout.WriteLine();
-            stdout.WriteLine("이유:");
-            stdout.WriteLine($"  {recommendation.Reason}");
+            console.WriteLine();
+            console.WriteLine($"추천 작성 방식: {RecipeMethodCatalog.For(method).Label.Get("ko")}");
+            console.WriteLine();
+            console.WriteLine("이유:");
+            console.WriteLine($"  {recommendation.Reason}");
 
             if (recommendation.Warnings.Count > 0)
             {
-                stdout.WriteLine();
+                console.WriteLine();
                 foreach (var warning in recommendation.Warnings)
                 {
-                    stdout.WriteLine($"경고: {warning}");
+                    console.WriteLine($"경고: {warning}");
                 }
             }
 
-            stdout.WriteLine();
-            stdout.WriteLine("이 방식으로 만들면:");
+            console.WriteLine();
+            console.WriteLine("이 방식으로 만들면:");
             foreach (var effect in Effects[method])
             {
-                stdout.WriteLine($"  - {effect}");
+                console.WriteLine($"  - {effect}");
             }
 
-            stdout.WriteLine();
-            stdout.WriteLine("앞으로 입력할 항목:");
+            console.WriteLine();
+            console.WriteLine("앞으로 입력할 항목:");
             foreach (var field in RecipeFieldCatalog.FieldsFor(method))
             {
-                stdout.WriteLine($"  - {field.Label.Get("ko")}");
+                console.WriteLine($"  - {field.Label.Get("ko")}");
             }
 
-            stdout.WriteLine();
-            stdout.WriteLine("주의:");
+            console.WriteLine();
+            console.WriteLine("주의:");
             foreach (var caution in Cautions[method])
             {
-                stdout.WriteLine($"  - {caution}");
+                console.WriteLine($"  - {caution}");
             }
 
-            stdout.WriteLine();
+            console.WriteLine();
         }
 
-        private static RecipeMethodId? PromptManualMethodChoice(TextReader stdin, TextWriter stdout)
+        private static RecipeMethodId? PromptManualMethodChoice(IRecipeConsole console)
         {
-            stdout.WriteLine("다른 작성 방식을 선택하세요.");
-            stdout.WriteLine();
+            console.WriteLine("다른 작성 방식을 선택하세요.");
+            console.WriteLine();
             for (var i = 0; i < MethodOrder.Count; i++)
             {
                 var m = MethodOrder[i];
                 var info = RecipeMethodCatalog.For(m);
-                stdout.WriteLine($"[{i + 1}] {info.Label.Get("ko")}");
-                stdout.WriteLine($"    {info.Description.Get("ko")}");
-                stdout.WriteLine();
+                console.WriteLine($"[{i + 1}] {info.Label.Get("ko")}");
+                console.WriteLine($"    {info.Description.Get("ko")}");
+                console.WriteLine();
             }
 
-            stdout.WriteLine("선택:");
-            var line = (stdin.ReadLine() ?? string.Empty).Trim();
+            console.WriteLine("선택:");
+            var line = (console.ReadLine() ?? string.Empty).Trim();
             RecipeCreateEscapeCommands.ThrowIfEscape(line);
             if (TryParseMethodSelection(line, out var method))
             {
                 return method;
             }
 
-            stdout.WriteLine("알 수 없는 선택입니다. 다시 선택하세요.");
+            console.WriteLine("알 수 없는 선택입니다. 다시 선택하세요.");
             return null;
         }
     }

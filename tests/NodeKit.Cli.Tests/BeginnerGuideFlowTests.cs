@@ -475,8 +475,7 @@ namespace NodeKit.Cli.Tests
 
             var method = BeginnerGuideFlow.Run(
                 session,
-                stdin,
-                stdout,
+                new PlainTextRecipeConsole(stdin, stdout),
                 NoCancellation,
                 new FakeDigestResolver(ImageDigestResolutionResult.Resolved(Digest)));
 
@@ -501,8 +500,7 @@ namespace NodeKit.Cli.Tests
 
             var method = BeginnerGuideFlow.Run(
                 session,
-                stdin,
-                stdout,
+                new PlainTextRecipeConsole(stdin, stdout),
                 NoCancellation,
                 NullImageDigestResolver.Instance);
 
@@ -526,8 +524,7 @@ namespace NodeKit.Cli.Tests
 
             var method = BeginnerGuideFlow.Run(
                 session,
-                stdin,
-                stdout,
+                new PlainTextRecipeConsole(stdin, stdout),
                 NoCancellation,
                 new FakeDigestResolver(ImageDigestResolutionResult.NotFound()));
 
@@ -551,8 +548,7 @@ namespace NodeKit.Cli.Tests
 
             var method = BeginnerGuideFlow.Run(
                 session,
-                stdin,
-                stdout,
+                new PlainTextRecipeConsole(stdin, stdout),
                 NoCancellation,
                 new FakeDigestResolver(ImageDigestResolutionResult.Resolved(Digest)));
 

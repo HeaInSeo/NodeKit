@@ -43,7 +43,7 @@ namespace NodeKit.Cli
             "conda", "micromamba", "source-build", "dockerfile-fallback",
         };
 
-        public static int Run(string outPath, string[] options, TextReader stdin, TextWriter stdout, TextWriter stderr)
+        public static int Run(string outPath, string[] options, IRecipeConsole console, TextWriter stdout, TextWriter stderr)
         {
             var parsed = ParseOptions(options);
             if (parsed.Error != null)
@@ -56,7 +56,7 @@ namespace NodeKit.Cli
             {
                 return parsed.NonInteractive
                     ? RunNonInteractive(outPath, parsed, stdout, stderr)
-                    : RecipeCreateInteractiveRunner.Run(outPath, parsed, stdin, stdout, stderr);
+                    : RecipeCreateInteractiveRunner.Run(outPath, parsed, console, stderr);
             }
             catch (InvalidOperationException ex)
             {
@@ -68,10 +68,13 @@ namespace NodeKit.Cli
         internal static bool IsListType(RecipeFieldDescriptor field) =>
             field.Type is RecipeFieldType.StringList;
 
-        internal static void SaveDocument(RecipeDocument document, string outPath, TextWriter stdout)
+        internal static void SaveDocument(RecipeDocument document, string outPath, TextWriter stdout) =>
+            SaveDocument(document, outPath, new PlainTextRecipeConsole(TextReader.Null, stdout));
+
+        internal static void SaveDocument(RecipeDocument document, string outPath, IRecipeConsole console)
         {
             File.WriteAllText(outPath, JsonSerializer.Serialize(document, JsonOptions));
-            stdout.WriteLine($"저장되었습니다: {outPath}");
+            console.WriteLine($"저장되었습니다: {outPath}");
         }
 
         private static int RunNonInteractive(string outPath, RecipeCreateOptions parsed, TextWriter stdout, TextWriter stderr)

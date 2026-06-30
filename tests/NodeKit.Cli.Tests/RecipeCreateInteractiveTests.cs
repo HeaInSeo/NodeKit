@@ -682,8 +682,7 @@ namespace NodeKit.Cli.Tests
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 outPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
-                new StringReader(string.Join("\n", transcript)),
-                stdout,
+                new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
                 stderr,
                 cancellation);
 
@@ -728,8 +727,7 @@ namespace NodeKit.Cli.Tests
             var ctrlCExitCode = RecipeCreateInteractiveRunner.Run(
                 ctrlCOutPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
-                new StringReader(string.Join("\n", ctrlCTranscript)),
-                ctrlCStdout,
+                new PlainTextRecipeConsole(new StringReader(string.Join("\n", ctrlCTranscript)), ctrlCStdout),
                 new StringWriter(),
                 new SequencedCancellationSource(checksBeforeCancellation: 0));
 
@@ -1206,8 +1204,7 @@ namespace NodeKit.Cli.Tests
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 outPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
-                new StringReader(string.Join("\n", transcript)),
-                stdout,
+                new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
                 stderr,
                 new SequencedCancellationSource(checksBeforeCancellation: 1000),
                 resolveClient: new FixedResolveRecipeClient(resolveResult));
@@ -1243,8 +1240,7 @@ namespace NodeKit.Cli.Tests
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 outPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
-                new StringReader(string.Join("\n", transcript)),
-                stdout,
+                new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
                 stderr,
                 new SequencedCancellationSource(checksBeforeCancellation: 1000),
                 resolveClient: new FixedResolveRecipeClient(resolveResult));
@@ -1286,8 +1282,7 @@ namespace NodeKit.Cli.Tests
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 outPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
-                new StringReader(string.Join("\n", transcript)),
-                stdout,
+                new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
                 stderr,
                 new SequencedCancellationSource(checksBeforeCancellation: 1000),
                 resolveClient: new FixedResolveRecipeClient(resolveResult));
