@@ -913,6 +913,268 @@ namespace NodeKit.Cli.Tests
             Assert.Contains("\"BuildKind\": \"BioContainer\"", json);
         }
 
+        [Fact]
+        public void RecoveryLoop_EmptySelection_ExitsWithCode1WithoutSaving()
+        {
+            // Regression guard: empty input at the recovery menu means "save 없이 종료".
+            // RunRecoveryLoop returns false → main loop writes stderr message and returns 1.
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "2", // 빠른 설정 모드
+                "n", "n", "y", "n", "n", "n", // Q&A -> recommend container
+                "", // accept recommended method
+                "bwa-mem", "0.7.17", "run.sh",
+                "condaforge/miniforge3:24.3.0-0", // ImageRef
+                "sha256:bad",   // ImageDigest — malformed, fails final validation
+                "",             // Command — skip
+                "",             // empty selection at recovery menu → return false
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
+
+            Assert.Equal(1, exitCode);
+            Assert.False(File.Exists(outPath));
+            Assert.Contains("최종 검증을 통과하지 못해 저장하지 않습니다.", stderr.ToString());
+        }
+
+        [Fact]
+        public void RecoveryLoop_InvalidSelection_PrintsMessageAndRecurses()
+        {
+            // Out-of-range or non-numeric selection prints "알 수 없는 선택입니다." and
+            // re-shows the recovery menu. The user then picks a valid action.
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "2", // 빠른 설정 모드
+                "n", "n", "y", "n", "n", "n", // Q&A -> recommend container
+                "", // accept recommended method
+                "bwa-mem", "0.7.17", "run.sh",
+                "condaforge/miniforge3:24.3.0-0",
+                "sha256:bad",
+                "",
+                "99", // invalid: out of range → "알 수 없는 선택입니다.", recurse
+                "1",  // valid action
+                "condaforge/miniforge3:24.3.0-0", DigestOnly, // fix the digest
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.Empty(stderr.ToString());
+            Assert.Contains("알 수 없는 선택입니다.", stdout.ToString());
+
+            var json = File.ReadAllText(outPath);
+            Assert.Contains("\"BuildKind\": \"BioContainer\"", json);
+        }
+
+        [Fact]
+        public void RecoveryLoop_CancelCommand_ExitsWithCode130WithoutSaving()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "2", // 빠른 설정 모드
+                "n", "n", "y", "n", "n", "n", // Q&A -> recommend container
+                "", // accept recommended method
+                "bwa-mem", "0.7.17", "run.sh",
+                "condaforge/miniforge3:24.3.0-0",
+                "sha256:bad",
+                "",
+                "/cancel", // at recovery menu → ThrowIfCancel → exit 130
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
+
+            Assert.Equal(130, exitCode);
+            Assert.False(File.Exists(outPath));
+            Assert.Contains("recipe 생성을 취소했습니다.", stdout.ToString());
+        }
+
+        [Fact]
+        public void ChangeMethod_BackDuringNumberInput_CancelsChangeAndRepromptsCurrentField()
+        {
+            // /back typed at the method-number prompt inside /change-method cancels the change
+            // and re-prompts the same field (no method switch occurs).
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "2", // 빠른 설정 모드
+                "n", "n", "n", "y", "n", "n", // Q&A -> recommend package
+                "", // accept recommended method
+                "bwa-mem", "0.7.17", "run.sh",
+                "/change-method", // at ImageRef prompt
+                "/back",          // cancel the change → "method 변경을 취소하고..."
+                ImageRefWithDigest,  // ImageRef re-prompted for the same Package method
+                "bwa=0.7.17=h5bf99c6_8", "", // Packages
+                "bioconda", "",              // Channels
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.Empty(stderr.ToString());
+            Assert.Contains("method 변경을 취소하고 현재 입력 단계로 돌아갑니다.", stdout.ToString());
+
+            var json = File.ReadAllText(outPath);
+            Assert.Contains("\"BuildKind\": \"Conda\"", json);
+        }
+
+        [Fact]
+        public void ChangeMethod_InvalidNumber_PrintsErrorAndRepromptsCurrentField()
+        {
+            // An unrecognized method number cancels the change and re-prompts the current field.
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "2", // 빠른 설정 모드
+                "n", "n", "n", "y", "n", "n", // Q&A -> recommend package
+                "", // accept recommended method
+                "bwa-mem", "0.7.17", "run.sh",
+                "/change-method",
+                "99",  // invalid number → "알 수 없는 방법입니다. 변경을 취소합니다."
+                ImageRefWithDigest,
+                "bwa=0.7.17=h5bf99c6_8", "",
+                "bioconda", "",
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.Empty(stderr.ToString());
+            Assert.Contains("알 수 없는 방법입니다. 변경을 취소합니다.", stdout.ToString());
+
+            var json = File.ReadAllText(outPath);
+            Assert.Contains("\"BuildKind\": \"Conda\"", json);
+        }
+
+        [Fact]
+        public void ChangeMethod_ConfirmDeclined_DoesNotSwitchMethodAndRepromptsCurrentField()
+        {
+            // Typing N at the "계속할까요?" step cancels the method change in place.
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "2", // 빠른 설정 모드
+                "n", "n", "n", "y", "n", "n", // Q&A -> recommend package
+                "", // accept recommended method
+                "bwa-mem", "0.7.17", "run.sh",
+                "/change-method",
+                "4",  // source
+                "n",  // decline confirm → ChangeMethod(Cancel) → field re-prompted
+                ImageRefWithDigest,
+                "bwa=0.7.17=h5bf99c6_8", "",
+                "bioconda", "",
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.Empty(stderr.ToString());
+
+            var json = File.ReadAllText(outPath);
+            Assert.Contains("\"BuildKind\": \"Conda\"", json);
+            Assert.DoesNotContain("\"BuildKind\": \"SourceBuild\"", json);
+        }
+
+        [Fact]
+        public void StringListField_EmptyOnRequiredList_PrintsErrorAndRepromptsUntilFilled()
+        {
+            // CompleteListField throws when a Required list has no items yet.
+            // PromptStringListField prints the exception message and continues collecting.
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "2", // 빠른 설정 모드
+                "n", "n", "n", "y", "n", "n", // Q&A -> recommend package
+                "", // accept recommended method
+                "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
+                "",                         // empty first entry on Packages → error message, re-prompt
+                "bwa=0.7.17=h5bf99c6_8", "",  // correct entry + complete
+                "bioconda", "",
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.Empty(stderr.ToString());
+            Assert.Contains("requires at least one item before it can be completed", stdout.ToString());
+
+            var json = File.ReadAllText(outPath);
+            Assert.Contains("bwa=0.7.17=h5bf99c6_8", json);
+        }
+
+        [Fact]
+        public void CancelCommand_DuringDockerfileWarningPrompt_ExitsWithCode130()
+        {
+            // /cancel typed at the Dockerfile warning confirmation bypasses the warning
+            // and exits with 130 (same as any other /cancel).
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "2", // 빠른 설정 모드
+                "n", "n", "n", "n", "n", "y", // Q&A -> recommend dockerfile
+                "",       // accept recommended method
+                "/cancel", // at dockerfile warning prompt → ThrowIfCancel → exit 130
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
+
+            Assert.Equal(130, exitCode);
+            Assert.False(File.Exists(outPath));
+            Assert.Contains("recipe 생성을 취소했습니다.", stdout.ToString());
+        }
+
+        [Fact]
+        public void BackCommand_AtQandAMidQuestion_ReturnsToPreviousQuestion()
+        {
+            // /back at Q&A question N>0 decrements the index to N-1, re-prompting
+            // the previous question. The first answer is replaced by the re-entered one.
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "2",     // 빠른 설정 모드
+                "y",     // Q1 (IsRestrictedNetwork): yes (will be corrected)
+                "/back", // Q2: /back → goes back to Q1
+                "n",     // Q1 (re-entered): no
+                "n",     // Q2
+                "n",     // Q3
+                "y",     // Q4 (HasPackageInPublicChannels): yes → package recommendation
+                "n",     // Q5
+                "n",     // Q6
+                "",      // accept package recommendation
+                "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
+                "bwa=0.7.17=h5bf99c6_8", "",
+                "bioconda", "",
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.Empty(stderr.ToString());
+
+            var json = File.ReadAllText(outPath);
+            Assert.Contains("\"BuildKind\": \"Conda\"", json);
+        }
+
         /// <summary>
         /// Fake IRecipeCreateCancellationSource for design doc Section 18.5
         /// tests — simulates Ctrl+C without a real signal by returning false
