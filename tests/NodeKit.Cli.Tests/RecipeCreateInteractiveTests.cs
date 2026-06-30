@@ -285,8 +285,8 @@ namespace NodeKit.Cli.Tests
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
-            Assert.Contains("유지되는 필드: ToolName, ToolVersion", stdout.ToString());
-            Assert.Contains("버려지는 필드: Packages, Channels, PackageEngine", stdout.ToString());
+            Assert.Contains("유지되는 필드: 도구 이름 (ToolName), 도구 버전 (ToolVersion)", stdout.ToString());
+            Assert.Contains("버려지는 필드: 패키지 목록 (Packages), 채널 목록 (Channels), 패키지 엔진 (PackageEngine)", stdout.ToString());
             Assert.Empty(stderr.ToString());
 
             var json = File.ReadAllText(outPath);

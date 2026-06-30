@@ -184,6 +184,24 @@ namespace NodeKit.Cli
                         }
                     }
 
+                    // 포트 설정 (선택사항 — ToolFunctionSpec 완성 전 초안)
+                    PromptPortSelection(document, stdin, stdout, cancellation);
+
+                    // 저장 전 최종 확인
+                    RecipeCreateScreen.ClearForNewStep(stdout);
+                    stdout.WriteLine("── 저장 확인 ──────────────────────────────────────────");
+                    PrintDocumentSummary(document, stdout);
+                    stdout.WriteLine();
+                    stdout.WriteLine("[Enter / y] 저장   [n] 처음부터 다시 작성");
+                    var saveConfirm = (stdin.ReadLine() ?? string.Empty).Trim().ToLowerInvariant();
+                    RecipeCreateEscapeCommands.ThrowIfCancel(saveConfirm);
+                    if (saveConfirm == "n")
+                    {
+                        stdout.WriteLine("저장을 취소합니다. 처음부터 다시 작성합니다.");
+                        RecipeCreateScreen.ClearForNewStep(stdout);
+                        continue;
+                    }
+
                     RecipeCreateCommand.SaveDocument(document, outPath, stdout);
                     return 0;
                 }
@@ -390,6 +408,11 @@ namespace NodeKit.Cli
                 }
 
                 stdout.WriteLine($"{field.Label.Get("ko")} — {field.Help.Get("ko")}");
+                if (field.Examples.Count > 0)
+                {
+                    stdout.WriteLine($"   예: {string.Join(", ", field.Examples)}");
+                }
+
                 var line = stdin.ReadLine() ?? string.Empty;
 
                 if (TryHandleChangeMethod(session, line, stdin, stdout))
@@ -499,6 +522,11 @@ namespace NodeKit.Cli
         private static void PromptStringListField(RecipeAuthoringSession session, RecipeFieldDescriptor field, TextReader stdin, TextWriter stdout, IRecipeCreateCancellationSource cancellation)
         {
             stdout.WriteLine($"{field.Label.Get("ko")} — {field.Help.Get("ko")} (빈 줄 입력 시 종료)");
+            if (field.Examples.Count > 0)
+            {
+                stdout.WriteLine($"   예: {string.Join(", ", field.Examples)}");
+            }
+
             while (true)
             {
                 if (cancellation.IsCancellationRequested)
@@ -586,7 +614,7 @@ namespace NodeKit.Cli
             var valueByField = snapshot.Values.ToDictionary(v => v.FieldName, v => v.DisplayValue, StringComparer.Ordinal);
 
             stdout.WriteLine("현재까지 입력한 내용:");
-            stdout.WriteLine($"작성 방식: {snapshot.SelectedMethod}");
+            stdout.WriteLine($"작성 방식: {RecipeMethodCatalog.For(snapshot.SelectedMethod!.Value).Label.Get("ko")} ({snapshot.SelectedMethod})");
             foreach (var field in RecipeFieldCatalog.FieldsFor(snapshot.SelectedMethod!.Value))
             {
                 var value = valueByField.TryGetValue(field.Name, out var displayValue) ? displayValue : "아직 입력 안 함";
@@ -649,9 +677,13 @@ namespace NodeKit.Cli
             }
 
             var preview = session.PreviewMethodChange(nextMethod);
-            stdout.WriteLine($"유지되는 필드: {string.Join(", ", preview.PreservedFields)}");
-            stdout.WriteLine($"재확인이 필요한 필드: {string.Join(", ", preview.FieldsRequiringRevalidation)}");
-            stdout.WriteLine($"버려지는 필드: {string.Join(", ", preview.DiscardedFields)}");
+            var fieldLabelMap = RecipeFieldCatalog.FieldsFor(preview.CurrentMethod)
+                .Concat(RecipeFieldCatalog.FieldsFor(preview.NextMethod))
+                .GroupBy(f => f.Name, StringComparer.Ordinal)
+                .ToDictionary(g => g.Key, g => g.First().Label.Get("ko"), StringComparer.Ordinal);
+            stdout.WriteLine($"유지되는 필드: {string.Join(", ", preview.PreservedFields.Select(n => fieldLabelMap.TryGetValue(n, out var l) ? $"{l} ({n})" : n))}");
+            stdout.WriteLine($"재확인이 필요한 필드: {string.Join(", ", preview.FieldsRequiringRevalidation.Select(n => fieldLabelMap.TryGetValue(n, out var l) ? $"{l} ({n})" : n))}");
+            stdout.WriteLine($"버려지는 필드: {string.Join(", ", preview.DiscardedFields.Select(n => fieldLabelMap.TryGetValue(n, out var l) ? $"{l} ({n})" : n))}");
             stdout.WriteLine("계속할까요? [y/N]");
 
             var confirm = (stdin.ReadLine() ?? string.Empty).Trim().ToLowerInvariant();
@@ -724,6 +756,141 @@ namespace NodeKit.Cli
                 stdout.WriteLine(violation.Field is null
                     ? $"{violation.RuleId}: {violation.Message}"
                     : $"{violation.RuleId} ({violation.Field}): {violation.Message}");
+            }
+        }
+
+        private static void PromptPortSelection(
+            RecipeDocument document, TextReader stdin, TextWriter stdout, IRecipeCreateCancellationSource cancellation)
+        {
+            RecipeCreateScreen.ClearForNewStep(stdout);
+            stdout.WriteLine("── 포트 설정 (선택사항) ────────────────────────────────────");
+            stdout.WriteLine("이 도구가 받는 입력 파일 유형을 설정합니다.");
+            stdout.WriteLine("나중에 ToolFunctionSpec으로 교체할 초안입니다.");
+            stdout.WriteLine();
+
+            var inputPresets = InputOutputPresetCatalog.InputPresets;
+            for (var i = 0; i < inputPresets.Count; i++)
+            {
+                var p = inputPresets[i];
+                stdout.WriteLine($"  [{i + 1}] {p.Label.Get("ko")}");
+                stdout.WriteLine($"      {p.Description.Get("ko")}");
+                if (p.Examples.Count > 0)
+                {
+                    stdout.WriteLine($"      예: {string.Join(", ", p.Examples)}");
+                }
+            }
+
+            stdout.WriteLine();
+            stdout.WriteLine("번호 입력 (쉼표 구분, 빈 줄 = 건너뛰기):");
+
+            if (cancellation.IsCancellationRequested)
+            {
+                throw new RecipeCreateCancelledException();
+            }
+
+            var inputLine = (stdin.ReadLine() ?? string.Empty).Trim();
+            RecipeCreateEscapeCommands.ThrowIfCancel(inputLine);
+
+            if (inputLine.Length > 0 && !RecipeCreateEscapeCommands.IsBack(inputLine))
+            {
+                foreach (var idx in ParseNumberList(inputLine, inputPresets.Count))
+                {
+                    var preset = inputPresets[idx];
+                    if (preset.Id != InputOutputPresetCatalog.CustomPresetId)
+                    {
+                        document.Inputs.Add(new ToolInput
+                        {
+                            Name = preset.Role,
+                            Role = preset.Role,
+                            Format = preset.Format,
+                            Shape = preset.Shape,
+                            Required = true,
+                        });
+                    }
+                }
+            }
+
+            stdout.WriteLine();
+            stdout.WriteLine("이 도구가 생성하는 출력 파일 유형을 설정합니다.");
+            stdout.WriteLine();
+
+            var outputPresets = InputOutputPresetCatalog.OutputPresets;
+            for (var i = 0; i < outputPresets.Count; i++)
+            {
+                var p = outputPresets[i];
+                stdout.WriteLine($"  [{i + 1}] {p.Label.Get("ko")}");
+                stdout.WriteLine($"      {p.Description.Get("ko")}");
+                if (p.Examples.Count > 0)
+                {
+                    stdout.WriteLine($"      예: {string.Join(", ", p.Examples)}");
+                }
+            }
+
+            stdout.WriteLine();
+            stdout.WriteLine("번호 입력 (쉼표 구분, 빈 줄 = 건너뛰기):");
+
+            var outputLine = (stdin.ReadLine() ?? string.Empty).Trim();
+            RecipeCreateEscapeCommands.ThrowIfCancel(outputLine);
+
+            if (outputLine.Length > 0 && !RecipeCreateEscapeCommands.IsBack(outputLine))
+            {
+                foreach (var idx in ParseNumberList(outputLine, outputPresets.Count))
+                {
+                    var preset = outputPresets[idx];
+                    if (preset.Id != InputOutputPresetCatalog.CustomPresetId)
+                    {
+                        document.Outputs.Add(new ToolOutput
+                        {
+                            Name = preset.Role,
+                            Role = preset.Role,
+                            Format = preset.Format,
+                            Shape = "single",
+                            Class = preset.Class,
+                        });
+                    }
+                }
+            }
+        }
+
+        private static IReadOnlyList<int> ParseNumberList(string input, int maxCount)
+        {
+            var result = new List<int>();
+            foreach (var part in input.Split(','))
+            {
+                var trimmed = part.Trim();
+                if (int.TryParse(trimmed, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var n)
+                    && n >= 1 && n <= maxCount)
+                {
+                    result.Add(n - 1);
+                }
+            }
+
+            return result;
+        }
+
+        private static void PrintDocumentSummary(RecipeDocument document, TextWriter stdout)
+        {
+            stdout.WriteLine($"  도구 이름: {document.ToolName}");
+            stdout.WriteLine($"  도구 버전: {document.Version}");
+            stdout.WriteLine($"  기본 실행 명령: {document.Script}");
+            if (!string.IsNullOrEmpty(document.BaseImage))
+            {
+                stdout.WriteLine($"  기반 이미지: {document.BaseImage}");
+            }
+
+            if (document.Packages.Count > 0)
+            {
+                stdout.WriteLine($"  패키지: {string.Join(", ", document.Packages)}");
+            }
+
+            if (document.Inputs.Count > 0)
+            {
+                stdout.WriteLine($"  입력 포트: {string.Join(", ", document.Inputs.Select(i => i.Name))}");
+            }
+
+            if (document.Outputs.Count > 0)
+            {
+                stdout.WriteLine($"  출력 포트: {string.Join(", ", document.Outputs.Select(o => o.Name))}");
             }
         }
     }
