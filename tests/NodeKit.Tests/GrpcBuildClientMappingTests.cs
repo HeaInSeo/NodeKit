@@ -71,6 +71,8 @@ namespace NodeKit.Tests
                 Message = "digest acquired",
                 Timestamp = timestamp.ToUnixTimeMilliseconds(),
                 Digest = "sha256:abc123",
+                BuildId = "build-job-42",
+                Status = "Running",
             };
 
             var mapped = GrpcBuildClient.FromProto(ev);
@@ -79,6 +81,8 @@ namespace NodeKit.Tests
             Assert.Equal("digest acquired", mapped.Message);
             Assert.Equal(timestamp.UtcDateTime, mapped.Timestamp);
             Assert.Equal("sha256:abc123", mapped.Digest);
+            Assert.Equal("build-job-42", mapped.BuildId);
+            Assert.Equal("Running", mapped.Status);
         }
     }
 }

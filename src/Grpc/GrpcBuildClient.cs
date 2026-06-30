@@ -75,6 +75,8 @@ namespace NodeKit.Grpc
                 Message = ev.Message,
                 Timestamp = DateTimeOffset.FromUnixTimeMilliseconds(ev.Timestamp).UtcDateTime,
                 Digest = ev.Digest,
+                BuildId = ev.BuildId,
+                Status = ev.Status,
             };
         }
 
