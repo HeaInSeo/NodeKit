@@ -43,7 +43,7 @@ namespace NodeKit.Cli
             "conda", "micromamba", "source-build", "dockerfile-fallback",
         };
 
-        public static int Run(string outPath, string[] options, IRecipeConsole console, TextWriter stdout, TextWriter stderr)
+        public static int Run(string? outPathHint, string[] options, IRecipeConsole console, TextWriter stdout, TextWriter stderr)
         {
             var parsed = ParseOptions(options);
             if (parsed.Error != null)
@@ -52,11 +52,17 @@ namespace NodeKit.Cli
                 return 2;
             }
 
+            if (parsed.NonInteractive && string.IsNullOrEmpty(outPathHint))
+            {
+                stderr.WriteLine("--non-interactive 모드에서는 출력 경로가 필요합니다.");
+                return 2;
+            }
+
             try
             {
                 return parsed.NonInteractive
-                    ? RunNonInteractive(outPath, parsed, stdout, stderr)
-                    : RecipeCreateInteractiveRunner.Run(outPath, parsed, console, stderr);
+                    ? RunNonInteractive(outPathHint!, parsed, stdout, stderr)
+                    : RecipeCreateInteractiveRunner.Run(outPathHint, parsed, console, stderr);
             }
             catch (InvalidOperationException ex)
             {

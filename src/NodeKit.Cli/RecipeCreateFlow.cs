@@ -35,7 +35,7 @@ namespace NodeKit.Cli
         private const string ExitCommand = "/exit";
 
         internal static RecipeCreateFlowResult Execute(
-            string outPath,
+            string? outPathHint,
             RecipeAuthoringSession session,
             IRecipeConsole console,
             TextWriter stderr,
@@ -116,22 +116,43 @@ namespace NodeKit.Cli
             // 단계 8: 포트 설정
             PromptPortSelection(document, console, cancellation);
 
-            // 단계 9: 저장 확인 + 저장
+            // 단계 9: 저장 경로 확정 + 저장
             RecipeCreateScreen.ClearForNewStep(console);
             console.WriteLine("── 저장 확인 ──────────────────────────────────────────");
             PrintDocumentSummary(document, console);
             console.WriteLine();
-            console.WriteLine("[Enter / y] 저장   [n] 처음부터 다시 작성");
-            var saveConfirm = (console.ReadLine() ?? string.Empty).Trim().ToLowerInvariant();
-            RecipeCreateEscapeCommands.ThrowIfCancel(saveConfirm);
-            if (saveConfirm == "n")
+
+            string finalPath;
+            if (!string.IsNullOrEmpty(outPathHint) && !Directory.Exists(outPathHint))
             {
-                console.WriteLine("저장을 취소합니다. 처음부터 다시 작성합니다.");
-                RecipeCreateScreen.ClearForNewStep(console);
-                return RecipeCreateFlowResult.RestartWizard;
+                // Explicit file path: confirm save or restart.
+                console.WriteLine("[Enter / y] 저장   [n] 처음부터 다시 작성");
+                var saveConfirm = (console.ReadLine() ?? string.Empty).Trim().ToLowerInvariant();
+                RecipeCreateEscapeCommands.ThrowIfCancel(saveConfirm);
+                if (saveConfirm == "n")
+                {
+                    console.WriteLine("저장을 취소합니다. 처음부터 다시 작성합니다.");
+                    RecipeCreateScreen.ClearForNewStep(console);
+                    return RecipeCreateFlowResult.RestartWizard;
+                }
+
+                finalPath = outPathHint;
+            }
+            else
+            {
+                // No path / directory hint: prompt user for save path.
+                var prompted = PromptSavePath(document, outPathHint, console, cancellation);
+                if (prompted is null)
+                {
+                    console.WriteLine("저장을 취소합니다. 처음부터 다시 작성합니다.");
+                    RecipeCreateScreen.ClearForNewStep(console);
+                    return RecipeCreateFlowResult.RestartWizard;
+                }
+
+                finalPath = prompted;
             }
 
-            RecipeCreateCommand.SaveDocument(document, outPath, console);
+            RecipeCreateCommand.SaveDocument(document, finalPath, console);
             return RecipeCreateFlowResult.Saved;
         }
 
@@ -841,6 +862,63 @@ namespace NodeKit.Cli
             }
 
             return result;
+        }
+
+        // Returns the resolved save path, or null if the user chose to restart the wizard.
+        private static string? PromptSavePath(
+            RecipeDocument document,
+            string? dirHint,
+            IRecipeConsole console,
+            IRecipeCreateCancellationSource cancellation)
+        {
+            var toolName = document.ToolName ?? "recipe";
+            var version = document.Version ?? "1.0.0";
+            var defaultName = $"{toolName}-{version}.json";
+            var dir = !string.IsNullOrEmpty(dirHint)
+                ? dirHint
+                : Directory.GetCurrentDirectory();
+            var defaultPath = Path.Combine(dir, defaultName);
+
+            console.WriteLine("저장 위치를 확인하세요.");
+            console.WriteLine();
+            console.WriteLine($"기본 경로: {defaultPath}");
+            console.WriteHints("/cancel: 종료");
+            console.WriteLine("다른 경로를 입력하거나 Enter로 기본 경로를 사용 [n = 처음부터 다시 작성]:");
+
+            while (true)
+            {
+                if (cancellation.IsCancellationRequested)
+                {
+                    throw new RecipeCreateCancelledException();
+                }
+
+                var pathInput = (console.ReadLine() ?? string.Empty).Trim();
+                RecipeCreateEscapeCommands.ThrowIfCancel(pathInput);
+
+                if (pathInput.Equals("n", StringComparison.OrdinalIgnoreCase))
+                {
+                    return null;
+                }
+
+                var savePath = string.IsNullOrEmpty(pathInput) ? defaultPath : pathInput;
+
+                if (!File.Exists(savePath))
+                {
+                    return savePath;
+                }
+
+                console.WriteLine($"파일이 이미 존재합니다: {savePath}");
+                console.WriteLine("[Enter / y] 덮어쓰기   [n] 다른 경로 입력");
+                var overwrite = (console.ReadLine() ?? string.Empty).Trim().ToLowerInvariant();
+                RecipeCreateEscapeCommands.ThrowIfCancel(overwrite);
+
+                if (overwrite != "n")
+                {
+                    return savePath;
+                }
+
+                console.WriteLine("다른 경로를 입력하세요:");
+            }
         }
 
         private static void PrintDocumentSummary(RecipeDocument document, IRecipeConsole console)

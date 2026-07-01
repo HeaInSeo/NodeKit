@@ -22,14 +22,14 @@ namespace NodeKit.Cli
             "강한 주의: Dockerfile 방법은 재현성을 스스로 책임져야 합니다. base image digest 고정과 패키지 버전 고정을 직접 관리하지 않으면 " +
             "최종 검증에서 막히거나, 통과하더라도 나중에 다른 결과가 나올 수 있습니다.";
 
-        public static int Run(string outPath, RecipeCreateOptions parsed, IRecipeConsole console, TextWriter stderr)
+        public static int Run(string? outPathHint, RecipeCreateOptions parsed, IRecipeConsole console, TextWriter stderr)
         {
             using var cancellation = new ConsoleCancelKeyCancellationSource();
-            return Run(outPath, parsed, console, stderr, cancellation);
+            return Run(outPathHint, parsed, console, stderr, cancellation);
         }
 
         internal static int Run(
-            string outPath,
+            string? outPathHint,
             RecipeCreateOptions parsed,
             IRecipeConsole console,
             TextWriter stderr,
@@ -119,7 +119,7 @@ namespace NodeKit.Cli
                     RecipeCreateFlowResult flowResult;
                     try
                     {
-                        flowResult = RecipeCreateFlow.Execute(outPath, session, console, stderr, cancellation, recipeResolver, step4Resolver);
+                        flowResult = RecipeCreateFlow.Execute(outPathHint, session, console, stderr, cancellation, recipeResolver, step4Resolver);
                     }
                     catch (RecipeCreateBackRequestedException)
                     {

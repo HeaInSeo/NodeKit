@@ -46,17 +46,32 @@ namespace NodeKit.Cli
 
         private static int RunRecipe(string[] args, TextReader stdin, TextWriter stdout, TextWriter stderr)
         {
-            if (args.Length < 3 || args[1] != "create")
+            if (args.Length < 2 || args[1] != "create")
             {
-                stderr.WriteLine("사용법: nodekit recipe create <recipe.json> [--method ...] [--non-interactive ...]");
+                stderr.WriteLine("사용법: nodekit recipe create [<recipe.json>] [--method ...] [--non-interactive ...]");
                 return 2;
+            }
+
+            // Path argument is optional. If args[2] exists and is not a flag, treat it as
+            // the output path hint; otherwise the wizard prompts for a path at the end.
+            string? outPathHint;
+            string[] options;
+            if (args.Length >= 3 && !args[2].StartsWith("--", StringComparison.Ordinal))
+            {
+                outPathHint = args[2];
+                options = args[3..];
+            }
+            else
+            {
+                outPathHint = null;
+                options = args.Length >= 3 ? args[2..] : Array.Empty<string>();
             }
 
             IRecipeConsole console = (!Console.IsOutputRedirected && !Console.IsInputRedirected)
                 ? new AnsiRecipeConsole()
                 : new PlainTextRecipeConsole(stdin, stdout);
 
-            return RecipeCreateCommand.Run(args[2], args[3..], console, stdout, stderr);
+            return RecipeCreateCommand.Run(outPathHint, options, console, stdout, stderr);
         }
 
         private static int Unknown(string command, TextWriter stderr)
