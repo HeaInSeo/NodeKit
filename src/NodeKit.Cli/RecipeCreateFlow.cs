@@ -40,10 +40,17 @@ namespace NodeKit.Cli
             IRecipeConsole console,
             TextWriter stderr,
             IRecipeCreateCancellationSource cancellation,
-            IResolveRecipeClient recipeResolver)
+            IResolveRecipeClient recipeResolver,
+            IImageDigestResolver? imageDigestResolver = null)
         {
             // 단계 3: 채널 확정 (Package 방식만)
             ConfirmChannels(session, console, cancellation);
+
+            // 단계 4: Base image 선택 + digest 자동 조회 (resolver 구성 시)
+            if (imageDigestResolver is not null)
+            {
+                PromptBaseImageSelection(session, imageDigestResolver, console, cancellation);
+            }
 
             // 단계 5: 나머지 필드 입력
             RecipeCreateScreen.ClearForNewStep(console);
@@ -221,6 +228,91 @@ namespace NodeKit.Cli
                         console.WriteLine($"{v.RuleId}: {v.Message}");
                     }
                 }
+            }
+        }
+
+        // ── Base image 선택 단계 (step 4) ────────────────────────────────────────
+
+        private static void PromptBaseImageSelection(
+            RecipeAuthoringSession session,
+            IImageDigestResolver digestResolver,
+            IRecipeConsole console,
+            IRecipeCreateCancellationSource cancellation)
+        {
+            var method = session.Snapshot().SelectedMethod!.Value;
+            var candidates = BaseImageCatalog.CandidatesFor(method);
+            if (candidates.Count == 0)
+            {
+                return;
+            }
+
+            RecipeCreateScreen.ClearForNewStep(console);
+            console.WriteLine("── Base image 선택 ─────────────────────────────────────────");
+            console.WriteLine("사용할 기반 이미지를 선택하세요. Digest는 자동으로 조회합니다.");
+            console.WriteLine();
+
+            for (var i = 0; i < candidates.Count; i++)
+            {
+                var c = candidates[i];
+                console.WriteLine($"  [{i + 1}] {c.Reference}");
+                console.WriteLine($"      {c.Description}");
+            }
+
+            console.WriteLine();
+            console.WriteLine("  [0] 직접 입력 (다음 단계에서 직접 입력)");
+            console.WriteLine();
+            console.WriteHints("/cancel: 종료");
+            console.WriteLine($"번호를 선택하세요 (1–{candidates.Count}, 0 = 직접 입력):");
+
+            while (true)
+            {
+                if (cancellation.IsCancellationRequested)
+                {
+                    throw new RecipeCreateCancelledException();
+                }
+
+                var line = (console.ReadLine() ?? string.Empty).Trim();
+                RecipeCreateEscapeCommands.ThrowIfCancel(line);
+
+                if (line == "0" || line.Length == 0)
+                {
+                    return;
+                }
+
+                if (!int.TryParse(line, System.Globalization.NumberStyles.Integer,
+                        System.Globalization.CultureInfo.InvariantCulture, out var idx)
+                    || idx < 1 || idx > candidates.Count)
+                {
+                    console.WriteLine($"1–{candidates.Count} 사이의 번호 또는 0을 입력하세요.");
+                    continue;
+                }
+
+                var selected = candidates[idx - 1];
+                console.WriteLine($"{selected.Reference} 의 digest를 조회합니다...");
+
+                var result = digestResolver
+                    .ResolveAsync(selected.Reference, System.Threading.CancellationToken.None)
+                    .GetAwaiter().GetResult();
+
+                if (result.Status == ImageDigestResolutionStatus.Resolved
+                    && !string.IsNullOrEmpty(result.Digest))
+                {
+                    var combined = $"{selected.Reference}@{result.Digest}";
+                    var violations = session.SetField("ImageRef", combined);
+                    if (violations.Count == 0)
+                    {
+                        console.WriteLine($"설정 완료: {combined}");
+                    }
+                    else
+                    {
+                        PrintViolations(violations, console);
+                    }
+
+                    return;
+                }
+
+                console.WriteLine($"digest 조회 실패: {result.Message ?? result.Status.ToString()}");
+                console.WriteLine("다시 시도하려면 번호를, 직접 입력하려면 0을 입력하세요.");
             }
         }
 

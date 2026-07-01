@@ -34,15 +34,27 @@ namespace NodeKit.Cli
             IRecipeConsole console,
             TextWriter stderr,
             IRecipeCreateCancellationSource cancellation,
-            IResolveRecipeClient? resolveClient = null)
+            IResolveRecipeClient? resolveClient = null,
+            IImageDigestResolver? imageDigestResolver = null)
         {
             using var harborResolver = HarborImageDigestResolver.TryCreate();
             using var grpcResolver = GrpcResolveRecipeClient.TryCreate();
-            IImageDigestResolver resolver = (IImageDigestResolver?)harborResolver ?? NullImageDigestResolver.Instance;
+
+            // BeginnerGuideFlow always needs a non-null resolver (uses it for image lookup).
+            IImageDigestResolver resolverForBeginner =
+                (IImageDigestResolver?)harborResolver ?? NullImageDigestResolver.Instance;
+
             IResolveRecipeClient recipeResolver = resolveClient
                 ?? StubResolveRecipeClient.TryCreate()
                 ?? (IResolveRecipeClient?)grpcResolver
                 ?? NullResolveRecipeClient.Instance;
+
+            // Step 4 resolver chain: injected > stub env var > Harbor.
+            // null means step 4 is skipped (e.g., no resolver configured, open-network
+            // PublicRegistryImageDigestResolver not wired here to avoid live HTTP in tests).
+            IImageDigestResolver? step4Resolver = imageDigestResolver
+                ?? StubImageDigestResolver.TryCreate()
+                ?? (IImageDigestResolver?)harborResolver;
 
             try
             {
@@ -61,7 +73,7 @@ namespace NodeKit.Cli
                         RecipeCreateScreen.ClearForNewStep(console);
                         if (mode == AuthoringModeSelector.Mode.GuidedBeginner)
                         {
-                            var beginnerMethod = BeginnerGuideFlow.Run(session, console, cancellation, resolver);
+                            var beginnerMethod = BeginnerGuideFlow.Run(session, console, cancellation, resolverForBeginner);
                             if (beginnerMethod is null)
                             {
                                 console.WriteLine("단서가 부족합니다. recipe를 저장하지 않고 종료합니다.");
@@ -107,7 +119,7 @@ namespace NodeKit.Cli
                     RecipeCreateFlowResult flowResult;
                     try
                     {
-                        flowResult = RecipeCreateFlow.Execute(outPath, session, console, stderr, cancellation, recipeResolver);
+                        flowResult = RecipeCreateFlow.Execute(outPath, session, console, stderr, cancellation, recipeResolver, step4Resolver);
                     }
                     catch (RecipeCreateBackRequestedException)
                     {
