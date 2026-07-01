@@ -6,6 +6,7 @@ namespace NodeKit.Cli
     internal sealed class AnsiRecipeConsole : IRecipeConsole
     {
         private readonly IAnsiConsole _ansi;
+        private string? _pendingHints;
 
         public AnsiRecipeConsole() : this(AnsiConsole.Console) { }
 
@@ -16,8 +17,11 @@ namespace NodeKit.Cli
 
         public void BeginStep()
         {
+            _pendingHints = null;
             try { Console.Clear(); }
             catch (Exception) { }
+            _ansi.Write(new Rule().RuleStyle("grey dim"));
+            _ansi.WriteLine();
         }
 
         public void WriteLine(string text = "") => _ansi.WriteLine(text);
@@ -26,13 +30,18 @@ namespace NodeKit.Cli
 
         public void WriteHints(string hintsLine)
         {
-            _ansi.WriteLine();
-            _ansi.Write(new Rule($"[dim]{Markup.Escape(hintsLine)}[/]").RuleStyle("grey"));
-            _ansi.WriteLine();
+            _pendingHints = hintsLine;
         }
 
         public string? ReadLine()
         {
+            if (_pendingHints != null)
+            {
+                _ansi.WriteLine();
+                _ansi.Write(new Rule($"[dim]{Markup.Escape(_pendingHints)}[/]").RuleStyle("grey"));
+                _ansi.WriteLine();
+                _pendingHints = null;
+            }
             _ansi.Markup("[cyan]>[/] ");
             return Console.ReadLine();
         }
