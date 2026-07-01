@@ -156,7 +156,9 @@ namespace NodeKit.Cli
             console.WriteLine();
             console.WriteLine("선택:");
 
-            while (true)
+            RecipeMethodId? selectedMethod = null;
+            var subflowDone = false;
+            while (!subflowDone)
             {
                 if (cancellation.IsCancellationRequested)
                 {
@@ -167,23 +169,48 @@ namespace NodeKit.Cli
                 switch (line)
                 {
                     case "1":
-                        return RunInstallCommandFlow(session, console, cancellation, digestResolver);
+                        selectedMethod = RunInstallCommandFlow(session, console, cancellation, digestResolver);
+                        subflowDone = true;
+                        break;
                     case "2":
-                        return RunContainerImageFlow(session, console, cancellation, digestResolver);
+                        selectedMethod = RunContainerImageFlow(session, console, cancellation, digestResolver);
+                        subflowDone = true;
+                        break;
                     case "3":
-                        return RunSourceFlow(session, console, cancellation, digestResolver);
+                        selectedMethod = RunSourceFlow(session, console, cancellation, digestResolver);
+                        subflowDone = true;
+                        break;
                     case "4":
-                        return RunDockerfileFlow(session, console, cancellation, digestResolver);
+                        selectedMethod = RunDockerfileFlow(session, console, cancellation, digestResolver);
+                        subflowDone = true;
+                        break;
                     case "5":
-                        return RunMirrorFlow(session, console, cancellation);
+                        selectedMethod = RunMirrorFlow(session, console, cancellation);
+                        subflowDone = true;
+                        break;
                     case "6":
-                        return RunNoClueFlow(session, console, cancellation, digestResolver);
+                        selectedMethod = RunNoClueFlow(session, console, cancellation, digestResolver);
+                        subflowDone = true;
+                        break;
                     default:
                         console.WriteLine("1–6 중에서 선택해 주세요.");
                         console.WriteLine("선택:");
                         break;
                 }
             }
+
+            if (selectedMethod != null)
+                TryPreFillToolName(session, name);
+
+            return selectedMethod;
+        }
+
+        private static void TryPreFillToolName(RecipeAuthoringSession session, string nameHint)
+        {
+            if (string.IsNullOrEmpty(nameHint)) return;
+            var existing = session.Snapshot().Values.FirstOrDefault(v => v.FieldName == "ToolName");
+            if (existing != null && !string.IsNullOrEmpty(existing.DisplayValue)) return;
+            session.SetField("ToolName", nameHint);
         }
 
         // ── Section 9: 설치 명령 기반 흐름 ─────────────────────────────────────
