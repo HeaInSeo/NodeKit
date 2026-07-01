@@ -44,14 +44,14 @@ namespace NodeKit.Cli.Tests
                 "n", // HasSourceArchiveAndChecksum
                 "n", // HasExistingDockerfile
                 "", // accept recommended method (package)
+                "bioconda", // Channels item (채널 확정 단계)
+                "", // complete Channels
                 "bwa-mem", // ToolName
                 "0.7.17", // ToolVersion
                 "run.sh", // Script
                 ImageRefWithDigest, // ImageRef
                 "bwa=0.7.17=h5bf99c6_8", // Packages item
                 "", // complete Packages
-                "bioconda", // Channels item
-                "", // complete Channels
             };
 
             var stdout = new StringWriter();
@@ -112,9 +112,9 @@ namespace NodeKit.Cli.Tests
                 "2", // 빠른 설정 모드
                 "n", "n", "n", "y", "n", "n", // Q&A -> recommend package
                 "", // accept recommended method
+                "bioconda", "", // 채널 확정 단계
                 "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
                 "bwa=0.7.17=h5bf99c6_8", "",
-                "bioconda", "",
             };
             var interactiveExitCode = CliApp.Run(
                 new[] { "recipe", "create", interactiveOutPath },
@@ -212,9 +212,9 @@ namespace NodeKit.Cli.Tests
                 "n", // HasSourceArchiveAndChecksum
                 "n", // HasExistingDockerfile
                 "", // accept recommended method (package)
+                "bioconda", "", // 채널 확정 단계
                 "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
                 "bwa=0.7.17=h5bf99c6_8", "",
-                "bioconda", "",
             };
 
             var stdout = new StringWriter();
@@ -243,9 +243,9 @@ namespace NodeKit.Cli.Tests
                 "u", // HasSourceArchiveAndChecksum
                 "u", // HasExistingDockerfile
                 "2", // no recommendation — manually pick from fixed menu: [2] package
+                "bioconda", "", // 채널 확정 단계
                 "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
                 "bwa=0.7.17=h5bf99c6_8", "",
-                "bioconda", "",
             };
 
             var stdout = new StringWriter();
@@ -269,6 +269,7 @@ namespace NodeKit.Cli.Tests
                 "2", // 빠른 설정 모드
                 "n", "n", "n", "y", "n", "n", // Q&A -> recommend package
                 "", // accept recommended method
+                "bioconda", "", // 채널 확정 단계
                 "bwa-mem", "0.7.17", "run.sh",
                 "/change-method", // at the ImageRef prompt, switch away from package
                 "4", // source
@@ -302,6 +303,7 @@ namespace NodeKit.Cli.Tests
                 "2", // 빠른 설정 모드
                 "n", "n", "n", "y", "n", "n", // Q&A -> recommend package
                 "", // accept recommended method
+                "bioconda", "", // 채널 확정 단계 (Package 방식용, Mirror로 바뀌면 버려짐)
                 "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
                 "/change-method", // at the Packages prompt — ImageRef is preserved but invalidated
                 "3", // mirror
@@ -778,6 +780,7 @@ namespace NodeKit.Cli.Tests
                 "2",  // clue: install command
                 "conda install -c bioconda bwa=0.7.17=h5bf99c6_8 -y",
                 "1",  // use understood values (Parsed result)
+                "",   // 채널 확인: 파싱된 "bioconda" 그대로 사용 (Enter)
                 "bwa-mem", "0.7.17", "run.sh",
                 ImageRefWithDigest,  // ImageRef (BaseImage for Package method)
                 // Packages/Channels: pre-filled by BeginnerGuideFlow, skipped
@@ -850,6 +853,8 @@ namespace NodeKit.Cli.Tests
                 "2", // 빠른 설정 모드
                 "n", "n", "n", "y", "n", "n", // Q&A -> recommend package
                 "", // accept recommended method
+                "bioconda",           // Channels (채널 확정 단계)
+                "",                   // complete Channels
                 "bwa-mem", // ToolName
                 "0.7.17",  // ToolVersion
                 "run.sh",  // Script
@@ -859,8 +864,6 @@ namespace NodeKit.Cli.Tests
                 ImageRefWithDigest,   // ImageRef (re-entered)
                 "bwa=0.7.17=h5bf99c6_8", // Packages: correct entry
                 "",                   // complete Packages
-                "bioconda",           // Channels
-                "",                   // complete Channels
             };
 
             var stdout = new StringWriter();
@@ -1006,12 +1009,12 @@ namespace NodeKit.Cli.Tests
                 "2", // 빠른 설정 모드
                 "n", "n", "n", "y", "n", "n", // Q&A -> recommend package
                 "", // accept recommended method
+                "bioconda", "",              // Channels (채널 확정 단계)
                 "bwa-mem", "0.7.17", "run.sh",
                 "/change-method", // at ImageRef prompt
                 "/back",          // cancel the change → "method 변경을 취소하고..."
                 ImageRefWithDigest,  // ImageRef re-prompted for the same Package method
                 "bwa=0.7.17=h5bf99c6_8", "", // Packages
-                "bioconda", "",              // Channels
             };
 
             var stdout = new StringWriter();
@@ -1036,12 +1039,12 @@ namespace NodeKit.Cli.Tests
                 "2", // 빠른 설정 모드
                 "n", "n", "n", "y", "n", "n", // Q&A -> recommend package
                 "", // accept recommended method
+                "bioconda", "", // 채널 확정 단계
                 "bwa-mem", "0.7.17", "run.sh",
                 "/change-method",
                 "99",  // invalid number → "알 수 없는 방법입니다. 변경을 취소합니다."
                 ImageRefWithDigest,
                 "bwa=0.7.17=h5bf99c6_8", "",
-                "bioconda", "",
             };
 
             var stdout = new StringWriter();
@@ -1066,13 +1069,13 @@ namespace NodeKit.Cli.Tests
                 "2", // 빠른 설정 모드
                 "n", "n", "n", "y", "n", "n", // Q&A -> recommend package
                 "", // accept recommended method
+                "bioconda", "", // 채널 확정 단계
                 "bwa-mem", "0.7.17", "run.sh",
                 "/change-method",
                 "4",  // source
                 "n",  // decline confirm → ChangeMethod(Cancel) → field re-prompted
                 ImageRefWithDigest,
                 "bwa=0.7.17=h5bf99c6_8", "",
-                "bioconda", "",
             };
 
             var stdout = new StringWriter();
@@ -1098,10 +1101,10 @@ namespace NodeKit.Cli.Tests
                 "2", // 빠른 설정 모드
                 "n", "n", "n", "y", "n", "n", // Q&A -> recommend package
                 "", // accept recommended method
+                "bioconda", "", // 채널 확정 단계
                 "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
                 "",                         // empty first entry on Packages → error message, re-prompt
                 "bwa=0.7.17=h5bf99c6_8", "",  // correct entry + complete
-                "bioconda", "",
             };
 
             var stdout = new StringWriter();
@@ -1157,9 +1160,9 @@ namespace NodeKit.Cli.Tests
                 "n",     // Q5
                 "n",     // Q6
                 "",      // accept package recommendation
+                "bioconda", "", // 채널 확정 단계
                 "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
                 "bwa=0.7.17=h5bf99c6_8", "",
-                "bioconda", "",
             };
 
             var stdout = new StringWriter();
@@ -1193,9 +1196,9 @@ namespace NodeKit.Cli.Tests
             var transcript = new[]
             {
                 "2", "n", "n", "n", "y", "n", "n", "",
+                "bioconda", "",    // 채널 확정 단계
                 "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
                 "bwa=0.7.17", "",  // version-only pin
-                "bioconda", "",
                 "1",               // PackageCandidatePresenter: pick first candidate
             };
 
@@ -1230,9 +1233,9 @@ namespace NodeKit.Cli.Tests
             var transcript = new[]
             {
                 "2", "n", "n", "n", "y", "n", "n", "",
+                "bioconda", "", // 채널 확정 단계
                 "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
                 "bwa=0.7.17", "",
-                "bioconda", "",
             };
 
             var stdout = new StringWriter();
@@ -1271,9 +1274,9 @@ namespace NodeKit.Cli.Tests
             var transcript = new[]
             {
                 "2", "n", "n", "n", "y", "n", "n", "",
+                "bioconda", "", // 채널 확정 단계
                 "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
                 "bwa=0.7.17", "",
-                "bioconda", "",
                 "/cancel",         // during PackageCandidatePresenter → exit 130
             };
 

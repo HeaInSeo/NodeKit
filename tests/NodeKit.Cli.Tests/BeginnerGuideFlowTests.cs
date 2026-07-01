@@ -197,6 +197,7 @@ namespace NodeKit.Cli.Tests
                 "2",   // 설치 명령
                 "conda install -c bioconda bwa=0.7.17=h5bf99c6_8 -y",
                 "1",   // use understood values
+                "",    // 채널 확인: 파싱된 "bioconda" 그대로 사용 (Enter)
                 // RunFieldLoop:
                 "bwa-mem", "0.7.17", "run.sh",
                 BaseImageWithDigest,  // ImageRef (BaseImage for Package method)
@@ -229,11 +230,11 @@ namespace NodeKit.Cli.Tests
                 "2",            // 설치 명령
                 "pip install bwa==0.7.17",  // Failed
                 "1",            // package 방식으로 계속 → no pre-population
+                "bioconda", "",              // Channels (채널 확정 단계, RunFieldLoop 이전)
                 // RunFieldLoop (all Package fields must be filled):
                 "bwa-mem", "0.7.17", "run.sh",
                 BaseImageWithDigest,         // ImageRef
                 "bwa=0.7.17=h5bf99c6_8", "", // Packages
-                "bioconda", "",              // Channels
                 "",                          // PackageEngine (Defaulted — skipped)
                 "reads", "1", "",
                 "bam", "1", "",
@@ -255,12 +256,12 @@ namespace NodeKit.Cli.Tests
                 "1",   // GuidedBeginner
                 "2",   // 설치 명령
                 "conda install bwa=0.7.17=h5bf99c6_8",  // PartiallyParsed: no channel
-                "1",   // use understood values (channels missing → RunFieldLoop asks)
-                // RunFieldLoop (Channels missing → will be asked):
+                "1",   // use understood values (channels missing → 채널 확정 단계에서 입력)
+                "bioconda", "",  // Channels: NOT pre-filled, 채널 확정 단계에서 입력
+                // RunFieldLoop:
                 "bwa-mem", "0.7.17", "run.sh",
                 BaseImageWithDigest,
                 // Packages: pre-filled
-                "bioconda", "",  // Channels: NOT pre-filled, must be entered
                 // PackageEngine: Defaulted → skipped
                 "reads", "1", "",
                 "bam", "1", "",
