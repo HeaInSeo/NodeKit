@@ -25,6 +25,12 @@ recipe.json을 손으로 쓰지 않아도 된다. 이게 핵심이다.
 `validate recipe.json`부터 실행하면 "recipe 파일을 읽을 수 없습니다" 오류가 난다.
 
 ```bash
+dotnet run --project src/NodeKit.Cli -- recipe create
+```
+
+경로 없이 실행하면 마법사 마지막 단계에서 저장 경로를 직접 입력한다(기본값 제안). 경로를 미리 지정하고 싶으면 세 번째 인자로 전달한다.
+
+```bash
 dotnet run --project src/NodeKit.Cli -- recipe create recipe.json
 ```
 
@@ -98,6 +104,8 @@ Avalonia/Grpc.Net.Client/Google.Protobuf/Wasmtime/ReactiveUI 의존성을 전혀
 v1.0 authoring UX를 직접 확인하려면 아래 명령으로 시작한다.
 
 ```bash
+dotnet run --project src/NodeKit.Cli -- recipe create
+# 또는 경로를 미리 지정하는 경우:
 dotnet run --project src/NodeKit.Cli -- recipe create /tmp/nodekit-recipe.json
 ```
 
@@ -141,11 +149,14 @@ dotnet run --project src/NodeKit.Cli -- render /tmp/nodekit-recipe.json --out /t
 `recipe.json`을 만들어 준다.
 
 ```bash
-nodekit recipe create <recipe.json> [--method ...] [--non-interactive ...]
+nodekit recipe create [<recipe.json>] [--method ...] [--non-interactive ...]
 ```
+
+출력 경로는 선택사항이다. 생략하면 마법사 마지막 단계에서 경로를 직접 입력한다(기본값: `현재디렉터리/ToolName-ToolVersion.json`). 기존 디렉터리 경로를 전달하면 해당 디렉터리 아래 기본값 파일명을 사용한다.
 
 옵션 없이 실행하면 **대화형 모드**로 들어간다. `--non-interactive`와 함께
 `--method`/`--field` 등을 모두 지정하면 프롬프트 없이 한 번에 만든다(2-10절).
+`--non-interactive`에서는 출력 경로가 필수다.
 
 ### 2-1. 진행 방식 선택
 
@@ -406,6 +417,41 @@ Q. 내부망/폐쇄망 환경인가요?
 
 `dockerfile`을 고르면 재현성 경고 화면이 별도로 뜬다 — `y`로 동의해야 진행된다.
 
+### 2-3.5. base image 선택 (Package/Mirror/Source 방식 전용)
+
+`package`, `mirror`, `source` 방식으로 진행하면 채널 확인 다음에 **base image 선택** 화면이 자동으로 나온다. 이 화면에서 번호를 선택하면 digest를 자동으로 조회해 `ImageRef` 필드를 설정한다. `0`을 입력하면 다음 필드 입력 단계에서 직접 입력한다.
+
+```
+── Base image 선택 ─────────────────────────────────────────
+사용할 기반 이미지를 선택하세요. Digest는 자동으로 조회합니다.
+
+  [1] condaforge/miniforge3:24.3.0-0
+      공식 conda-forge Miniforge 기반 이미지 (conda/mamba 포함)
+  [2] mambaorg/micromamba:1.5.8
+      Micromamba 경량 기반 이미지 (빠른 설치)
+
+  [0] 직접 입력 (다음 단계에서 직접 입력)
+
+/cancel: 종료
+번호를 선택하세요 (1–2, 0 = 직접 입력):
+> 1
+
+condaforge/miniforge3:24.3.0-0 의 digest를 조회합니다...
+설정 완료: condaforge/miniforge3:24.3.0-0@sha256:abcdef...
+```
+
+digest 조회에 성공하면 `ImageRef` 필드가 자동으로 채워지고 이후 단계에서 건너뛴다. 조회에 실패하면 재시도 또는 `0`을 입력해 직접 입력 모드로 전환할 수 있다.
+
+**자동 조회 동작 조건:**
+
+| 환경 | 동작 |
+|---|---|
+| `NODEKIT_HARBOR_URL` 설정 | Harbor에서 digest 조회 |
+| `NODEKIT_BASE_IMAGE_STUB=1` | 테스트/UX 확인용 고정 digest 반환 |
+| 아무것도 없음 | 이 화면이 나타나지 않음 (다음 단계에서 직접 입력) |
+
+공개 registry 자동 조회(`PublicRegistryImageDigestResolver`)는 현재 비활성화 상태다 — 오픈망 환경에서 이 화면을 테스트하려면 `NODEKIT_BASE_IMAGE_STUB=1`을 사용한다.
+
 ### 2-4. 공통 필드 입력
 
 method가 정해지면 공통 필드를 먼저 물어본다. 화면마다 **라벨 — 설명** 아래에
@@ -572,10 +618,12 @@ stub 모드는 각 패키지에 대해 `bioconda` 채널 1개 + `conda-forge` �
 > `recipe.json`에 `Inputs`/`Outputs` 배열로 저장되므로 텍스트 편집기로
 > 직접 수정하거나 제거할 수 있다.
 
-### 2-8. 저장 전 최종 확인
+### 2-8. 저장 전 최종 확인 / 경로 확정
 
 포트 설정까지 완료되면 지금까지 입력한 내용 전체를 요약해 보여주고 저장
 여부를 묻는다.
+
+**경로를 미리 지정한 경우** (`recipe create recipe.json`):
 
 ```
 ── 저장 확인 ──────────────────────────────────────────
@@ -591,6 +639,28 @@ stub 모드는 각 패키지에 대해 `bioconda` 채널 1개 + `conda-forge` �
 
 `n`을 입력하면 모드 선택 화면으로 돌아간다(입력한 값은 초기화됨). Enter 또는
 `y`를 입력하면 저장된다.
+
+**경로 없이 실행한 경우** (`recipe create`):
+
+요약 화면 다음에 저장 경로 입력 화면이 추가로 나온다.
+
+```
+저장 위치를 확인하세요.
+
+기본 경로: /home/user/bwa-mem-0.7.17.json
+/cancel: 종료
+다른 경로를 입력하거나 Enter로 기본 경로를 사용 [n = 처음부터 다시 작성]:
+> (Enter)
+
+저장되었습니다: /home/user/bwa-mem-0.7.17.json
+```
+
+- Enter → 기본 경로에 저장
+- 다른 경로 입력 → 해당 경로에 저장 (파일이 이미 있으면 덮어쓰기 확인)
+- `n` → 처음부터 다시 작성(입력한 값 초기화)
+
+**디렉터리 경로를 지정한 경우** (`recipe create /tmp/`): 해당 디렉터리가
+기본 경로의 기준 디렉터리가 된다 — `bwa-mem-0.7.17.json`이 `/tmp/` 아래에 생성된다.
 
 ### 2-9. recovery — 마지막 검증 실패 시 수정
 
@@ -623,7 +693,7 @@ Output의 `Class` 허용값 위반) 때문에 여기서 막힐 수 있다. 입�
 프롬프트가 전혀 나오지 않고 빠진 값이 있으면 즉시 에러로 끝난다.
 
 ```bash
-nodekit recipe create recipe.json \
+nodekit recipe create /tmp/recipe.json \
   --non-interactive --method package \
   --field ToolName=bwa-mem \
   --field ToolVersion=0.7.17 \
@@ -1034,6 +1104,23 @@ n      ← Dockerfile 없음
 (Enter) ← 추천 method(package) 수락
 ```
 
+채널 확인 다음에 **base image 선택** 화면이 나온다(`NODEKIT_HARBOR_URL` 설정 시):
+
+```
+── Base image 선택 ─────────────────────────────────────────
+  [1] condaforge/miniforge3:24.3.0-0
+  [2] mambaorg/micromamba:1.5.8
+  [0] 직접 입력
+
+번호를 선택하세요 (1–2, 0 = 직접 입력):
+> 1
+
+condaforge/miniforge3:24.3.0-0 의 digest를 조회합니다...
+설정 완료: condaforge/miniforge3:24.3.0-0@sha256:abcdef...
+```
+
+환경변수가 없으면 이 화면이 나타나지 않고 필드 입력 단계에서 직접 입력한다.
+
 필드 입력:
 
 ```
@@ -1046,7 +1133,7 @@ n      ← Dockerfile 없음
 [3 / 7] 기본 실행 명령
 > bwa mem
 
-[4 / 7] 기반 이미지 — digest 포함 필요
+[4 / 7] 기반 이미지 — (base image 선택에서 자동 설정된 경우 건너뜀)
 > condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef...
 
 [5 / 7] 패키지 목록
@@ -1110,6 +1197,8 @@ bwa → bwa=0.7.17=h5bf99c6_8
 ```
 
 **저장 전 최종 확인:**
+
+경로를 미리 지정했으므로 요약 후 [y/n] 확인만 나온다.
 
 ```
 ── 저장 확인 ──────────────────────────────────────────
@@ -1339,5 +1428,8 @@ dotnet run --project src/NodeKit.Cli -- validate /tmp/samtools.json
   쉬운 안내 모드, 빠른 설정 질문, 필드 입력, recovery 화면, 빌드 문자열 선택 화면에서
   사용할 수 있다. `/back`은 필드 입력 중 이전 필드로 돌아가거나, 첫 번째 필드에서
   입력하면 모드 선택 화면으로 돌아간다. draft 저장/resume은 범위 밖이다.
-- digest 자동 조회는 `NODEKIT_HARBOR_URL` 환경변수가 설정된 경우 내부 Harbor에
-  한해 동작한다. 공개 registry(quay.io, ghcr.io 등) 자동 조회는 범위 밖이다.
+- base image digest 자동 조회는 두 경로가 있다: (1) `NODEKIT_HARBOR_URL` 환경변수가
+  설정된 경우 내부 Harbor에서 조회하거나, (2) `NODEKIT_BASE_IMAGE_STUB=1`로 고정
+  digest를 반환한다. `PublicRegistryImageDigestResolver`(Docker Hub / quay.io)는
+  구현은 완료되었으나 현재 비활성화 상태다 — 오픈망 환경의 자동 조회는
+  Harbor 우선 사용을 권장한다.
