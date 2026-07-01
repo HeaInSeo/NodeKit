@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using Spectre.Console;
 
 namespace NodeKit.Cli
@@ -6,13 +7,15 @@ namespace NodeKit.Cli
     internal sealed class AnsiRecipeConsole : IRecipeConsole
     {
         private readonly IAnsiConsole _ansi;
+        private readonly TextReader? _inputOverride;
         private string? _pendingHints;
 
         public AnsiRecipeConsole() : this(AnsiConsole.Console) { }
 
-        internal AnsiRecipeConsole(IAnsiConsole ansi)
+        internal AnsiRecipeConsole(IAnsiConsole ansi, TextReader? inputOverride = null)
         {
             _ansi = ansi;
+            _inputOverride = inputOverride;
         }
 
         public void BeginStep()
@@ -43,7 +46,7 @@ namespace NodeKit.Cli
                 _pendingHints = null;
             }
             _ansi.Markup("[cyan]>[/] ");
-            return Console.ReadLine();
+            return (_inputOverride ?? Console.In).ReadLine();
         }
     }
 }
