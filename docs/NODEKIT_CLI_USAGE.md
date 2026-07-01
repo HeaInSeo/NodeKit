@@ -34,6 +34,10 @@ dotnet run --project src/NodeKit.Cli -- recipe create
 dotnet run --project src/NodeKit.Cli -- recipe create recipe.json
 ```
 
+**파일 경로를 지정하면 파일명 stem이 도구 이름 기본값으로 자동 제안된다.** 예: `samtools.json`을
+전달하면 `ToolName` 입력 시 `samtools`가 기본값으로 표시된다. Enter를 누르면 그대로 사용하고,
+다른 이름을 입력하면 덮어써진다.
+
 질문에 답하면서 따라가면 끝에 `recipe.json`이 저장된다. 그 다음:
 
 ```bash
@@ -123,6 +127,9 @@ dotnet run --project src/NodeKit.Cli -- recipe create /tmp/nodekit-recipe.json
 | **저장 전 확인 화면** | 포트 설정 직후 최종 요약을 보여주고 `[n]`으로 취소할 수 있다 |
 | **빌드 문자열 후보 선택 UX** | `NODEKIT_RESOLVE_RECIPE_STUB=1` 설정 후 package 방식으로 진행 (2-6절) |
 | **이전 필드로 `/back`** | 필드 입력 중 `/back` → 직전 필드 재입력 (첫 필드에서는 모드 선택으로) |
+| **파일명 ToolName 기본값** | `/tmp/samtools.json`으로 실행 → ToolName 필드에 `samtools` 기본값 표시, Enter로 수락 |
+| **쉬운 안내 ToolName 자동 채움** | `[1] 쉬운 안내 모드` → `[1] 도구 이름만 알고 있다` → 이름 입력 → 필드 루프에서 ToolName 건너뜀 |
+| **3-구역 TUI 레이아웃** | 화면 상단 가로선 구분자 / 설명 구역 / 힌트 구분자+`>` 입력 프롬프트 순서 |
 
 **패키지 빌드 문자열 후보 선택 UX 확인 방법:**
 
@@ -153,6 +160,10 @@ nodekit recipe create [<recipe.json>] [--method ...] [--non-interactive ...]
 ```
 
 출력 경로는 선택사항이다. 생략하면 마법사 마지막 단계에서 경로를 직접 입력한다(기본값: `현재디렉터리/ToolName-ToolVersion.json`). 기존 디렉터리 경로를 전달하면 해당 디렉터리 아래 기본값 파일명을 사용한다.
+
+**파일 경로를 지정하면 파일명 stem이 `ToolName` 필드의 기본값으로 사용된다.** 예: `recipe create /tmp/samtools.json` 실행 시
+`ToolName` 프롬프트에 `기본값: samtools (Enter를 누르면 이 값을 사용합니다)`가 표시된다.
+Enter를 누르면 기본값을 그대로 사용하고, 다른 이름을 입력하면 덮어써진다.
 
 옵션 없이 실행하면 **대화형 모드**로 들어간다. `--non-interactive`와 함께
 `--method`/`--field` 등을 모두 지정하면 프롬프트 없이 한 번에 만든다(2-10절).
@@ -244,7 +255,8 @@ NodeKit recipe create
 
 **도구 이름만 아는 경우** (`[1]`): 도구 이름을 입력하면 별도 화면에서
 bioconda/BioContainers 확인 URL을 보여준 뒤, 찾은 것이 무엇인지(설치 명령/이미지/소스
-등)를 다시 선택한다.
+등)를 다시 선택한다. **이때 입력한 도구 이름은 뒤에 나오는 필드 입력 단계에서
+`ToolName` 필드에 자동으로 채워진다** — ToolName을 다시 묻지 않는다.
 
 ```
 다음 위치에서 도구를 확인해보세요.
@@ -454,15 +466,39 @@ digest 조회에 성공하면 `ImageRef` 필드가 자동으로 채워지고 이
 
 ### 2-4. 공통 필드 입력
 
-method가 정해지면 공통 필드를 먼저 물어본다. 화면마다 **라벨 — 설명** 아래에
-**`예:` 줄**이 함께 표시된다.
+method가 정해지면 공통 필드를 먼저 물어본다. 각 화면은 다음 **3-구역 레이아웃**으로
+표시된다.
 
 ```
+────────────────────────────────────────────────────────────────  ← 상단 구분자 (구역 1 시작)
 [1 / 6]
-/back: 이전 필드   /cancel: 종료   /review: 현재 값   /change-method: 작성 방식 변경
 
 도구 이름 — recipe에서 식별할 도구 이름입니다.
    예: bwa-mem
+
+── /back: 이전 필드   /cancel: 종료   /review: 현재 값   /change-method: 작성 방식 변경 ──
+
+>                                                                  ← 입력 프롬프트
+```
+
+- **구역 1 (설명)**: 상단 가로선 구분자로 시작. 진행도(`[1 / 6]`), 필드 라벨·설명, `예:` 줄 표시.
+- **구역 2 (힌트)**: 사용 가능한 명령(`/back`, `/cancel` 등)이 가로선 형태로 표시.
+  필드 설명 아래에 위치하므로 내용을 먼저 읽은 뒤 명령을 확인할 수 있다.
+- **구역 3 (입력)**: `> ` 프롬프트에서 값을 입력한다.
+
+파일 경로를 지정한 경우(`recipe create /tmp/samtools.json`), ToolName 필드에는 기본값이 추가로 표시된다.
+
+```
+────────────────────────────────────────────────────────────────
+[1 / 7]
+
+도구 이름 — recipe에서 식별할 도구 이름입니다.
+   예: bwa-mem
+   기본값: samtools  (Enter를 누르면 이 값을 사용합니다)
+
+── /back: 이전 필드   /cancel: 종료   /review: 현재 값   /change-method: 작성 방식 변경 ──
+
+>
 ```
 
 | 필드 | 필수 여부 | 설명 |
@@ -976,11 +1012,13 @@ Harbor가 digest를 응답하면:
 **8. 이후 필드 입력 (빠른 설정 모드로 method 선택 후 진행됨)**
 
 method가 `container`로 확정되면 공통/method 필드를 순서대로 입력한다.
+경로를 `/tmp/bwa-mem2.json`으로 지정했으므로 ToolName 필드에 `bwa-mem2`가 기본값으로 표시된다.
 
 ```
 [1 / 6]
 도구 이름 — recipe에서 식별할 도구 이름입니다.
-> bwa-mem2
+   기본값: bwa-mem2  (Enter를 누르면 이 값을 사용합니다)
+> (Enter)     ← 기본값 bwa-mem2 사용
 
 [2 / 6]
 도구 버전 — 도구 버전 또는 고정된 release/version입니다.
@@ -1121,11 +1159,16 @@ condaforge/miniforge3:24.3.0-0 의 digest를 조회합니다...
 
 환경변수가 없으면 이 화면이 나타나지 않고 필드 입력 단계에서 직접 입력한다.
 
-필드 입력:
+필드 입력 (`/tmp/bwa.json`으로 실행했으므로 ToolName 기본값은 `bwa`):
 
 ```
-[1 / 7] 도구 이름
-> bwa
+[1 / 7]
+도구 이름 — recipe에서 식별할 도구 이름입니다.
+   기본값: bwa  (Enter를 누르면 이 값을 사용합니다)
+
+── /back: 이전 필드   /cancel: 종료   /review: 현재 값   /change-method: 작성 방식 변경 ──
+
+> (Enter)     ← 기본값 bwa 사용
 
 [2 / 7] 도구 버전
 > 0.7.17
@@ -1318,29 +1361,36 @@ install command에서 자동 채워진 항목: **Packages, Channels, PackageEngi
 > install 명령에는 `samtools=1.17` 패키지 정보만 있고, 어떤 conda base 이미지를
 > 쓸지는 포함되지 않기 때문이다.
 
+경로를 `/tmp/samtools.json`으로 지정했으므로 `ToolName` 필드에 `samtools`가 기본값으로 표시된다.
+
 ```
 [1 / 7]
-/back: 이전 필드   /cancel: 종료   /review: 현재 값   /change-method: 작성 방식 변경
-
 도구 이름 — recipe에서 식별할 도구 이름입니다.
-> samtools
+   기본값: samtools  (Enter를 누르면 이 값을 사용합니다)
+
+── /back: 이전 필드   /cancel: 종료   /review: 현재 값   /change-method: 작성 방식 변경 ──
+
+> (Enter)     ← 기본값 samtools 사용
 
 [2 / 7]
-/back: 이전 필드   /cancel: 종료   /review: 현재 값   /change-method: 작성 방식 변경
-
 도구 버전 — 도구 버전 또는 고정된 release/version입니다.
+
+── /back: 이전 필드   /cancel: 종료   ...
+
 > 1.17
 
 [3 / 7]
-/back: 이전 필드   /cancel: 종료   /review: 현재 값   /change-method: 작성 방식 변경
-
 기본 실행 명령 — 도구 실행 시 사용할 기본 명령 또는 이미지 안의 스크립트 경로입니다.
+
+── /back: 이전 필드   /cancel: 종료   ...
+
 > samtools view
 
 [4 / 7]
-/back: 이전 필드   /cancel: 종료   /review: 현재 값   /change-method: 작성 방식 변경
-
 기반 이미지 — conda가 설치된 base 이미지입니다. digest 포함 필요.
+
+── /back: 이전 필드   /cancel: 종료   ...
+
 > condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef...
 ```
 
