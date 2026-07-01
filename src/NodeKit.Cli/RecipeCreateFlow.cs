@@ -53,10 +53,8 @@ namespace NodeKit.Cli
             }
 
             // 단계 5: 나머지 필드 입력
-            // 파일 경로가 있으면 stem을 ToolName 기본값 힌트로 전달 (직접 입력하면 덮어씀)
-            var toolNameHint = GetToolNameHintFromPath(outPathHint);
             RecipeCreateScreen.ClearForNewStep(console);
-            RunFieldLoop(session, console, cancellation, toolNameHint);
+            RunFieldLoop(session, console, cancellation);
 
             // 단계 6: 빌드 + 검증 + recovery
             var method = session.Snapshot().SelectedMethod!.Value;
@@ -339,16 +337,9 @@ namespace NodeKit.Cli
             }
         }
 
-        private static string? GetToolNameHintFromPath(string? outPathHint)
-        {
-            if (string.IsNullOrEmpty(outPathHint) || Directory.Exists(outPathHint)) return null;
-            var stem = Path.GetFileNameWithoutExtension(outPathHint);
-            return string.IsNullOrEmpty(stem) ? null : stem;
-        }
-
         // ── RunFieldLoop 및 PromptField 계열 ─────────────────────────────────────
 
-        private static void RunFieldLoop(RecipeAuthoringSession session, IRecipeConsole console, IRecipeCreateCancellationSource cancellation, string? toolNameHint = null)
+        private static void RunFieldLoop(RecipeAuthoringSession session, IRecipeConsole console, IRecipeCreateCancellationSource cancellation)
         {
             var total = RecipeFieldCatalog.FieldsFor(session.Snapshot().SelectedMethod!.Value).Count;
             var history = new List<RecipeFieldDescriptor>();
@@ -361,10 +352,9 @@ namespace NodeKit.Cli
                 console.WriteHints("/back: 이전 필드   /cancel: 종료   /review: 현재 값   /change-method: 작성 방식 변경");
                 console.WriteLine();
 
-                var defaultValue = field.Name == "ToolName" ? toolNameHint : null;
                 try
                 {
-                    PromptField(session, field, console, cancellation, defaultValue);
+                    PromptField(session, field, console, cancellation);
                     history.Add(field);
                 }
                 catch (RecipeCreateBackRequestedException)
@@ -387,12 +377,12 @@ namespace NodeKit.Cli
             }
         }
 
-        private static void PromptField(RecipeAuthoringSession session, RecipeFieldDescriptor field, IRecipeConsole console, IRecipeCreateCancellationSource cancellation, string? defaultValue = null)
+        private static void PromptField(RecipeAuthoringSession session, RecipeFieldDescriptor field, IRecipeConsole console, IRecipeCreateCancellationSource cancellation)
         {
             switch (field.Type)
             {
                 case RecipeFieldType.Scalar:
-                    PromptScalarField(session, field, console, cancellation, defaultValue);
+                    PromptScalarField(session, field, console, cancellation);
                     break;
                 case RecipeFieldType.Choice:
                     PromptChoiceField(session, field, console, cancellation);
@@ -405,7 +395,7 @@ namespace NodeKit.Cli
             }
         }
 
-        private static void PromptScalarField(RecipeAuthoringSession session, RecipeFieldDescriptor field, IRecipeConsole console, IRecipeCreateCancellationSource cancellation, string? defaultValue = null)
+        private static void PromptScalarField(RecipeAuthoringSession session, RecipeFieldDescriptor field, IRecipeConsole console, IRecipeCreateCancellationSource cancellation)
         {
             while (true)
             {
@@ -418,11 +408,6 @@ namespace NodeKit.Cli
                 if (field.Examples.Count > 0)
                 {
                     console.WriteLine($"   예: {string.Join(", ", field.Examples)}");
-                }
-
-                if (defaultValue != null)
-                {
-                    console.WriteLine($"   기본값: {defaultValue}  (Enter를 누르면 이 값을 사용합니다)");
                 }
 
                 var line = console.ReadLine() ?? string.Empty;
@@ -446,19 +431,6 @@ namespace NodeKit.Cli
 
                 if (TryHandleHelp(field, line, console))
                 {
-                    continue;
-                }
-
-                // Enter with default value: use the hint from the filename
-                if (line.Trim().Length == 0 && defaultValue != null)
-                {
-                    var defaultViolations = session.SetField(field.Name, defaultValue);
-                    if (defaultViolations.Count == 0)
-                    {
-                        return;
-                    }
-
-                    PrintViolations(defaultViolations, console);
                     continue;
                 }
 
