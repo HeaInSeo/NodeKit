@@ -84,6 +84,7 @@ namespace NodeKit.Cli.Tests
                 "n", "n", "n", "y", "n", "n",
                 "",     // accept package
                 "bioconda", "",
+                "0", // 기반 이미지: 직접 입력
                 "bwa-mem", "0.7.17", "run.sh",
                 "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
                 "bwa=0.7.17=h5bf99c6_8", "",
@@ -120,6 +121,7 @@ namespace NodeKit.Cli.Tests
                 "n", "n", "n", "y", "n", "n",
                 "",     // accept package
                 "bioconda", "",
+                "0", // 기반 이미지: 직접 입력
                 "bwa-mem", "0.7.17", "run.sh",
                 "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
                 "bwa=0.7.17=h5bf99c6_8", "",
@@ -152,6 +154,7 @@ namespace NodeKit.Cli.Tests
                 "n", "n", "n", "y", "n", "n",
                 "",     // accept package
                 "bioconda", "",
+                "0", // 기반 이미지: 직접 입력
                 "bwa-mem", "0.7.17", "run.sh",
                 "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
                 "bwa=0.7.17=h5bf99c6_8", "",
@@ -184,6 +187,7 @@ namespace NodeKit.Cli.Tests
                 "n", "n", "n", "y", "n", "n",
                 "",     // accept package
                 "bioconda", "",
+                "0", // 기반 이미지: 직접 입력
                 "bwa-mem", "0.7.17", "run.sh",
                 "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
                 "bwa=0.7.17=h5bf99c6_8", "",
@@ -219,6 +223,7 @@ namespace NodeKit.Cli.Tests
                 "2", "n", "n", "n", "y", "n", "n",
                 "",             // accept package
                 "bioconda", "", // channels
+                "0",             // 기반 이미지: 직접 입력
                 "bwa-mem", "0.7.17", "run.sh", imageRef,
                 "bwa=0.7.17=h5bf99c6_8", "",
                 "",     // Port input (skip)
@@ -229,6 +234,7 @@ namespace NodeKit.Cli.Tests
                 "2", "n", "n", "n", "y", "n", "n",
                 "",             // accept package
                 "bioconda", "", // channels
+                "0",             // 기반 이미지: 직접 입력
                 "bwa-mem", "0.7.17", "run.sh", imageRef,
                 "bwa=0.7.17=h5bf99c6_8", "",
                 "",     // Port input (skip)

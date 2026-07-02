@@ -40,21 +40,27 @@ namespace NodeKit.Cli
             using var harborResolver = HarborImageDigestResolver.TryCreate();
             using var grpcResolver = GrpcResolveRecipeClient.TryCreate();
 
-            // BeginnerGuideFlow always needs a non-null resolver (uses it for image lookup).
-            IImageDigestResolver resolverForBeginner =
-                (IImageDigestResolver?)harborResolver ?? NullImageDigestResolver.Instance;
-
             IResolveRecipeClient recipeResolver = resolveClient
                 ?? StubResolveRecipeClient.TryCreate()
                 ?? (IResolveRecipeClient?)grpcResolver
                 ?? NullResolveRecipeClient.Instance;
 
-            // Step 4 resolver chain: injected > stub env var > Harbor.
-            // null means step 4 is skipped (e.g., no resolver configured, open-network
-            // PublicRegistryImageDigestResolver not wired here to avoid live HTTP in tests).
-            IImageDigestResolver? step4Resolver = imageDigestResolver
+            // Step 4 resolver chain: injected (tests) > stub env var > Harbor (closed-net) > public registry (open-net).
+            IImageDigestResolver? step4Candidate = imageDigestResolver
                 ?? StubImageDigestResolver.TryCreate()
                 ?? (IImageDigestResolver?)harborResolver;
+
+            // Open-network fallback: created only when neither stub nor Harbor is available.
+            using var publicResolver = step4Candidate is null
+                ? new PublicRegistryImageDigestResolver()
+                : null;
+
+            IImageDigestResolver? step4Resolver = step4Candidate ?? publicResolver;
+
+            // BeginnerGuideFlow: Harbor > null (image lookup when user types a container ref).
+            // PublicRegistryImageDigestResolver not wired here to avoid live HTTP in tests.
+            IImageDigestResolver resolverForBeginner =
+                (IImageDigestResolver?)harborResolver ?? NullImageDigestResolver.Instance;
 
             try
             {

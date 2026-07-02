@@ -191,20 +191,21 @@ namespace NodeKit.Cli.Tests
         }
 
         [Fact]
-        public void Step4_NullResolver_SkipsStep4_ImageRefPromptedInFieldLoop()
+        public void Step4_PublicResolver_DirectInput_ImageRefPromptedInFieldLoop()
         {
             var outPath = Path.Combine(_workDir, "recipe.json");
             const string manualRef =
                 "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
-            // No resolver injected (null) → step 4 is completely skipped.
+            // publicResolver is used (open-net). User selects '0' (직접 입력) → step 4 returns, ImageRef prompted in field loop.
             var transcript = new[]
             {
                 "2",    // 빠른 설정 모드
                 "n", "n", "n", "y", "n", "n",
                 "",     // accept package
                 "bioconda", "",
-                // Step 4 absent → RunFieldLoop includes ImageRef
+                "0", // 기반 이미지: 직접 입력 → ImageRef still in field loop
+                // Step 4 direct input → RunFieldLoop includes ImageRef
                 "bwa-mem", "0.7.17", "run.sh",
                 manualRef,
                 "bwa=0.7.17=h5bf99c6_8", "",

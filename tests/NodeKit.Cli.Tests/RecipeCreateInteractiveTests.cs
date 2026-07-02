@@ -46,6 +46,7 @@ namespace NodeKit.Cli.Tests
                 "", // accept recommended method (package)
                 "bioconda", // Channels item (채널 확정 단계)
                 "", // complete Channels
+                "0", // 기반 이미지: 직접 입력
                 "bwa-mem", // ToolName
                 "0.7.17", // ToolVersion
                 "run.sh", // Script
@@ -113,6 +114,7 @@ namespace NodeKit.Cli.Tests
                 "n", "n", "n", "y", "n", "n", // Q&A -> recommend package
                 "", // accept recommended method
                 "bioconda", "", // 채널 확정 단계
+                "0", // 기반 이미지: 직접 입력
                 "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
                 "bwa=0.7.17=h5bf99c6_8", "",
             };
@@ -180,6 +182,7 @@ namespace NodeKit.Cli.Tests
                 "n", // HasSourceArchiveAndChecksum
                 "n", // HasExistingDockerfile
                 "", // accept recommended method (mirror)
+                "0", // 기반 이미지: 직접 입력
                 "bwa-mem", "0.7.17", "run.sh",
                 ImageRefWithDigest, // ImageRef
                 "https://mirror.internal/conda-channel", // MirrorUri
@@ -213,6 +216,7 @@ namespace NodeKit.Cli.Tests
                 "n", // HasExistingDockerfile
                 "", // accept recommended method (package)
                 "bioconda", "", // 채널 확정 단계
+                "0", // 기반 이미지: 직접 입력
                 "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
                 "bwa=0.7.17=h5bf99c6_8", "",
             };
@@ -244,6 +248,7 @@ namespace NodeKit.Cli.Tests
                 "u", // HasExistingDockerfile
                 "2", // no recommendation — manually pick from fixed menu: [2] package
                 "bioconda", "", // 채널 확정 단계
+                "0", // 기반 이미지: 직접 입력
                 "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
                 "bwa=0.7.17=h5bf99c6_8", "",
             };
@@ -270,6 +275,7 @@ namespace NodeKit.Cli.Tests
                 "n", "n", "n", "y", "n", "n", // Q&A -> recommend package
                 "", // accept recommended method
                 "bioconda", "", // 채널 확정 단계
+                "0", // 기반 이미지: 직접 입력
                 "bwa-mem", "0.7.17", "run.sh",
                 "/change-method", // at the ImageRef prompt, switch away from package
                 "4", // source
@@ -304,6 +310,7 @@ namespace NodeKit.Cli.Tests
                 "n", "n", "n", "y", "n", "n", // Q&A -> recommend package
                 "", // accept recommended method
                 "bioconda", "", // 채널 확정 단계 (Package 방식용, Mirror로 바뀌면 버려짐)
+                "0", // 기반 이미지: 직접 입력
                 "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
                 "/change-method", // at the Packages prompt — ImageRef is preserved but invalidated
                 "3", // mirror
@@ -781,6 +788,7 @@ namespace NodeKit.Cli.Tests
                 "conda install -c bioconda bwa=0.7.17=h5bf99c6_8 -y",
                 "1",  // use understood values (Parsed result)
                 "",   // 채널 확인: 파싱된 "bioconda" 그대로 사용 (Enter)
+                "0",  // 기반 이미지: 직접 입력
                 "bwa-mem", "0.7.17", "run.sh",
                 ImageRefWithDigest,  // ImageRef (BaseImage for Package method)
                 // Packages/Channels: pre-filled by BeginnerGuideFlow, skipped
@@ -855,6 +863,7 @@ namespace NodeKit.Cli.Tests
                 "", // accept recommended method
                 "bioconda",           // Channels (채널 확정 단계)
                 "",                   // complete Channels
+                "0",                  // 기반 이미지: 직접 입력
                 "bwa-mem", // ToolName
                 "0.7.17",  // ToolVersion
                 "run.sh",  // Script
@@ -1010,6 +1019,7 @@ namespace NodeKit.Cli.Tests
                 "n", "n", "n", "y", "n", "n", // Q&A -> recommend package
                 "", // accept recommended method
                 "bioconda", "",              // Channels (채널 확정 단계)
+                "0", // 기반 이미지: 직접 입력
                 "bwa-mem", "0.7.17", "run.sh",
                 "/change-method", // at ImageRef prompt
                 "/back",          // cancel the change → "method 변경을 취소하고..."
@@ -1040,6 +1050,7 @@ namespace NodeKit.Cli.Tests
                 "n", "n", "n", "y", "n", "n", // Q&A -> recommend package
                 "", // accept recommended method
                 "bioconda", "", // 채널 확정 단계
+                "0", // 기반 이미지: 직접 입력
                 "bwa-mem", "0.7.17", "run.sh",
                 "/change-method",
                 "99",  // invalid number → "알 수 없는 방법입니다. 변경을 취소합니다."
@@ -1070,6 +1081,7 @@ namespace NodeKit.Cli.Tests
                 "n", "n", "n", "y", "n", "n", // Q&A -> recommend package
                 "", // accept recommended method
                 "bioconda", "", // 채널 확정 단계
+                "0", // 기반 이미지: 직접 입력
                 "bwa-mem", "0.7.17", "run.sh",
                 "/change-method",
                 "4",  // source
@@ -1102,6 +1114,7 @@ namespace NodeKit.Cli.Tests
                 "n", "n", "n", "y", "n", "n", // Q&A -> recommend package
                 "", // accept recommended method
                 "bioconda", "", // 채널 확정 단계
+                "0", // 기반 이미지: 직접 입력
                 "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
                 "",                         // empty first entry on Packages → error message, re-prompt
                 "bwa=0.7.17=h5bf99c6_8", "",  // correct entry + complete
@@ -1161,6 +1174,7 @@ namespace NodeKit.Cli.Tests
                 "n",     // Q6
                 "",      // accept package recommendation
                 "bioconda", "", // 채널 확정 단계
+                "0", // 기반 이미지: 직접 입력
                 "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
                 "bwa=0.7.17=h5bf99c6_8", "",
             };
@@ -1197,6 +1211,7 @@ namespace NodeKit.Cli.Tests
             {
                 "2", "n", "n", "n", "y", "n", "n", "",
                 "bioconda", "",    // 채널 확정 단계
+                "0",              // 기반 이미지: 직접 입력
                 "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
                 "bwa=0.7.17", "",  // version-only pin
                 "1",               // PackageCandidatePresenter: pick first candidate
@@ -1234,6 +1249,7 @@ namespace NodeKit.Cli.Tests
             {
                 "2", "n", "n", "n", "y", "n", "n", "",
                 "bioconda", "", // 채널 확정 단계
+                "0",              // 기반 이미지: 직접 입력
                 "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
                 "bwa=0.7.17", "",
             };
@@ -1275,6 +1291,7 @@ namespace NodeKit.Cli.Tests
             {
                 "2", "n", "n", "n", "y", "n", "n", "",
                 "bioconda", "", // 채널 확정 단계
+                "0",         // 기반 이미지: 직접 입력
                 "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
                 "bwa=0.7.17", "",
                 "/cancel",         // during PackageCandidatePresenter → exit 130

@@ -198,6 +198,7 @@ namespace NodeKit.Cli.Tests
                 "conda install -c bioconda bwa=0.7.17=h5bf99c6_8 -y",
                 "1",   // use understood values
                 "",    // 채널 확인: 파싱된 "bioconda" 그대로 사용 (Enter)
+                "0",  // 기반 이미지: 직접 입력
                 // RunFieldLoop:
                 "bwa-mem", "0.7.17", "run.sh",
                 BaseImageWithDigest,  // ImageRef (BaseImage for Package method)
@@ -231,6 +232,7 @@ namespace NodeKit.Cli.Tests
                 "pip install bwa==0.7.17",  // Failed
                 "1",            // package 방식으로 계속 → no pre-population
                 "bioconda", "",              // Channels (채널 확정 단계, RunFieldLoop 이전)
+                "0",                        // 기반 이미지: 직접 입력
                 // RunFieldLoop (all Package fields must be filled):
                 "bwa-mem", "0.7.17", "run.sh",
                 BaseImageWithDigest,         // ImageRef
@@ -258,6 +260,7 @@ namespace NodeKit.Cli.Tests
                 "conda install bwa=0.7.17=h5bf99c6_8",  // PartiallyParsed: no channel
                 "1",   // use understood values (channels missing → 채널 확정 단계에서 입력)
                 "bioconda", "",  // Channels: NOT pre-filled, 채널 확정 단계에서 입력
+                "0",            // 기반 이미지: 직접 입력
                 // RunFieldLoop:
                 "bwa-mem", "0.7.17", "run.sh",
                 BaseImageWithDigest,
@@ -419,6 +422,7 @@ namespace NodeKit.Cli.Tests
                 "4",  // source
                 "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz",
                 "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "0",   // 기반 이미지: 직접 입력
                 // RunFieldLoop (SourceUri + SourceChecksum pre-filled):
                 "bwa-mem", "0.7.17", "run.sh",
                 BaseImageWithDigest,  // ImageRef (BaseImage for Source method)
@@ -621,6 +625,7 @@ namespace NodeKit.Cli.Tests
                 "1",  // GuidedBeginner
                 "6",  // internal mirror
                 "https://mirror.internal/conda",
+                "0",                             // 기반 이미지: 직접 입력
                 // RunFieldLoop (MirrorUri pre-filled):
                 "bwa-mem", "0.7.17", "run.sh",
                 BaseImageWithDigest,            // ImageRef (BaseImage for Mirror method)
