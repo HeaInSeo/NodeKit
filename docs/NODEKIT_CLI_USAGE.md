@@ -1466,6 +1466,8 @@ Packages/Channels/PackageEngine도 자동 채워졌으므로 `[5/7]`, `[6/7]`, `
 
 생성된 파일에는 Packages, Channels, PackageEngine, ImageRef가 이미 채워져 있다.
 
+**10. 검증**
+
 ```bash
 dotnet run --project src/NodeKit.Cli -- validate /home/user/samtools-1.17.json
 ```
