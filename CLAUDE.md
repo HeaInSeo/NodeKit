@@ -9,10 +9,10 @@ Current planning source of truth:
 
 - **NodeVault Phase 1 gate 열림 (2026-07-02)**: `ResolveToolSpec` / `SubmitToolBuild` / `WatchToolBuild`
   클라이언트 경로가 NodeKit에서 구현 허용됨.
-- `nodekit submit` 기본 경로: `ResolveToolSpec → SubmitToolBuild → WatchToolBuild`.
-- `--legacy` 플래그로 `BuildAndRegister` 레거시 경로 유지.
-- Phase 6 (legacy API 축소): NodeKit 전환 확인 후 진행.
-- Follow `PLATFORM_SCHEDULE.md` Phase 6 order.
+- `nodekit submit` 경로: `ResolveToolSpec → SubmitToolBuild → WatchToolBuild`.
+- **Phase 6 완료 (2026-07-02)**: `--legacy` 플래그 및 `BuildAndRegister` 경로 NodeKit CLI에서 제거.
+  `IBuildClient` / `GrpcBuildClient` 는 NodeKit.csproj(Avalonia) 에만 남음.
+  NodeVault 측 `BuildAndRegister` RPC deprecated 표시는 NodeVault 담당.
 
 Older sprint documents under `docs/obsolete/` are historical reference only and
 must not override the active sprint plan.

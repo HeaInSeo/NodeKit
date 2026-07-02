@@ -50,7 +50,7 @@ namespace NodeKit.Cli.Tests
         }
         """;
 
-        // ── 공통 검증 (신규/레거시 경로 공통 ────────────────────────────────────
+        // ── 공통 검증 ────────────────────────────────────────────────────────────
 
         [Fact]
         public void Submit_MissingUrl_ReturnsTwo()
@@ -88,7 +88,7 @@ namespace NodeKit.Cli.Tests
                 new[] { "submit", missingPath },
                 stdout,
                 stderr,
-                legacyClient: new StubBuildClient(BuildEventKind.Succeeded));
+                toolSpecClient: new StubToolSpecClient(new[] { new BuildEvent { Kind = BuildEventKind.Succeeded } }));
 
             Assert.Equal(2, exitCode);
             Assert.Contains("읽을 수 없습니다", stderr.ToString());
@@ -105,7 +105,7 @@ namespace NodeKit.Cli.Tests
                 new[] { "submit", recipePath },
                 stdout,
                 stderr,
-                legacyClient: new StubBuildClient(BuildEventKind.Succeeded));
+                toolSpecClient: new StubToolSpecClient(new[] { new BuildEvent { Kind = BuildEventKind.Succeeded } }));
 
             Assert.Equal(2, exitCode);
             Assert.Contains("파싱에 실패", stderr.ToString());
@@ -122,86 +122,16 @@ namespace NodeKit.Cli.Tests
                 new[] { "submit", recipePath },
                 stdout,
                 stderr,
-                legacyClient: new StubBuildClient(BuildEventKind.Succeeded));
+                toolSpecClient: new StubToolSpecClient(new[] { new BuildEvent { Kind = BuildEventKind.Succeeded } }));
 
             Assert.Equal(1, exitCode);
             Assert.Contains("L1-SRC-001", stderr.ToString());
         }
 
-        // ── 레거시 경로 (--legacy 플래그 + IBuildClient 주입) ─────────────────
-
-        [Fact]
-        public void Submit_Legacy_BuildSucceeded_ReturnsZero()
-        {
-            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
-            var events = new[]
-            {
-                new BuildEvent { Kind = BuildEventKind.JobCreated, Message = "빌드 시작됨" },
-                new BuildEvent { Kind = BuildEventKind.Succeeded, Message = "완료" },
-            };
-
-            var exitCode = SubmitCommand.Run(
-                new[] { "submit", recipePath, "--legacy" },
-                stdout,
-                stderr,
-                legacyClient: new StubBuildClient(events));
-
-            Assert.Equal(0, exitCode);
-            Assert.Contains("[빌드 시작]", stdout.ToString());
-            Assert.Contains("[성공]", stdout.ToString());
-            Assert.Contains("레거시 경로", stdout.ToString());
-        }
-
-        [Fact]
-        public void Submit_Legacy_BuildFailed_ReturnsOne()
-        {
-            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
-            var events = new[]
-            {
-                new BuildEvent { Kind = BuildEventKind.Log, Message = "빌드 로그" },
-                new BuildEvent { Kind = BuildEventKind.Failed, Message = "패키지 설치 실패" },
-            };
-
-            var exitCode = SubmitCommand.Run(
-                new[] { "submit", recipePath, "--legacy" },
-                stdout,
-                stderr,
-                legacyClient: new StubBuildClient(events));
-
-            Assert.Equal(1, exitCode);
-            Assert.Contains("빌드 실패", stderr.ToString());
-        }
-
-        [Fact]
-        public void Submit_Legacy_DigestAcquiredEvent_PrintsDigest()
-        {
-            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
-            var events = new[]
-            {
-                new BuildEvent { Kind = BuildEventKind.DigestAcquired, Digest = "sha256:abcd1234" },
-                new BuildEvent { Kind = BuildEventKind.Succeeded },
-            };
-
-            var exitCode = SubmitCommand.Run(
-                new[] { "submit", recipePath, "--legacy" },
-                stdout,
-                stderr,
-                legacyClient: new StubBuildClient(events));
-
-            Assert.Equal(0, exitCode);
-            Assert.Contains("sha256:abcd1234", stdout.ToString());
-        }
-
         // ── 신규 경로 (IToolSpecBuildClient 주입) ─────────────────────────────
 
         [Fact]
-        public void Submit_ToolSpec_BuildSucceeded_ReturnsZero()
+        public void Submit_BuildSucceeded_ReturnsZero()
         {
             var recipePath = WriteFile("recipe.json", ValidRecipeJson);
             var stdout = new StringWriter();
@@ -221,11 +151,10 @@ namespace NodeKit.Cli.Tests
 
             Assert.Equal(0, exitCode);
             Assert.Contains("[성공]", stdout.ToString());
-            Assert.Contains("신규 경로", stdout.ToString());
         }
 
         [Fact]
-        public void Submit_ToolSpec_BuildFailed_ReturnsOne()
+        public void Submit_BuildFailed_ReturnsOne()
         {
             var recipePath = WriteFile("recipe.json", ValidRecipeJson);
             var stdout = new StringWriter();
@@ -247,7 +176,7 @@ namespace NodeKit.Cli.Tests
         }
 
         [Fact]
-        public void Submit_ToolSpec_RawSpecContainsProtoFieldNames()
+        public void Submit_RawSpecContainsProtoFieldNames()
         {
             var recipePath = WriteFile("recipe.json", ValidRecipeJson);
             var stdout = new StringWriter();
@@ -284,34 +213,6 @@ namespace NodeKit.Cli.Tests
             var path = Path.Combine(_workDir, name);
             File.WriteAllText(path, content);
             return path;
-        }
-
-        private sealed class StubBuildClient : IBuildClient
-        {
-            private readonly BuildEvent[] _events;
-
-            public StubBuildClient(BuildEventKind terminalKind)
-            {
-                _events = new[] { new BuildEvent { Kind = terminalKind } };
-            }
-
-            public StubBuildClient(BuildEvent[] events)
-            {
-                _events = events;
-            }
-
-#pragma warning disable CS1998
-            public async IAsyncEnumerable<BuildEvent> BuildAndRegisterAsync(
-                BuildRequest request,
-                [EnumeratorCancellation] CancellationToken cancellationToken = default)
-            {
-                foreach (var ev in _events)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    yield return ev;
-                }
-            }
-#pragma warning restore CS1998
         }
 
         private sealed class StubToolSpecClient : IToolSpecBuildClient

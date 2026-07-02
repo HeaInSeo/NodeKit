@@ -130,19 +130,37 @@ namespace NodeKit.Cli
 
         private static GrpcBuildEvent MapWatchEvent(BuildEvent ev)
         {
-            var mapped = NodeKit.Grpc.GrpcBuildClient.FromProto(ev);
-
             // WatchToolBuild은 모든 이벤트를 LOG 종류로 보낸다.
             // status 필드로 terminal 상태를 판별해 적절한 Kind로 변환한다.
-            mapped.Kind = ev.Status switch
+            var kind = ev.Status switch
             {
                 "succeeded" => GrpcBuildEventKind.Succeeded,
                 "failed" => GrpcBuildEventKind.Failed,
                 "interrupted" => GrpcBuildEventKind.Failed,
-                _ => mapped.Kind,
+                _ => MapProtoKind(ev.Kind),
             };
 
-            return mapped;
+            return new GrpcBuildEvent
+            {
+                Kind = kind,
+                Message = ev.Message,
+                Timestamp = DateTimeOffset.FromUnixTimeMilliseconds(ev.Timestamp).UtcDateTime,
+                Digest = ev.Digest,
+                BuildId = ev.BuildId,
+                Status = ev.Status,
+            };
         }
+
+        private static GrpcBuildEventKind MapProtoKind(Nodevault.V1.BuildEventKind kind) => kind switch
+        {
+            Nodevault.V1.BuildEventKind.Log => GrpcBuildEventKind.Log,
+            Nodevault.V1.BuildEventKind.JobCreated => GrpcBuildEventKind.JobCreated,
+            Nodevault.V1.BuildEventKind.JobRunning => GrpcBuildEventKind.JobRunning,
+            Nodevault.V1.BuildEventKind.PushSucceeded => GrpcBuildEventKind.RegistryPushSucceeded,
+            Nodevault.V1.BuildEventKind.DigestAcquired => GrpcBuildEventKind.DigestAcquired,
+            Nodevault.V1.BuildEventKind.Succeeded => GrpcBuildEventKind.Succeeded,
+            Nodevault.V1.BuildEventKind.Failed => GrpcBuildEventKind.Failed,
+            _ => GrpcBuildEventKind.Log,
+        };
     }
 }
