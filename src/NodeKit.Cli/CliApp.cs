@@ -31,7 +31,7 @@ namespace NodeKit.Cli
         {
             if (args.Length == 0)
             {
-                stderr.WriteLine("사용법: nodekit validate <recipe.json> | nodekit render <recipe.json> --out <build-request.json> | nodekit recipe create <recipe.json> [...]");
+                stderr.WriteLine("사용법: nodekit validate <recipe.json> | nodekit render <recipe.json> --out <build-request.json> | nodekit submit <recipe.json> [--url <url>] | nodekit recipe create <recipe.json> [...]");
                 return 2;
             }
 
@@ -39,6 +39,7 @@ namespace NodeKit.Cli
             {
                 "validate" => RunValidate(args, stdout, stderr),
                 "render" => RunRender(args, stdout, stderr),
+                "submit" => SubmitCommand.Run(args, stdout, stderr),
                 "recipe" => RunRecipe(args, stdin, stdout, stderr),
                 _ => Unknown(args[0], stderr),
             };
@@ -76,7 +77,7 @@ namespace NodeKit.Cli
 
         private static int Unknown(string command, TextWriter stderr)
         {
-            stderr.WriteLine($"알 수 없는 명령입니다: {command} (validate | render | recipe 만 지원합니다)");
+            stderr.WriteLine($"알 수 없는 명령입니다: {command} (validate | render | submit | recipe 만 지원합니다)");
             return 2;
         }
 

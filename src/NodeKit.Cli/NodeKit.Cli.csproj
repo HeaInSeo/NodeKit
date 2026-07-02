@@ -102,5 +102,10 @@
 
     <Compile Include="..\Grpc\BuildRequest.cs" Link="Grpc\BuildRequest.cs" />
     <Compile Include="..\Grpc\BuildRequestFactory.cs" Link="Grpc\BuildRequestFactory.cs" />
+    <Compile Include="..\Grpc\BuildEvent.cs" Link="Grpc\BuildEvent.cs" />
+    <Compile Include="..\Grpc\BuildEventKind.cs" Link="Grpc\BuildEventKind.cs" />
+    <Compile Include="..\Grpc\IBuildClient.cs" Link="Grpc\IBuildClient.cs" />
+    <Compile Include="..\Grpc\GrpcBuildClient.cs" Link="Grpc\GrpcBuildClient.cs" />
+    <Compile Include="..\Grpc\BuildErrorMessages.cs" Link="Grpc\BuildErrorMessages.cs" />
   </ItemGroup>
 </Project>
