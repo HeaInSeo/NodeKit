@@ -8,15 +8,6 @@ namespace NodeKit.Tests
 {
     public class CommercialGuardrailTests
     {
-        private static readonly string[] _forbiddenProductionApiTerms =
-        {
-            "ToolSpecRequest",
-            "SubmitToolBuild",
-            "WatchToolBuild",
-            "CancelToolBuild",
-            "ResolveToolSpecAsync",
-        };
-
         private static readonly string[] _forbiddenKubernetesDependencyTerms =
         {
             "KubernetesClient",
@@ -45,26 +36,6 @@ namespace NodeKit.Tests
             Assert.True(
                 offenders.Length == 0,
                 "PackageReference versions must be explicit for repeatable commercial builds. Offenders: "
-                + string.Join(", ", offenders));
-        }
-
-        [Fact]
-        public void ProductionSource_DoesNotUseBlockedNodeVaultNewPathApis()
-        {
-            var offenders = SourceFiles()
-                .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}Generated", StringComparison.Ordinal))
-                .SelectMany(path =>
-                {
-                    var text = File.ReadAllText(path);
-                    return _forbiddenProductionApiTerms
-                        .Where(term => text.Contains(term, StringComparison.Ordinal))
-                        .Select(term => $"{Path.GetRelativePath(RepoRoot, path)}: {term}");
-                })
-                .ToArray();
-
-            Assert.True(
-                offenders.Length == 0,
-                "NodeKit must stay on legacy BuildRequest/BuildAndRegister until the NodeVault migration gate opens. Offenders: "
                 + string.Join(", ", offenders));
         }
 

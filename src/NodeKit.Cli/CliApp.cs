@@ -39,7 +39,7 @@ namespace NodeKit.Cli
             {
                 "validate" => RunValidate(args, stdout, stderr),
                 "render" => RunRender(args, stdout, stderr),
-                "submit" => SubmitCommand.Run(args, stdout, stderr),
+                "submit" => SubmitCommand.Run(args, stdout, stderr, legacyClient: null, toolSpecClient: null),
                 "recipe" => RunRecipe(args, stdin, stdout, stderr),
                 _ => Unknown(args[0], stderr),
             };

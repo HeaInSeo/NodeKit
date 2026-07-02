@@ -7,17 +7,15 @@ Read `docs/NODEKIT_CLI_UX_IMPROVEMENT_SPRINT_PLAN.md` for the active CLI UX impr
 
 Current planning source of truth:
 
-- NodeKit must not implement the new `ToolSpecRequest` production path yet.
-- Keep the current `BuildRequest` / `BuildAndRegister` legacy gRPC path working.
-- NodeKit migrates only after NodeVault Phase 1 is complete:
-  - canonical `ResolveToolSpec` implementation
-  - `SubmitToolBuild` API
+- **NodeVault Phase 1 gate 열림 (2026-07-02)**: `ResolveToolSpec` / `SubmitToolBuild` / `WatchToolBuild`
+  클라이언트 경로가 NodeKit에서 구현 허용됨.
+- `nodekit submit` 기본 경로: `ResolveToolSpec → SubmitToolBuild → WatchToolBuild`.
+- `--legacy` 플래그로 `BuildAndRegister` 레거시 경로 유지.
+- Phase 6 (legacy API 축소): NodeKit 전환 확인 후 진행.
 - Follow `PLATFORM_SCHEDULE.md` Phase 6 order.
 
-Until that gate opens, immediate NodeKit work is limited to legacy path stability,
-L1 validation quality, BuildRequest mapping quality, gRPC client resilience, CI,
-lint, tests, and coverage. Older sprint documents under `docs/obsolete/` are
-historical reference only and must not override the active sprint plan.
+Older sprint documents under `docs/obsolete/` are historical reference only and
+must not override the active sprint plan.
 
 New application state should follow the same direction as DagEdit: ReactiveUI /
 System.Reactive first, with DynamicData where collection change streams are useful.
