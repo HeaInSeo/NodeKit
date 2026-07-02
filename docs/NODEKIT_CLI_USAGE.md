@@ -1021,7 +1021,7 @@ Harbor가 digest를 응답하면:
 
 [2 / 6]
 
-기본 실행 명령 — 도구 실행 시 사용할 기본 명령 또는 이미지 안의 스크립트 경로입니다.
+기본 실행 명령 — 도구 실행 시 사용할 기본 명령 또는 이미지 안의 스크립트 경로입니다. 현재 legacy BuildRequest 호환을 위해 필요합니다.
    예: bwa mem, /app/run.sh
 
 ── /back: 이전 필드   /cancel: 종료   /review: 현재 값   /change-method: 작성 방식 변경 ──
@@ -1346,6 +1346,9 @@ dotnet run --project src/NodeKit.Cli -- recipe create
 
 **4. 파싱 결과 확인**
 
+버전만 있고 build string이 없으면 `주의:` 경고가 함께 나온다.
+(build string은 저장 전 ResolveRecipe 단계에서 선택한다.)
+
 ```
 설치 명령을 이해했습니다.
 
@@ -1355,6 +1358,9 @@ dotnet run --project src/NodeKit.Cli -- recipe create
     - bioconda
   Packages:
     - samtools=1.17
+
+주의:
+  samtools=1.17: build string이 고정되어 있지 않습니다.
 
 선택:
 [1] 이해한 값을 사용하고 부족한 값을 직접 입력한다
@@ -1366,7 +1372,20 @@ dotnet run --project src/NodeKit.Cli -- recipe create
 > 1
 ```
 
-**5. 필드 입력**
+**5. 채널 확인**
+
+패키지 채널 목록을 확인한다. 이상 없으면 Enter.
+
+```
+채널 확인
+
+  채널: 1개 항목
+
+[Enter / y] 이 채널 사용   [n] 채널 다시 입력:
+> (Enter)
+```
+
+**6. 필드 입력**
 
 install command에서 자동 채워진 항목: **Packages, Channels, PackageEngine** (3개)
 
@@ -1395,16 +1414,16 @@ install command에서 자동 채워진 항목: **Packages, Channels, PackageEngi
 
 [3 / 7]
 
-기본 실행 명령 — 도구 실행 시 사용할 기본 명령 또는 이미지 안의 스크립트 경로입니다.
-   예: samtools view, bwa mem, /app/run.sh
+기본 실행 명령 — 도구 실행 시 사용할 기본 명령 또는 이미지 안의 스크립트 경로입니다. 현재 legacy BuildRequest 호환을 위해 필요합니다.
+   예: bwa mem, /app/run.sh
 
 ── /back: 이전 필드   /cancel: 종료   /review: 현재 값   /change-method: 작성 방식 변경 ──
 > samtools view
 
 [4 / 7]
 
-기반 이미지 — conda가 설치된 base 이미지입니다. digest 포함 필요.
-   예: condaforge/miniforge3:24.3.0-0@sha256:...
+기반 이미지 — 이 빌드의 기반이 되는 컨테이너 이미지입니다. 별도의 digest 필드가 없으므로 이 값 자체에 @sha256:... digest를 포함해야 최종 검증을 통과합니다.
+   예: condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
 ── /back: 이전 필드   /cancel: 종료   /review: 현재 값   /change-method: 작성 방식 변경 ──
 > condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef...
