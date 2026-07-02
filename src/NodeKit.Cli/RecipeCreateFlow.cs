@@ -410,6 +410,12 @@ namespace NodeKit.Cli
                     console.WriteLine($"   예: {string.Join(", ", field.Examples)}");
                 }
 
+                var suggested = session.GetFieldDefault(field.Name);
+                if (suggested != null)
+                {
+                    console.WriteLine($"   제안 값: {suggested} (Enter로 수락, 다른 값 입력 시 변경)");
+                }
+
                 var line = console.ReadLine() ?? string.Empty;
 
                 if (TryHandleChangeMethod(session, line, console))
@@ -431,6 +437,14 @@ namespace NodeKit.Cli
 
                 if (TryHandleHelp(field, line, console))
                 {
+                    continue;
+                }
+
+                if (line.Trim().Length == 0 && suggested != null)
+                {
+                    var violations2 = session.SetField(field.Name, suggested);
+                    if (violations2.Count == 0) return;
+                    PrintViolations(violations2, console);
                     continue;
                 }
 

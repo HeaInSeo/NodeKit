@@ -50,6 +50,7 @@ namespace NodeKit.Authoring.Recipes
         private readonly Dictionary<string, List<object>> _listItems = new(StringComparer.Ordinal);
         private readonly Dictionary<string, int> _appliedListItemCounts = new(StringComparer.Ordinal);
         private readonly HashSet<string> _dirtyListFields = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, string> _suggestedDefaults = new(StringComparer.Ordinal);
 
         private RecipeMethodId? _selectedMethod;
         private RecipeAuthoringSessionMetadata _metadata = new();
@@ -78,6 +79,19 @@ namespace NodeKit.Authoring.Recipes
             EnsureMethodSelected();
             return RecipeFieldCatalog.FieldsFor(_selectedMethod!.Value).FirstOrDefault(f => !IsFieldComplete(f));
         }
+
+        public void SuggestFieldDefault(string fieldName, string value)
+        {
+            if (string.IsNullOrEmpty(fieldName) || string.IsNullOrEmpty(value))
+            {
+                return;
+            }
+
+            _suggestedDefaults[fieldName] = value;
+        }
+
+        public string? GetFieldDefault(string fieldName) =>
+            _suggestedDefaults.TryGetValue(fieldName, out var v) ? v : null;
 
         public IReadOnlyList<ValidationViolation> SetField(string fieldName, object value)
         {

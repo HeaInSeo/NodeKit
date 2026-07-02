@@ -213,6 +213,37 @@ namespace NodeKit.Cli
             session.SetField("ToolName", nameHint);
         }
 
+        private static void TryPreFillToolVersion(RecipeAuthoringSession session, string versionHint)
+        {
+            if (string.IsNullOrEmpty(versionHint)) return;
+            var existing = session.Snapshot().Values.FirstOrDefault(v => v.FieldName == "ToolVersion");
+            if (existing != null && !string.IsNullOrEmpty(existing.DisplayValue)) return;
+            session.SetField("ToolVersion", versionHint);
+        }
+
+        private static void TrySuggestFromBioContainersRef(RecipeAuthoringSession session, string repositoryAndTag)
+        {
+            // BioContainers pattern: quay.io/biocontainers/{name}:{version}--{buildstring}
+            var colonIdx = repositoryAndTag.LastIndexOf(':');
+            if (colonIdx < 0) return;
+
+            var repoPath = repositoryAndTag[..colonIdx];
+            var tag = repositoryAndTag[(colonIdx + 1)..];
+
+            if (!repoPath.Contains("biocontainers/", StringComparison.OrdinalIgnoreCase)) return;
+
+            var slashIdx = repoPath.LastIndexOf('/');
+            var toolName = slashIdx >= 0 ? repoPath[(slashIdx + 1)..] : repoPath;
+            if (string.IsNullOrEmpty(toolName)) return;
+
+            var dashDashIdx = tag.IndexOf("--", StringComparison.Ordinal);
+            var version = dashDashIdx >= 0 ? tag[..dashDashIdx] : tag;
+            if (string.IsNullOrEmpty(version)) return;
+
+            session.SuggestFieldDefault("ToolName", toolName);
+            session.SuggestFieldDefault("ToolVersion", version);
+        }
+
         // ── Section 9: 설치 명령 기반 흐름 ─────────────────────────────────────
         private static RecipeMethodId? RunInstallCommandFlow(
             RecipeAuthoringSession session,
@@ -463,6 +494,19 @@ namespace NodeKit.Cli
                 }
 
                 session.CompleteListField("Packages");
+
+                // 패키지가 정확히 1개이고 버전이 명시된 경우 ToolName/ToolVersion 기본값 제안.
+                // "samtools=1.17" → ToolName 제안=samtools, ToolVersion 제안=1.17
+                // "bwa=0.7.17=h5bf99c6_8" → ToolName 제안=bwa, ToolVersion 제안=0.7.17 (build string 제외)
+                if (parsed.Packages.Count == 1)
+                {
+                    var parts = parsed.Packages[0].Split('=');
+                    if (parts.Length >= 2 && !string.IsNullOrEmpty(parts[0]) && !string.IsNullOrEmpty(parts[1]))
+                    {
+                        session.SuggestFieldDefault("ToolName", parts[0]);
+                        session.SuggestFieldDefault("ToolVersion", parts[1]);
+                    }
+                }
             }
 
             return RecipeMethodId.Package;
@@ -511,6 +555,7 @@ namespace NodeKit.Cli
                     session.SelectMethod(RecipeMethodId.Container);
                     session.SetField("ImageRef", result.RepositoryAndTag);
                     session.SetField("ImageDigest", result.Digest!);
+                    TrySuggestFromBioContainersRef(session, result.RepositoryAndTag);
                     return RecipeMethodId.Container;
                 }
 
@@ -534,6 +579,7 @@ namespace NodeKit.Cli
                                 session.SelectMethod(RecipeMethodId.Container);
                                 session.SetField("ImageRef", resolved.RepositoryAndTag);
                                 session.SetField("ImageDigest", resolved.Digest!);
+                                TrySuggestFromBioContainersRef(session, resolved.RepositoryAndTag);
                                 return RecipeMethodId.Container;
                             }
                         }
