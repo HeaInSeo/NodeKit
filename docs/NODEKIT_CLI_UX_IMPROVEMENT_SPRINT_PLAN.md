@@ -15,21 +15,24 @@ NodeVault 경계(BuildRequest 레거시 경로 유지, ToolSpecRequest 미구현
 ═══════════════════════════════════════════════════════
  NodeKit CLI UX 개선 — 스프린트 진행률
 ═══════════════════════════════════════════════════════
- 전체 진행률   : ░░░░░░░░░░  0/23 (0%)
- 현재 스프린트 : U1 — TUI 기반 도입
- U1 진행률     : ░░░░░░░░░░  0/5  (0%)
+ 전체 진행률   : ██████████  22/23 (96%)
+ 현재 스프린트 : U5 — 문서 + 최종 검증
+ U5 진행률     : ██████████  2/3  (67%)
 ═══════════════════════════════════════════════════════
- U1 TUI 기반 도입          [0/5]  ░░░░░░░░░░
-   ○ U1-1  Spectre.Console 패키지 추가
-   ○ U1-2  IAnsiConsole 추상화 + RecipeCreateScreen 교체
-   ○ U1-3  3구역 레이아웃 구현 (설명 / 슬래시명령 / 입력)
-   ○ U1-4  기존 테스트 TestConsole 기반으로 전환
-   ○ U1-5  빌드 0 경고 / 전체 테스트 통과
+ U1 TUI 기반 도입          [5/5]  ██████████
+   ✓ U1-1  Spectre.Console 패키지 추가
+   ✓ U1-2  IAnsiConsole 추상화 + RecipeCreateScreen 교체
+   ✓ U1-3  3구역 레이아웃 구현 (설명 / 슬래시명령 / 입력)
+   ✓ U1-4  AnsiRecipeConsoleRenderingTests (TestConsole 기반)
+   ✓ U1-5  빌드 0 경고 / 전체 테스트 통과 (464 tests)
 ───────────────────────────────────────────────────────
- U2 통합 흐름 재설계       [0/6]  ░░░░░░░░░░
- U3 Base image 자동 조회   [0/5]  ░░░░░░░░░░
- U4 저장 경로 마지막 확정  [0/4]  ░░░░░░░░░░
- U5 문서 + 최종 검증       [0/3]  ░░░░░░░░░░
+ U2 통합 흐름 재설계       [6/6]  ██████████
+ U3 Base image 자동 조회   [5/5]  ██████████
+ U4 저장 경로 마지막 확정  [4/4]  ██████████ (U4-2 draft save 제외, 범위 밖)
+ U5 문서 + 최종 검증       [2/3]  ███████░░░
+   ✓ U5-1  NODEKIT_CLI_USAGE.md 업데이트 (2026-07-02)
+   ○ U5-2  사용자 수동 테스트 통과 (seoy 원격 장비 필요)
+   ✓ U5-3  커밋 + GitHub push
 ═══════════════════════════════════════════════════════
 ```
 
@@ -230,28 +233,28 @@ NodeVault 경계(BuildRequest 레거시 경로 유지, ToolSpecRequest 미구현
 
 | ID | 스프린트 | 설명 | 상태 |
 |---|---|---|---|
-| U1-1 | U1 | Spectre.Console 패키지 추가 | ○ |
-| U1-2 | U1 | IAnsiConsole 추상화 + RecipeCreateScreen 교체 | ○ |
-| U1-3 | U1 | 3구역 레이아웃 구현 | ○ |
-| U1-4 | U1 | 기존 테스트 TestConsole 기반 전환 | ○ |
-| U1-5 | U1 | 빌드 0 경고 / 전체 테스트 통과 | ○ |
-| U2-1 | U2 | RecipeCreateFlow 신설 | ○ |
-| U2-2 | U2 | BeginnerGuideFlow 역할 축소 | ○ |
-| U2-3 | U2 | 빠른 설정에 채널 확정 단계 추가 | ○ |
-| U2-4 | U2 | RunFieldLoop에서 ImageRef 처리 분리 | ○ |
-| U2-5 | U2 | 테스트 업데이트 | ○ |
-| U2-6 | U2 | 빌드 + 테스트 검증 | ○ |
-| U3-1 | U3 | BaseImageSelectionStep 인터페이스 + UI | ○ |
-| U3-2 | U3 | PublicRegistryImageDigestResolver (오픈망) | ○ |
-| U3-3 | U3 | HarborImageDigestResolver 통합 (폐쇄망) | ○ |
-| U3-4 | U3 | Stub + 테스트 추가 | ○ |
-| U3-5 | U3 | 빌드 + 테스트 검증 | ○ |
-| U4-1 | U4 | Run() 시그니처 변경 | ○ |
-| U4-2 | U4 | 임시 파일 draft 저장 | ○ |
-| U4-3 | U4 | 저장 경로 확정 UI | ○ |
-| U4-4 | U4 | 테스트 + 빌드 검증 | ○ |
-| U5-1 | U5 | NODEKIT_CLI_USAGE.md 전면 업데이트 | ○ |
-| U5-2 | U5 | 사용자 수동 테스트 통과 | ○ |
+| U1-1 | U1 | Spectre.Console 패키지 추가 | ✓ |
+| U1-2 | U1 | IAnsiConsole 추상화 + RecipeCreateScreen 교체 | ✓ |
+| U1-3 | U1 | 3구역 레이아웃 구현 | ✓ |
+| U1-4 | U1 | AnsiRecipeConsoleRenderingTests (TestConsole 기반) | ✓ |
+| U1-5 | U1 | 빌드 0 경고 / 전체 테스트 통과 | ✓ |
+| U2-1 | U2 | RecipeCreateFlow 신설 | ✓ |
+| U2-2 | U2 | BeginnerGuideFlow 역할 축소 | ✓ |
+| U2-3 | U2 | 빠른 설정에 채널 확정 단계 추가 | ✓ |
+| U2-4 | U2 | RunFieldLoop에서 ImageRef 처리 분리 (BaseImageSelectionStep) | ✓ |
+| U2-5 | U2 | 테스트 업데이트 | ✓ |
+| U2-6 | U2 | 빌드 + 테스트 검증 | ✓ |
+| U3-1 | U3 | BaseImageSelectionStep 인터페이스 + UI | ✓ |
+| U3-2 | U3 | PublicRegistryImageDigestResolver (오픈망) | ✓ |
+| U3-3 | U3 | HarborImageDigestResolver 통합 (폐쇄망) | ✓ |
+| U3-4 | U3 | StubImageDigestResolver + 테스트 | ✓ |
+| U3-5 | U3 | 빌드 + 테스트 검증 | ✓ |
+| U4-1 | U4 | outPathHint 시그니처 변경 | ✓ |
+| U4-2 | U4 | 임시 파일 draft 저장 | — (범위 조정: 제거) |
+| U4-3 | U4 | 저장 경로 확정 UI (PromptSavePath) | ✓ |
+| U4-4 | U4 | SavePathConfirmationTests + 빌드 검증 | ✓ |
+| U5-1 | U5 | NODEKIT_CLI_USAGE.md 업데이트 | ✓ |
+| U5-2 | U5 | 사용자 수동 테스트 통과 | ○ (seoy 원격 장비 필요) |
 | U5-3 | U5 | 커밋 + GitHub push | ○ |
 
 ---

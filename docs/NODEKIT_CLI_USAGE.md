@@ -4,10 +4,10 @@
 문서만 보고 recipe 하나를 끝까지 만들 수 있도록, 명령어 → 예시 → 막혔을 때
 어떻게 하는지 순서로 적었다.
 
-이 CLI는 **legacy `BuildRequest` 경로만** 다룬다 — `RecipeDocument →
-RecipeValidator → RecipeRenderer → ToolDefinition → 기존 L1 validator 체인 →
-legacy `BuildRequest` JSON`. gRPC 전송, NodeVault 조회, 이미지 빌드,
-`submit`/`build` 명령은 이 CLI에 없다 (CLAUDE.md 1절, NodeKit 책임 경계).
+이 CLI는 **recipe authoring → L1 정적 검증 → NodeVault 빌드 제출**을 담당한다.
+NodeVault Phase 1 게이트(2026-07-02)가 열려 `ResolveToolSpec → SubmitToolBuild →
+WatchToolBuild` 신규 경로가 사용 가능하다. 이미지 빌드, Job 스케줄링,
+K8s API 호출은 NodeVault 영역이며 이 CLI에 없다 (CLAUDE.md 1절).
 
 명령 설계 배경은 [`NODEKIT_CLI_RECIPE_SPEC_DRAFT.md`](NODEKIT_CLI_RECIPE_SPEC_DRAFT.md)
 §5/§6, recipe create 마법사의 v1.0 UX 계약은
@@ -41,7 +41,7 @@ dotnet run --project src/NodeKit.Cli -- validate recipe.json
 dotnet run --project src/NodeKit.Cli -- render recipe.json --out build-request.json
 ```
 
-아래 절들은 이 세 명령(`recipe create`, `validate`, `render`)을 차례로
+아래 절들은 이 네 명령(`recipe create`, `validate`, `render`, `submit`)을 차례로
 자세히 설명한다.
 
 중간에 그만두려면 대부분의 프롬프트에서 다음 중 하나를 입력한다.
@@ -83,7 +83,8 @@ dotnet run --project src/NodeKit.Cli -- validate recipe.json
 전체 테스트:
 
 ```bash
-dotnet test --solution NodeKit.sln
+dotnet test --project tests/NodeKit.Tests/NodeKit.Tests.csproj
+dotnet test --project tests/NodeKit.Cli.Tests/NodeKit.Cli.Tests.csproj
 ```
 
 Microsoft.Testing.Platform/xUnit v3를 사용하므로 특정 테스트 클래스만 돌릴 때는
@@ -757,7 +758,40 @@ nodekit recipe create /tmp/recipe.json \
 올라갈 수 있다. 저장 전 확인(2-8절) 화면에서는 `n`을 입력하면 처음부터
 다시 작성할 수 있다.
 
-## 3. `nodekit validate <recipe.json>`
+## 3. `nodekit submit <recipe.json>`
+
+recipe를 검증하고 NodeVault에 빌드 제출한다.
+
+```bash
+nodekit submit recipe.json [--url <nodevault-url>] [--legacy]
+```
+
+기본 경로는 NodeVault Phase 1 신규 경로(`ResolveToolSpec → SubmitToolBuild →
+WatchToolBuild`)다. `--legacy` 플래그를 붙이면 기존 `BuildAndRegister` 경로를 사용한다.
+
+NodeVault URL은 `NODEKIT_NODEVAULT_URL` 환경변수 또는 `--url` 옵션으로 지정한다.
+
+```bash
+export NODEKIT_NODEVAULT_URL=http://nodevault.lab.local:8080
+nodekit submit recipe.json
+```
+
+빌드 이벤트 로그가 실시간으로 출력되며, 빌드 성공 시 종료 코드 0, 실패 시 1을 반환한다.
+
+```
+[빌드 시작] 신규 경로 (ToolSpec)
+spec 해결 완료 (digest: 8f3a1c2d...)
+빌드 제출됨 (build ID: abc-123)
+...
+[성공] 빌드가 완료되었습니다.
+```
+
+| 옵션 | 의미 |
+|---|---|
+| `--url <url>` | NodeVault gRPC 엔드포인트 URL (환경변수 `NODEKIT_NODEVAULT_URL`이 없을 때 필수) |
+| `--legacy` | `BuildAndRegister` 레거시 경로 사용 (Phase 6 전환 완료 전 호환용) |
+
+## 4. `nodekit validate <recipe.json>`
 
 recipe를 검증만 한다. 파일을 만들지 않는다.
 
@@ -784,7 +818,7 @@ $ echo $?
 1
 ```
 
-## 4. `nodekit render <recipe.json> --out <build-request.json>`
+## 5. `nodekit render <recipe.json> --out <build-request.json>`
 
 `validate`와 동일한 검증을 내부에서 먼저 수행한다 (fail-closed — 검증 안 된
 정의는 절대 export하지 않는다). 통과하면 `BuildRequestFactory`로
@@ -829,7 +863,7 @@ $ ls build-request.json
 ls: cannot access 'build-request.json': No such file or directory
 ```
 
-## 5. 종료 코드
+## 6. 종료 코드
 
 | 코드 | 의미 |
 |---|---|
@@ -839,12 +873,11 @@ ls: cannot access 'build-request.json': No such file or directory
 
 ### 그 외
 
-- `nodekit` 단독 실행, 또는 `validate`/`render`/`recipe`가 아닌 명령 → 사용법
+- `nodekit` 단독 실행, 또는 `validate`/`render`/`submit`/`recipe`가 아닌 명령 → 사용법
   안내 출력, 종료 코드 2.
-- `nodekit submit` 같은 명령은 존재하지 않는다 — 만들다 만 stub이 아니라
-  의도적으로 빠져 있다. NodeVault로의 실제 전송은 이 CLI의 책임이 아니다.
+- `nodekit submit` 빌드 제출 실패 시 종료 코드 1. URL 미지정 시 종료 코드 2.
 
-## 6. `recipe.json`을 손으로 쓰거나 고칠 때
+## 7. `recipe.json`을 손으로 쓰거나 고칠 때
 
 `recipe create`로 만든 파일을 텍스트 편집기로 직접 손보고 싶을 때를 위한
 참고용 스키마다. `RecipeDocument`는 flat POCO다. JSON 키는 C# 속성명과
@@ -896,7 +929,7 @@ ls: cannot access 'build-request.json': No such file or directory
 }
 ```
 
-## 7. 베스트 프랙티스 따라하기
+## 8. 베스트 프랙티스 따라하기
 
 실제로 입력하며 따라갈 수 있는 완성 시나리오 두 가지다.
 `>` 로 시작하는 줄이 직접 입력하는 값이다.
@@ -1226,8 +1259,8 @@ bwa → bwa=0.7.17=h5bf99c6_8
 ```
 
 > 위 출력은 `NODEKIT_RESOLVE_RECIPE_STUB=1` 환경변수를 켠 UX 테스트 결과다.
-> stub 없이 실행하면 (`GrpcResolveRecipeClient` Sprint R17 전) 이 화면이 나오지 않고
-> 입력한 `bwa=0.7.17`이 그대로 저장된다.
+> 실제 NodeVault에 연결하면(`NODEKIT_NODEVAULT_URL` 설정) `GrpcResolveRecipeClient`가
+> 동작한다. URL이 없으면 이 화면이 나오지 않고 입력한 버전 문자열이 그대로 저장된다.
 
 **6. 포트 설정 (선택사항)**
 
@@ -1531,17 +1564,14 @@ dotnet run --project src/NodeKit.Cli -- validate /home/user/samtools-1.17.json
 > `L1-IMG-006`이 나오면 `imageRef`에 `@sha256:` 부분이 빠진 것이다.
 > `/review`로 현재 값을 확인하고, 해당 필드에서 `/back`으로 돌아가서 수정한다.
 
-## 8. 범위 / 제한사항
+## 9. 범위 / 제한사항
 
-- gRPC 전송, NodeVault 조회, 이미지 레지스트리 push, 로컬 docker/buildah/buildkit
-  실행 — 전부 이 CLI의 범위 밖이다.
-- `ToolSpecRequest`/`ResolveToolSpec`/`SubmitToolBuild` 계열은 구현하지
-  않는다 (NodeVault Phase 1/2 게이트가 아직 열리지 않음 — CLAUDE.md 0절).
-- **`ResolveRecipe` 클라이언트 인터페이스(`IResolveRecipeClient`)는 구현 완료**,
-  UX 테스트용 stub(`NODEKIT_RESOLVE_RECIPE_STUB=1`)도 동작한다.
-  실제 gRPC 클라이언트(`GrpcResolveRecipeClient`)는 NodeVault proto에
-  `ResolveRecipe` RPC가 추가된 후 Sprint R17에서 연결한다. 그 전까지는
-  빌드 문자열 선택 화면이 나오지 않고 입력한 버전 문자열이 그대로 저장된다.
+- 이미지 레지스트리 push, 로컬 docker/buildah/buildkit 실행 — 이 CLI의 범위 밖이다.
+- K8s API 호출, Job 스케줄링, 이미지 빌드 오케스트레이션 — NodeVault 영역이다.
+- **`ResolveToolSpec`/`SubmitToolBuild`/`WatchToolBuild` 신규 경로**: NodeVault Phase 1
+  완료(2026-07-02) 후 `GrpcToolSpecClient`로 구현 완료. `nodekit submit` 기본 경로.
+- **`ResolveRecipe` 클라이언트**: `GrpcResolveRecipeClient`로 구현 완료.
+  UX 테스트용 stub(`NODEKIT_RESOLVE_RECIPE_STUB=1`)도 제공된다.
 - 5개 method가 생성하는 Dockerfile은 NodeKit L1 정적 검증만 통과했을 뿐,
   실제 `docker build`로 검증된 적은 없다.
 - `recipe create`의 escape hatch는 `/help`, `/review`, `/change-method`,
@@ -1554,3 +1584,5 @@ dotnet run --project src/NodeKit.Cli -- validate /home/user/samtools-1.17.json
   (3) 아무것도 없을 때 — Docker Hub / quay.io에서 자동 조회 (오픈망 기본).
   `PublicRegistryImageDigestResolver`는 15초 HTTP 타임아웃으로 Docker Hub anonymous
   Bearer 토큰 인증을 사용한다 — 조회 실패 시 재시도 또는 `0`(직접 입력)으로 전환된다.
+- **레거시 경로(`--legacy` 플래그)**: `BuildAndRegister` RPC를 통한 기존 경로. Phase 6
+  전환(legacy usage 0 확인) 완료 전까지 유지한다.
