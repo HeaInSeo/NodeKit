@@ -916,7 +916,7 @@ export NODEKIT_HARBOR_PASSWORD=$HARBOR_ADMIN_PASSWORD
 **2. 마법사 실행**
 
 ```bash
-dotnet run --project src/NodeKit.Cli -- recipe create /tmp/bwa-mem2.json
+dotnet run --project src/NodeKit.Cli -- recipe create
 ```
 
 **3. 모드 선택 — 쉬운 안내 모드**
@@ -1029,16 +1029,31 @@ Harbor가 digest를 응답하면:
 > method 전체 필드 수다. pre-filled 필드는 분모에 포함되지만 프롬프트가 나오지
 > 않으므로 자연스럽게 건너뛰어진다.
 
-**9. 저장 확인**
+**9. 저장 확인 및 경로 입력**
 
 ```
-저장되었습니다: /tmp/bwa-mem2.json
+── 저장 확인 ──────────────────────────────────────────
+  도구 이름: bwa-mem2
+  도구 버전: 2.2.1
+  ...
+
+[Enter / y] 저장   [n] 처음부터 다시 작성
+> (Enter)
+
+저장 위치를 확인하세요.
+
+기본 경로: /home/user/bwa-mem2-2.2.1.json
+/cancel: 종료
+다른 경로를 입력하거나 Enter로 기본 경로를 사용 [n = 처음부터 다시 작성]:
+> (Enter)
+
+저장되었습니다: /home/user/bwa-mem2-2.2.1.json
 ```
 
 **10. 검증**
 
 ```bash
-dotnet run --project src/NodeKit.Cli -- validate /tmp/bwa-mem2.json
+dotnet run --project src/NodeKit.Cli -- validate /home/user/bwa-mem2-2.2.1.json
 ```
 
 ```
@@ -1114,7 +1129,7 @@ condaforge/miniforge3:24.3.0-0@sha256:<위에서 구한 64자 hex>
 **실행**
 
 ```bash
-dotnet run --project src/NodeKit.Cli -- recipe create /tmp/bwa.json
+dotnet run --project src/NodeKit.Cli -- recipe create
 ```
 
 ```
@@ -1238,11 +1253,18 @@ bwa → bwa=0.7.17=h5bf99c6_8
 [Enter / y] 저장   [n] 처음부터 다시 작성
 > (Enter)
 
-저장되었습니다: /tmp/bwa.json
+저장 위치를 확인하세요.
+
+기본 경로: /home/user/bwa-0.7.17.json
+/cancel: 종료
+다른 경로를 입력하거나 Enter로 기본 경로를 사용 [n = 처음부터 다시 작성]:
+> (Enter)
+
+저장되었습니다: /home/user/bwa-0.7.17.json
 ```
 
 ```bash
-dotnet run --project src/NodeKit.Cli -- validate /tmp/bwa.json
+dotnet run --project src/NodeKit.Cli -- validate /home/user/bwa-0.7.17.json
 ```
 
 ---
@@ -1265,8 +1287,11 @@ condaforge/miniforge3:24.3.0-0@sha256:<64자 hex>
 **실행**
 
 ```bash
-dotnet run --project src/NodeKit.Cli -- recipe create /tmp/samtools.json
+dotnet run --project src/NodeKit.Cli -- recipe create
 ```
+
+경로는 마지막 단계에서 ToolName/ToolVersion을 기반으로 제안된다.
+시작 전에 파일명을 알 수 없으므로 경로를 미리 지정하지 않는다.
 
 **1. 모드 선택 — 쉬운 안내 모드**
 
@@ -1408,14 +1433,27 @@ Packages/Channels/PackageEngine은 자동 채워졌으므로 `[5/7]`, `[6/7]`, `
 
 [Enter / y] 저장   [n] 처음부터 다시 작성
 > (Enter)
-
-저장되었습니다: /tmp/samtools.json
 ```
 
-생성된 `samtools.json`에는 Packages, Channels, PackageEngine이 이미 채워져 있다.
+**8. 저장 경로 확인**
+
+경로를 지정하지 않고 시작했으므로 ToolName과 ToolVersion을 기반으로 기본 경로가 제안된다.
+
+```
+저장 위치를 확인하세요.
+
+기본 경로: /home/user/samtools-1.17.json
+/cancel: 종료
+다른 경로를 입력하거나 Enter로 기본 경로를 사용 [n = 처음부터 다시 작성]:
+> (Enter)
+
+저장되었습니다: /home/user/samtools-1.17.json
+```
+
+생성된 파일에는 Packages, Channels, PackageEngine이 이미 채워져 있다.
 
 ```bash
-dotnet run --project src/NodeKit.Cli -- validate /tmp/samtools.json
+dotnet run --project src/NodeKit.Cli -- validate /home/user/samtools-1.17.json
 ```
 
 ```
