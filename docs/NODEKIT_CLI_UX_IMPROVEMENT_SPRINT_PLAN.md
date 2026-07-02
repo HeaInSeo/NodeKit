@@ -1,11 +1,23 @@
 # NodeKit CLI UX 개선 스프린트 계획
 
-Status: Active  
+Status: U1-U4 완료 / U5 진행 중 (U5-2만 잔류)  
 Created: 2026-06-30  
+Updated: 2026-07-02  
 Scope: CLI UX 품질을 상업용 수준으로 끌어올리는 4개 스프린트
 
-이 계획은 `NODEKIT_CLI_FIRST_SPRINT_PLAN.md`의 R0-R16 완료 이후 진행한다.
-NodeVault 경계(BuildRequest 레거시 경로 유지, ToolSpecRequest 미구현)는 변경하지 않는다.
+이 계획은 `NODEKIT_CLI_FIRST_SPRINT_PLAN.md`의 Sprint 0-5 완료 이후 진행한다.
+Phase 6(ToolSpec 경로 전환)은 2026-07-02 완료됨 — 이 문서의 UX 항목과 별도 트랙.
+
+**추가 UX 개선 (계획 단계에서 이미 구현됨, 별도 스프린트 불필요):**
+
+```text
+✓ Inputs/Outputs 프리셋 설명 + 예시 출력
+    RecipeCreateFlow.cs PromptPresetListField에서 p.Description.Get("ko") + p.Examples 출력 중.
+✓ 앞으로 입력할 항목에 사용자 레이블 표시
+    MethodRecommendationPresenter.cs에서 field.Label.Get("ko") 사용 중.
+✓ 필드 /back 지원 + [n/total] 진행도 표시
+    RecipeCreateFlow.RunFieldLoop에 history + ClearField + [x/total] 이미 구현됨.
+```
 
 ---
 

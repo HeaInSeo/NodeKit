@@ -1,34 +1,26 @@
 # NodeKit Legacy-First Sprint Plan
 
-Status: Active Planning  
+Status: Sprint 6 완료 / Sprint 7 진행 중  
 Created: 2026-06-17  
-Updated: 2026-06-25  
-Scope: NodeKit work before NodeVault Phase 1 / PLATFORM_SCHEDULE.md Phase 6
+Updated: 2026-07-02  
+Scope: NodeKit work — Sprint 0-6 완료, Sprint 7(Post-Migration Hardening) 진행 중
 
 ## 0. Resume Note For Agents
 
 Read this document first when resuming NodeKit work.
 
-Current instruction from the NodeVault development boundary:
+**Phase 6 완료 (2026-07-02)**: NodeVault Phase 1 gate가 열렸고 NodeKit CLI는 이미
+ToolSpec 경로(`ResolveToolSpec → SubmitToolBuild → WatchToolBuild`)로 전환 완료.
+`--legacy` 플래그와 `BuildAndRegister` 경로는 CLI에서 제거됨.
+`IBuildClient` / `GrpcBuildClient`는 Avalonia(NodeKit.csproj)에만 남아 있음 — Sprint 7 대상.
+
+현재 NodeKit 초점:
 
 ```text
-NodeKit must not implement the new ToolSpecRequest path yet.
-Keep the current BuildRequest / BuildAndRegister legacy gRPC path working.
-NodeKit migrates only after NodeVault Phase 1 is complete:
-  - ResolveToolSpec canonical implementation
-  - SubmitToolBuild API
-Follow PLATFORM_SCHEDULE.md Phase 6 order.
+Sprint 7: Avalonia GUI ToolSpec 마이그레이션
++ U5-2: seoy 원격 장비 nodekit submit 수동 테스트 (seoy 준비 후)
++ CI 그린 유지
 ```
-
-This means the immediate NodeKit focus is:
-
-```text
-legacy BuildRequest path stability
-+ L1 validation quality
-+ CI / lint / test / coverage discipline
-```
-
-Do not add a production `ToolSpecRequest`, `ResolveToolSpec`, or `SubmitToolBuild` client path in NodeKit until NodeVault exposes and stabilizes the corresponding APIs.
 
 ## 1. Current Boundary
 
@@ -276,7 +268,7 @@ Done when:
 - Build progress/error output is easier to diagnose.
 ```
 
-### Sprint 6. ToolSpecRequest Migration Gate
+### Sprint 6. ToolSpecRequest Migration Gate ✓ (2026-07-02 완료)
 
 Goal:
 
@@ -284,55 +276,49 @@ Goal:
 Start migration only after NodeVault Phase 1 is actually complete.
 ```
 
-Entry criteria:
+Entry criteria — 모두 충족됨 (2026-07-02):
 
 ```text
-- NodeVault has canonical ResolveToolSpec implementation.
-- NodeVault has SubmitToolBuild API.
-- PLATFORM_SCHEDULE.md Phase 6 has begun.
-- NodeVault proto/API is stable enough to vendor.
+✓ NodeVault has canonical ResolveToolSpec implementation.
+✓ NodeVault has SubmitToolBuild API.
+✓ PLATFORM_SCHEDULE.md Phase 6 has begun.
+✓ NodeVault proto/API is stable enough to vendor (protos/ 디렉터리에 벤더링됨).
 ```
 
-Tasks after entry criteria are met:
+Tasks — 모두 완료:
 
 ```text
-1. Vendor the stable NodeVault proto.
-2. Add ToolSpecRequest authoring models.
-3. Add CLI-first path if still planned.
-4. Add ResolveToolSpec client.
-5. Add SubmitToolBuild client.
-6. Keep legacy BuildRequest path until migration is proven.
+✓ 1. Vendor the stable NodeVault proto. (protos/nodevault/v1/nodevault.proto)
+✓ 2. Add ToolSpecRequest authoring models. (GrpcToolSpecClient, IToolSpecBuildClient)
+✓ 3. Add CLI-first path. (nodekit submit → ResolveToolSpec → SubmitToolBuild → WatchToolBuild)
+✓ 4. Add ResolveToolSpec client. (GrpcToolSpecClient.ResolveAndBuildAsync Step 1)
+✓ 5. Add SubmitToolBuild client. (GrpcToolSpecClient.ResolveAndBuildAsync Step 2)
+✓ 6. Remove legacy BuildRequest path from CLI. (--legacy 플래그 + BuildAndRegister 제거)
 ```
 
-Done when:
-
-```text
-- New path is explicitly enabled by platform phase.
-- Legacy path remains available during migration.
-```
-
-### Sprint 7. Post-Migration Hardening
+### Sprint 7. Post-Migration Hardening (진행 중)
 
 Goal:
 
 ```text
-Make the new path reliable enough to replace legacy usage.
+Make the new path reliable enough to replace all legacy usage.
 ```
 
 Tasks:
 
 ```text
-1. Compare legacy and new behavior on representative tools.
-2. Add migration documentation.
-3. Keep runtime image selection authority in NodeVault Certified*Record.
-4. Remove or deprecate legacy only after usage reaches zero and an ADR approves it.
+○ 1. Avalonia GUI(NodeKit.csproj)를 IBuildClient/GrpcBuildClient에서 GrpcToolSpecClient로 전환.
+     IBuildClient / GrpcBuildClient는 현재 NodeKit.csproj(Avalonia)에만 남아 있음.
+○ 2. U5-2: seoy 원격 장비에서 nodekit submit 수동 테스트 통과.
+○ 3. NodeVault 측 BuildAndRegister RPC deprecated 표시 (NodeVault 담당).
 ```
 
 Done when:
 
 ```text
-- New path is covered by CI/lint/test/coverage.
-- Legacy removal has an explicit ADR, not an implicit refactor.
+- Avalonia GUI도 ToolSpec 경로로 전환 완료.
+- CLI end-to-end 수동 테스트 통과 (seoy 장비).
+- IBuildClient / GrpcBuildClient 완전 제거 또는 명시적 ADR 후 유지 결정.
 ```
 
 ## 5. Immediate First Slice
@@ -350,16 +336,15 @@ Start here:
 
 ## 6. Baseline Snapshot
 
-Captured: 2026-06-18
+Captured: 2026-07-02 (업데이트)
 
 NodeVault observation:
 
 ```text
-- NodeVault is the upstream Kubernetes data-plane app.
-- Current proto still exposes BuildService.BuildAndRegister(BuildRequest).
-- Current proto also exposes BuildService.ResolveToolSpec(ToolSpecRequest).
-- SubmitToolBuild / WatchToolBuild / CancelToolBuild are not present yet.
-- Therefore NodeKit must keep the legacy BuildRequest / BuildAndRegister path.
+- NodeVault Phase 1 완료: ResolveToolSpec / SubmitToolBuild / WatchToolBuild API 사용 가능.
+- BuildAndRegister RPC는 NodeVault에 남아 있지만 NodeKit CLI에서는 제거됨.
+- proto는 protos/nodevault/v1/nodevault.proto 로 벤더링됨 (git tracked).
+- NodeKit CLI는 GrpcToolSpecClient 경유 3단계 경로만 사용.
 ```
 
 Local CI-equivalent commands:
@@ -373,15 +358,15 @@ dotnet test --solution NodeKit.sln --no-build --configuration Release --results-
 ./scripts/ci-check-coverage.sh
 ```
 
-Latest local result:
+Latest local result (2026-07-02):
 
 ```text
 - Locked restore: pass
 - Package audit: pass
-- Format: pass
+- Format: pass (dotnet format --verify-no-changes exit 0)
 - Build: pass, 0 warnings, 0 errors
-- Tests: pass, 82 passed, 0 failed, 0 skipped
-- Coverage threshold: pass, line >= 0.1400 and branch >= 0.0900
+- Tests: pass, 461 passed, 0 failed, 0 skipped
+- Coverage threshold: pass
 - Coverage artifact generated under TestResults/coverage.cobertura.xml
 ```
 
@@ -397,17 +382,24 @@ dependency changes on pull requests.
 pushes, pull requests, and a weekly schedule.
 ```
 
-## 7. Non-Goals Until NodeVault Phase 1 Completes
+## 7. Non-Goals (불변 / 영구)
+
+NodeVault Phase 1 완료 후에도 NodeKit이 절대 하지 않는 것:
 
 ```text
-- No production ToolSpecRequest path.
-- No ResolveToolSpec client path.
-- No SubmitToolBuild client path.
 - No local authoritative canonical digest calculation.
-- No NodeKit image build logic.
+- No NodeKit image build logic (docker/buildah/buildkit 실행 금지).
 - No Kubernetes API calls from NodeKit.
 - No rootless/Buildah handling in NodeKit.
-- No full UI rewrite.
+- No NodeVault index/catalog mutation from NodeKit.
+```
+
+Phase 1 이전 non-goal이었으나 현재 완료된 항목 (참고용):
+
+```text
+✓ ToolSpecRequest CLI 경로 — 완료 (GrpcToolSpecClient)
+✓ ResolveToolSpec 클라이언트 경로 — 완료
+✓ SubmitToolBuild 클라이언트 경로 — 완료
 ```
 
 ## 8. Handoff Note
@@ -415,10 +407,11 @@ pushes, pull requests, and a weekly schedule.
 The correct instruction for a NodeKit agent is:
 
 ```text
-NodeKit은 지금 당장 새 ToolSpecRequest 경로를 구현하지 말 것.
-현재 BuildRequest / BuildAndRegister legacy gRPC 경로를 유지하고 동작하게 두는 것이 맞다.
-NodeVault Phase 1 (ResolveToolSpec canonical 구현 + SubmitToolBuild API)이 완료된 후 NodeKit이 migration한다.
-PLATFORM_SCHEDULE.md Phase 6 순서대로 진행한다.
+NodeKit CLI는 Phase 6 완료 (2026-07-02)로 ToolSpec 경로로 전환됨.
+BuildAndRegister / legacy 경로는 CLI에서 제거됨.
+다음 단계: Avalonia GUI(NodeKit.csproj)의 IBuildClient → GrpcToolSpecClient 전환 (Sprint 7).
+재현성 규칙(latest 태그 금지, digest 필수, 패키지 버전 고정)은 여전히 불변.
+NodeVault 경계(이미지 빌드, K8s API, 인덱스 뮤테이션)도 여전히 불변.
 ```
 
 ## 9. Recipe Authoring Boundary And CLI Command Naming (2026-06-21 design intent)
