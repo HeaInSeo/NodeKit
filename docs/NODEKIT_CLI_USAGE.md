@@ -449,11 +449,9 @@ digest 조회에 성공하면 `ImageRef` 필드가 자동으로 채워지고 이
 
 | 환경 | 동작 |
 |---|---|
-| `NODEKIT_HARBOR_URL` 설정 | Harbor에서 digest 조회 |
+| `NODEKIT_HARBOR_URL` 설정 | Harbor에서 digest 조회 (폐쇄망) |
 | `NODEKIT_BASE_IMAGE_STUB=1` | 테스트/UX 확인용 고정 digest 반환 |
-| 아무것도 없음 | 이 화면이 나타나지 않음 (다음 단계에서 직접 입력) |
-
-공개 registry 자동 조회(`PublicRegistryImageDigestResolver`)는 현재 비활성화 상태다 — 오픈망 환경에서 이 화면을 테스트하려면 `NODEKIT_BASE_IMAGE_STUB=1`을 사용한다.
+| 아무것도 없음 (오픈망 기본) | Docker Hub / quay.io에서 자동 조회 |
 
 ### 2-4. 공통 필드 입력
 
@@ -1085,12 +1083,14 @@ dotnet run --project src/NodeKit.Cli -- validate /home/user/bwa-mem2-2.2.1.json
 
 bioconda에 패키지가 있는 경우의 빠른 설정 모드 흐름이다.
 
-**사전 준비 — 두 가지 정보를 미리 구한다**
+**사전 준비 — 패키지 문자열만 있으면 된다**
 
 package method에서 입력해야 하는 이미지는 **bwa 이미지가 아니다.**
-conda가 설치된 빌드 환경 이미지(condaforge/miniforge3 등)의 digest가 필요하다.
+conda가 설치된 빌드 환경 이미지(condaforge/miniforge3 등)를 사용하는데,
+**마법사 안에서 번호를 선택하면 digest를 자동으로 조회한다** — 수동으로
+미리 구할 필요가 없다. 폐쇄망이거나 직접 고정하고 싶은 경우에만 수동 취득이 필요하다.
 
-**① 패키지 문자열** — anaconda.org Files 탭에서 확인
+**패키지 문자열** — anaconda.org Files 탭에서 확인
 
 ```
 https://anaconda.org/bioconda/bwa
@@ -1112,39 +1112,6 @@ linux-64/bwa-0.7.17-h5bf99c6_8.tar.bz2
          이름  버전    build string
 ```
 
-**② base image digest** — 커맨드로 가져오기
-
-miniforge3 이미지 digest를 가져오는 가장 간단한 방법:
-
-```bash
-# skopeo가 있는 경우 (권장)
-skopeo inspect docker://condaforge/miniforge3:24.3.0-0 | python3 -m json.tool | grep Digest
-# → "Digest": "sha256:xxxxxxxx..."
-
-# docker가 있는 경우
-docker pull condaforge/miniforge3:24.3.0-0
-docker inspect condaforge/miniforge3:24.3.0-0 \
-  --format='{{index .RepoDigests 0}}'
-# → condaforge/miniforge3@sha256:xxxxxxxx...
-
-# 아무것도 없을 때 — curl + Docker Hub API
-TOKEN=$(curl -sf \
-  "https://auth.docker.io/token?service=registry.docker.io&scope=repository:condaforge/miniforge3:pull" \
-  | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
-curl -sI \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
-  "https://registry-1.docker.io/v2/condaforge/miniforge3/manifests/24.3.0-0" \
-  | grep -i docker-content-digest
-# → docker-content-digest: sha256:xxxxxxxx...
-```
-
-digest를 구했으면 아래 형식으로 조합해 놓는다:
-
-```
-condaforge/miniforge3:24.3.0-0@sha256:<위에서 구한 64자 hex>
-```
-
 **실행**
 
 ```bash
@@ -1164,7 +1131,7 @@ n      ← Dockerfile 없음
 (Enter) ← 추천 method(package) 수락
 ```
 
-채널 확인 다음에 **base image 선택** 화면이 나온다(`NODEKIT_HARBOR_URL` 설정 시):
+채널 확인 다음에 **base image 선택** 화면이 나온다:
 
 ```
 ── Base image 선택 ─────────────────────────────────────────
@@ -1179,7 +1146,7 @@ condaforge/miniforge3:24.3.0-0 의 digest를 조회합니다...
 설정 완료: condaforge/miniforge3:24.3.0-0@sha256:abcdef...
 ```
 
-환경변수가 없으면 이 화면이 나타나지 않고 필드 입력 단계에서 직접 입력한다.
+번호를 선택하면 Docker Hub(오픈망) 또는 Harbor(폐쇄망, `NODEKIT_HARBOR_URL` 설정 시)에서 digest를 자동으로 가져온다. `0`을 입력하면 필드 입력 단계에서 직접 입력한다.
 
 필드 입력:
 
@@ -1193,7 +1160,7 @@ condaforge/miniforge3:24.3.0-0 의 digest를 조회합니다...
 [3 / 7] 기본 실행 명령
 > bwa mem
 
-[4 / 7] 기반 이미지 — (base image 선택에서 자동 설정된 경우 건너뜀)
+[4 / 7] 기반 이미지 — (base image 선택에서 번호를 골랐으면 자동 설정되어 건너뜀. 0을 선택한 경우만 여기서 입력)
 > condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef...
 
 [5 / 7] 패키지 목록
@@ -1291,14 +1258,11 @@ bioconda에서 설치하는 방법만 알고 있는 경우의 흐름이다.
 설치 명령을 붙여 넣으면 Packages/Channels/PackageEngine이 자동으로 채워지고,
 나머지 항목만 직접 입력하면 된다.
 
-**사전 준비 — base image digest만 있으면 된다**
+**사전 준비 — 없다**
 
-시나리오 B의 `condaforge/miniforge3` digest 획득 방법과 동일하다.
-이미 구해 놓은 경우 그대로 사용한다.
-
-```
-condaforge/miniforge3:24.3.0-0@sha256:<64자 hex>
-```
+install command에서 Packages/Channels/PackageEngine이 자동으로 채워진다.
+기반 이미지(ImageRef)는 마법사 안에서 번호를 선택하면 digest를 자동으로 조회한다 —
+수동으로 미리 구할 필요가 없다.
 
 **실행**
 
@@ -1403,15 +1367,36 @@ dotnet run --project src/NodeKit.Cli -- recipe create
 > (Enter)
 ```
 
-**6. 필드 입력**
+**6. 기반 이미지 선택**
+
+채널 확인 직후 base image 선택 화면이 자동으로 나온다.
+번호를 고르면 digest를 자동으로 조회한다.
+
+```
+── Base image 선택 ─────────────────────────────────────────
+사용할 기반 이미지를 선택하세요. Digest는 자동으로 조회합니다.
+
+  [1] condaforge/miniforge3:24.3.0-0
+      공식 conda-forge Miniforge 기반 이미지 (conda/mamba 포함)
+  [2] mambaorg/micromamba:1.5.8
+      Micromamba 경량 기반 이미지 (빠른 설치)
+
+  [0] 직접 입력 (다음 단계에서 직접 입력)
+
+/cancel: 종료
+번호를 선택하세요 (1–2, 0 = 직접 입력):
+> 1
+
+condaforge/miniforge3:24.3.0-0 의 digest를 조회합니다...
+설정 완료: condaforge/miniforge3:24.3.0-0@sha256:abcdef...
+```
+
+**7. 필드 입력**
 
 install command에서 자동 채워진 항목: **Packages, Channels, PackageEngine** (3개)
+base image 선택에서 자동 채워진 항목: **ImageRef** (1개)
 
-직접 입력이 필요한 항목: **ToolName, ToolVersion, 실행 명령, 기반 이미지** (4개)
-
-> **기반 이미지(ImageRef)는 install command에서 알 수 없어 항상 직접 입력해야 한다.**
-> install 명령에는 `samtools=1.17` 패키지 정보만 있고, 어떤 conda base 이미지를
-> 쓸지는 포함되지 않기 때문이다.
+직접 입력이 필요한 항목: **ToolName, ToolVersion, 실행 명령** (3개)
 
 ```
 [1 / 7]
@@ -1437,18 +1422,10 @@ install command에서 자동 채워진 항목: **Packages, Channels, PackageEngi
 
 ── /back: 이전 필드   /cancel: 종료   /review: 현재 값   /change-method: 작성 방식 변경 ──
 > samtools view
-
-[4 / 7]
-
-기반 이미지 — 이 빌드의 기반이 되는 컨테이너 이미지입니다. 별도의 digest 필드가 없으므로 이 값 자체에 @sha256:... digest를 포함해야 최종 검증을 통과합니다.
-   예: condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
-
-── /back: 이전 필드   /cancel: 종료   /review: 현재 값   /change-method: 작성 방식 변경 ──
-> condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef...
 ```
 
-Packages/Channels/PackageEngine은 자동 채워졌으므로 `[5/7]`, `[6/7]`, `[7/7]`은
-건너뛴다.
+`[4/7]` 기반 이미지는 base image 선택에서 자동 설정되었으므로 건너뛴다.
+Packages/Channels/PackageEngine도 자동 채워졌으므로 `[5/7]`, `[6/7]`, `[7/7]`도 건너뛴다.
 
 **6. 포트 설정 (선택사항)**
 
@@ -1537,8 +1514,8 @@ dotnet run --project src/NodeKit.Cli -- validate /home/user/samtools-1.17.json
   쉬운 안내 모드, 빠른 설정 질문, 필드 입력, recovery 화면, 빌드 문자열 선택 화면에서
   사용할 수 있다. `/back`은 필드 입력 중 이전 필드로 돌아가거나, 첫 번째 필드에서
   입력하면 모드 선택 화면으로 돌아간다. draft 저장/resume은 범위 밖이다.
-- base image digest 자동 조회는 두 경로가 있다: (1) `NODEKIT_HARBOR_URL` 환경변수가
-  설정된 경우 내부 Harbor에서 조회하거나, (2) `NODEKIT_BASE_IMAGE_STUB=1`로 고정
-  digest를 반환한다. `PublicRegistryImageDigestResolver`(Docker Hub / quay.io)는
-  구현은 완료되었으나 현재 비활성화 상태다 — 오픈망 환경의 자동 조회는
-  Harbor 우선 사용을 권장한다.
+- base image digest 자동 조회 우선순위: (1) `NODEKIT_BASE_IMAGE_STUB=1` — 테스트용
+  고정 digest, (2) `NODEKIT_HARBOR_URL` 설정 시 — Harbor에서 조회 (폐쇄망),
+  (3) 아무것도 없을 때 — Docker Hub / quay.io에서 자동 조회 (오픈망 기본).
+  `PublicRegistryImageDigestResolver`는 15초 HTTP 타임아웃으로 Docker Hub anonymous
+  Bearer 토큰 인증을 사용한다 — 조회 실패 시 재시도 또는 `0`(직접 입력)으로 전환된다.
