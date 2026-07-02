@@ -1080,7 +1080,7 @@ Harbor가 digest를 응답하면:
   기본 실행 명령: bwa-mem2 mem
   기반 이미지: harbor.lab.local/bioinformatics/bwa-mem2:2.2.1@sha256:...
   입력 포트: reads
-  출력 포트: bam
+  출력 포트: alignment
 
 저장 위치를 확인하세요.
 
