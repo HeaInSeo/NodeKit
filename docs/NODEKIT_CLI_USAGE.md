@@ -1170,9 +1170,9 @@ condaforge/miniforge3:24.3.0-0 의 digest를 조회합니다...
 
 [6 / 7] 채널 목록
 채널 (완료하려면 빈 줄):
-> bioconda
-> conda-forge
-> defaults
+> bioconda      ← bwa 패키지가 있는 채널
+> conda-forge   ← 의존성 해결용 커뮤니티 채널
+> defaults      ← Anaconda 기본 채널 (상업 이용 시 라이선스 확인 필요)
 > (Enter)
 ```
 
