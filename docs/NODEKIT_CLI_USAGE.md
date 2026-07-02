@@ -1112,11 +1112,13 @@ linux-64/bwa-0.7.17-h5bf99c6_8.tar.bz2
          이름  버전    build string
 ```
 
-**실행**
+**1. 마법사 실행**
 
 ```bash
 dotnet run --project src/NodeKit.Cli -- recipe create
 ```
+
+**2. 빠른 설정 Q&A**
 
 ```
 > 2    ← 빠른 설정 모드
@@ -1131,7 +1133,9 @@ n      ← Dockerfile 없음
 (Enter) ← 추천 method(package) 수락
 ```
 
-채널 확인 다음에 **base image 선택** 화면이 나온다:
+**3. 기반 이미지 선택**
+
+method 수락 직후 **base image 선택** 화면이 자동으로 나온다.
 
 ```
 ── Base image 선택 ─────────────────────────────────────────
@@ -1146,9 +1150,9 @@ condaforge/miniforge3:24.3.0-0 의 digest를 조회합니다...
 설정 완료: condaforge/miniforge3:24.3.0-0@sha256:abcdef...
 ```
 
-번호를 선택하면 Docker Hub(오픈망) 또는 Harbor(폐쇄망, `NODEKIT_HARBOR_URL` 설정 시)에서 digest를 자동으로 가져온다. `0`을 입력하면 필드 입력 단계에서 직접 입력한다.
+번호를 선택하면 Docker Hub(오픈망) 또는 Harbor(폐쇄망, `NODEKIT_HARBOR_URL` 설정 시)에서 digest를 자동으로 가져온다. `0`을 입력하면 다음 단계 필드 입력에서 직접 입력한다.
 
-필드 입력:
+**4. 필드 입력**
 
 ```
 [1 / 7] 도구 이름
@@ -1160,8 +1164,8 @@ condaforge/miniforge3:24.3.0-0 의 digest를 조회합니다...
 [3 / 7] 기본 실행 명령
 > bwa mem
 
-[4 / 7] 기반 이미지 — (base image 선택에서 번호를 골랐으면 자동 설정되어 건너뜀. 0을 선택한 경우만 여기서 입력)
-> condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef...
+[4 / 7] 기반 이미지 — (3단계에서 번호를 골랐으면 자동 설정되어 건너뜀. 0을 선택한 경우만 여기서 입력)
+> condaforge/miniforge3:24.3.0-0@sha256:abcdef...
 
 [5 / 7] 패키지 목록
 패키지 문자열 (완료하려면 빈 줄):
@@ -1176,7 +1180,9 @@ condaforge/miniforge3:24.3.0-0 의 digest를 조회합니다...
 > (Enter)
 ```
 
-PackageEngine(conda/micromamba 선택)은 `Defaulted` 필드이므로 `NextField()`가 반환하지 않는다. 빈 줄로 Channels를 완료하면 세션이 바로 종료 판정되어 **빌드 문자열 선택** 화면으로 넘어간다.
+PackageEngine(conda/micromamba 선택)은 `Defaulted` 필드이므로 `NextField()`가 반환하지 않는다. 빈 줄로 Channels를 완료하면 세션이 바로 종료 판정되어 다음 단계로 넘어간다.
+
+**5. 빌드 문자열 선택**
 
 ```
 패키지 빌드 문자열 선택
@@ -1198,7 +1204,7 @@ bwa → bwa=0.7.17=h5bf99c6_8
 > stub 없이 실행하면 (`GrpcResolveRecipeClient` Sprint R17 전) 이 화면이 나오지 않고
 > 입력한 `bwa=0.7.17`이 그대로 저장된다.
 
-**포트 설정 (선택사항):**
+**6. 포트 설정 (선택사항)**
 
 ```
 ── 포트 설정 (선택사항) ────────────────────────────────────
@@ -1223,7 +1229,7 @@ bwa → bwa=0.7.17=h5bf99c6_8
 > 3
 ```
 
-**저장 전 최종 확인 및 경로 입력:**
+**7. 저장 확인 및 경로 입력**
 
 경로 없이 시작했으므로 요약 바로 아래에 경로 입력이 이어진다 (`[Enter / y]` 없음).
 
@@ -1232,7 +1238,7 @@ bwa → bwa=0.7.17=h5bf99c6_8
   도구 이름: bwa
   도구 버전: 0.7.17
   기본 실행 명령: bwa mem
-  기반 이미지: condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef...
+  기반 이미지: condaforge/miniforge3:24.3.0-0@sha256:abcdef...
   패키지: bwa=0.7.17=h5bf99c6_8
   입력 포트: reads
 
@@ -1245,6 +1251,8 @@ bwa → bwa=0.7.17=h5bf99c6_8
 
 저장되었습니다: /home/user/bwa-0.7.17.json
 ```
+
+**8. 검증**
 
 ```bash
 dotnet run --project src/NodeKit.Cli -- validate /home/user/bwa-0.7.17.json
