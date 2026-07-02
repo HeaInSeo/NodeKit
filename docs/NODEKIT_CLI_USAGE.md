@@ -933,8 +933,17 @@ dotnet run --project src/NodeKit.Cli -- recipe create
 
 ```
 [1] 쉬운 안내 모드
-[2] 빠른 설정 모드
+    도구 이름만 알아도 시작할 수 있습니다.
+    설치 명령, 이미지 주소, GitHub 주소 등을 예시와 함께 하나씩 확인합니다.
+    처음 사용하는 사람에게 추천합니다.
 
+[2] 빠른 설정 모드
+    내부망, mirror, public channel, source checksum, Dockerfile 여부를 알고 있는 경우 사용합니다.
+
+[3] 스크립트/CI 모드 사용법 보기
+    프롬프트 없이 한 줄 명령으로 recipe를 만들 때 사용합니다.
+
+선택:
 > 1
 ```
 
@@ -1304,8 +1313,17 @@ dotnet run --project src/NodeKit.Cli -- recipe create
 
 ```
 [1] 쉬운 안내 모드
-[2] 빠른 설정 모드
+    도구 이름만 알아도 시작할 수 있습니다.
+    설치 명령, 이미지 주소, GitHub 주소 등을 예시와 함께 하나씩 확인합니다.
+    처음 사용하는 사람에게 추천합니다.
 
+[2] 빠른 설정 모드
+    내부망, mirror, public channel, source checksum, Dockerfile 여부를 알고 있는 경우 사용합니다.
+
+[3] 스크립트/CI 모드 사용법 보기
+    프롬프트 없이 한 줄 명령으로 recipe를 만들 때 사용합니다.
+
+선택:
 > 1
 ```
 
