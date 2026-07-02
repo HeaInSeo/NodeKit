@@ -11,7 +11,7 @@ namespace NodeKit.Cli
     /// </summary>
     internal static class MethodRecommendationPresenter
     {
-        private static readonly IReadOnlyList<RecipeMethodId> MethodOrder = new[]
+        private static readonly IReadOnlyList<RecipeMethodId> _methodOrder = new[]
         {
             RecipeMethodId.Container,
             RecipeMethodId.Package,
@@ -20,7 +20,7 @@ namespace NodeKit.Cli
             RecipeMethodId.Dockerfile,
         };
 
-        private static readonly IReadOnlyDictionary<RecipeMethodId, IReadOnlyList<string>> Effects =
+        private static readonly IReadOnlyDictionary<RecipeMethodId, IReadOnlyList<string>> _effects =
             new Dictionary<RecipeMethodId, IReadOnlyList<string>>
             {
                 [RecipeMethodId.Container] = new[]
@@ -51,7 +51,7 @@ namespace NodeKit.Cli
                 },
             };
 
-        private static readonly IReadOnlyDictionary<RecipeMethodId, IReadOnlyList<string>> Cautions =
+        private static readonly IReadOnlyDictionary<RecipeMethodId, IReadOnlyList<string>> _cautions =
             new Dictionary<RecipeMethodId, IReadOnlyList<string>>
             {
                 [RecipeMethodId.Container] = new[]
@@ -176,7 +176,7 @@ namespace NodeKit.Cli
 
             console.WriteLine();
             console.WriteLine("이 방식으로 만들면:");
-            foreach (var effect in Effects[method])
+            foreach (var effect in _effects[method])
             {
                 console.WriteLine($"  - {effect}");
             }
@@ -190,7 +190,7 @@ namespace NodeKit.Cli
 
             console.WriteLine();
             console.WriteLine("주의:");
-            foreach (var caution in Cautions[method])
+            foreach (var caution in _cautions[method])
             {
                 console.WriteLine($"  - {caution}");
             }
@@ -202,9 +202,9 @@ namespace NodeKit.Cli
         {
             console.WriteLine("다른 작성 방식을 선택하세요.");
             console.WriteLine();
-            for (var i = 0; i < MethodOrder.Count; i++)
+            for (var i = 0; i < _methodOrder.Count; i++)
             {
-                var m = MethodOrder[i];
+                var m = _methodOrder[i];
                 var info = RecipeMethodCatalog.For(m);
                 console.WriteLine($"[{i + 1}] {info.Label.Get("ko")}");
                 console.WriteLine($"    {info.Description.Get("ko")}");

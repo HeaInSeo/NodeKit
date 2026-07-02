@@ -55,6 +55,7 @@ namespace NodeKit.Authoring.Recipes
         public string MirrorKind { get; set; } = string.Empty;
 
         // ── BioContainer ─────────────────────────────────────────────────────
+
         /// <summary>Pinned external image URI. This build kind's only image input.</summary>
         public string BioContainerImageUri { get; set; } = string.Empty;
 

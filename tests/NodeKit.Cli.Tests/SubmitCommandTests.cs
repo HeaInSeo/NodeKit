@@ -224,7 +224,7 @@ namespace NodeKit.Cli.Tests
                 _events = events;
             }
 
-#pragma warning disable CS1998
+#pragma warning disable CS1998, IDE0060
             public async IAsyncEnumerable<BuildEvent> ResolveAndBuildAsync(
                 string toolName,
                 string version,
@@ -237,7 +237,7 @@ namespace NodeKit.Cli.Tests
                     yield return ev;
                 }
             }
-#pragma warning restore CS1998
+#pragma warning restore CS1998, IDE0060
         }
 
         private sealed class CapturingToolSpecClient : IToolSpecBuildClient
@@ -249,7 +249,7 @@ namespace NodeKit.Cli.Tests
                 _onResolve = onResolve;
             }
 
-#pragma warning disable CS1998
+#pragma warning disable CS1998, IDE0060
             public async IAsyncEnumerable<BuildEvent> ResolveAndBuildAsync(
                 string toolName,
                 string version,
@@ -262,7 +262,7 @@ namespace NodeKit.Cli.Tests
                     yield return ev;
                 }
             }
-#pragma warning restore CS1998
+#pragma warning restore CS1998, IDE0060
         }
     }
 }

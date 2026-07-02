@@ -29,7 +29,7 @@ namespace NodeKit.Cli.Tests
         private readonly string _workDir = Path.Combine(
             Path.GetTempPath(), "nodekit-beginner-guide-tests-" + Guid.NewGuid());
 
-        private static readonly NoOpCancellationSource NoCancellation = new();
+        private static readonly NoOpCancellationSource _noCancellation = new();
 
         public BeginnerGuideFlowTests()
         {
@@ -481,7 +481,7 @@ namespace NodeKit.Cli.Tests
             var method = BeginnerGuideFlow.Run(
                 session,
                 new PlainTextRecipeConsole(stdin, stdout),
-                NoCancellation,
+                _noCancellation,
                 new FakeDigestResolver(ImageDigestResolutionResult.Resolved(Digest)));
 
             Assert.Equal(RecipeMethodId.Container, method);
@@ -506,7 +506,7 @@ namespace NodeKit.Cli.Tests
             var method = BeginnerGuideFlow.Run(
                 session,
                 new PlainTextRecipeConsole(stdin, stdout),
-                NoCancellation,
+                _noCancellation,
                 NullImageDigestResolver.Instance);
 
             Assert.Equal(RecipeMethodId.Container, method);
@@ -530,7 +530,7 @@ namespace NodeKit.Cli.Tests
             var method = BeginnerGuideFlow.Run(
                 session,
                 new PlainTextRecipeConsole(stdin, stdout),
-                NoCancellation,
+                _noCancellation,
                 new FakeDigestResolver(ImageDigestResolutionResult.NotFound()));
 
             Assert.Equal(RecipeMethodId.Container, method);
@@ -554,7 +554,7 @@ namespace NodeKit.Cli.Tests
             var method = BeginnerGuideFlow.Run(
                 session,
                 new PlainTextRecipeConsole(stdin, stdout),
-                NoCancellation,
+                _noCancellation,
                 new FakeDigestResolver(ImageDigestResolutionResult.Resolved(Digest)));
 
             Assert.Equal(RecipeMethodId.Container, method);

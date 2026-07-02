@@ -7,7 +7,7 @@ namespace NodeKit.Cli.Tests
 {
     public class PackageCandidatePresenterTests
     {
-        private static readonly IRecipeCreateCancellationSource NeverCancel =
+        private static readonly IRecipeCreateCancellationSource _neverCancel =
             new FixedCancellationSource(false);
 
         // ── Present ──────────────────────────────────────────────────────────
@@ -26,7 +26,7 @@ namespace NodeKit.Cli.Tests
             var stdin = new StringReader(""); // no input needed
             var stdout = new StringWriter();
 
-            var selections = PackageCandidatePresenter.Present(packages, new PlainTextRecipeConsole(stdin, stdout), NeverCancel);
+            var selections = PackageCandidatePresenter.Present(packages, new PlainTextRecipeConsole(stdin, stdout), _neverCancel);
 
             Assert.NotNull(selections);
             Assert.Equal("bwa=0.7.17=h5bf99c6_8", selections!["bwa"]);
@@ -48,7 +48,7 @@ namespace NodeKit.Cli.Tests
             var stdin = new StringReader("2\n");
             var stdout = new StringWriter();
 
-            var selections = PackageCandidatePresenter.Present(packages, new PlainTextRecipeConsole(stdin, stdout), NeverCancel);
+            var selections = PackageCandidatePresenter.Present(packages, new PlainTextRecipeConsole(stdin, stdout), _neverCancel);
 
             Assert.NotNull(selections);
             Assert.Equal("bwa=0.7.17=h7132678_8", selections!["bwa"]);
@@ -69,7 +69,7 @@ namespace NodeKit.Cli.Tests
             var stdin = new StringReader("\n");
             var stdout = new StringWriter();
 
-            var selections = PackageCandidatePresenter.Present(packages, new PlainTextRecipeConsole(stdin, stdout), NeverCancel);
+            var selections = PackageCandidatePresenter.Present(packages, new PlainTextRecipeConsole(stdin, stdout), _neverCancel);
 
             Assert.NotNull(selections);
             Assert.Equal("bwa=0.7.17=h5bf99c6_8", selections!["bwa"]);
@@ -91,7 +91,7 @@ namespace NodeKit.Cli.Tests
             var stdout = new StringWriter();
 
             Assert.Throws<RecipeCreateCancelledException>(() =>
-                PackageCandidatePresenter.Present(packages, new PlainTextRecipeConsole(stdin, stdout), NeverCancel));
+                PackageCandidatePresenter.Present(packages, new PlainTextRecipeConsole(stdin, stdout), _neverCancel));
         }
 
         [Fact]
@@ -109,7 +109,7 @@ namespace NodeKit.Cli.Tests
             var stdin = new StringReader("9\n1\n"); // 9 is out of range; then valid
             var stdout = new StringWriter();
 
-            var selections = PackageCandidatePresenter.Present(packages, new PlainTextRecipeConsole(stdin, stdout), NeverCancel);
+            var selections = PackageCandidatePresenter.Present(packages, new PlainTextRecipeConsole(stdin, stdout), _neverCancel);
 
             Assert.NotNull(selections);
             Assert.Equal("bwa=0.7.17=h5bf99c6_8", selections!["bwa"]);

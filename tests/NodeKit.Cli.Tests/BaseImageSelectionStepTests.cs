@@ -12,7 +12,7 @@ namespace NodeKit.Cli.Tests
     /// </summary>
     public class BaseImageSelectionStepTests : IDisposable
     {
-        private static readonly IRecipeCreateCancellationSource NoCancellation =
+        private static readonly IRecipeCreateCancellationSource _noCancellation =
             new FixedCancellationSource(false);
 
         private readonly string _workDir =
@@ -104,7 +104,7 @@ namespace NodeKit.Cli.Tests
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
                 new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
                 stderr,
-                NoCancellation,
+                _noCancellation,
                 imageDigestResolver: StubImageDigestResolver.Instance);
 
             Assert.Equal(0, exitCode);
@@ -141,7 +141,7 @@ namespace NodeKit.Cli.Tests
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
                 new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
                 stderr,
-                NoCancellation,
+                _noCancellation,
                 imageDigestResolver: StubImageDigestResolver.Instance);
 
             Assert.Equal(0, exitCode);
@@ -178,7 +178,7 @@ namespace NodeKit.Cli.Tests
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
                 new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
                 stderr,
-                NoCancellation,
+                _noCancellation,
                 imageDigestResolver: StubImageDigestResolver.Instance);
 
             Assert.Equal(0, exitCode);
@@ -218,7 +218,7 @@ namespace NodeKit.Cli.Tests
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
                 new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
                 stderr,
-                NoCancellation,
+                _noCancellation,
                 imageDigestResolver: null);
 
             Assert.Equal(0, exitCode);
@@ -264,7 +264,7 @@ namespace NodeKit.Cli.Tests
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
                 new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
                 stderr,
-                NoCancellation,
+                _noCancellation,
                 imageDigestResolver: StubImageDigestResolver.Instance);
 
             Assert.Equal(0, exitCode);
@@ -302,7 +302,7 @@ namespace NodeKit.Cli.Tests
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
                 new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
                 stderr,
-                NoCancellation,
+                _noCancellation,
                 imageDigestResolver: failingResolver);
 
             Assert.Equal(0, exitCode);
@@ -342,7 +342,7 @@ namespace NodeKit.Cli.Tests
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
                 new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
                 stderr,
-                NoCancellation,
+                _noCancellation,
                 imageDigestResolver: StubImageDigestResolver.Instance);
 
             Assert.Equal(0, exitCode);
