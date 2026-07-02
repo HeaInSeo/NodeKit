@@ -1451,7 +1451,7 @@ Packages/Channels/PackageEngine도 자동 채워졌으므로 `[5/7]`, `[6/7]`, `
   도구 이름: samtools
   도구 버전: 1.17
   기본 실행 명령: samtools view
-  기반 이미지: condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef...
+  기반 이미지: condaforge/miniforge3:24.3.0-0@sha256:abcdef...
   패키지: samtools=1.17
 
 저장 위치를 확인하세요.
@@ -1464,7 +1464,7 @@ Packages/Channels/PackageEngine도 자동 채워졌으므로 `[5/7]`, `[6/7]`, `
 저장되었습니다: /home/user/samtools-1.17.json
 ```
 
-생성된 파일에는 Packages, Channels, PackageEngine이 이미 채워져 있다.
+생성된 파일에는 Packages, Channels, PackageEngine, ImageRef가 이미 채워져 있다.
 
 ```bash
 dotnet run --project src/NodeKit.Cli -- validate /home/user/samtools-1.17.json
