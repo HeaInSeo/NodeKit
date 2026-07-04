@@ -2,7 +2,7 @@
 
 Status: Sprint 6 완료 / Sprint 7 진행 중  
 Created: 2026-06-17  
-Updated: 2026-07-02  
+Updated: 2026-07-03  
 Scope: NodeKit work — Sprint 0-6 완료, Sprint 7(Post-Migration Hardening) 진행 중
 
 ## 0. Resume Note For Agents
@@ -1508,4 +1508,27 @@ Done when:
 - bwa=0.7.17 + Harbor miss + open network → candidate list shown to user.
 - bwa=0.7.17 + Harbor miss + closed network → NotFound guidance shown,
   recipe saved without build_string (NodeVault will resolve at submit time).
+```
+
+**Progress (Sprint R17 완료, 2026-06-30):**
+
+```text
+완료 (커밋 0180674):
+- src/NodeKit.Cli/GrpcResolveRecipeClient.cs
+    TryCreate(): NODEKIT_NODEVAULT_URL 게이팅 (HarborImageDigestResolver와 동일 패턴)
+    BuildService.BuildServiceClient.ResolveRecipeAsync 호출, PackageSpec/RecipeVariant/
+    ResolveRecipeResponse → ResolveRecipeResult 매핑. GrpcChannel 소유, IDisposable.
+- RecipeCreateInteractiveRunner.cs: resolve client fallback chain에 연결
+    (test override → StubResolveRecipeClient → GrpcResolveRecipeClient → NullResolveRecipeClient)
+- protos/nodevault/v1/nodevault.proto: NodeVault 원본과 diff 결과 동일, 재벤더링 불필요
+    (ResolveRecipeRequest/ResolveRecipeResponse/PackageResolution/BuildStringCandidate 이미 반영됨)
+- tests/NodeKit.Cli.Tests/GrpcResolveRecipeClientIntegrationTests.cs
+    NODEKIT_NODEVAULT_URL 미설정 시 skip되는 opt-in 통합 테스트
+
+NodeVault 측 pkg/build/recipe_resolve.go: Harbor 우선 조회 + conda/micromamba 외부 조회
+(Anaconda.org API) + 폐쇄망 차단 모두 실구현, TestResolveRecipe_* 7/7 통과 확인.
+BIOCONTAINER variant만 codes.Unimplemented로 명시적 미구현(P3, 의도된 설계).
+
+최종 결과: PackageCandidatePresenterTests 9개 + GrpcResolveRecipeClientIntegrationTests
++ RecipeCreateInteractiveTests(FixedResolveRecipeClient) 모두 통과.
 ```
