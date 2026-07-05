@@ -223,7 +223,8 @@ namespace NodeKit.Cli
                     throw new RecipeCreateCancelledException();
                 }
 
-                var line = console.ReadLine() ?? string.Empty;
+                var rawLine = console.ReadLine();
+                var line = rawLine ?? string.Empty;
                 RecipeCreateEscapeCommands.ThrowIfCancel(line);
                 RecipeCreateEscapeCommands.ThrowIfBack(line);
 
@@ -236,6 +237,14 @@ namespace NodeKit.Cli
                     }
                     catch (InvalidOperationException ex)
                     {
+                        // Channels가 아직 0개인데 stdin이 EOF(rawLine이 null)면
+                        // 다시는 채널을 못 받으므로 여기서 반복해봐야 영원히 같은
+                        // 실패를 반복한다(issue #11) — 즉시 취소 처리한다.
+                        if (rawLine is null)
+                        {
+                            throw new RecipeCreateCancelledException();
+                        }
+
                         console.WriteLine(ex.Message);
                         continue;
                     }
@@ -545,7 +554,8 @@ namespace NodeKit.Cli
                     throw new RecipeCreateCancelledException();
                 }
 
-                var line = console.ReadLine() ?? string.Empty;
+                var rawLine = console.ReadLine();
+                var line = rawLine ?? string.Empty;
                 if (TryHandleChangeMethod(session, line, console))
                 {
                     return;
@@ -577,6 +587,16 @@ namespace NodeKit.Cli
                     }
                     catch (InvalidOperationException ex)
                     {
+                        // 필수 리스트가 아직 0개인데 stdin이 EOF(rawLine이 null)면
+                        // 다시는 항목을 못 받으므로 여기서 계속 재시도해봐야 영원히
+                        // 같은 실패를 반복한다(issue #11) — 즉시 취소 처리한다.
+                        // 일반적인 "그냥 Enter만 누름"(rawLine == "")은 지금처럼
+                        // 메시지 출력 후 재입력을 계속 받는다.
+                        if (rawLine is null)
+                        {
+                            throw new RecipeCreateCancelledException();
+                        }
+
                         console.WriteLine(ex.Message);
                         continue;
                     }

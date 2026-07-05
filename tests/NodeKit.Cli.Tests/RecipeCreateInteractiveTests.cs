@@ -294,6 +294,56 @@ namespace NodeKit.Cli.Tests
             Assert.False(File.Exists(outPath), "취소된 recipe는 저장되면 안 됩니다.");
         }
 
+        // Issue #11 회귀 테스트: 방식은 선택됐지만 필수 채널 입력 단계에서
+        // transcript가 끝나면(stdin EOF), PromptChannelEntry의 while(true) 루프가
+        // "Channels requires at least one item" 실패를 영원히 반복했다.
+        [Fact]
+        public void PackageMethodSelected_StdinEndsAtChannelPrompt_CancelsInsteadOfLooping()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "2", // 빠른 설정 모드
+                "n", "n", "u", "u", "u", "u", // 추천 보류로 유도
+                "2", // 수동 선택: package
+                // 여기서 transcript가 끝남 — 채널 입력 프롬프트에서 stdin EOF
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
+
+            Assert.Equal(130, exitCode);
+            Assert.False(File.Exists(outPath), "취소된 recipe는 저장되면 안 됩니다.");
+        }
+
+        // Issue #11 회귀 테스트 (PromptStringListField 쪽): 채널까지는 입력했지만
+        // 필수 리스트 필드인 Packages 입력 단계에서 transcript가 끝나면, 범용
+        // PromptStringListField의 while(true) 루프도 PromptChannelEntry와 똑같은
+        // 이유로 무한 재입력 루프에 빠졌다.
+        [Fact]
+        public void PackageMethodFields_StdinEndsAtPackagesPrompt_CancelsInsteadOfLooping()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "2", // 빠른 설정 모드
+                "n", "n", "u", "u", "u", "u", // 추천 보류로 유도
+                "2", // 수동 선택: package
+                "bioconda", "", // 채널 확정 단계
+                "0", // 기반 이미지: 직접 입력
+                "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
+                // 여기서 transcript가 끝남 — Packages 입력 프롬프트에서 stdin EOF
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
+
+            Assert.Equal(130, exitCode);
+            Assert.False(File.Exists(outPath), "취소된 recipe는 저장되면 안 됩니다.");
+        }
+
         [Fact]
         public void ChangeMethodMidFieldEntry_PackageToSource_PreservesToolNameAndDiscardsPackageFields()
         {
