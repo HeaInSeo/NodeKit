@@ -1,8 +1,8 @@
 # NodeKit ↔ NodeVault 로컬 gRPC 통합 테스트 시나리오
 
-Status: Draft v0.2 (실행 전, 1차 리뷰 반영 완료)
+Status: 실행 완료 (2026-07-05) — 버그 4건 발견, 전부 수정·머지 완료
 Created: 2026-07-04
-Updated: 2026-07-04
+Updated: 2026-07-05
 Scope: heain 개발 장비에서 seoy/K8s 없이 `nodekit submit` 전체 경로를 검증
 
 ## 0. 배경 및 목적
@@ -266,3 +266,72 @@ TC-9 성공 후 다음을 모두 교차 확인해야 pass로 간주한다 (하�
 - 취소(TC-11) 검증 시 BuildEvent에 취소 전용 kind가 없다는 점을 인지하고, buildstate
   SQLite의 Interrupted 상태와 index의 lifecycle_phase 비-Active를 직접 확인한다.
 ```
+
+## 7. 실행 결과 (2026-07-05)
+
+이 시나리오를 실제로 heain에서 실행했다. 환경 구성 중 두 가지 추가 이슈를 만났고
+(둘 다 이 문서 §2에 이미 반영됨), 이후 TC-1~TC-13 대부분을 실행해서 4개의 실제
+버그를 발견·수정·머지했다.
+
+### 환경 구성 중 발견 (문서에 이미 반영, 별도 이슈 아님)
+
+- 시스템 `/etc/containers/storage.conf`가 root 전용 `runroot`를 하드코딩하고 있어
+  `podbridge5.NewStoreWithOptions()`(buildah CLI와 달리 rootless 자동 보정이 없음)가
+  `/run/containers` mkdir로 실패함 → 사용자 레벨 `storage.conf` override로 해결.
+- `netavark`가 이 장비에 설치돼 있지 않아 실제 `conda install` 등 네트워크가 필요한
+  `RUN` 단계에서 buildah가 실패함 (`slirp4netns`는 이 버전이 지원 안 함) → `dnf install
+  netavark` + `network_backend="netavark"` 명시로 해결.
+
+### 실행 결과 요약
+
+| TC | 결과 |
+|---|---|
+| TC-1 (인프라: gRPC ping, 상태 디렉터리 격리, registry push/pull) | ✓ 통과 |
+| TC-9 (submit 성공 — 실제 conda install + push + index 등록) | ✓ 통과 (환경 구성 후) |
+| TC-12 (`lifecycle_phase: Active` 등록 확인) | ✓ 통과 |
+| TC-10B (빌드 중 실패) | 실패 자체는 재현됐으나 **CLI가 exit 0을 반환하는 버그 발견** → Issue #5 |
+| TC-11 (취소) | **취소가 서버 빌드를 실제로 멈추지 않는 버그 발견** → Issue #6 |
+| TC-6 (오픈망 base image digest 조회) | **`library/` 네임스페이스 미보정으로 공식 이미지 401 버그 발견** → Issue #7 |
+| TC-7 (폐쇄망 base image digest 조회) | **개인키 없는 CA cert 로딩 시 크래시 버그 발견** → Issue #8 |
+| TC-4B (네트워크 차단) | ✓ 통과 — 크래시 없이 NetworkUnavailable류 상태 반환 확인 |
+| TC-3 (cache-hit) | 재현 안 됨 — recipe에 build string까지 고정되지 않으면 harbor_cache 분기를
+  안 탐 (설계상 특성, 버그 아님) |
+| TC-13 (BioContainer) | 초기 픽스처가 유효하지 않은 base image 조합이라 재검증 필요 (테스트 설계
+  자체의 결함, NodeKit/NodeVault 버그 아님) |
+
+### 발견된 버그와 수정 커밋
+
+모두 NodeKit 저장소 내에서만 해결됐다 (NodeVault는 조사 결과 이미 정상 동작 중이었음).
+
+- **Issue #5** (commit `bd9786e`): `GrpcToolSpecClient.MapWatchEvent()`가 서버의
+  `Status` 필드(PascalCase)를 소문자와 비교해서 매칭이 항상 실패 → 빌드 실패 시에도
+  exit code 0.
+- **Issue #6** (commit `bd9786e`, #5와 같은 커밋): `SubmitCommand`가 Ctrl-C 시
+  `CancelToolBuild` RPC를 아예 호출하지 않고, gRPC 스트림 취소가 `RpcException`으로
+  오는데 `OperationCanceledException`만 잡고 있어서 취소 처리 자체가 도달 불가능한
+  코드였음.
+- **Issue #7** (commit `73805d4`): `PublicRegistryImageDigestResolver`가 `alpine:3.20`
+  같은 네임스페이스 없는 공식 이미지명에 `library/`를 보정하지 않아 401.
+- **Issue #8** (commit `a938690`): `HarborImageDigestResolver.TryCreate()`가
+  `X509Certificate2.CreateFromPemFile()`(개인키 필요)을 써서, 개인키 없는 정상적인
+  CA 신뢰 전용 인증서로 크래시.
+
+### 후속 개선: 테스트 스위트 신뢰성
+
+버그 발견 과정에서 기존 opt-in 통합 테스트(`GrpcBuildClientIntegrationTests`,
+`GrpcResolveRecipeClientIntegrationTests`)가 env var 미설정 시 조용히 통과 처리되는
+것을 확인 — 즉 원래 이 gRPC 경로의 회귀는 유닛 테스트로 전혀 못 잡는 구조였다.
+`Assert.Skip()`으로 정직하게 Skipped 표시하도록 고치고, in-process fake gRPC
+서버(`GrpcServices=Both` 코드젠 + ASP.NET Core TestServer)를 새로 구축해서
+seoy/NodeVault 없이 매 실행마다 자동으로 wire-level 회귀를 잡는 테스트 7개를
+추가했다 (commit `461e963`). #5 버그를 코드에서 잠깐 되돌려 이 새 테스트들이
+정확히 잡아내는 것도 직접 확인함.
+
+### 이 실행이 완료한 것 / 완료하지 않은 것
+
+- **완료**: Sprint 7 Task 2 / U5-2 이전 사전 검증. `nodekit submit`의 happy path와
+  주요 실패/취소/base-image-resolve 경로에서 발견 가능한 버그를 seoy 없이 조기에
+  찾아 고쳤다.
+- **완료 아님**: seoy 실제 장비에서의 최종 수동 확인(U5-2)은 여전히 별도로 필요하다.
+  이 로컬 실행은 K8s 기반 NodeSentinel 검증, 실제 Harbor 인증/웹훅/GC, seoy 네트워크
+  조건을 대체하지 않는다 (§1에 이미 명시).

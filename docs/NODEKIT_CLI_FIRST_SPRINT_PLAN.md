@@ -2,7 +2,7 @@
 
 Status: Sprint 6 완료 / Sprint 7 진행 중  
 Created: 2026-06-17  
-Updated: 2026-07-03  
+Updated: 2026-07-05  
 Scope: NodeKit work — Sprint 0-6 완료, Sprint 7(Post-Migration Hardening) 진행 중
 
 ## 0. Resume Note For Agents
@@ -19,6 +19,8 @@ ToolSpec 경로(`ResolveToolSpec → SubmitToolBuild → WatchToolBuild`)로 전
 ```text
 Sprint 7: Avalonia GUI ToolSpec 마이그레이션
 + U5-2: seoy 원격 장비 nodekit submit 수동 테스트 (seoy 준비 후)
+  — 2026-07-05: seoy 없이 heain 로컬 사전 검증 완료, 버그 4건 발견·수정
+    (docs/NODEKIT_LOCAL_GRPC_TEST_SCENARIO.md §7 참조). seoy 본 테스트는 아직 미완료.
 + CI 그린 유지
 ```
 
@@ -319,6 +321,30 @@ Done when:
 - Avalonia GUI도 ToolSpec 경로로 전환 완료.
 - CLI end-to-end 수동 테스트 통과 (seoy 장비).
 - IBuildClient / GrpcBuildClient 완전 제거 또는 명시적 ADR 후 유지 결정.
+```
+
+**Progress (Task 2 / U5-2 사전 검증, 2026-07-05):**
+
+```text
+seoy 장비 없이 heain에서 nodekit submit 전체 경로(gRPC 프로토콜, 실제 podbridge5
+rootless build, base image digest 조회, 취소)를 로컬 NodeVault + 로컬 OCI
+레지스트리로 사전 검증함 — 상세 시나리오/실행 결과는
+docs/NODEKIT_LOCAL_GRPC_TEST_SCENARIO.md §7 참조.
+
+발견 및 수정된 버그 4건 (전부 NodeKit 저장소 내에서 해결, GitHub Issue #5-#8 모두 close):
+- #5 nodekit submit이 빌드 실패 시에도 exit code 0 반환 (commit bd9786e)
+- #6 Ctrl-C 취소가 서버 빌드를 실제로 멈추지 않음 (commit bd9786e)
+- #7 library/ 네임스페이스 미보정으로 공식 Docker Hub 이미지 401 (commit 73805d4)
+- #8 개인키 없는 CA cert 로딩 시 크래시 (commit a938690)
+
+부가 성과: opt-in 통합 테스트의 vacuous pass 문제를 발견해 Assert.Skip()으로 수정하고,
+in-process fake gRPC 서버(GrpcServices=Both + ASP.NET Core TestServer)를 구축해
+seoy 없이도 매 테스트 실행마다 자동으로 이 gRPC 경로의 wire-level 회귀를 잡도록
+개선함 (commit 461e963).
+
+**주의**: 이 사전 검증은 seoy 실제 장비 수동 테스트(U5-2 본 항목)를 대체하지 않는다.
+K8s 기반 NodeSentinel 검증(L3/L4/L5), 실제 Harbor 인증/웹훅/GC, seoy 네트워크
+조건은 여전히 seoy에서 별도 확인 필요 — Task 2는 여전히 미완료(○) 상태로 유지.
 ```
 
 ## 5. Immediate First Slice

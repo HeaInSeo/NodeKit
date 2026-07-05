@@ -2,7 +2,7 @@
 
 Status: U1-U4 완료 / U5 진행 중 (U5-2만 잔류)  
 Created: 2026-06-30  
-Updated: 2026-07-02  
+Updated: 2026-07-05  
 Scope: CLI UX 품질을 상업용 수준으로 끌어올리는 4개 스프린트
 
 이 계획은 `NODEKIT_CLI_FIRST_SPRINT_PLAN.md`의 Sprint 0-5 완료 이후 진행한다.
@@ -234,6 +234,14 @@ Phase 6(ToolSpec 경로 전환)은 2026-07-02 완료됨 — 이 문서의 UX 항
 - 쉬운 안내 모드: 설치 명령 → 채널 확정 → base image 자동 조회 → 저장
 - 빠른 설정 모드: Q&A → 채널 확정 → base image 자동 조회 → 저장
 - 오픈망 / 폐쇄망 각각 확인
+
+**Progress (사전 검증, 2026-07-05):** seoy 없이 heain 로컬 NodeVault + 로컬
+레지스트리로 위 흐름(채널 확정, 오픈망/폐쇄망 base image 조회, 저장, 실제
+submit)을 사전 검증함. 이 과정에서 base image digest 조회(오픈망/폐쇄망) 양쪽
+모두에서 버그를 발견해 수정함 — Issue #7(공식 이미지명 401), #8(CA cert 로딩
+크래시), 커밋 `73805d4`/`a938690`. 상세는
+docs/NODEKIT_LOCAL_GRPC_TEST_SCENARIO.md §7 참조. **여전히 seoy 원격 장비에서의
+실제 수동 테스트가 남아있어 이 항목은 미완료(○) 상태를 유지한다.**
 
 ### U5-3. 커밋 + GitHub push
 
