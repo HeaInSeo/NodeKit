@@ -22,8 +22,10 @@ namespace NodeKit.Cli
             string version,
             IReadOnlyList<string> packages,
             CancellationToken cancellationToken,
-            RecipeBuildKind? buildKind = null)
+            RecipeBuildKind? buildKind = null,
+            string? packageMirrorUri = null)
         {
+            _ = packageMirrorUri;
             var resolutions = new List<PackageResolution>();
             foreach (var pkg in packages)
             {

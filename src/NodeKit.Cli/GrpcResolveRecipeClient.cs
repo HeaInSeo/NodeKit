@@ -42,13 +42,15 @@ namespace NodeKit.Cli
             string version,
             IReadOnlyList<string> packages,
             CancellationToken cancellationToken,
-            RecipeBuildKind? buildKind = null)
+            RecipeBuildKind? buildKind = null,
+            string? packageMirrorUri = null)
         {
             var request = new ResolveRecipeRequest
             {
                 ToolName = toolName,
                 Version = version,
                 Variant = MapVariant(buildKind),
+                PackageMirrorUri = packageMirrorUri ?? string.Empty,
             };
 
             foreach (var pkg in packages)

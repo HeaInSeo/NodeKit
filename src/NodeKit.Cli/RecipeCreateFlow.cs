@@ -80,10 +80,23 @@ namespace NodeKit.Cli
             // 단계 7: 패키지 빌드 문자열 선택 (ResolveRecipe)
             if (document.Packages.Count > 0)
             {
-                var resolveResult = recipeResolver
-                    .ResolveAsync(document.ToolName ?? string.Empty, document.Version ?? string.Empty,
-                        document.Packages, System.Threading.CancellationToken.None, document.BuildKind)
-                    .GetAwaiter().GetResult();
+                ResolveRecipeResult resolveResult;
+                try
+                {
+                    resolveResult = recipeResolver
+                        .ResolveAsync(document.ToolName ?? string.Empty, document.Version ?? string.Empty,
+                            document.Packages, System.Threading.CancellationToken.None, document.BuildKind,
+                            document.PackageMirrorUri)
+                        .GetAwaiter().GetResult();
+                }
+                catch (global::Grpc.Core.RpcException rpc)
+                {
+                    console.WriteLine();
+                    console.WriteLine($"⚠  패키지 빌드 문자열을 조회하지 못했습니다: {NodeKit.Grpc.BuildErrorMessages.Describe(rpc)}");
+                    console.WriteLine("   저장 후 nodekit submit 시점에 다시 해소를 시도할 수 있습니다.");
+                    console.WriteLine();
+                    resolveResult = ResolveRecipeResult.Unsupported();
+                }
 
                 if (resolveResult.Source != RecipeResolutionSource.Unsupported
                     && resolveResult.Packages.Count > 0)

@@ -18,13 +18,15 @@ namespace NodeKit.Cli
             string version,
             IReadOnlyList<string> packages,
             CancellationToken cancellationToken,
-            RecipeBuildKind? buildKind = null)
+            RecipeBuildKind? buildKind = null,
+            string? packageMirrorUri = null)
         {
             _ = toolName;
             _ = version;
             _ = packages;
             _ = cancellationToken;
             _ = buildKind;
+            _ = packageMirrorUri;
             return Task.FromResult(ResolveRecipeResult.Unsupported());
         }
     }

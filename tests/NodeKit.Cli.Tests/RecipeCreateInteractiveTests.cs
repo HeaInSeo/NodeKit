@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using Grpc.Core;
 using NodeKit.Cli;
 using Xunit;
 
@@ -1375,6 +1376,46 @@ namespace NodeKit.Cli.Tests
         }
 
         [Fact]
+        public void PackageMirror_ResolveRecipeThrowsRpcException_PrintsWarningAndSavesInsteadOfCrashing()
+        {
+            // Issue #13 regression: Mirror 방식은 필드에 입력한 MirrorUri를
+            // ResolveRecipe에 실제로 전달해야 하고(document.PackageMirrorUri),
+            // ResolveRecipe가 RpcException을 던져도(예: NodeVault가
+            // package_mirror_uri required로 거부) 프로세스 전체가 크래시하는 대신
+            // 경고만 출력하고 저장까지 정상 완료되어야 한다.
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var resolveClient = new ThrowingResolveRecipeClient(
+                new RpcException(new Status(StatusCode.InvalidArgument,
+                    "package_mirror_uri is required for PACKAGE_MIRROR variant")));
+
+            var transcript = new[]
+            {
+                "2",                    // 빠른 설정 모드
+                "n", "n", "u", "u", "u", "u", // 추천 질문 6개: 전부 모름 → 수동 선택으로
+                "3",                    // 수동 method 선택: Mirror
+                "0",                    // 기반 이미지: 직접 입력
+                "mirrortool", "1.0", "mirrortool run", ImageRefWithDigest,
+                "https://mirror.internal.example/conda", // MirrorUri
+                "mirrortool=1.0", "",   // Packages, blank로 목록 종료
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = RecipeCreateInteractiveRunner.Run(
+                outPath,
+                new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
+                new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
+                stderr,
+                new SequencedCancellationSource(checksBeforeCancellation: 1000),
+                resolveClient: resolveClient);
+
+            Assert.Equal(0, exitCode);
+            Assert.True(File.Exists(outPath));
+            Assert.Contains("패키지 빌드 문자열을 조회하지 못했습니다", stdout.ToString());
+            Assert.Equal("https://mirror.internal.example/conda", resolveClient.CapturedPackageMirrorUri);
+        }
+
+        [Fact]
         public void ResolveRecipe_CancelDuringCandidateSelection_ExitsWithCode130()
         {
             // Sprint R17: /cancel inside PackageCandidatePresenter throws
@@ -1425,8 +1466,31 @@ namespace NodeKit.Cli.Tests
                 string version,
                 System.Collections.Generic.IReadOnlyList<string> packages,
                 System.Threading.CancellationToken cancellationToken,
-                NodeKit.Authoring.Recipes.RecipeBuildKind? buildKind = null)
+                NodeKit.Authoring.Recipes.RecipeBuildKind? buildKind = null,
+                string? packageMirrorUri = null)
                 => System.Threading.Tasks.Task.FromResult(_result);
+        }
+
+        // Issue #13 regression: captures the packageMirrorUri it was called with,
+        // then throws to simulate NodeVault rejecting a Mirror-method resolve.
+        private sealed class ThrowingResolveRecipeClient : IResolveRecipeClient
+        {
+            private readonly Exception _exception;
+            internal ThrowingResolveRecipeClient(Exception exception) => _exception = exception;
+
+            internal string? CapturedPackageMirrorUri { get; private set; }
+
+            public System.Threading.Tasks.Task<ResolveRecipeResult> ResolveAsync(
+                string toolName,
+                string version,
+                System.Collections.Generic.IReadOnlyList<string> packages,
+                System.Threading.CancellationToken cancellationToken,
+                NodeKit.Authoring.Recipes.RecipeBuildKind? buildKind = null,
+                string? packageMirrorUri = null)
+            {
+                CapturedPackageMirrorUri = packageMirrorUri;
+                throw _exception;
+            }
         }
 
         /// <summary>
