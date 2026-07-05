@@ -210,6 +210,15 @@ namespace NodeKit.Cli
                 repository = rest;
             }
 
+            // Docker Hub 공식 이미지(예: alpine, ubuntu)는 실제로는 library/ 네임스페이스
+            // 아래에 있다 (docker pull alpine == docker pull docker.io/library/alpine).
+            // quay.io는 이 규칙이 없으므로 제외한다.
+            if (!string.Equals(registry, "quay.io", StringComparison.OrdinalIgnoreCase)
+                && !repository.Contains('/', StringComparison.Ordinal))
+            {
+                repository = $"library/{repository}";
+            }
+
             return !string.IsNullOrWhiteSpace(repository);
         }
 
