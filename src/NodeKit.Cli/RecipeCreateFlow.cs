@@ -425,7 +425,8 @@ namespace NodeKit.Cli
                     console.WriteLine($"   제안 값: {suggested} (Enter로 수락, 다른 값 입력 시 변경)");
                 }
 
-                var line = console.ReadLine() ?? string.Empty;
+                var rawLine = console.ReadLine();
+                var line = rawLine ?? string.Empty;
 
                 if (TryHandleChangeMethod(session, line, console))
                 {
@@ -469,6 +470,14 @@ namespace NodeKit.Cli
                     return;
                 }
 
+                // 필수 필드가 값을 못 받았는데(예: 빈 문자열 거부) stdin이 EOF면
+                // 다시는 유효한 값을 못 받으므로 여기서 계속 재시도해봐야 영원히
+                // 같은 실패를 반복한다(issue #11과 동일 계열) — 즉시 취소 처리한다.
+                if (rawLine is null)
+                {
+                    throw new RecipeCreateCancelledException();
+                }
+
                 PrintViolations(violations, console);
             }
         }
@@ -488,7 +497,8 @@ namespace NodeKit.Cli
                     console.WriteLine($"  [{i + 1}] {field.Choices[i].Label.Get("ko")} — {field.Choices[i].Description.Get("ko")}");
                 }
 
-                var line = console.ReadLine() ?? string.Empty;
+                var rawLine = console.ReadLine();
+                var line = rawLine ?? string.Empty;
                 if (TryHandleChangeMethod(session, line, console))
                 {
                     return;
@@ -522,6 +532,14 @@ namespace NodeKit.Cli
                 if (violations.Count == 0)
                 {
                     return;
+                }
+
+                // 필수 선택 필드가 값을 못 받았는데 stdin이 EOF면 다시는 유효한
+                // 선택을 못 받으므로 여기서 계속 재시도해봐야 영원히 같은 실패를
+                // 반복한다(issue #11과 동일 계열) — 즉시 취소 처리한다.
+                if (rawLine is null)
+                {
+                    throw new RecipeCreateCancelledException();
                 }
 
                 PrintViolations(violations, console);

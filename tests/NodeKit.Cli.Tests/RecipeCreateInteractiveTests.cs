@@ -344,6 +344,30 @@ namespace NodeKit.Cli.Tests
             Assert.False(File.Exists(outPath), "취소된 recipe는 저장되면 안 됩니다.");
         }
 
+        // Issue #11 회귀 테스트 (PromptScalarField 쪽): 방식을 mirror로 고르고
+        // 첫 필수 스칼라 필드(ToolName)에서 transcript가 끝나면(stdin EOF),
+        // PromptScalarField의 while(true) 루프도 같은 이유로 무한 재입력
+        // 루프에 빠졌다.
+        [Fact]
+        public void MirrorMethodSelected_StdinEndsAtToolNamePrompt_CancelsInsteadOfLooping()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "2", // 빠른 설정 모드
+                "n", "n", "u", "u", "u", "u", // 추천 보류로 유도
+                "3", // 수동 선택: mirror
+                // 여기서 transcript가 끝남 — ToolName(필수 스칼라 필드) 입력에서 stdin EOF
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
+
+            Assert.Equal(130, exitCode);
+            Assert.False(File.Exists(outPath), "취소된 recipe는 저장되면 안 됩니다.");
+        }
+
         [Fact]
         public void ChangeMethodMidFieldEntry_PackageToSource_PreservesToolNameAndDiscardsPackageFields()
         {
