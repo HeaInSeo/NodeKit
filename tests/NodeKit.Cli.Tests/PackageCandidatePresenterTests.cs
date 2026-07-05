@@ -33,6 +33,27 @@ namespace NodeKit.Cli.Tests
             Assert.DoesNotContain("선택하세요", stdout.ToString());
         }
 
+        // Issue #9 회귀 테스트: candidates가 0개인 패키지를 조용히 건너뛰지
+        // 않고, 사용자에게 경고를 남긴 뒤 버전만 고정된 채로 계속 진행해야 한다.
+        [Fact]
+        public void Present_ZeroCandidates_PrintsWarningAndSkipsPackage()
+        {
+            var packages = new[]
+            {
+                new PackageResolution("bwa", "0.7.17", System.Array.Empty<BuildStringCandidate>()),
+            };
+
+            var stdin = new StringReader("");
+            var stdout = new StringWriter();
+
+            var selections = PackageCandidatePresenter.Present(packages, new PlainTextRecipeConsole(stdin, stdout), _neverCancel);
+
+            Assert.NotNull(selections);
+            Assert.False(selections!.ContainsKey("bwa"));
+            Assert.Contains("bwa=0.7.17", stdout.ToString());
+            Assert.Contains("찾지 못했습니다", stdout.ToString());
+        }
+
         [Fact]
         public void Present_MultipleCandidates_PromptsUser_PicksSecond()
         {

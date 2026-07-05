@@ -29,6 +29,14 @@ namespace NodeKit.Cli
 
                 if (pkg.Candidates.Count == 0)
                 {
+                    // NodeVault가 채널 전체 조회는 성공했지만 이 버전의 빌드를
+                    // 못 찾은 경우다(네트워크가 전부 막힌 경우는 NodeVault가
+                    // 별도 에러로 알린다). 조용히 넘어가면 사용자는 build
+                    // string이 왜 안 고정됐는지 recipe.json을 직접 열어봐야만
+                    // 알 수 있다 — 최소한의 경고를 남긴다.
+                    console.WriteLine(
+                        $"⚠ {pkg.Name}={pkg.Version}: 빌드 문자열 후보를 찾지 못했습니다. " +
+                        "버전만 고정된 채로 저장됩니다 — 실제로 해당 버전이 존재하는지 확인하세요.");
                     continue;
                 }
 
