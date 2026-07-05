@@ -267,11 +267,11 @@ TC-9 성공 후 다음을 모두 교차 확인해야 pass로 간주한다 (하�
   SQLite의 Interrupted 상태와 index의 lifecycle_phase 비-Active를 직접 확인한다.
 ```
 
-## 7. 실행 결과 (2026-07-05)
+## 7. 실행 결과 (2026-07-05, 2차 실행까지 반영)
 
-이 시나리오를 실제로 heain에서 실행했다. 환경 구성 중 두 가지 추가 이슈를 만났고
-(둘 다 이 문서 §2에 이미 반영됨), 이후 TC-1~TC-13 대부분을 실행해서 4개의 실제
-버그를 발견·수정·머지했다.
+이 시나리오를 heain에서 실제로 두 차례에 걸쳐 실행했다. 환경 구성 중 이슈 두 건을
+만났고(둘 다 §2에 반영, 이슈 아님), TC-1~TC-13 전체를 실제 NodeVault로 실행해서
+**총 6개의 실제 버그**를 발견했으며 전부 수정·머지·close 완료했다.
 
 ### 환경 구성 중 발견 (문서에 이미 반영, 별도 이슈 아님)
 
@@ -281,40 +281,55 @@ TC-9 성공 후 다음을 모두 교차 확인해야 pass로 간주한다 (하�
 - `netavark`가 이 장비에 설치돼 있지 않아 실제 `conda install` 등 네트워크가 필요한
   `RUN` 단계에서 buildah가 실패함 (`slirp4netns`는 이 버전이 지원 안 함) → `dnf install
   netavark` + `network_backend="netavark"` 명시로 해결.
+- 로컬 registry 컨테이너 기동 시 rootless cgroup delegation 문제로 `runc create
+  failed`가 발생 → `cgroup_manager = "cgroupfs"`를 `containers.conf`에 명시해 해결
+  (systemd cgroup manager 대신 사용).
 
-### 실행 결과 요약
+### 실행 결과 요약 (TC-1~TC-13 전부 실제 NodeVault로 실행 완료)
 
 | TC | 결과 |
 |---|---|
-| TC-1 (인프라: gRPC ping, 상태 디렉터리 격리, registry push/pull) | ✓ 통과 |
-| TC-9 (submit 성공 — 실제 conda install + push + index 등록) | ✓ 통과 (환경 구성 후) |
-| TC-12 (`lifecycle_phase: Active` 등록 확인) | ✓ 통과 |
-| TC-10B (빌드 중 실패) | 실패 자체는 재현됐으나 **CLI가 exit 0을 반환하는 버그 발견** → Issue #5 |
-| TC-11 (취소) | **취소가 서버 빌드를 실제로 멈추지 않는 버그 발견** → Issue #6 |
-| TC-6 (오픈망 base image digest 조회) | **`library/` 네임스페이스 미보정으로 공식 이미지 401 버그 발견** → Issue #7 |
-| TC-7 (폐쇄망 base image digest 조회) | **개인키 없는 CA cert 로딩 시 크래시 버그 발견** → Issue #8 |
-| TC-4B (네트워크 차단) | ✓ 통과 — 크래시 없이 NetworkUnavailable류 상태 반환 확인 |
-| TC-3 (cache-hit) | 재현 안 됨 — recipe에 build string까지 고정되지 않으면 harbor_cache 분기를
-  안 탐 (설계상 특성, 버그 아님) |
-| TC-13 (BioContainer) | 초기 픽스처가 유효하지 않은 base image 조합이라 재검증 필요 (테스트 설계
-  자체의 결함, NodeKit/NodeVault 버그 아님) |
+| TC-1/1B/1C (인프라) | ✓ 통과 |
+| TC-2 (오픈망 cache-miss) | ✓ 통과 — external_source, 다수 후보 반환 확인 |
+| TC-3 (cache-hit) | 재현 안 됨 — recipe에 build string까지 고정되지 않으면 harbor_cache 분기를 안 탐 (설계상 특성, 버그 아님) |
+| TC-4A (closed_network 정책 분기) | ✓ 통과 — 외부망이 열려 있어도 정책상 즉시 차단 확인 |
+| TC-4B (실제 네트워크 차단) | **버그 발견**: 진짜 네트워크 실패인데 candidates=0으로 조용히 "성공" 처리 → Issue #9 |
+| TC-6 (오픈망 base image digest 조회) | **버그 발견**: `library/` 네임스페이스 미보정으로 공식 이미지 401 → Issue #7 |
+| TC-7 (폐쇄망 base image digest 조회) | **버그 발견**: 개인키 없는 CA cert 로딩 시 크래시 → Issue #8 |
+| TC-8/8B/8C/8D (L1 검증) | ✓ 통과 |
+| TC-9 (submit 성공) | ✓ 통과 — 실제 conda install + push + index 등록 확인 |
+| TC-10A (submit 전 실패) | ✓ 확인 — 실제로는 "submit 전 실패"가 없고 항상 빌드 단계에서 실패한다는 것도 규명 (L1은 형식만 검사, NodeVault는 존재 여부를 빌드 시점에 확인) |
+| TC-10B (빌드 중 실패) | **버그 발견**: 실패 자체는 정상 재현되지만 CLI가 exit 0 반환 → Issue #5 |
+| TC-11 (취소) | **버그 발견**: 취소가 서버 빌드를 실제로 멈추지 않음 → Issue #6 |
+| TC-12 (등록 확인) | ✓ 통과 |
+| TC-13 (BioContainer) | ✓ 통과 (1차 실행 픽스처가 무효해서 2차에 유효한 이미지로 재검증) |
+| 대화형 `recipe create` 흐름 | 시도 중 **버그 발견**: stdin EOF 시 무한 루프(300MB+ 로그) → Issue #10 |
 
-### 발견된 버그와 수정 커밋
+### 발견된 버그 6건과 수정 커밋 — 전부 close 완료
 
-모두 NodeKit 저장소 내에서만 해결됐다 (NodeVault는 조사 결과 이미 정상 동작 중이었음).
-
-- **Issue #5** (commit `bd9786e`): `GrpcToolSpecClient.MapWatchEvent()`가 서버의
+- **Issue #5** (NodeKit `bd9786e`): `GrpcToolSpecClient.MapWatchEvent()`가 서버의
   `Status` 필드(PascalCase)를 소문자와 비교해서 매칭이 항상 실패 → 빌드 실패 시에도
   exit code 0.
-- **Issue #6** (commit `bd9786e`, #5와 같은 커밋): `SubmitCommand`가 Ctrl-C 시
-  `CancelToolBuild` RPC를 아예 호출하지 않고, gRPC 스트림 취소가 `RpcException`으로
-  오는데 `OperationCanceledException`만 잡고 있어서 취소 처리 자체가 도달 불가능한
-  코드였음.
-- **Issue #7** (commit `73805d4`): `PublicRegistryImageDigestResolver`가 `alpine:3.20`
+- **Issue #6** (NodeKit `bd9786e`): `SubmitCommand`가 Ctrl-C 시 `CancelToolBuild`
+  RPC를 아예 호출하지 않고, gRPC 스트림 취소가 `RpcException`으로 오는데
+  `OperationCanceledException`만 잡고 있어서 취소 처리 자체가 도달 불가능한 코드였음.
+- **Issue #7** (NodeKit `73805d4`): `PublicRegistryImageDigestResolver`가 `alpine:3.20`
   같은 네임스페이스 없는 공식 이미지명에 `library/`를 보정하지 않아 401.
-- **Issue #8** (commit `a938690`): `HarborImageDigestResolver.TryCreate()`가
+- **Issue #8** (NodeKit `a938690`): `HarborImageDigestResolver.TryCreate()`가
   `X509Certificate2.CreateFromPemFile()`(개인키 필요)을 써서, 개인키 없는 정상적인
   CA 신뢰 전용 인증서로 크래시.
+- **Issue #9** (NodeVault `605a98d` + NodeKit `1749a58`): `queryAnacondaOrg`가 채널
+  조회 실패(진짜 네트워크 에러)와 404(없음)를 구분 안 해서, 전체 채널 연결 불가
+  상황에서도 candidates=0으로 조용히 "성공" 처리됨 → NodeVault는 전체 실패 시
+  `Unavailable` 에러 반환하도록, NodeKit은 candidates=0인 패키지에 경고 메시지를
+  출력하도록 각각 수정.
+- **Issue #10** (NodeKit `f1b5b37`): `MethodRecommendationPresenter.Present()`의
+  `while(true)` 루프가 stdin EOF와 "빈 줄 입력"을 구분 못 해서 유효한 선택을
+  영원히 못 받으면 무한 재입력 루프(CPU 100%, 수백MB 로그)에 빠짐.
+
+**#5/#6/#9는 처음엔 NodeVault 근본 수정이 필요할 것으로 예상했으나, 조사 결과
+NodeVault의 `CancelToolBuild`/`WatchToolBuild` 메커니즘 자체는 이미 정상이었고
+(#5/#6은 NodeKit의 매핑/호출 누락 버그), #9만 실제로 NodeVault 쪽 원인이 있었다.**
 
 ### 후속 개선: 테스트 스위트 신뢰성
 
@@ -329,9 +344,12 @@ seoy/NodeVault 없이 매 실행마다 자동으로 wire-level 회귀를 잡는 
 
 ### 이 실행이 완료한 것 / 완료하지 않은 것
 
-- **완료**: Sprint 7 Task 2 / U5-2 이전 사전 검증. `nodekit submit`의 happy path와
-  주요 실패/취소/base-image-resolve 경로에서 발견 가능한 버그를 seoy 없이 조기에
-  찾아 고쳤다.
+- **완료**: Sprint 7 Task 2 / U5-2 이전 사전 검증. TC-1~TC-13 전체와 대화형
+  `recipe create` 흐름 일부를 seoy 없이 실행해서 버그 6건을 찾아 전부 수정했다.
+  `nodekit submit`의 happy path, 실패, 취소, base-image-resolve(오픈망/폐쇄망),
+  ResolveRecipe 정책 분기(closed_network)와 네트워크 실패 처리까지 검증됨.
 - **완료 아님**: seoy 실제 장비에서의 최종 수동 확인(U5-2)은 여전히 별도로 필요하다.
   이 로컬 실행은 K8s 기반 NodeSentinel 검증, 실제 Harbor 인증/웹훅/GC, seoy 네트워크
-  조건을 대체하지 않는다 (§1에 이미 명시).
+  조건을 대체하지 않는다 (§1에 이미 명시). 대화형 `recipe create → 저장 → submit`
+  전체를 처음부터 끝까지 완주시키는 것도 아직 안 됨 (EOF 버그 발견 후 시행착오
+  비용 대비 가치가 낮다고 판단해 중단).

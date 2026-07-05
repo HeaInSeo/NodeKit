@@ -2,7 +2,7 @@
 
 Status: Sprint 6 완료 / Sprint 7 진행 중  
 Created: 2026-06-17  
-Updated: 2026-07-05  
+Updated: 2026-07-06  
 Scope: NodeKit work — Sprint 0-6 완료, Sprint 7(Post-Migration Hardening) 진행 중
 
 ## 0. Resume Note For Agents
@@ -19,8 +19,9 @@ ToolSpec 경로(`ResolveToolSpec → SubmitToolBuild → WatchToolBuild`)로 전
 ```text
 Sprint 7: Avalonia GUI ToolSpec 마이그레이션
 + U5-2: seoy 원격 장비 nodekit submit 수동 테스트 (seoy 준비 후)
-  — 2026-07-05: seoy 없이 heain 로컬 사전 검증 완료, 버그 4건 발견·수정
-    (docs/NODEKIT_LOCAL_GRPC_TEST_SCENARIO.md §7 참조). seoy 본 테스트는 아직 미완료.
+  — 2026-07-05: seoy 없이 heain 로컬 사전 검증 완료(TC-1~TC-13 전체), 버그 6건
+    발견·수정·close (docs/NODEKIT_LOCAL_GRPC_TEST_SCENARIO.md §7 참조).
+    seoy 본 테스트는 아직 미완료.
 + CI 그린 유지
 ```
 
@@ -323,19 +324,26 @@ Done when:
 - IBuildClient / GrpcBuildClient 완전 제거 또는 명시적 ADR 후 유지 결정.
 ```
 
-**Progress (Task 2 / U5-2 사전 검증, 2026-07-05):**
+**Progress (Task 2 / U5-2 사전 검증, 2026-07-05, 2차 실행까지 반영):**
 
 ```text
 seoy 장비 없이 heain에서 nodekit submit 전체 경로(gRPC 프로토콜, 실제 podbridge5
-rootless build, base image digest 조회, 취소)를 로컬 NodeVault + 로컬 OCI
-레지스트리로 사전 검증함 — 상세 시나리오/실행 결과는
-docs/NODEKIT_LOCAL_GRPC_TEST_SCENARIO.md §7 참조.
+rootless build, base image digest 조회, ResolveRecipe 정책 분기, 취소)를 로컬
+NodeVault + 로컬 OCI 레지스트리로 사전 검증함 — TC-1~TC-13 전부 실행 완료.
+상세 시나리오/실행 결과는 docs/NODEKIT_LOCAL_GRPC_TEST_SCENARIO.md §7 참조.
 
-발견 및 수정된 버그 4건 (전부 NodeKit 저장소 내에서 해결, GitHub Issue #5-#8 모두 close):
-- #5 nodekit submit이 빌드 실패 시에도 exit code 0 반환 (commit bd9786e)
-- #6 Ctrl-C 취소가 서버 빌드를 실제로 멈추지 않음 (commit bd9786e)
-- #7 library/ 네임스페이스 미보정으로 공식 Docker Hub 이미지 401 (commit 73805d4)
-- #8 개인키 없는 CA cert 로딩 시 크래시 (commit a938690)
+발견 및 수정된 버그 6건 (GitHub Issue #5-#10 전부 close):
+- #5 nodekit submit이 빌드 실패 시에도 exit code 0 반환 (NodeKit bd9786e)
+- #6 Ctrl-C 취소가 서버 빌드를 실제로 멈추지 않음 (NodeKit bd9786e)
+- #7 library/ 네임스페이스 미보정으로 공식 Docker Hub 이미지 401 (NodeKit 73805d4)
+- #8 개인키 없는 CA cert 로딩 시 크래시 (NodeKit a938690)
+- #9 ResolveRecipe가 실제 네트워크 실패를 candidates=0으로 조용히 성공 처리
+  (NodeVault 605a98d + NodeKit 1749a58)
+- #10 recipe create가 stdin EOF 시 무한 루프(CPU 100%, 수백MB 로그) (NodeKit f1b5b37)
+
+#5/#6/#9는 처음엔 NodeVault 근본 수정이 필요할 것으로 예상했으나, 조사 결과
+CancelToolBuild/WatchToolBuild 메커니즘 자체는 이미 정상이었고 (#5/#6은 NodeKit의
+매핑/호출 누락), #9만 실제로 NodeVault 쪽 원인이 있었다.
 
 부가 성과: opt-in 통합 테스트의 vacuous pass 문제를 발견해 Assert.Skip()으로 수정하고,
 in-process fake gRPC 서버(GrpcServices=Both + ASP.NET Core TestServer)를 구축해
