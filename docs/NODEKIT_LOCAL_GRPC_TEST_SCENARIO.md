@@ -303,9 +303,10 @@ TC-9 성공 후 다음을 모두 교차 확인해야 pass로 간주한다 (하�
 | TC-11 (취소) | **버그 발견**: 취소가 서버 빌드를 실제로 멈추지 않음 → Issue #6 |
 | TC-12 (등록 확인) | ✓ 통과 |
 | TC-13 (BioContainer) | ✓ 통과 (1차 실행 픽스처가 무효해서 2차에 유효한 이미지로 재검증) |
-| 대화형 `recipe create` 흐름 | 시도 중 **버그 발견**: stdin EOF 시 무한 루프(300MB+ 로그) → Issue #10 |
+| 대화형 `recipe create` 흐름 (Package 방식) | 시도 중 **버그 발견**: stdin EOF 시 무한 루프(300MB+ 로그) → Issue #10, #11 |
+| 대화형 `recipe create` 흐름 (Mirror/PackageMirror 방식) | 시도 중 **버그 발견**: ResolveRecipe에서 처리 안 된 `RpcException`으로 CLI 전체 크래시(exit 134) → Issue #13. 수정 후 실제 NodeVault로 재검증 — 크래시 없이 저장 완료, 이어서 `nodekit submit`도 시도해 실제 conda 빌드 단계까지 도달·실패(존재하지 않는 mirror URI이므로 예상된 인프라 실패, 코드 버그 아님)까지 확인 |
 
-### 발견된 버그 6건과 수정 커밋 — 전부 close 완료
+### 발견된 버그 8건과 수정 커밋 — #12(BeginnerGuideFlow 전수조사)만 open, 나머지 전부 close 완료
 
 - **Issue #5** (NodeKit `bd9786e`): `GrpcToolSpecClient.MapWatchEvent()`가 서버의
   `Status` 필드(PascalCase)를 소문자와 비교해서 매칭이 항상 실패 → 빌드 실패 시에도
@@ -326,10 +327,34 @@ TC-9 성공 후 다음을 모두 교차 확인해야 pass로 간주한다 (하�
 - **Issue #10** (NodeKit `f1b5b37`): `MethodRecommendationPresenter.Present()`의
   `while(true)` 루프가 stdin EOF와 "빈 줄 입력"을 구분 못 해서 유효한 선택을
   영원히 못 받으면 무한 재입력 루프(CPU 100%, 수백MB 로그)에 빠짐.
+- **Issue #11** (NodeKit `49250e6`): #10과 동일한 근본 원인이 `PromptChannelEntry`,
+  `PromptStringListField` 두 곳에도 있었음 — 필수 리스트 필드(Channels 등)가 값을
+  하나도 못 채운 채 stdin이 EOF에 도달하면 동일하게 무한 루프. 처음에는 두 지점
+  모두 `ReadLineOrCancel()`로 일괄 치환했으나 기존 테스트 24개가 깨짐(같은 함수가
+  옵션 필드에도 재사용되고, 그 테스트들은 EOF를 "남은 옵션 필드는 기본값으로 넘어감"
+  신호로 의도적으로 사용하고 있었음) → raw EOF(`null`)와 실제 빈 줄을 구분해서
+  `CompleteListField`가 실패했을 때만 취소로 승격시키는 정밀 패턴으로 재수정.
+- **Issue #12** (open, 의도적으로 미close): `PromptScalarField`/`PromptChoiceField`도
+  같은 계열 버그가 있어 `0c17984`로 수정했지만, `BeginnerGuideFlow.cs`의 12개
+  `while(true)` 루프는 아직 전수조사가 안 됐음을 별도로 추적하기 위해 열어 둠
+  (`PromptChoiceField`는 현재 카탈로그에 도달 가능한 Required choice 필드가 없어서
+  방어적 수정일 뿐 — 테스트 없음).
+- **Issue #13** (NodeKit `70048ff`): `IResolveRecipeClient.ResolveAsync()`가
+  `package_mirror_uri`를 받을 파라미터 자체가 없어서, Mirror 방식 recipe는 항상 빈
+  URI로 ResolveRecipe를 호출 → NodeVault가 필연적으로 `InvalidArgument`로 거부.
+  `RecipeCreateFlow.Execute()`가 이 호출을 try/catch로 감싸지도 않아서 처리 안 된
+  `RpcException`으로 CLI 프로세스 전체가 크래시(exit 134, raw stack trace)했음.
+  인터페이스에 `packageMirrorUri` 파라미터를 추가해 실제 값을 전달하도록 고치고,
+  `RpcException`을 잡아 NotFound 분기처럼 경고만 출력하고 계속 진행하도록 방어
+  코드도 추가. 수정 후 실제 로컬 NodeVault로 재검증: 더 이상 크래시하지 않고
+  ResolveRecipe가 정상적으로 `not_found`를 반환하며(관리자 사전 등록 필요, 설계상
+  의도된 동작), recipe가 정상 저장됨을 확인.
 
 **#5/#6/#9는 처음엔 NodeVault 근본 수정이 필요할 것으로 예상했으나, 조사 결과
 NodeVault의 `CancelToolBuild`/`WatchToolBuild` 메커니즘 자체는 이미 정상이었고
-(#5/#6은 NodeKit의 매핑/호출 누락 버그), #9만 실제로 NodeVault 쪽 원인이 있었다.**
+(#5/#6은 NodeKit의 매핑/호출 누락 버그), #9만 실제로 NodeVault 쪽 원인이 있었다.
+#13도 마찬가지로 NodeKit 쪽 파라미터 누락 버그였다 — NodeVault의
+`resolvePackageMirror()`는 처음부터 올바르게 동작하고 있었다.**
 
 ### 후속 개선: 테스트 스위트 신뢰성
 
@@ -345,11 +370,18 @@ seoy/NodeVault 없이 매 실행마다 자동으로 wire-level 회귀를 잡는 
 ### 이 실행이 완료한 것 / 완료하지 않은 것
 
 - **완료**: Sprint 7 Task 2 / U5-2 이전 사전 검증. TC-1~TC-13 전체와 대화형
-  `recipe create` 흐름 일부를 seoy 없이 실행해서 버그 6건을 찾아 전부 수정했다.
-  `nodekit submit`의 happy path, 실패, 취소, base-image-resolve(오픈망/폐쇄망),
-  ResolveRecipe 정책 분기(closed_network)와 네트워크 실패 처리까지 검증됨.
+  `recipe create` 흐름(Package 방식, Mirror/PackageMirror 방식 둘 다)을 seoy 없이
+  실행해서 버그 8건을 찾아 그중 7건을 수정했다(#12만 의도적으로 open — 별도
+  전수조사 항목). `nodekit submit`의 happy path, 실패, 취소,
+  base-image-resolve(오픈망/폐쇄망), ResolveRecipe 정책 분기(closed_network)와
+  네트워크 실패 처리까지 검증됨. Mirror 방식은 `recipe create → 저장 →
+  nodekit submit`을 실제로 처음부터 끝까지 완주시켰다 — ResolveRecipe가
+  `not_found`를 정상 반환하고, 존재하지 않는 mirror URI로 실제 conda 빌드
+  단계까지 진행해 예상대로 실패(코드 버그 아닌 인프라 성격의 실패)하는 것까지
+  확인.
 - **완료 아님**: seoy 실제 장비에서의 최종 수동 확인(U5-2)은 여전히 별도로 필요하다.
   이 로컬 실행은 K8s 기반 NodeSentinel 검증, 실제 Harbor 인증/웹훅/GC, seoy 네트워크
-  조건을 대체하지 않는다 (§1에 이미 명시). 대화형 `recipe create → 저장 → submit`
-  전체를 처음부터 끝까지 완주시키는 것도 아직 안 됨 (EOF 버그 발견 후 시행착오
-  비용 대비 가치가 낮다고 판단해 중단).
+  조건을 대체하지 않는다 (§1에 이미 명시). Issue #12(`BeginnerGuideFlow.cs`의 12개
+  `while(true)` 루프 전수조사)는 범위 밖으로 남겨둠 — 지금까지 발견된 EOF 버그들과
+  같은 계열일 가능성이 있으나, 가이드 모드 대화형 흐름 전체를 훑어야 해서 비용이
+  더 크다고 판단.
