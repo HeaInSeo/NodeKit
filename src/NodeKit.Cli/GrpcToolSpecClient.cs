@@ -18,7 +18,7 @@ namespace NodeKit.Cli
     /// </summary>
     internal sealed class GrpcToolSpecClient : IToolSpecBuildClient, IDisposable
     {
-        private readonly GrpcChannel _channel;
+        private readonly GrpcChannel? _channel;
         private readonly BuildService.BuildServiceClient _client;
         private bool _disposed;
 
@@ -28,6 +28,14 @@ namespace NodeKit.Cli
             _client = new BuildService.BuildServiceClient(_channel);
         }
 
+        // 테스트 전용: in-process fake 서버(TestServer)가 만든 채널을 그대로 쓴다.
+        // 이 인스턴스는 채널을 소유하지 않으므로 Dispose()에서 닫지 않는다.
+        internal GrpcToolSpecClient(ChannelBase channel)
+        {
+            _channel = null;
+            _client = new BuildService.BuildServiceClient(channel);
+        }
+
         public void Dispose()
         {
             if (_disposed)
@@ -35,7 +43,7 @@ namespace NodeKit.Cli
                 return;
             }
 
-            _channel.Dispose();
+            _channel?.Dispose();
             _disposed = true;
         }
 

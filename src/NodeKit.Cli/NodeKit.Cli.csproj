@@ -29,7 +29,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Protobuf Include="$(ApiProtosRoot)/nodevault/v1/nodevault.proto" GrpcServices="Client" Access="Internal" ProtoRoot="$(ApiProtosRoot)" />
+    <!--
+      GrpcServices=Both: 서버 스텁(BuildServiceBase)도 함께 생성한다. 프로덕션
+      경로는 여전히 클라이언트만 사용하지만, NodeKit.Cli.Tests가 in-process
+      fake gRPC 서버(TestServer)를 세워 실제 wire-level 테스트를 하려면
+      서버 베이스 클래스가 필요하다 — 별도 프로젝트에서 재생성하면 메시지
+      타입이 두 어셈블리에 중복 정의되므로, 여기서 한 번에 생성한다.
+    -->
+    <Protobuf Include="$(ApiProtosRoot)/nodevault/v1/nodevault.proto" GrpcServices="Both" Access="Internal" ProtoRoot="$(ApiProtosRoot)" />
   </ItemGroup>
 
   <ItemGroup>

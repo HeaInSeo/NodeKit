@@ -7,9 +7,17 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.0.4" />
     <PackageReference Include="Spectre.Console.Testing" Version="0.57.1" />
     <PackageReference Include="xunit.v3" Version="3.2.2" />
+    <!-- in-process fake gRPC 서버(TestServer)로 GrpcToolSpecClient/
+         GrpcResolveRecipeClient의 실제 wire-level 동작을 검증하기 위함. -->
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.0" />
+    <PackageReference Include="Grpc.AspNetCore.Server" Version="2.76.0" />
   </ItemGroup>
 
   <ItemGroup>

@@ -34,7 +34,7 @@ namespace NodeKit.Tests
         {
             if (!ShouldRun)
             {
-                return;
+                Assert.Skip("NODEVAULT_INTEGRATION=1 미설정 — 실제 NodeVault 연동 스킵");
             }
 
             var request = new BuildRequest

@@ -25,7 +25,7 @@ namespace NodeKit.Cli.Tests
         {
             if (!ShouldRun)
             {
-                return;
+                Assert.Skip("NODEKIT_NODEVAULT_URL 미설정 — 실제 NodeVault 연동 스킵");
             }
 
             using var client = GrpcResolveRecipeClient.TryCreate()!;
