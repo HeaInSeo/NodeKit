@@ -265,6 +265,35 @@ namespace NodeKit.Cli.Tests
             Assert.Contains("\"BuildKind\": \"Conda\"", json);
         }
 
+        // Issue #10 회귀 테스트: 추천 보류 상태에서 수동 방식 선택 프롬프트에
+        // 도달했는데 transcript가 거기서 끝나면(stdin EOF), 예전에는
+        // MethodRecommendationPresenter.Present()의 while(true) 루프가 유효한
+        // 선택을 영원히 못 받아 무한 재입력 루프에 빠졌다. 지금은 즉시 취소
+        // 처리되어야 한다.
+        [Fact]
+        public void UnknownHeavyAnswers_StdinEndsAtManualMethodPrompt_CancelsInsteadOfLooping()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "2", // 빠른 설정 모드
+                "n", // IsRestrictedNetwork
+                "n", // HasInternalPackageMirror
+                "u", // HasExistingContainerImage
+                "u", // HasPackageInPublicChannels
+                "u", // HasSourceArchiveAndChecksum
+                "u", // HasExistingDockerfile
+                // 여기서 transcript가 끝남 — 수동 방식 선택 프롬프트에서 stdin EOF
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
+
+            Assert.Equal(130, exitCode);
+            Assert.False(File.Exists(outPath), "취소된 recipe는 저장되면 안 됩니다.");
+        }
+
         [Fact]
         public void ChangeMethodMidFieldEntry_PackageToSource_PreservesToolNameAndDiscardsPackageFields()
         {

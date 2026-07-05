@@ -212,7 +212,12 @@ namespace NodeKit.Cli
             }
 
             console.WriteLine("선택:");
-            var line = (console.ReadLine() ?? string.Empty).Trim();
+
+            // 이 메서드는 유효한 선택을 받을 때까지 while(true)로 재호출된다.
+            // 빈 줄 입력("")에는 되물어보는 게 맞지만, stdin이 EOF에 도달하면
+            // 다시는 유효한 입력을 받을 수 없으므로 즉시 취소 처리해야 한다 —
+            // 그러지 않으면 무한 재입력 루프에 빠진다.
+            var line = console.ReadLineOrCancel().Trim();
             RecipeCreateEscapeCommands.ThrowIfEscape(line);
             if (TryParseMethodSelection(line, out var method))
             {
