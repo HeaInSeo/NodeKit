@@ -128,15 +128,23 @@ namespace NodeKit.Cli
             }
         }
 
-        private static GrpcBuildEvent MapWatchEvent(BuildEvent ev)
+        public async Task CancelBuildAsync(string buildId, CancellationToken cancellationToken = default)
+        {
+            await _client.CancelToolBuildAsync(
+                new CancelToolBuildRequest { BuildId = buildId, Reason = "user cancelled (Ctrl-C)" },
+                cancellationToken: cancellationToken);
+        }
+
+        internal static GrpcBuildEvent MapWatchEvent(BuildEvent ev)
         {
             // WatchToolBuild은 모든 이벤트를 LOG 종류로 보낸다.
-            // status 필드로 terminal 상태를 판별해 적절한 Kind로 변환한다.
+            // status 필드(buildstate.Status 그대로, PascalCase)로 terminal 상태를
+            // 판별해 적절한 Kind로 변환한다.
             var kind = ev.Status switch
             {
-                "succeeded" => GrpcBuildEventKind.Succeeded,
-                "failed" => GrpcBuildEventKind.Failed,
-                "interrupted" => GrpcBuildEventKind.Failed,
+                "Succeeded" => GrpcBuildEventKind.Succeeded,
+                "Failed" => GrpcBuildEventKind.Failed,
+                "Interrupted" => GrpcBuildEventKind.Failed,
                 _ => MapProtoKind(ev.Kind),
             };
 

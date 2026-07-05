@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using Grpc.Core;
 using NodeKit.Authoring;
 using NodeKit.Authoring.Recipes;
 using NodeKit.Grpc;
@@ -105,6 +106,7 @@ namespace NodeKit.Cli
             TextWriter stderr)
         {
             using var cts = new CancellationTokenSource();
+            string? buildId = null;
             Console.CancelKeyPress += (_, e) =>
             {
                 e.Cancel = true;
@@ -116,6 +118,11 @@ namespace NodeKit.Cli
                 await foreach (var ev in client.ResolveAndBuildAsync(toolName, version, rawSpec, cts.Token))
                 {
                     PrintEvent(ev, stdout);
+                    if (!string.IsNullOrEmpty(ev.BuildId))
+                    {
+                        buildId = ev.BuildId;
+                    }
+
                     if (ev.Kind == BuildEventKind.Succeeded)
                     {
                         return 0;
@@ -132,6 +139,13 @@ namespace NodeKit.Cli
             }
             catch (OperationCanceledException)
             {
+                await CancelServerBuildBestEffort(client, buildId, stderr);
+                stderr.WriteLine("빌드 요청이 취소되었습니다.");
+                return 130;
+            }
+            catch (RpcException rpc) when (rpc.StatusCode == StatusCode.Cancelled)
+            {
+                await CancelServerBuildBestEffort(client, buildId, stderr);
                 stderr.WriteLine("빌드 요청이 취소되었습니다.");
                 return 130;
             }
@@ -139,6 +153,27 @@ namespace NodeKit.Cli
             {
                 stderr.WriteLine(BuildErrorMessages.Describe(ex));
                 return 1;
+            }
+        }
+
+        // 클라이언트 취소는 로컬 스트림만 끊을 뿐 서버 빌드를 멈추지 않는다 —
+        // CancelToolBuild를 명시적으로 호출해야 서버가 실제로 빌드를 중단한다.
+        // 이미 취소된 cts.Token을 재사용할 수 없으므로 별도 토큰으로 호출한다.
+        private static async Task CancelServerBuildBestEffort(
+            IToolSpecBuildClient client, string? buildId, TextWriter stderr)
+        {
+            if (string.IsNullOrEmpty(buildId))
+            {
+                return;
+            }
+
+            try
+            {
+                await client.CancelBuildAsync(buildId, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                stderr.WriteLine($"경고: 서버에 빌드 취소 요청을 보내지 못했습니다 (build ID: {buildId}): {ex.Message}");
             }
         }
 

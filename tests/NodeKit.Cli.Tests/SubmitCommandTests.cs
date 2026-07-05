@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Grpc.Core;
 using NodeKit.Cli;
 using NodeKit.Grpc;
 using Xunit;
@@ -176,6 +177,46 @@ namespace NodeKit.Cli.Tests
         }
 
         [Fact]
+        public void Submit_OperationCanceled_CallsCancelBuildAndReturns130()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var client = new CancellingToolSpecClient("build-cancel-1", new OperationCanceledException());
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath },
+                stdout,
+                stderr,
+                toolSpecClient: client);
+
+            Assert.Equal(130, exitCode);
+            Assert.Contains("취소되었습니다", stderr.ToString());
+            Assert.Equal(new[] { "build-cancel-1" }, client.CancelledBuildIds);
+        }
+
+        [Fact]
+        public void Submit_RpcCancelled_CallsCancelBuildAndReturns130()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var client = new CancellingToolSpecClient(
+                "build-cancel-2",
+                new RpcException(new Status(StatusCode.Cancelled, "stream cancelled")));
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath },
+                stdout,
+                stderr,
+                toolSpecClient: client);
+
+            Assert.Equal(130, exitCode);
+            Assert.Contains("취소되었습니다", stderr.ToString());
+            Assert.Equal(new[] { "build-cancel-2" }, client.CancelledBuildIds);
+        }
+
+        [Fact]
         public void Submit_RawSpecContainsProtoFieldNames()
         {
             var recipePath = WriteFile("recipe.json", ValidRecipeJson);
@@ -224,6 +265,8 @@ namespace NodeKit.Cli.Tests
                 _events = events;
             }
 
+            public List<string> CancelledBuildIds { get; } = new();
+
 #pragma warning disable CS1998, IDE0060
             public async IAsyncEnumerable<BuildEvent> ResolveAndBuildAsync(
                 string toolName,
@@ -236,6 +279,12 @@ namespace NodeKit.Cli.Tests
                     cancellationToken.ThrowIfCancellationRequested();
                     yield return ev;
                 }
+            }
+
+            public Task CancelBuildAsync(string buildId, CancellationToken cancellationToken = default)
+            {
+                CancelledBuildIds.Add(buildId);
+                return Task.CompletedTask;
             }
 #pragma warning restore CS1998, IDE0060
         }
@@ -262,7 +311,46 @@ namespace NodeKit.Cli.Tests
                     yield return ev;
                 }
             }
+
+            public Task CancelBuildAsync(string buildId, CancellationToken cancellationToken = default) =>
+                Task.CompletedTask;
 #pragma warning restore CS1998, IDE0060
+        }
+
+        // Console.CancelKeyPress는 테스트에서 직접 발생시킬 수 없으므로, 이미
+        // 취소된 상황에서 실제로 관측되는 예외(OperationCanceledException 또는
+        // RpcException(StatusCode.Cancelled))를 build_id 수신 이후 던져서
+        // SubmitCommand의 취소 처리 경로(CancelBuildAsync 호출 + exit 130)를 검증한다.
+        private sealed class CancellingToolSpecClient : IToolSpecBuildClient
+        {
+            private readonly string _buildId;
+            private readonly Exception _cancellationException;
+
+            public CancellingToolSpecClient(string buildId, Exception cancellationException)
+            {
+                _buildId = buildId;
+                _cancellationException = cancellationException;
+            }
+
+            public List<string> CancelledBuildIds { get; } = new();
+
+#pragma warning disable CS1998
+            public async IAsyncEnumerable<BuildEvent> ResolveAndBuildAsync(
+                string toolName,
+                string version,
+                string rawSpec,
+                [EnumeratorCancellation] CancellationToken cancellationToken = default)
+            {
+                yield return new BuildEvent { Kind = BuildEventKind.JobCreated, BuildId = _buildId };
+                throw _cancellationException;
+            }
+#pragma warning restore CS1998
+
+            public Task CancelBuildAsync(string buildId, CancellationToken cancellationToken = default)
+            {
+                CancelledBuildIds.Add(buildId);
+                return Task.CompletedTask;
+            }
         }
     }
 }
