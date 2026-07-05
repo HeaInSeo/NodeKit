@@ -1,6 +1,9 @@
 using System;
+using System.IO;
 using System.Net;
 using System.Net.Http;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
 using NodeKit.Cli;
@@ -10,6 +13,39 @@ namespace NodeKit.Cli.Tests
 {
     public class HarborImageDigestResolverTests
     {
+        [Fact]
+        public void TryCreate_WhenCaCertHasNoPrivateKey_DoesNotThrow()
+        {
+            // CA 신뢰 전용 인증서는 개인키가 없는 게 정상 — 사용자가 실제로 전달하는
+            // 형태(순수 인증서 PEM)로 TryCreate()가 죽지 않는지 확인한다.
+            var certPath = Path.GetTempFileName();
+            var originalUrl = Environment.GetEnvironmentVariable("NODEKIT_HARBOR_URL");
+            var originalCa = Environment.GetEnvironmentVariable("NODEKIT_HARBOR_CA_CERT");
+            try
+            {
+                using var rsa = RSA.Create(2048);
+                var request = new CertificateRequest(
+                    "CN=test-ca", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+                using var cert = request.CreateSelfSigned(
+                    DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+
+                File.WriteAllText(certPath, cert.ExportCertificatePem());
+
+                Environment.SetEnvironmentVariable("NODEKIT_HARBOR_URL", "https://harbor.lab.local");
+                Environment.SetEnvironmentVariable("NODEKIT_HARBOR_CA_CERT", certPath);
+
+                using var resolver = HarborImageDigestResolver.TryCreate();
+
+                Assert.NotNull(resolver);
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable("NODEKIT_HARBOR_URL", originalUrl);
+                Environment.SetEnvironmentVariable("NODEKIT_HARBOR_CA_CERT", originalCa);
+                File.Delete(certPath);
+            }
+        }
+
         [Fact]
         public void TryCreate_WhenNoEnvVar_ReturnsNull()
         {

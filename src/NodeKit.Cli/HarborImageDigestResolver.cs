@@ -59,7 +59,9 @@ namespace NodeKit.Cli
             var caCertPath = Environment.GetEnvironmentVariable("NODEKIT_HARBOR_CA_CERT");
             if (!string.IsNullOrWhiteSpace(caCertPath) && File.Exists(caCertPath))
             {
-                customCa = X509Certificate2.CreateFromPemFile(caCertPath);
+                // CreateFromPemFile()은 개인키를 요구한다 — CA 신뢰 전용 인증서는
+                // 개인키가 없는 게 정상이므로 인증서 전용 로더를 사용해야 한다.
+                customCa = X509CertificateLoader.LoadCertificateFromFile(caCertPath);
             }
 
             var handler = new HttpClientHandler();
