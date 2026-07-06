@@ -121,6 +121,11 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void Step4_PackageMethod_WithStubResolver_PickSecondCandidate_SetsMicromamba()
         {
+            // Regression: quick-setup has no dedicated question for
+            // conda-vs-micromamba, so picking the micromamba base image
+            // candidate must auto-set PackageEngine too — otherwise
+            // PackageEngine stays defaulted to "conda" and the renderer emits
+            // "conda install" against an image that has no conda binary.
             var outPath = Path.Combine(_workDir, "recipe.json");
 
             var transcript = new[]
@@ -148,8 +153,44 @@ namespace NodeKit.Cli.Tests
             Assert.True(File.Exists(outPath));
 
             var json = File.ReadAllText(outPath);
-            Assert.Contains("micromamba", json);
+            Assert.Contains("mambaorg/micromamba", json);
+            Assert.Contains("\"PackageEngine\": \"micromamba\"", json);
             Assert.Contains(StubImageDigestResolver.StubDigest, json);
+        }
+
+        [Fact]
+        public void Step4_PackageMethod_WithStubResolver_PickFirstCandidate_KeepsCondaEngine()
+        {
+            // Sanity counterpart: picking the conda-forge candidate must NOT
+            // be affected by the micromamba auto-detection.
+            var outPath = Path.Combine(_workDir, "recipe.json");
+
+            var transcript = new[]
+            {
+                "2",
+                "n", "n", "n", "y", "n", "n",
+                "",
+                "bioconda", "",
+                "1",    // pick candidate [1] (condaforge/miniforge3)
+                "bwa-mem", "0.7.17", "run.sh",
+                "bwa=0.7.17=h5bf99c6_8", "",
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = RecipeCreateInteractiveRunner.Run(
+                outPath,
+                new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
+                new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
+                stderr,
+                _noCancellation,
+                imageDigestResolver: StubImageDigestResolver.Instance);
+
+            Assert.Equal(0, exitCode);
+            Assert.True(File.Exists(outPath));
+
+            var json = File.ReadAllText(outPath);
+            Assert.Contains("\"PackageEngine\": \"conda\"", json);
         }
 
         [Fact]

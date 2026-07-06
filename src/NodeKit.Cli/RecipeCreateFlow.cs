@@ -345,6 +345,17 @@ namespace NodeKit.Cli
                     if (violations.Count == 0)
                     {
                         console.WriteLine($"설정 완료: {combined}");
+
+                        // Package 방식에서 micromamba 전용 base image를 고르면 PackageEngine도
+                        // 맞춰준다 — 안 그러면 PackageEngine이 기본값 conda로 남아서, conda가
+                        // 없는 micromamba 전용 이미지에 "conda install"을 렌더링하는 불일치가
+                        // 생긴다 (quick-setup에는 PackageEngine을 직접 묻는 질문이 없다).
+                        if (method == RecipeMethodId.Package
+                            && selected.Reference.StartsWith("mambaorg/micromamba", StringComparison.Ordinal))
+                        {
+                            session.SetField("PackageEngine", "micromamba");
+                            console.WriteLine("micromamba 전용 이미지를 선택해 PackageEngine을 micromamba로 설정했습니다.");
+                        }
                     }
                     else
                     {
