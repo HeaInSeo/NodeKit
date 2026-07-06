@@ -155,6 +155,33 @@ namespace NodeKit.Cli.Tests
         }
 
         [Fact]
+        public void Submit_StreamEndsWithoutTerminalEvent_DoesNotReturnZero()
+        {
+            // Hidden-failure-mode check (CLAUDE.md §11 "gRPC 실패가 조용히
+            // 사라지는 경우"): if WatchToolBuild's stream ends (server
+            // restart, network blip) without ever sending a Succeeded/Failed/
+            // Interrupted status, the outcome was never actually observed —
+            // this must not be reported as success (exit 0).
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var events = new[]
+            {
+                new BuildEvent { Kind = BuildEventKind.Log, Message = "spec 해결 완료" },
+                new BuildEvent { Kind = BuildEventKind.JobCreated, Message = "빌드 제출됨", BuildId = "build-999" },
+                new BuildEvent { Kind = BuildEventKind.JobRunning, Message = "실행 중" },
+            };
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(events));
+
+            Assert.NotEqual(0, exitCode);
+        }
+
+        [Fact]
         public void Submit_BuildFailed_ReturnsOne()
         {
             var recipePath = WriteFile("recipe.json", ValidRecipeJson);

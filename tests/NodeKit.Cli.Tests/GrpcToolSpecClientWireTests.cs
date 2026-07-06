@@ -77,6 +77,34 @@ namespace NodeKit.Cli.Tests
         }
 
         [Fact]
+        public async Task ResolveAndBuildAsync_StreamEndsWithoutTerminalStatus_DoesNotYieldSucceeded()
+        {
+            // Investigation probe: what happens if WatchToolBuild's stream just
+            // ends (server restart, network blip, proxy timeout) without ever
+            // sending a Succeeded/Failed/Interrupted status? MoveNext() returns
+            // false and the while loop exits with no exception - if the client
+            // doesn't notice, SubmitCommand's caller falls through to its own
+            // "stream ended, return 0" fallback and reports success for a build
+            // whose outcome was never actually observed.
+            using var server = new GrpcTestServer();
+            server.Fake.WatchEvents = new List<BuildEvent>
+            {
+                new() { Kind = BuildEventKind.Log, Status = "Building", BuildId = "b-4" },
+                new() { Kind = BuildEventKind.Log, Status = "Building", BuildId = "b-4", Message = "still building" },
+            };
+            using var client = new GrpcToolSpecClient(server.Channel);
+
+            var events = new List<NodeKit.Grpc.BuildEvent>();
+            await foreach (var ev in client.ResolveAndBuildAsync("bwa", "0.7.17", "{}", CancellationToken.None))
+            {
+                events.Add(ev);
+            }
+
+            Assert.DoesNotContain(events, e => e.Kind == NodeKit.Grpc.BuildEventKind.Succeeded);
+            Assert.DoesNotContain(events, e => e.Kind == NodeKit.Grpc.BuildEventKind.Failed);
+        }
+
+        [Fact]
         public async Task CancelBuildAsync_CallsFakeServerCancelToolBuild()
         {
             using var server = new GrpcTestServer();

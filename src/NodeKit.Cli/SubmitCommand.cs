@@ -135,7 +135,13 @@ namespace NodeKit.Cli
                     }
                 }
 
-                return 0;
+                // 스트림이 Succeeded/Failed 등 최종 상태 이벤트 없이 그냥 끝났다(서버
+                // 재시작, 네트워크 문제 등) — 빌드 결과를 실제로 확인하지 못한 것이므로
+                // 성공으로 간주하지 않는다.
+                stderr.WriteLine(string.IsNullOrEmpty(buildId)
+                    ? "빌드 결과를 확인하지 못한 채 서버 스트림이 종료되었습니다."
+                    : $"빌드 결과를 확인하지 못한 채 서버 스트림이 종료되었습니다 (build ID: {buildId}). NodeVault에서 빌드 상태를 직접 확인하세요.");
+                return 1;
             }
             catch (OperationCanceledException)
             {
