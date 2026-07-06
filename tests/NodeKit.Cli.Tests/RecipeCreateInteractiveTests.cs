@@ -1376,6 +1376,39 @@ namespace NodeKit.Cli.Tests
         }
 
         [Fact]
+        public void ManualBaseImageEntry_MicromambaImageWithCondaEngine_WarnsButStillSaves()
+        {
+            // Issue #15/#16 follow-up: step-4 candidate auto-detection only
+            // covers the curated candidate list — typing a micromamba-style
+            // image manually (via "0" direct entry) bypasses it entirely, so
+            // this needs its own warning to avoid a silent 100%-fail combo.
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            const string micromambaImageWithDigest =
+                "mambaorg/micromamba:1.5.8@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+            var transcript = new[]
+            {
+                "2", "n", "n", "n", "y", "n", "n", "",
+                "bioconda", "",   // 채널 확정 단계
+                "0",              // 기반 이미지: 직접 입력
+                "bwa-mem", "0.7.17", "run.sh", micromambaImageWithDigest,
+                "bwa=0.7.17=h5bf99c6_8", "",
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = RecipeCreateInteractiveRunner.Run(
+                outPath,
+                new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
+                new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
+                stderr,
+                new SequencedCancellationSource(checksBeforeCancellation: 1000));
+
+            Assert.Equal(0, exitCode);
+            Assert.True(File.Exists(outPath));
+            Assert.Contains("micromamba 전용 이미지로 보이는데 PackageEngine은 conda", stdout.ToString());
+        }
+
+        [Fact]
         public void PackageMirror_ResolveRecipeThrowsRpcException_PrintsWarningAndSavesInsteadOfCrashing()
         {
             // Issue #13 regression: Mirror 방식은 필드에 입력한 MirrorUri를

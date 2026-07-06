@@ -77,6 +77,18 @@ namespace NodeKit.Cli
                 result = RecipeValidationPipeline.ValidateRecipe(document);
             }
 
+            // step4 candidate 선택은 PackageEngine을 자동으로 맞춰주지만(#15/#16),
+            // "0" 수동 입력으로 base image를 직접 타이핑한 경우는 그 대상이 아니다 —
+            // 여기서 한 번 더 체크해 놓치는 조합을 경고한다 (차단은 아님, 커스텀
+            // 이미지가 실제로 둘 다 가지고 있을 수도 있으므로).
+            var mismatch = BaseImageEngineMismatchChecker.DescribeMismatch(document.BuildKind!.Value, document.BaseImage);
+            if (mismatch != null)
+            {
+                console.WriteLine();
+                console.WriteLine($"⚠  {mismatch}");
+                console.WriteLine();
+            }
+
             // 단계 7: 패키지 빌드 문자열 선택 (ResolveRecipe)
             if (document.Packages.Count > 0)
             {

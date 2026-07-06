@@ -154,6 +154,12 @@ namespace NodeKit.Cli
             var document = session.Build();
             document.BuildKind = RecipeBuildKindResolver.Resolve(method, document);
 
+            var mismatch = BaseImageEngineMismatchChecker.DescribeMismatch(document.BuildKind.Value, document.BaseImage);
+            if (mismatch != null)
+            {
+                stderr.WriteLine($"경고: {mismatch}");
+            }
+
             var result = RecipeValidationPipeline.ValidateRecipe(document);
             if (!result.IsValid)
             {

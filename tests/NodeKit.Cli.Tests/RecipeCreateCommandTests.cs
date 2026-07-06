@@ -218,6 +218,54 @@ namespace NodeKit.Cli.Tests
             Assert.Empty(stderr.ToString());
         }
 
+        // --- #15/#16 후속: non-interactive free-text BaseImage/engine 불일치 경고 ---
+
+        [Fact]
+        public void Package_MicromambaBaseImage_EngineFlagOmitted_WarnsButStillSaves()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var stderr = new StringWriter();
+            var args = new[]
+            {
+                "--non-interactive", "--method", "package",
+                "--field", "ToolName=bwa-mem",
+                "--field", "ToolVersion=0.7.17",
+                "--field", "Script=run.sh",
+                "--field", "BaseImage=mambaorg/micromamba:1.5.8@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "--field", "Packages=bwa=0.7.17=h5bf99c6_8",
+                "--field", "Channels=bioconda",
+            };
+
+            var exitCode = RunCreate(args, outPath, stderr: stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.True(File.Exists(outPath));
+            Assert.Contains("micromamba 전용 이미지로 보이는데 PackageEngine은 conda", stderr.ToString());
+        }
+
+        [Fact]
+        public void Mirror_MicromambaBaseImage_WarnsButStillSaves()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var stderr = new StringWriter();
+            var args = new[]
+            {
+                "--non-interactive", "--method", "mirror",
+                "--field", "ToolName=bwa-mem",
+                "--field", "ToolVersion=0.7.17",
+                "--field", "Script=run.sh",
+                "--field", "BaseImage=mambaorg/micromamba:1.5.8@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "--field", "MirrorUri=https://mirror.internal/conda-channel",
+                "--field", "Packages=bwa=0.7.17=h5bf99c6_8",
+            };
+
+            var exitCode = RunCreate(args, outPath, stderr: stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.True(File.Exists(outPath));
+            Assert.Contains("mirror 방식은 항상 conda로 렌더링됩니다", stderr.ToString());
+        }
+
         private static string[] RemoveField(string[] args, string fieldName)
         {
             var result = new System.Collections.Generic.List<string>();
