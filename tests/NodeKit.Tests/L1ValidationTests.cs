@@ -222,6 +222,67 @@ dependencies:
         }
 
         [Fact]
+        public void Fail_WhenDockerfilePipInstallIsUnpinned()
+        {
+            // Gap found while checking whether IPolicyChecker/WasmPolicyChecker being
+            // GUI-only (not wired into the CLI) left any coverage hole versus
+            // DockGuard's actual policy rules: DockGuard's DGF002 requires pip
+            // installs to be version-pinned too, but this validator only recognized
+            // conda/micromamba — "RUN pip install numpy" passed L1 with no warning
+            // at all. Confirmed live: `nodekit validate` returned OK/exit 0.
+            var def = new ToolDefinition
+            {
+                ImageUri = "reg/img:1.0@sha256:abc",
+                DockerfileContent = "FROM ubuntu:22.04\nRUN pip install numpy\n",
+            };
+
+            var result = _sut.Validate(def);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-PKG-003" && v.Field == "DockerfileContent");
+        }
+
+        [Fact]
+        public void Pass_WhenDockerfilePipInstallIsFullyPinned()
+        {
+            var def = new ToolDefinition
+            {
+                ImageUri = "reg/img:1.0@sha256:abc",
+                DockerfileContent = "FROM ubuntu:22.04\nRUN pip install numpy==1.26.4 pandas==2.2.1\n",
+            };
+
+            Assert.True(_sut.Validate(def).IsValid);
+        }
+
+        [Fact]
+        public void Fail_WhenDockerfilePip3EditableInstall_IsBlocked()
+        {
+            var def = new ToolDefinition
+            {
+                ImageUri = "reg/img:1.0@sha256:abc",
+                DockerfileContent = "FROM ubuntu:22.04\nRUN pip3 install -e git+https://example.com/repo.git\n",
+            };
+
+            var result = _sut.Validate(def);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-PKG-004" && v.Field == "DockerfileContent");
+        }
+
+        [Fact]
+        public void Pass_WhenDockerfilePipInstallUsesRequirementsFileFlag()
+        {
+            // -r/--requirement takes a filename argument, not a package name.
+            var def = new ToolDefinition
+            {
+                ImageUri = "reg/img:1.0@sha256:abc",
+                DockerfileContent = "FROM ubuntu:22.04\nRUN pip install -r requirements.txt\n",
+            };
+
+            Assert.True(_sut.Validate(def).IsValid);
+        }
+
+        [Fact]
         public void Pass_WhenDockerfileCondaInstallUsesChannelFlag()
         {
             // Regression test: -c bioconda was previously extracted as a package name,

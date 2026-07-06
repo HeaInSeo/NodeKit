@@ -22,6 +22,15 @@ namespace NodeKit.Validation
         private static readonly Regex _editableInstallPattern =
             new(@"^(-e|--editable)(\s|=)", RegexOptions.Compiled);
 
+        // pip install 옵션 중 다음 토큰을 인자로 소비하는 것들 — 이걸 패키지명으로
+        // 오인해 버전 검사를 하면 안 된다.
+        private static readonly HashSet<string> _pipValueOptions = new(StringComparer.Ordinal)
+        {
+            "-r", "--requirement", "-c", "--constraint", "-t", "--target",
+            "-i", "--index-url", "--extra-index-url", "--trusted-host",
+            "--cache-dir", "--proxy", "--retries", "--timeout", "-f", "--find-links",
+        };
+
         public ValidationResult Validate(ToolDefinition definition)
         {
             ArgumentNullException.ThrowIfNull(definition);
@@ -175,10 +184,84 @@ namespace NodeKit.Validation
                 {
                     ValidateCondaPackage(package, violations, "DockerfileContent");
                 }
+
+                ValidateDockerfilePipPackages(instruction.Raw, violations, "DockerfileContent");
             }
 
             return new ValidationResult(violations);
         }
+
+        // DGF002(DockGuard genomics policy)와 동일한 요구사항 — RUN 내 pip install도
+        // conda/micromamba install과 마찬가지로 버전 고정을 요구한다. conda 계열만
+        // 검사하던 기존 코드는 이 경로를 완전히 놓치고 있었다(Dockerfile 방식에서
+        // "RUN pip install numpy"가 아무 경고 없이 통과됨).
+        private static void ValidateDockerfilePipPackages(string rawInstruction, List<ValidationViolation> violations, string field)
+        {
+            var runBody = rawInstruction.Length > 3
+                ? rawInstruction[3..].Trim()
+                : string.Empty;
+
+            foreach (var command in runBody.Split(_shellCommandSeparators, StringSplitOptions.RemoveEmptyEntries))
+            {
+                var tokens = command
+                    .Split(_dockerfileTokenSeparators, StringSplitOptions.RemoveEmptyEntries)
+                    .ToList();
+
+                if (tokens.Count < 2 || !IsPipInstallCommand(tokens))
+                {
+                    continue;
+                }
+
+                var skipNext = false;
+                for (var index = 2; index < tokens.Count; index++)
+                {
+                    var token = tokens[index];
+                    if (skipNext)
+                    {
+                        skipNext = false;
+                        continue;
+                    }
+
+                    // Dockerfile 토큰은 공백으로 분리되므로 "-e"와 "git+..."가 별도
+                    // 토큰이다 — 한 줄짜리 requirements.txt 항목("-e git+...")을
+                    // 가정한 _editableInstallPattern은 "-e" 토큰 자체와 매치되지
+                    // 않는다. "-e"/"--editable"을 값-소비 옵션처럼 먼저 명시적으로
+                    // 처리해 다음 토큰(VCS URL/경로)을 건너뛴다.
+                    if (token is "-e" or "--editable")
+                    {
+                        violations.Add(new ValidationViolation(
+                            "L1-PKG-004",
+                            "editable/VCS 설치는 버전을 고정할 수 없어 차단됩니다.",
+                            field));
+                        skipNext = true;
+                        continue;
+                    }
+
+                    if (_editableInstallPattern.IsMatch(token))
+                    {
+                        violations.Add(new ValidationViolation(
+                            "L1-PKG-004",
+                            $"editable/VCS 설치는 버전을 고정할 수 없어 차단됩니다: '{token}'",
+                            field));
+                        continue;
+                    }
+
+                    if (token.StartsWith('-'))
+                    {
+                        skipNext = _pipValueOptions.Contains(token);
+                        continue;
+                    }
+
+                    ValidatePipPackage(token.Trim().Trim('"', '\''), violations, field);
+                }
+            }
+        }
+
+        private static bool IsPipInstallCommand(List<string> tokens) =>
+            tokens.Count >= 2 &&
+            (string.Equals(tokens[0], "pip", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(tokens[0], "pip3", StringComparison.OrdinalIgnoreCase)) &&
+            string.Equals(tokens[1], "install", StringComparison.OrdinalIgnoreCase);
 
         private static IEnumerable<string> ExtractInstalledPackages(string rawInstruction)
         {
@@ -260,7 +343,10 @@ namespace NodeKit.Validation
             // 참조: PLATFORM_MASTER_DESIGN.md §4.9
         }
 
-        private static void ValidatePipPackage(string packageExpression, List<ValidationViolation> violations)
+        private static void ValidatePipPackage(
+            string packageExpression,
+            List<ValidationViolation> violations,
+            string field = "EnvironmentSpec")
         {
             if (string.IsNullOrWhiteSpace(packageExpression))
             {
@@ -272,7 +358,7 @@ namespace NodeKit.Validation
                 violations.Add(new ValidationViolation(
                     "L1-PKG-003",
                     $"패키지 '{packageExpression}'에 정확한 버전이 없습니다. pip 형식: name==version (예: numpy==1.26.4)",
-                    "EnvironmentSpec"));
+                    field));
             }
         }
 
