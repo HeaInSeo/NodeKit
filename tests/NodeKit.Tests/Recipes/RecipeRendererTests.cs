@@ -52,8 +52,14 @@ namespace NodeKit.Tests.Recipes
         }
 
         [Fact]
-        public void Render_Micromamba_UsesMicromambaInstallCommand()
+        public void Render_Micromamba_UsesMicromambaInstallCommandWithBaseEnv()
         {
+            // Regression: mambaorg/micromamba images don't auto-activate an
+            // environment for plain RUN steps like conda-forge/miniforge images
+            // do, so "micromamba install" without "-n base" always fails with
+            // "No target prefix specified" regardless of package validity —
+            // found via a real local NodeVault + buildah build during Micromamba
+            // engine test coverage.
             var recipe = NewRecipe(RecipeBuildKind.Micromamba);
             recipe.BaseImage = PinnedBaseImage;
             recipe.Channels.Add("bioconda");
@@ -62,7 +68,7 @@ namespace NodeKit.Tests.Recipes
             var definition = RecipeRenderer.Render(recipe);
             var violations = RunFullL1Chain(definition);
 
-            Assert.Contains("RUN micromamba install -y samtools=1.17=h00cdaf9_0", definition.DockerfileContent);
+            Assert.Contains("RUN micromamba install -n base -y samtools=1.17=h00cdaf9_0", definition.DockerfileContent);
             Assert.Contains("RUN micromamba config append channels bioconda", definition.DockerfileContent);
             Assert.Empty(violations);
         }

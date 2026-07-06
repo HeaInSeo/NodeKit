@@ -89,7 +89,11 @@ namespace NodeKit.Authoring.Recipes
 
             if (recipe.Packages.Count > 0)
             {
-                dockerfile.Append("RUN ").Append(installer).Append(" install -y ")
+                // micromamba (unlike conda-forge/miniforge images) doesn't auto-activate
+                // an environment for plain RUN steps, so "micromamba install" fails with
+                // "No target prefix specified" unless a target env is named explicitly.
+                var envArgs = installer == "micromamba" ? "-n base " : string.Empty;
+                dockerfile.Append("RUN ").Append(installer).Append(" install ").Append(envArgs).Append("-y ")
                     .Append(string.Join(' ', recipe.Packages)).Append('\n');
             }
 
