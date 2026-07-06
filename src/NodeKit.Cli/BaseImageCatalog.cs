@@ -24,6 +24,17 @@ namespace NodeKit.Cli
                 "Micromamba 경량 기반 이미지 (빠른 설치)"),
         };
 
+        // Mirror 방식은 PackageEngine 필드가 없고 RecipeRenderer가 항상 "conda"를
+        // 하드코딩하므로(recipe.PackageMirrorUri를 conda channel처럼 취급), micromamba
+        // 전용 이미지를 후보로 보여주면 conda 바이너리가 없는 이미지에 "conda install"을
+        // 렌더링하는 조합이 만들어져 100% 빌드 실패한다.
+        private static readonly IReadOnlyList<BaseImageEntry> _mirrorCandidates = new[]
+        {
+            new BaseImageEntry(
+                "condaforge/miniforge3:24.3.0-0",
+                "공식 conda-forge Miniforge 기반 이미지 (conda/mamba 포함)"),
+        };
+
         private static readonly IReadOnlyList<BaseImageEntry> _empty =
             Array.Empty<BaseImageEntry>();
 
@@ -31,7 +42,7 @@ namespace NodeKit.Cli
             method switch
             {
                 RecipeMethodId.Package => _condaCandidates,
-                RecipeMethodId.Mirror => _condaCandidates,
+                RecipeMethodId.Mirror => _mirrorCandidates,
                 RecipeMethodId.Source => _condaCandidates,
                 _ => _empty,
             };

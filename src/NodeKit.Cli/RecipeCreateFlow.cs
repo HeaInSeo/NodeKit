@@ -346,15 +346,29 @@ namespace NodeKit.Cli
                     {
                         console.WriteLine($"설정 완료: {combined}");
 
-                        // Package 방식에서 micromamba 전용 base image를 고르면 PackageEngine도
-                        // 맞춰준다 — 안 그러면 PackageEngine이 기본값 conda로 남아서, conda가
-                        // 없는 micromamba 전용 이미지에 "conda install"을 렌더링하는 불일치가
-                        // 생긴다 (quick-setup에는 PackageEngine을 직접 묻는 질문이 없다).
-                        if (method == RecipeMethodId.Package
-                            && selected.Reference.StartsWith("mambaorg/micromamba", StringComparison.Ordinal))
+                        // Package 방식에서는 선택한 base image가 항상 PackageEngine을 결정한다
+                        // — 그렇지 않으면 (a) micromamba 전용 이미지를 골라도 PackageEngine이
+                        // 기본값 conda로 남거나, (b) BeginnerGuideFlow의 install-command 파서가
+                        // 먼저 PackageEngine=micromamba를 세팅해둔 상태에서 여기서 conda 이미지를
+                        // 골라도 그 값이 그대로 남는 역방향 불일치가 생긴다. 두 경우 다
+                        // 이미지에 없는 패키지 매니저를 RUN하도록 렌더링되어 100% 빌드 실패한다.
+                        if (method == RecipeMethodId.Package)
                         {
-                            session.SetField("PackageEngine", "micromamba");
-                            console.WriteLine("micromamba 전용 이미지를 선택해 PackageEngine을 micromamba로 설정했습니다.");
+                            var isMicromambaImage = selected.Reference.StartsWith("mambaorg/micromamba", StringComparison.Ordinal);
+                            var engineForImage = isMicromambaImage ? "micromamba" : "conda";
+                            var previousEngine = session.Snapshot().Values
+                                .FirstOrDefault(v => v.FieldName == "PackageEngine")?.DisplayValue;
+
+                            session.SetField("PackageEngine", engineForImage);
+
+                            if (isMicromambaImage)
+                            {
+                                console.WriteLine("micromamba 전용 이미지를 선택해 PackageEngine을 micromamba로 설정했습니다.");
+                            }
+                            else if (previousEngine == "micromamba")
+                            {
+                                console.WriteLine("conda 기반 이미지를 선택해 PackageEngine을 conda로 되돌렸습니다.");
+                            }
                         }
                     }
                     else

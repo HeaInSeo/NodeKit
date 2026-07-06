@@ -40,6 +40,21 @@ namespace NodeKit.Cli.Tests
         }
 
         [Fact]
+        public void BaseImageCatalog_Mirror_ReturnsOnlyCondaCandidate()
+        {
+            // Issue #15 follow-up: Mirror has no PackageEngine field and
+            // RecipeRenderer always hardcodes "conda" for it, so offering the
+            // micromamba-only image as a candidate here would let a user pick
+            // a combination that's guaranteed to fail at build time (no conda
+            // binary in that image). Confirmed via a real buildah build:
+            // "conda: not found".
+            var candidates = BaseImageCatalog.CandidatesFor(NodeKit.Authoring.Recipes.RecipeMethodId.Mirror);
+            Assert.Single(candidates);
+            Assert.Contains(candidates, c => c.Reference.StartsWith("condaforge/miniforge3", StringComparison.Ordinal));
+            Assert.DoesNotContain(candidates, c => c.Reference.StartsWith("mambaorg/micromamba", StringComparison.Ordinal));
+        }
+
+        [Fact]
         public void BaseImageCatalog_Container_ReturnsEmpty()
         {
             var candidates = BaseImageCatalog.CandidatesFor(NodeKit.Authoring.Recipes.RecipeMethodId.Container);
@@ -191,6 +206,48 @@ namespace NodeKit.Cli.Tests
 
             var json = File.ReadAllText(outPath);
             Assert.Contains("\"PackageEngine\": \"conda\"", json);
+        }
+
+        [Fact]
+        public void Step4_BeginnerGuideMicromambaInstallCommand_ThenPickCondaCandidate_RevertsEngineToConda()
+        {
+            // Reverse-direction counterpart to PickSecondCandidate_SetsMicromamba:
+            // BeginnerGuideFlow's install-command parser sets PackageEngine=
+            // micromamba first (from "micromamba install ..."), but if the user
+            // then picks the conda-forge candidate in step 4, the engine must
+            // be reverted to conda — otherwise the renderer emits "micromamba
+            // install" against an image with no micromamba binary. Confirmed
+            // via a real buildah build pre-fix: "micromamba: not found".
+            var outPath = Path.Combine(_workDir, "recipe.json");
+
+            var transcript = new[]
+            {
+                "1",    // 쉬운 안내 모드
+                "2",    // 설치 명령을 알고 있다
+                "micromamba install -c bioconda samtools=1.17",
+                "1",    // 이해한 값을 사용
+                "y",    // 채널 확인 수락
+                "1",    // step 4: pick candidate [1] (condaforge/miniforge3) — reverses the engine
+                "samtools", "1.17", "samtools view",
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = RecipeCreateInteractiveRunner.Run(
+                outPath,
+                new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
+                new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
+                stderr,
+                _noCancellation,
+                imageDigestResolver: StubImageDigestResolver.Instance);
+
+            Assert.Equal(0, exitCode);
+            Assert.True(File.Exists(outPath));
+
+            var json = File.ReadAllText(outPath);
+            Assert.Contains("condaforge/miniforge3", json);
+            Assert.Contains("\"PackageEngine\": \"conda\"", json);
+            Assert.Contains("\"BuildKind\": \"Conda\"", json);
         }
 
         [Fact]
