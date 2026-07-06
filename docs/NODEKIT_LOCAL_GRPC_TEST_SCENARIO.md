@@ -310,6 +310,8 @@ TC-9 성공 후 다음을 모두 교차 확인해야 pass로 간주한다 (하�
 | 대화형 `recipe create` 흐름 (Dockerfile/DockerfileFallback 방식) | ✓ 통과 — 저장 완료, `nodekit submit`으로 실제 build+push+index 등록까지 전부 성공(exit 0), NodeVault index `lifecycle_phase=Active` 교차 확인 완료 |
 | Package 방식 내 Micromamba 엔진(`--engine micromamba`, quick-setup에는 경로 없음) | 시도 중 **버그 발견**: `RecipeRenderer`가 렌더하는 `micromamba install -y <pkg>`에 target 환경 지정이 없어 패키지 유효성과 무관하게 100% 빌드 실패("No target prefix specified") → Issue #14. 수정 후 실제 buildah 직접 빌드 + 로컬 NodeVault `nodekit submit` 둘 다로 재검증 — build+push+index 등록까지 전부 성공(`lifecycle_phase=Active`) 확인 |
 | BeginnerGuideFlow(가이드 모드) 13개 재입력 루프 전수조사 | **버그 발견 — 12/13곳**: quick-setup과 동일한 EOF-vs-빈줄 버그가 안전한 `[Y/n]`/`[y/N]` 확인 프롬프트 2곳을 제외한 나머지 전부에 있었음(실제 루프 개수도 12개가 아니라 13개 — `while(!subflowDone)` 1개가 grep 카운트에서 누락) → Issue #12 close. 가이드 모드 진입 직후 입력을 끊으면 5초 안에 350만 줄 출력되는 것으로 재현 확인, 수정 후 동일 시나리오 4가지로 재검증 — 전부 크래시/무한루프 없이 정상 취소 |
+| BeginnerGuideFlow(가이드 모드) 정상 완주 — conda install 단서 | ✓ 통과 — `conda install -c bioconda samtools=1.17` 입력 → 파서가 Packages/Channels 자동 채움, ToolName/ToolVersion 제안값(samtools/1.17)도 Enter로 정상 수락 → 실제 `nodekit submit`으로 build+push+index 등록까지 전부 성공(`lifecycle_phase=Active`) |
+| BeginnerGuideFlow(가이드 모드) 정상 완주 — micromamba install 단서 | ✓ 통과 — `micromamba install -c bioconda samtools=1.17` 입력 → `InstallCommandParser`가 PackageEngine=micromamba를 정확히 추출, BuildKind=Micromamba로 정상 저장. `nodekit render`로 확인한 Dockerfile에 `-n base`가 정확히 포함됨(#14 수정과 이 진입 경로가 올바르게 맞물림 확인). 채널을 bioconda만 입력해 실제 빌드는 시도하지 않음(conda-forge 없이는 libgcc-ng 의존성으로 실패할 게 뻔한 픽스처 한계 — 앞서 non-interactive 경로로 이미 실빌드 성공까지 확인함) |
 
 ### 발견된 버그 10건(#5-#14)과 수정 커밋 — 전부 close 완료
 
