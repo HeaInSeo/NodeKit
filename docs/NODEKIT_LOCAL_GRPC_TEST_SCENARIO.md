@@ -309,8 +309,9 @@ TC-9 성공 후 다음을 모두 교차 확인해야 pass로 간주한다 (하�
 | 대화형 `recipe create` 흐름 (Source/SourceBuild 방식) | ✓ 통과 — 저장 완료, `nodekit submit`도 시도해 실제 curl 다운로드 + `sha256sum -c` 단계까지 도달·실패(가짜 checksum이므로 예상된 인프라 실패, 코드 버그 아님) |
 | 대화형 `recipe create` 흐름 (Dockerfile/DockerfileFallback 방식) | ✓ 통과 — 저장 완료, `nodekit submit`으로 실제 build+push+index 등록까지 전부 성공(exit 0), NodeVault index `lifecycle_phase=Active` 교차 확인 완료 |
 | Package 방식 내 Micromamba 엔진(`--engine micromamba`, quick-setup에는 경로 없음) | 시도 중 **버그 발견**: `RecipeRenderer`가 렌더하는 `micromamba install -y <pkg>`에 target 환경 지정이 없어 패키지 유효성과 무관하게 100% 빌드 실패("No target prefix specified") → Issue #14. 수정 후 실제 buildah 직접 빌드 + 로컬 NodeVault `nodekit submit` 둘 다로 재검증 — build+push+index 등록까지 전부 성공(`lifecycle_phase=Active`) 확인 |
+| BeginnerGuideFlow(가이드 모드) 13개 재입력 루프 전수조사 | **버그 발견 — 12/13곳**: quick-setup과 동일한 EOF-vs-빈줄 버그가 안전한 `[Y/n]`/`[y/N]` 확인 프롬프트 2곳을 제외한 나머지 전부에 있었음(실제 루프 개수도 12개가 아니라 13개 — `while(!subflowDone)` 1개가 grep 카운트에서 누락) → Issue #12 close. 가이드 모드 진입 직후 입력을 끊으면 5초 안에 350만 줄 출력되는 것으로 재현 확인, 수정 후 동일 시나리오 4가지로 재검증 — 전부 크래시/무한루프 없이 정상 취소 |
 
-### 발견된 버그 9건과 수정 커밋 — #12(BeginnerGuideFlow 전수조사)만 open, 나머지 전부 close 완료
+### 발견된 버그 10건(#5-#14)과 수정 커밋 — 전부 close 완료
 
 - **Issue #5** (NodeKit `bd9786e`): `GrpcToolSpecClient.MapWatchEvent()`가 서버의
   `Status` 필드(PascalCase)를 소문자와 비교해서 매칭이 항상 실패 → 빌드 실패 시에도
@@ -338,11 +339,21 @@ TC-9 성공 후 다음을 모두 교차 확인해야 pass로 간주한다 (하�
   옵션 필드에도 재사용되고, 그 테스트들은 EOF를 "남은 옵션 필드는 기본값으로 넘어감"
   신호로 의도적으로 사용하고 있었음) → raw EOF(`null`)와 실제 빈 줄을 구분해서
   `CompleteListField`가 실패했을 때만 취소로 승격시키는 정밀 패턴으로 재수정.
-- **Issue #12** (open, 의도적으로 미close): `PromptScalarField`/`PromptChoiceField`도
-  같은 계열 버그가 있어 `0c17984`로 수정했지만, `BeginnerGuideFlow.cs`의 12개
-  `while(true)` 루프는 아직 전수조사가 안 됐음을 별도로 추적하기 위해 열어 둠
-  (`PromptChoiceField`는 현재 카탈로그에 도달 가능한 Required choice 필드가 없어서
-  방어적 수정일 뿐 — 테스트 없음).
+- **Issue #12** (NodeKit `9766494`, close 완료): `PromptScalarField`/`PromptChoiceField`도
+  같은 계열 버그가 있어 `0c17984`로 수정했지만(`PromptChoiceField`는 현재 카탈로그에
+  도달 가능한 Required choice 필드가 없어서 방어적 수정일 뿐 — 테스트 없음),
+  `BeginnerGuideFlow.cs`는 별도 전수조사 항목으로 열어 두었었다. 전수조사 결과 실제
+  루프는 12개가 아니라 **13개**였다(`while(true)` 12개 + `while(!subflowDone)` 1개 —
+  후자는 grep 패턴에 안 걸려서 원래 카운트에서 누락됨). 그중 확인된 두 개의 `[Y/n]`/
+  `[y/N]` 확인 프롬프트(digest 사용 확인, Dockerfile 경고 확인 — 둘 다 blank/EOF가
+  이미 명시적 기본값으로 처리됨)만 안전했고, **나머지 12곳은 전부 같은 EOF 버그를
+  가지고 있었다**(그중 하나는 while 루프 자체가 아니라 루프 안에 끼어 있는 별도 read
+  지점 — "직접 입력" 선택 후 ImageDigest를 물어보는 부분). 실제로 재현: 가이드 모드
+  진입 직후 입력을 끊으면 5초 안에 350만 줄이 출력됨. `ReadTrimmedLineOrNull` 헬퍼로
+  동일한 정밀 패턴(진짜 EOF만 취소로 승격, 실제 빈 Enter는 기존처럼 재입력 유도)을
+  12곳 전부에 적용, 기존 테스트 157개 그대로 통과 확인 후 회귀 테스트 7개 추가.
+  실제 CLI로 4개 경로(도구 이름/설치 명령/source checksum/container 개별 digest 입력)
+  재검증해서 전부 크래시 없이 정상 취소되는 것까지 확인.
 - **Issue #13** (NodeKit `70048ff`): `IResolveRecipeClient.ResolveAsync()`가
   `package_mirror_uri`를 받을 파라미터 자체가 없어서, Mirror 방식 recipe는 항상 빈
   URI로 ResolveRecipe를 호출 → NodeVault가 필연적으로 `InvalidArgument`로 거부.
@@ -384,25 +395,29 @@ seoy/NodeVault 없이 매 실행마다 자동으로 wire-level 회귀를 잡는 
 
 ### 이 실행이 완료한 것 / 완료하지 않은 것
 
-- **완료**: Sprint 7 Task 2 / U5-2 이전 사전 검증. TC-1~TC-13 전체와 quick-setup
+- **완료**: Sprint 7 Task 2 / U5-2 이전 사전 검증. TC-1~TC-13 전체, quick-setup
   경로의 **5개 recipe method 전부**(Package/Conda, Mirror/PackageMirror,
-  Container/BioContainer, Source/SourceBuild, Dockerfile/DockerfileFallback) +
-  **Package 방식 내 Micromamba 엔진**을 seoy 없이 실행해서 버그 9건을 찾아 그중
-  8건을 수정했다(#12만 의도적으로 open — 별도 전수조사 항목). `nodekit submit`의
-  happy path, 실패, 취소, base-image-resolve(오픈망/폐쇄망), ResolveRecipe 정책
-  분기(closed_network)와 네트워크 실패 처리까지 검증됨. Dockerfile 방식과
-  Micromamba 엔진은 실제 build+push+index 등록까지 성공(exit 0)까지 확인했고,
-  나머지는 의도적으로 존재하지 않는 이미지/checksum/mirror URI를 써서 빌드
-  단계까지는 정상 도달한 뒤 예상대로 실패(코드 버그 아닌 인프라 성격의 실패)하는
-  것까지 확인. Micromamba 엔진은 quick-setup 대화형 경로가 아예 없어서(현재는
-  `--engine micromamba` CLI 플래그 또는 BeginnerGuideFlow 전용)
-  `--non-interactive` 경로로 검증했고, 이 과정에서 **모든 Micromamba recipe가
-  100% 빌드 실패하는 실제 버그(#14)**를 찾아 수정했다 — "Conda 엔진과 동일한
-  경로라 위험이 낮다"는 이전 판단은 틀렸었다.
+  Container/BioContainer, Source/SourceBuild, Dockerfile/DockerfileFallback),
+  **Package 방식 내 Micromamba 엔진**, 그리고 **BeginnerGuideFlow(가이드 모드)의
+  13개 재입력 루프 전수조사**까지 seoy 없이 완료해서 버그 10건을 찾아 전부 수정했다.
+  `nodekit submit`의 happy path, 실패, 취소, base-image-resolve(오픈망/폐쇄망),
+  ResolveRecipe 정책 분기(closed_network)와 네트워크 실패 처리까지 검증됨.
+  Dockerfile 방식과 Micromamba 엔진은 실제 build+push+index 등록까지
+  성공(exit 0)까지 확인했고, 나머지는 의도적으로 존재하지 않는
+  이미지/checksum/mirror URI를 써서 빌드 단계까지는 정상 도달한 뒤 예상대로
+  실패(코드 버그 아닌 인프라 성격의 실패)하는 것까지 확인. Micromamba 엔진은
+  quick-setup 대화형 경로가 아예 없어서(현재는 `--engine micromamba` CLI 플래그
+  또는 BeginnerGuideFlow 전용) `--non-interactive` 경로로 검증했고, 이 과정에서
+  **모든 Micromamba recipe가 100% 빌드 실패하는 실제 버그(#14)**를 찾아 수정했다 —
+  "Conda 엔진과 동일한 경로라 위험이 낮다"는 이전 판단은 틀렸었다. BeginnerGuideFlow
+  전수조사(#12)에서는 실제 루프가 12개가 아니라 13개였고(grep 패턴에 안 걸리는
+  `while(!subflowDone)` 1개 누락), 그중 안전한 `[Y/n]`/`[y/N]` 확인 프롬프트 2곳을
+  제외한 **12곳 전부**가 같은 EOF 버그를 가지고 있었다 — 즉 quick-setup 모드보다
+  가이드 모드 쪽이 실질적으로 훨씬 더 취약했다.
 - **완료 아님**: seoy 실제 장비에서의 최종 수동 확인(U5-2)은 여전히 별도로 필요하다.
   이 로컬 실행은 K8s 기반 NodeSentinel 검증, 실제 Harbor 인증/웹훅/GC, seoy 네트워크
-  조건을 대체하지 않는다 (§1에 이미 명시). Issue #12(`BeginnerGuideFlow.cs`의 12개
-  `while(true)` 루프 전수조사)는 범위 밖으로 남겨둠 — 지금까지 발견된 EOF 버그들과
-  같은 계열일 가능성이 있으나, 가이드 모드 대화형 흐름 전체를 훑어야 해서 비용이
-  더 크다고 판단. Micromamba 엔진의 quick-setup 대화형 진입 경로 자체가 없다는
-  점도 별도 UX 공백으로 남아 있다(코드 버그는 아님, 설계 범위 밖).
+  조건을 대체하지 않는다 (§1에 이미 명시). Micromamba 엔진의 quick-setup 대화형 진입
+  경로 자체가 없다는 점은 별도 UX 공백으로 남아 있다(코드 버그는 아님, 설계 범위 밖).
+  Issue #1("쉬운 안내 모드 진입점만 있고 BeginnerGuideFlow 미구현")은 이번 전수조사로
+  BeginnerGuideFlow가 실제로 완전히 구현되어 있음이 확인되어 문서가 stale해 보이지만,
+  이 이슈를 닫는 것은 이번 작업 범위 밖이라 손대지 않았다.
