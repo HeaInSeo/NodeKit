@@ -289,7 +289,7 @@ namespace NodeKit.Authoring.Recipes
         // L1 digest-pinning rule. See RecipeRenderer.RenderInstallerFamily/
         // RenderSourceBuild and RecipeValidator.ValidateBaseImagePresent.
         private static RecipeFieldDescriptor BaseImageField() => new(
-            Name: "ImageRef",
+            Name: "BaseImage",
             Type: RecipeFieldType.Scalar,
             Requirement: RecipeFieldRequirement.Required,
             DefaultValue: null,

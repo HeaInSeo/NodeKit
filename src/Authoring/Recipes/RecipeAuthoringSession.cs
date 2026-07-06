@@ -19,11 +19,16 @@ namespace NodeKit.Authoring.Recipes
                 ["Name"] = new[] { "ToolName" },
                 ["Version"] = new[] { "ToolVersion" },
                 ["Script"] = new[] { "Script" },
-                ["ImageUri"] = new[] { "ImageRef", "ImageDigest" },
+
+                // "ImageUri" is handled separately in ResolveCatalogFields — it is
+                // emitted by ImageUriValidator uniformly for every build kind, but
+                // which catalog fields to re-edit depends on the method (Container
+                // keeps ImageRef/ImageDigest separate; everything else shares one
+                // combined BaseImage field).
                 ["BioContainerImageUri"] = new[] { "ImageRef", "ImageDigest" },
                 ["ImageRef"] = new[] { "ImageRef", "ImageDigest" },
                 ["ImageDigest"] = new[] { "ImageRef", "ImageDigest" },
-                ["BaseImage"] = new[] { "ImageRef" },
+                ["BaseImage"] = new[] { "BaseImage" },
                 ["Packages"] = new[] { "Packages" },
                 ["Channels"] = new[] { "Channels" },
                 ["PackageMirrorUri"] = new[] { "MirrorUri" },
@@ -430,8 +435,9 @@ namespace NodeKit.Authoring.Recipes
             foreach (var violation in violations)
             {
                 RecipeValidationRecoveryAction action;
+                var catalogFields = violation.Field != null ? ResolveCatalogFields(violation.Field) : null;
 
-                if (violation.Field != null && _renderedFieldToCatalogFields.TryGetValue(violation.Field, out var catalogFields))
+                if (catalogFields != null)
                 {
                     action = BuildMappedFieldAction(catalogFields);
                 }
@@ -663,6 +669,18 @@ namespace NodeKit.Authoring.Recipes
                 Text(
                     "작성 방법에 필요한 필드가 모두 있는지, 입력/출력 preset이 적절한지, package/source/dockerfile 정보가 서로 맞는지 확인하세요.",
                     "Check that every field your method needs is present, that the input/output presets fit, and that your package/source/dockerfile information is mutually consistent."));
+        }
+
+        private string[]? ResolveCatalogFields(string violationField)
+        {
+            if (violationField == "ImageUri")
+            {
+                return _selectedMethod == RecipeMethodId.Container
+                    ? new[] { "ImageRef", "ImageDigest" }
+                    : new[] { "BaseImage" };
+            }
+
+            return _renderedFieldToCatalogFields.TryGetValue(violationField, out var fields) ? fields : null;
         }
 
         private void EnsureMethodSelected()

@@ -134,7 +134,7 @@ namespace NodeKit.Cli.Tests
                     "--field", "ToolName=bwa-mem",
                     "--field", "ToolVersion=0.7.17",
                     "--field", "Script=run.sh",
-                    "--field", $"ImageRef={ImageRefWithDigest}",
+                    "--field", $"BaseImage={ImageRefWithDigest}",
                     "--field", "Packages=bwa=0.7.17=h5bf99c6_8",
                     "--field", "Channels=bioconda",
                 },

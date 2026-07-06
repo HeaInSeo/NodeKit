@@ -36,7 +36,7 @@ namespace NodeKit.Tests.Recipes
             session.SetField("ToolName", "bwa-mem");
             session.SetField("ToolVersion", "0.7.17");
             session.SetField("Script", "run.sh");
-            session.SetField("ImageRef", "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+            session.SetField("BaseImage", "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
             session.AppendListItem("Packages", "bwa=0.7.17=h5bf99c6_8");
             session.CompleteListField("Packages");
             session.AppendListItem("Channels", "bioconda");
@@ -278,7 +278,7 @@ namespace NodeKit.Tests.Recipes
             session.SetField("ToolName", "bwa-mem");
             session.SetField("ToolVersion", "0.7.17");
             session.SetField("Script", "run.sh");
-            session.SetField("ImageRef", "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+            session.SetField("BaseImage", "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
             session.SetField("PackageEngine", "micromamba");
             session.AppendListItem("Packages", "bwa=0.7.17=h5bf99c6_8");
             session.CompleteListField("Packages");
@@ -529,19 +529,53 @@ namespace NodeKit.Tests.Recipes
             session.SetField("ToolName", "bwa-mem");
             session.SetField("ToolVersion", "0.7.17");
             session.SetField("Script", "run.sh");
-            session.SetField("ImageRef", "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+            session.SetField("BaseImage", "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
 
             session.ChangeMethod(RecipeMethodId.Source, ChangeMethodDecision.Proceed);
 
             var snapshot = session.Snapshot();
             Assert.Contains(snapshot.Values, v => v.FieldName == "ToolName");
-            Assert.Contains(snapshot.Values, v => v.FieldName == "ImageRef");
+            Assert.Contains(snapshot.Values, v => v.FieldName == "BaseImage");
             Assert.DoesNotContain("ToolName", snapshot.InvalidatedFields);
         }
 
         [Fact]
         public void ChangeMethod_Proceed_PreservedSharedFieldDoesNotBlockIsComplete()
         {
+            // Package and Source both use the shared BaseImage field (single
+            // value with the digest embedded inline), so it genuinely carries
+            // over across this method switch.
+            var session = new RecipeAuthoringSession();
+            session.SelectMethod(RecipeMethodId.Package);
+            session.SetField("ToolName", "bwa-mem");
+            session.SetField("ToolVersion", "0.7.17");
+            session.SetField("Script", "run.sh");
+            session.SetField("BaseImage", "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+            session.AppendListItem("Packages", "bwa=0.7.17=h5bf99c6_8");
+            session.CompleteListField("Packages");
+            session.AppendListItem("Channels", "bioconda");
+            session.CompleteListField("Channels");
+
+            session.ChangeMethod(RecipeMethodId.Source, ChangeMethodDecision.Proceed);
+            session.SetField("SourceUri", "https://example.org/bwa.tar.gz");
+            session.SetField("SourceChecksum", "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+            session.AppendListItem("SourceBuildCommands", "make");
+            session.CompleteListField("SourceBuildCommands");
+            session.CompleteListField("BuildDependencies");
+
+            Assert.True(session.IsComplete);
+            Assert.Contains(session.Snapshot().Values, v => v.FieldName == "BaseImage");
+        }
+
+        [Fact]
+        public void ChangeMethod_Proceed_ContainerToDockerfile_DiscardsImageRefAndRequiresNewBaseImage()
+        {
+            // Issue #2 regression: Container's ImageRef (bare ref, separate
+            // ImageDigest field) and Dockerfile's BaseImage (single field, digest
+            // embedded inline) describe "the base image" but are different
+            // shapes — before the #2 fix they shared the name "ImageRef" and a
+            // Container value silently (and incorrectly) carried over into
+            // Dockerfile's field. They must no longer be treated as shared.
             var session = new RecipeAuthoringSession();
             session.SelectMethod(RecipeMethodId.Container);
             session.SetField("ToolName", "bwa-mem");
@@ -552,11 +586,15 @@ namespace NodeKit.Tests.Recipes
             session.CompleteListField("Command");
 
             session.ChangeMethod(RecipeMethodId.Dockerfile, ChangeMethodDecision.Proceed);
+
+            Assert.DoesNotContain(session.Snapshot().Values, v => v.FieldName == "ImageRef");
+            Assert.False(session.IsComplete);
+
+            session.SetField("BaseImage", "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
             session.SetField("DockerfilePath", "./Dockerfile");
             session.SetField("DockerfileContent", "FROM scratch");
 
             Assert.True(session.IsComplete);
-            Assert.Contains(session.Snapshot().Values, v => v.FieldName == "ImageRef");
         }
 
         [Fact]
@@ -591,13 +629,13 @@ namespace NodeKit.Tests.Recipes
         {
             var session = new RecipeAuthoringSession();
             session.SelectMethod(RecipeMethodId.Package);
-            session.SetField("ImageRef", "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+            session.SetField("BaseImage", "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
             session.ChangeMethod(RecipeMethodId.Source, ChangeMethodDecision.Proceed);
-            Assert.Contains("ImageRef", session.Snapshot().InvalidatedFields);
+            Assert.Contains("BaseImage", session.Snapshot().InvalidatedFields);
 
-            session.ConfirmInvalidatedField("ImageRef");
+            session.ConfirmInvalidatedField("BaseImage");
 
-            Assert.DoesNotContain("ImageRef", session.Snapshot().InvalidatedFields);
+            Assert.DoesNotContain("BaseImage", session.Snapshot().InvalidatedFields);
         }
 
         [Fact]
@@ -675,6 +713,25 @@ namespace NodeKit.Tests.Recipes
         }
 
         [Fact]
+        public void BuildRecoveryPlan_UnpinnedDigestViolation_ForPackageMethod_EditsSingleBaseImageField()
+        {
+            // Issue #2 regression: ImageUriValidator emits "ImageUri" uniformly for
+            // every build kind, but unlike Container (separate ImageRef/ImageDigest
+            // fields), Package/Mirror/Source/Dockerfile share one combined
+            // BaseImage field — recovery must re-edit that field, not a
+            // now-nonexistent "ImageRef" field for these methods.
+            var session = CompletePackageSession();
+            var violations = new[] { new ValidationViolation("L1-IMG-004", "ImageUri에 digest가 없습니다.", "ImageUri") };
+
+            var plan = session.BuildRecoveryPlan(violations);
+
+            Assert.Single(plan.Actions);
+            Assert.Equal(RecoveryActionKind.EditSingleField, plan.Actions[0].Kind);
+            Assert.Contains("BaseImage", plan.Actions[0].RelatedFields);
+            Assert.Empty(plan.UnmappedViolations);
+        }
+
+        [Fact]
         public void BuildRecoveryPlan_ForMissingSourceChecksum_IncludesCurlSha256sumHint()
         {
             var session = new RecipeAuthoringSession();
@@ -739,7 +796,7 @@ namespace NodeKit.Tests.Recipes
             session.SetField("ToolName", "bwa-mem");
             session.SetField("ToolVersion", "0.7.17");
             session.SetField("Script", "run.sh");
-            session.SetField("ImageRef", "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+            session.SetField("BaseImage", "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
             session.AppendListItem("Packages", "bwa=0.7.17=h5bf99c6_8");
             session.CompleteListField("Packages");
             session.AppendListItem("Channels", "bioconda");

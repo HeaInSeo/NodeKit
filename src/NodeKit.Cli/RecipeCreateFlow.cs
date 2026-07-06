@@ -341,7 +341,7 @@ namespace NodeKit.Cli
                     && !string.IsNullOrEmpty(result.Digest))
                 {
                     var combined = $"{selected.Reference}@{result.Digest}";
-                    var violations = session.SetField("ImageRef", combined);
+                    var violations = session.SetField("BaseImage", combined);
                     if (violations.Count == 0)
                     {
                         console.WriteLine($"설정 완료: {combined}");

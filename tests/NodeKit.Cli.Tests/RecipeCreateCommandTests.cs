@@ -123,7 +123,7 @@ namespace NodeKit.Cli.Tests
                 "--field", "ToolName=bwa-mem",
                 "--field", "ToolVersion=0.7.17",
                 "--field", "Script=run.sh",
-                "--field", $"ImageRef={ImageRefWithDigest}",
+                "--field", $"BaseImage={ImageRefWithDigest}",
                 "--field", "Packages=bwa=0.7.17=h5bf99c6_8",
                 "--field", "Packages=samtools=1.18=h50ea8bc_1",
                 "--field", "Channels=bioconda",
@@ -243,7 +243,7 @@ namespace NodeKit.Cli.Tests
                     "--field", "ToolName=bwa-mem",
                     "--field", "ToolVersion=0.7.17",
                     "--field", "Script=run.sh",
-                    "--field", $"ImageRef={ImageRefWithDigest}",
+                    "--field", $"BaseImage={ImageRefWithDigest}",
                     "--field", "Packages=bwa=0.7.17=h5bf99c6_8",
                     "--field", "Channels=bioconda",
                 }
@@ -253,7 +253,7 @@ namespace NodeKit.Cli.Tests
                     "--field", "ToolName=bwa-mem",
                     "--field", "ToolVersion=0.7.17",
                     "--field", "Script=run.sh",
-                    "--field", $"ImageRef={ImageRefWithDigest}",
+                    "--field", $"BaseImage={ImageRefWithDigest}",
                     "--field", "Packages=bwa=0.7.17=h5bf99c6_8",
                     "--field", "Channels=bioconda",
                 };
@@ -264,7 +264,7 @@ namespace NodeKit.Cli.Tests
             "--field", "ToolName=bwa-mem",
             "--field", "ToolVersion=0.7.17",
             "--field", "Script=run.sh",
-            "--field", $"ImageRef={ImageRefWithDigest}",
+            "--field", $"BaseImage={ImageRefWithDigest}",
             "--field", $"DockerfileContent=FROM {ImageRefWithDigest}\nRUN echo ok\n",
             "--field", "DockerfilePath=./Dockerfile",
         };
@@ -277,7 +277,7 @@ namespace NodeKit.Cli.Tests
                 "--field", "ToolName=bwa-mem",
                 "--field", "ToolVersion=0.7.17",
                 "--field", "Script=run.sh",
-                "--field", $"ImageRef={ImageRefWithDigest}",
+                "--field", $"BaseImage={ImageRefWithDigest}",
                 "--field", "SourceUri=https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz",
                 "--field", $"SourceChecksum={DigestOnly}",
                 "--field", "SourceBuildCommands=make",
@@ -299,7 +299,7 @@ namespace NodeKit.Cli.Tests
             "--field", "ToolName=bwa-mem",
             "--field", "ToolVersion=0.7.17",
             "--field", "Script=run.sh",
-            "--field", $"ImageRef={ImageRefWithDigest}",
+            "--field", $"BaseImage={ImageRefWithDigest}",
             "--field", "MirrorUri=https://mirror.internal/conda-channel",
             "--field", "Packages=bwa=0.7.17=h5bf99c6_8",
         };

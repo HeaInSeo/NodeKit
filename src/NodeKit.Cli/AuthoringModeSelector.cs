@@ -87,7 +87,8 @@ namespace NodeKit.Cli
             console.WriteLine("  --field ToolName=<이름>     필드 값 지정 (여러 번 사용 가능)");
             console.WriteLine("  --field ToolVersion=<버전>");
             console.WriteLine("  --field Script=<명령 또는 스크립트 경로>");
-            console.WriteLine("  --field ImageRef=<이미지>");
+            console.WriteLine("  --field BaseImage=<이미지@sha256:...>   package/mirror/source/dockerfile 전용");
+            console.WriteLine("  --field ImageRef=<이미지>               container 전용 (ImageDigest 별도 지정)");
             console.WriteLine("  --input <이름>=<preset>     입력 정의 (preset: fastq-paired, bam, ...)");
             console.WriteLine("  --output <이름>=<preset>    출력 정의");
             console.WriteLine("  --engine conda|micromamba    패키지 엔진 (--method package 전용)");
@@ -99,7 +100,7 @@ namespace NodeKit.Cli
             console.WriteLine("    --field ToolName=bwa-mem \\");
             console.WriteLine("    --field ToolVersion=0.7.17 \\");
             console.WriteLine("    --field \"Script=bwa mem\" \\");
-            console.WriteLine("    --field \"ImageRef=condaforge/miniforge3:24.3.0-0@sha256:<digest>\" \\");
+            console.WriteLine("    --field \"BaseImage=condaforge/miniforge3:24.3.0-0@sha256:<digest>\" \\");
             console.WriteLine("    --field Packages=bwa=0.7.17=h5bf99c6_8 \\");
             console.WriteLine("    --field Channels=bioconda \\");
             console.WriteLine("    --input reads=fastq-paired \\");

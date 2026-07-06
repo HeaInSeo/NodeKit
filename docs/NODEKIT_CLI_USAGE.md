@@ -423,7 +423,7 @@ Q. 내부망/폐쇄망 환경인가요?
 
 ### 2-3.5. base image 선택 (Package/Mirror/Source 방식 전용)
 
-`package`, `mirror`, `source` 방식으로 진행하면 채널 확인 다음에 **base image 선택** 화면이 자동으로 나온다. 이 화면에서 번호를 선택하면 digest를 자동으로 조회해 `ImageRef` 필드를 설정한다. `0`을 입력하면 다음 필드 입력 단계에서 직접 입력한다.
+`package`, `mirror`, `source` 방식으로 진행하면 채널 확인 다음에 **base image 선택** 화면이 자동으로 나온다. 이 화면에서 번호를 선택하면 digest를 자동으로 조회해 `BaseImage` 필드를 설정한다. `0`을 입력하면 다음 필드 입력 단계에서 직접 입력한다.
 
 ```
 ── Base image 선택 ─────────────────────────────────────────
@@ -444,7 +444,7 @@ condaforge/miniforge3:24.3.0-0 의 digest를 조회합니다...
 설정 완료: condaforge/miniforge3:24.3.0-0@sha256:abcdef...
 ```
 
-digest 조회에 성공하면 `ImageRef` 필드가 자동으로 채워지고 이후 단계에서 건너뛴다. 조회에 실패하면 재시도 또는 `0`을 입력해 직접 입력 모드로 전환할 수 있다.
+digest 조회에 성공하면 `BaseImage` 필드가 자동으로 채워지고 이후 단계에서 건너뛴다. 조회에 실패하면 재시도 또는 `0`을 입력해 직접 입력 모드로 전환할 수 있다.
 
 **자동 조회 동작 조건:**
 
@@ -505,7 +505,7 @@ dry-run profile의 `runnerScriptDigest`/observed I/O 기록으로 더 명확히 
 
 | 필드 | 필수 여부 | 설명 |
 |---|---|---|
-| `ImageRef` | 필수 | 기반 이미지, digest 포함 필요 (예: `condaforge/miniforge3:24.3.0-0@sha256:...`) |
+| `BaseImage` | 필수 | 기반 이미지, digest 포함 필요 (예: `condaforge/miniforge3:24.3.0-0@sha256:...`) |
 | `Packages` | 필수, 최소 1개 | 설치할 패키지. `bwa=0.7.17`(버전만)으로 충분하며, 빌드 문자열(`=version=build` 부분)은 저장 전 ResolveRecipe 단계(2-6절)에서 선택한다. 직접 고정하려면 `bwa=0.7.17=h5bf99c6_8` 형식을 쓰면 된다 |
 | `Channels` | 필수, 최소 1개 | conda channel (예: `bioconda`) |
 | `PackageEngine` | 자동 적용 | `conda`(기본) 또는 `micromamba`. `Defaulted` 필드로, 마법사에서 프롬프트 없이 기본값이 자동 적용됨 — 변경하려면 `--field PackageEngine=micromamba` (non-interactive) 또는 `/change-method` 후 재입력 |
@@ -514,7 +514,7 @@ dry-run profile의 `runnerScriptDigest`/observed I/O 기록으로 더 명확히 
 
 | 필드 | 필수 여부 | 설명 |
 |---|---|---|
-| `ImageRef` | 필수 | 기반 이미지, digest 포함 필요 |
+| `BaseImage` | 필수 | 기반 이미지, digest 포함 필요 |
 | `MirrorUri` | 필수 | 내부 mirror URI |
 | `Packages` | 필수, 최소 1개 | 설치할 패키지 |
 | `MirrorKind` | 선택 | v1에서는 비워둬도 됨 |
@@ -523,7 +523,7 @@ dry-run profile의 `runnerScriptDigest`/observed I/O 기록으로 더 명확히 
 
 | 필드 | 필수 여부 | 설명 |
 |---|---|---|
-| `ImageRef` | 필수 | 기반 이미지, digest 포함 필요 |
+| `BaseImage` | 필수 | 기반 이미지, digest 포함 필요 |
 | `SourceUri` | 필수 | source archive/release URI |
 | `SourceChecksum` | 필수 | `sha256:<64-hex>` 형식만 허용 |
 | `SourceBuildCommands` | 필수, 최소 1개 | 빌드 명령 (예: `make`, `make install`) |
@@ -533,7 +533,7 @@ dry-run profile의 `runnerScriptDigest`/observed I/O 기록으로 더 명확히 
 
 | 필드 | 필수 여부 | 설명 |
 |---|---|---|
-| `ImageRef` | 필수 | 기반 이미지 — Dockerfile의 첫 `FROM`과 정확히 같아야 함, digest 포함 필요 |
+| `BaseImage` | 필수 | 기반 이미지 — Dockerfile의 첫 `FROM`과 정확히 같아야 함, digest 포함 필요 |
 | `DockerfilePath` 또는 `DockerfileContent` | 필수 (둘 중 하나) | Dockerfile 경로 또는 내용 |
 | `BuildContext` | 비워두면 자동 | 비어 있으면 현재 디렉터리(`.`) |
 
@@ -685,7 +685,7 @@ ToolName과 ToolVersion을 기반으로 기본 파일명이 제안된다.
 ### 2-9. recovery — 마지막 검증 실패 시 수정
 
 모든 필드를 채운 뒤 최종 검증을 한 번 더 돈다. 필드 하나씩 받을 때는
-못 잡아내는 교차 필드 규칙(예: Dockerfile 첫 `FROM`과 `ImageRef` 불일치,
+못 잡아내는 교차 필드 규칙(예: Dockerfile 첫 `FROM`과 `BaseImage` 불일치,
 Output의 `Class` 허용값 위반) 때문에 여기서 막힐 수 있다. 입력값을
 버리지 않고 **고칠 항목만 선택**해서 수정한다.
 
@@ -718,7 +718,7 @@ nodekit recipe create /tmp/recipe.json \
   --field ToolName=bwa-mem \
   --field ToolVersion=0.7.17 \
   --field "Script=bwa mem" \
-  --field "ImageRef=condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" \
+  --field "BaseImage=condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" \
   --field Packages=bwa=0.7.17=h5bf99c6_8 \
   --field Channels=bioconda
 ```
@@ -894,9 +894,10 @@ ls: cannot access 'build-request.json': No such file or directory
 | `Command` | string[] | 선택, K8s 런타임 커맨드 오버라이드 |
 | `DisplayLabel`/`DisplayDescription`/`DisplayCategory`/`DisplayTags` | string/string[] | 선택, UI 팔레트 표시용 |
 
-> `recipe create` 마법사가 보여주는 `ImageRef`/`ToolVersion`은 authoring
-> 단계의 이름이다. 실제로 저장되는 JSON 키는 위 표처럼 `BaseImage`(또는
-> build kind별 이미지 필드)/`Version`이다.
+> `recipe create` 마법사가 보여주는 `ToolVersion`은 authoring 단계의 이름이다.
+> 실제로 저장되는 JSON 키는 위 표처럼 `Version`이다. (container 방식의
+> `ImageRef`/`ImageDigest`는 예외 — 저장 시 두 값이 합쳐져 `BioContainerImageUri`가
+> 된다.)
 
 ### BuildKind별 추가 필드
 
@@ -1327,7 +1328,7 @@ bioconda에서 설치하는 방법만 알고 있는 경우의 흐름이다.
 **사전 준비 — 없다**
 
 install command에서 Packages/Channels/PackageEngine이 자동으로 채워진다.
-기반 이미지(ImageRef)는 마법사 안에서 번호를 선택하면 digest를 자동으로 조회한다 —
+기반 이미지(BaseImage)는 마법사 안에서 번호를 선택하면 digest를 자동으로 조회한다 —
 수동으로 미리 구할 필요가 없다.
 
 **실행**
@@ -1460,7 +1461,7 @@ condaforge/miniforge3:24.3.0-0 의 digest를 조회합니다...
 **7. 필드 입력**
 
 install command에서 자동 채워진 항목: **Packages, Channels, PackageEngine** (3개)
-base image 선택에서 자동 채워진 항목: **ImageRef** (1개)
+base image 선택에서 자동 채워진 항목: **BaseImage** (1개)
 
 직접 입력이 필요한 항목: **ToolName, ToolVersion, 실행 명령** (3개)
 
@@ -1530,7 +1531,7 @@ Packages/Channels/PackageEngine도 자동 채워졌으므로 `[5/7]`, `[6/7]`, `
 저장되었습니다: /home/user/samtools-1.17.json
 ```
 
-생성된 파일에는 Packages, Channels, PackageEngine, ImageRef가 이미 채워져 있다.
+생성된 파일에는 Packages, Channels, PackageEngine, BaseImage가 이미 채워져 있다.
 
 **10. 검증**
 
