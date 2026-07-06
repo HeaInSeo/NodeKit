@@ -308,8 +308,9 @@ TC-9 성공 후 다음을 모두 교차 확인해야 pass로 간주한다 (하�
 | 대화형 `recipe create` 흐름 (Container/BioContainer 방식) | ✓ 통과 — 저장 완료(BuildKind=BioContainer, ImageRef+ImageDigest가 BioContainerImageUri로 정상 결합), `nodekit submit`도 시도해 실제 buildah pull 단계까지 도달·실패(가짜 digest이므로 예상된 인프라 실패, 코드 버그 아님) |
 | 대화형 `recipe create` 흐름 (Source/SourceBuild 방식) | ✓ 통과 — 저장 완료, `nodekit submit`도 시도해 실제 curl 다운로드 + `sha256sum -c` 단계까지 도달·실패(가짜 checksum이므로 예상된 인프라 실패, 코드 버그 아님) |
 | 대화형 `recipe create` 흐름 (Dockerfile/DockerfileFallback 방식) | ✓ 통과 — 저장 완료, `nodekit submit`으로 실제 build+push+index 등록까지 전부 성공(exit 0), NodeVault index `lifecycle_phase=Active` 교차 확인 완료 |
+| Package 방식 내 Micromamba 엔진(`--engine micromamba`, quick-setup에는 경로 없음) | 시도 중 **버그 발견**: `RecipeRenderer`가 렌더하는 `micromamba install -y <pkg>`에 target 환경 지정이 없어 패키지 유효성과 무관하게 100% 빌드 실패("No target prefix specified") → Issue #14. 수정 후 실제 buildah 직접 빌드 + 로컬 NodeVault `nodekit submit` 둘 다로 재검증 — build+push+index 등록까지 전부 성공(`lifecycle_phase=Active`) 확인 |
 
-### 발견된 버그 8건과 수정 커밋 — #12(BeginnerGuideFlow 전수조사)만 open, 나머지 전부 close 완료
+### 발견된 버그 9건과 수정 커밋 — #12(BeginnerGuideFlow 전수조사)만 open, 나머지 전부 close 완료
 
 - **Issue #5** (NodeKit `bd9786e`): `GrpcToolSpecClient.MapWatchEvent()`가 서버의
   `Status` 필드(PascalCase)를 소문자와 비교해서 매칭이 항상 실패 → 빌드 실패 시에도
@@ -352,12 +353,23 @@ TC-9 성공 후 다음을 모두 교차 확인해야 pass로 간주한다 (하�
   코드도 추가. 수정 후 실제 로컬 NodeVault로 재검증: 더 이상 크래시하지 않고
   ResolveRecipe가 정상적으로 `not_found`를 반환하며(관리자 사전 등록 필요, 설계상
   의도된 동작), recipe가 정상 저장됨을 확인.
+- **Issue #14** (NodeKit `927b047`): `RecipeRenderer.RenderInstallerFamily()`가
+  micromamba 엔진에도 conda와 동일하게 `"micromamba install -y <packages>"`만
+  렌더링하고 target 환경(`-n base`)을 지정하지 않음. `mambaorg/micromamba`
+  이미지는 conda-forge/miniforge 계열과 달리 plain `RUN` 단계에서 환경이 자동
+  activate되지 않아서, 패키지가 실제로 존재하고 버전이 정확해도 **항상**
+  "No target prefix specified"로 빌드가 실패했다. `installer == "micromamba"`일
+  때만 `-n base`를 추가하도록 수정 — `PackageVersionValidator`가 이미
+  `-n`/`--name`을 "다음 토큰을 소비하는 옵션"으로 처리하고 있어서 L1 false
+  positive는 없음. 실제 buildah 직접 빌드로 원인 재현(`-n base` 추가 전/후 비교)한
+  뒤, 로컬 NodeVault `nodekit submit`으로 build+push+index 등록까지 전부 성공하는
+  것까지 재검증.
 
 **#5/#6/#9는 처음엔 NodeVault 근본 수정이 필요할 것으로 예상했으나, 조사 결과
 NodeVault의 `CancelToolBuild`/`WatchToolBuild` 메커니즘 자체는 이미 정상이었고
 (#5/#6은 NodeKit의 매핑/호출 누락 버그), #9만 실제로 NodeVault 쪽 원인이 있었다.
-#13도 마찬가지로 NodeKit 쪽 파라미터 누락 버그였다 — NodeVault의
-`resolvePackageMirror()`는 처음부터 올바르게 동작하고 있었다.**
+#13, #14도 마찬가지로 NodeKit 쪽 버그였다 — NodeVault의 `resolvePackageMirror()`와
+빌드 실행 자체는 처음부터 올바르게 동작하고 있었다.**
 
 ### 후속 개선: 테스트 스위트 신뢰성
 
@@ -374,21 +386,23 @@ seoy/NodeVault 없이 매 실행마다 자동으로 wire-level 회귀를 잡는 
 
 - **완료**: Sprint 7 Task 2 / U5-2 이전 사전 검증. TC-1~TC-13 전체와 quick-setup
   경로의 **5개 recipe method 전부**(Package/Conda, Mirror/PackageMirror,
-  Container/BioContainer, Source/SourceBuild, Dockerfile/DockerfileFallback)를
-  대화형 `recipe create`로 seoy 없이 실행해서 버그 8건을 찾아 그중 7건을
-  수정했다(#12만 의도적으로 open — 별도 전수조사 항목). `nodekit submit`의 happy
-  path, 실패, 취소, base-image-resolve(오픈망/폐쇄망), ResolveRecipe 정책
-  분기(closed_network)와 네트워크 실패 처리까지 검증됨. 5개 method 모두
-  `recipe create → 저장 → nodekit submit`을 실제로 처음부터 끝까지 완주시켰다 —
-  Dockerfile 방식은 실제 build+push+index 등록까지 성공(exit 0)까지 확인했고,
-  나머지 4개는 의도적으로 존재하지 않는 이미지/checksum/mirror URI를 써서 빌드
+  Container/BioContainer, Source/SourceBuild, Dockerfile/DockerfileFallback) +
+  **Package 방식 내 Micromamba 엔진**을 seoy 없이 실행해서 버그 9건을 찾아 그중
+  8건을 수정했다(#12만 의도적으로 open — 별도 전수조사 항목). `nodekit submit`의
+  happy path, 실패, 취소, base-image-resolve(오픈망/폐쇄망), ResolveRecipe 정책
+  분기(closed_network)와 네트워크 실패 처리까지 검증됨. Dockerfile 방식과
+  Micromamba 엔진은 실제 build+push+index 등록까지 성공(exit 0)까지 확인했고,
+  나머지는 의도적으로 존재하지 않는 이미지/checksum/mirror URI를 써서 빌드
   단계까지는 정상 도달한 뒤 예상대로 실패(코드 버그 아닌 인프라 성격의 실패)하는
-  것까지 확인.
+  것까지 확인. Micromamba 엔진은 quick-setup 대화형 경로가 아예 없어서(현재는
+  `--engine micromamba` CLI 플래그 또는 BeginnerGuideFlow 전용)
+  `--non-interactive` 경로로 검증했고, 이 과정에서 **모든 Micromamba recipe가
+  100% 빌드 실패하는 실제 버그(#14)**를 찾아 수정했다 — "Conda 엔진과 동일한
+  경로라 위험이 낮다"는 이전 판단은 틀렸었다.
 - **완료 아님**: seoy 실제 장비에서의 최종 수동 확인(U5-2)은 여전히 별도로 필요하다.
   이 로컬 실행은 K8s 기반 NodeSentinel 검증, 실제 Harbor 인증/웹훅/GC, seoy 네트워크
   조건을 대체하지 않는다 (§1에 이미 명시). Issue #12(`BeginnerGuideFlow.cs`의 12개
   `while(true)` 루프 전수조사)는 범위 밖으로 남겨둠 — 지금까지 발견된 EOF 버그들과
   같은 계열일 가능성이 있으나, 가이드 모드 대화형 흐름 전체를 훑어야 해서 비용이
-  더 크다고 판단. Package 방식 내 Micromamba 엔진 선택(PackageEngine=micromamba)도
-  아직 대화형으로 별도 검증하지 않았다 — Conda 엔진과 동일한 필드 경로를 타므로
-  위험은 낮다고 보지만 실증은 안 됨.
+  더 크다고 판단. Micromamba 엔진의 quick-setup 대화형 진입 경로 자체가 없다는
+  점도 별도 UX 공백으로 남아 있다(코드 버그는 아님, 설계 범위 밖).
