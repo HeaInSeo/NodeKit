@@ -666,6 +666,122 @@ namespace NodeKit.Cli.Tests
             Assert.Contains("1–7 중에서 선택", stdout);
         }
 
+        // ── Issue #12 regression: stdin EOF must cancel, not loop forever ──────
+        // Same bug class as #10/#11: a retry loop that only checks the trimmed
+        // value can't tell true stdin EOF from a genuine blank Enter, so it
+        // retries forever once there is no more input to satisfy a required
+        // prompt. Confirmed empirically pre-fix (one probe produced 3.5M lines
+        // in 5 seconds). Fixed via ReadTrimmedLineOrNull, which escalates to
+        // RecipeCreateCancelledException only on a true null read.
+
+        [Fact]
+        public void CluePicker_StdinEndsWithoutChoice_CancelsInsteadOfLooping()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[] { "1" }; // GuidedBeginner, then EOF at the clue picker itself
+
+            var exitCode = RunCli(outPath, transcript, out var stdout, out _);
+
+            Assert.Equal(130, exitCode);
+            Assert.False(File.Exists(outPath));
+            Assert.Contains("recipe 생성을 취소했습니다.", stdout);
+        }
+
+        [Fact]
+        public void ToolNameFlow_StdinEndsAtNamePrompt_CancelsInsteadOfLooping()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[] { "1", "1" }; // GuidedBeginner, clue: tool name, then EOF
+
+            var exitCode = RunCli(outPath, transcript, out var stdout, out _);
+
+            Assert.Equal(130, exitCode);
+            Assert.False(File.Exists(outPath));
+            Assert.Contains("recipe 생성을 취소했습니다.", stdout);
+        }
+
+        [Fact]
+        public void InstallCommandFlow_StdinEndsAtFailedParseChoice_CancelsInsteadOfLooping()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[] { "1", "2", "notarealcommand" }; // EOF at the failed-parse choice prompt
+
+            var exitCode = RunCli(outPath, transcript, out var stdout, out _);
+
+            Assert.Equal(130, exitCode);
+            Assert.False(File.Exists(outPath));
+            Assert.Contains("recipe 생성을 취소했습니다.", stdout);
+        }
+
+        [Fact]
+        public void SourceFlow_StdinEndsAtChecksumPrompt_CancelsInsteadOfLooping()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[] { "1", "4", "https://example.org/tool.tar.gz" }; // EOF at SourceChecksum prompt
+
+            var exitCode = RunCli(outPath, transcript, out var stdout, out _);
+
+            Assert.Equal(130, exitCode);
+            Assert.False(File.Exists(outPath));
+            Assert.Contains("recipe 생성을 취소했습니다.", stdout);
+        }
+
+        [Fact]
+        public void ContainerFlow_StdinEndsAtSeparateDigestPrompt_CancelsInsteadOfLooping()
+        {
+            // The trickiest site: an ad-hoc read embedded inside the outer
+            // while(true) (not its own loop) after the user picks "직접 입력"
+            // (2) for a missing digest. Confirmed pre-fix this reached the
+            // digest prompt cleanly but then hung forever once stdin ran dry.
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[] { "1", "3", ContainerImageRef, "2" }; // EOF right at "ImageDigest:"
+
+            var exitCode = RunCli(outPath, transcript, out var stdout, out _);
+
+            Assert.Equal(130, exitCode);
+            Assert.False(File.Exists(outPath));
+            Assert.Contains("recipe 생성을 취소했습니다.", stdout);
+        }
+
+        [Fact]
+        public void MirrorFlow_StdinEndsAtUriPrompt_CancelsInsteadOfLooping()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[] { "1", "6" }; // GuidedBeginner, clue: internal mirror, then EOF
+
+            var exitCode = RunCli(outPath, transcript, out var stdout, out _);
+
+            Assert.Equal(130, exitCode);
+            Assert.False(File.Exists(outPath));
+            Assert.Contains("recipe 생성을 취소했습니다.", stdout);
+        }
+
+        [Fact]
+        public void DockerfileFlow_StdinEndsAtPathPrompt_CancelsInsteadOfLooping()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[] { "1", "5" }; // GuidedBeginner, clue: Dockerfile, then EOF
+
+            var exitCode = RunCli(outPath, transcript, out var stdout, out _);
+
+            Assert.Equal(130, exitCode);
+            Assert.False(File.Exists(outPath));
+            Assert.Contains("recipe 생성을 취소했습니다.", stdout);
+        }
+
+        [Fact]
+        public void NoClueFlow_StdinEndsWithoutChoice_CancelsInsteadOfLooping()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[] { "1", "7" }; // GuidedBeginner, 잘 모르겠다, then EOF at NoClue's choice
+
+            var exitCode = RunCli(outPath, transcript, out var stdout, out _);
+
+            Assert.Equal(130, exitCode);
+            Assert.False(File.Exists(outPath));
+            Assert.Contains("recipe 생성을 취소했습니다.", stdout);
+        }
+
         // ── Helpers ──────────────────────────────────────────────────────────
 
         private static int RunCli(string outPath, string[] transcript, out string stdout, out string stderr)

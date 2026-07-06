@@ -81,7 +81,12 @@ namespace NodeKit.Cli
                     throw new RecipeCreateCancelledException();
                 }
 
-                var line = ReadTrimmedLine(console);
+                var line = ReadTrimmedLineOrNull(console);
+                if (line is null)
+                {
+                    throw new RecipeCreateCancelledException();
+                }
+
                 switch (line)
                 {
                     case "1":
@@ -132,7 +137,13 @@ namespace NodeKit.Cli
                 console.WriteHints("/cancel: 종료");
                 console.WriteLine("도구 이름:");
 
-                name = ReadTrimmedLine(console);
+                var rawName = ReadTrimmedLineOrNull(console);
+                if (rawName is null)
+                {
+                    throw new RecipeCreateCancelledException();
+                }
+
+                name = rawName;
                 if (name.Length > 0)
                 {
                     break;
@@ -165,7 +176,12 @@ namespace NodeKit.Cli
                     throw new RecipeCreateCancelledException();
                 }
 
-                var line = ReadTrimmedLine(console);
+                var line = ReadTrimmedLineOrNull(console);
+                if (line is null)
+                {
+                    throw new RecipeCreateCancelledException();
+                }
+
                 switch (line)
                 {
                     case "1":
@@ -397,7 +413,12 @@ namespace NodeKit.Cli
                     throw new RecipeCreateCancelledException();
                 }
 
-                var line = ReadTrimmedLine(console);
+                var line = ReadTrimmedLineOrNull(console);
+                if (line is null)
+                {
+                    throw new RecipeCreateCancelledException();
+                }
+
                 switch (line)
                 {
                     case "1": return InstallParseChoice.UseValues;
@@ -452,7 +473,12 @@ namespace NodeKit.Cli
                     throw new RecipeCreateCancelledException();
                 }
 
-                var line = ReadTrimmedLine(console);
+                var line = ReadTrimmedLineOrNull(console);
+                if (line is null)
+                {
+                    throw new RecipeCreateCancelledException();
+                }
+
                 switch (line)
                 {
                     case "1": return InstallParseChoice.UseValues;
@@ -545,7 +571,13 @@ namespace NodeKit.Cli
                     console.WriteHints("/cancel: 종료");
                     console.WriteLine("이미지 주소:");
 
-                    pendingRef = ReadTrimmedLine(console);
+                    var rawRef = ReadTrimmedLineOrNull(console);
+                    if (rawRef is null)
+                    {
+                        throw new RecipeCreateCancelledException();
+                    }
+
+                    pendingRef = rawRef;
                 }
 
                 var result = ImageReferenceNormalizer.Normalize(pendingRef, null);
@@ -624,7 +656,13 @@ namespace NodeKit.Cli
                         // result will be re-evaluated in next loop iteration with the digest set
                         console.WriteLine();
                         console.WriteLine("ImageDigest:");
-                        var separateDigest = ReadTrimmedLine(console);
+                        var rawSeparateDigest = ReadTrimmedLineOrNull(console);
+                        if (rawSeparateDigest is null)
+                        {
+                            throw new RecipeCreateCancelledException();
+                        }
+
+                        var separateDigest = rawSeparateDigest;
                         var combined = ImageReferenceNormalizer.Normalize(pendingRef, separateDigest);
                         if (combined.Status == ImageReferenceNormalizeStatus.Normalized)
                         {
@@ -657,7 +695,12 @@ namespace NodeKit.Cli
                     throw new RecipeCreateCancelledException();
                 }
 
-                var line = ReadTrimmedLine(console);
+                var line = ReadTrimmedLineOrNull(console);
+                if (line is null)
+                {
+                    throw new RecipeCreateCancelledException();
+                }
+
                 switch (line)
                 {
                     case "1": return ContainerChoice.Reenter;
@@ -701,7 +744,13 @@ namespace NodeKit.Cli
                 console.WriteHints("/cancel: 종료");
                 console.WriteLine("소스코드 주소:");
 
-                var uri = ReadTrimmedLine(console);
+                var rawUri = ReadTrimmedLineOrNull(console);
+                if (rawUri is null)
+                {
+                    throw new RecipeCreateCancelledException();
+                }
+
+                var uri = rawUri;
                 if (string.IsNullOrEmpty(uri))
                 {
                     console.WriteLine("주소를 입력해 주세요.");
@@ -713,7 +762,13 @@ namespace NodeKit.Cli
                 console.WriteHints("/cancel: 종료");
                 console.WriteLine("SourceChecksum:");
 
-                var checksum = ReadTrimmedLine(console);
+                var rawChecksum = ReadTrimmedLineOrNull(console);
+                if (rawChecksum is null)
+                {
+                    throw new RecipeCreateCancelledException();
+                }
+
+                var checksum = rawChecksum;
                 if (!string.IsNullOrEmpty(checksum))
                 {
                     session.SelectMethod(RecipeMethodId.Source);
@@ -740,7 +795,12 @@ namespace NodeKit.Cli
                         throw new RecipeCreateCancelledException();
                     }
 
-                    var line = ReadTrimmedLine(console);
+                    var line = ReadTrimmedLineOrNull(console);
+                    if (line is null)
+                    {
+                        throw new RecipeCreateCancelledException();
+                    }
+
                     switch (line)
                     {
                         case "1":
@@ -748,7 +808,13 @@ namespace NodeKit.Cli
                             continue;
                         case "2":
                             console.WriteLine("SourceChecksum:");
-                            var newChecksum = ReadTrimmedLine(console);
+                            var rawNewChecksum = ReadTrimmedLineOrNull(console);
+                            if (rawNewChecksum is null)
+                            {
+                                throw new RecipeCreateCancelledException();
+                            }
+
+                            var newChecksum = rawNewChecksum;
                             if (!string.IsNullOrEmpty(newChecksum))
                             {
                                 session.SelectMethod(RecipeMethodId.Source);
@@ -800,7 +866,13 @@ namespace NodeKit.Cli
                 console.WriteHints("/cancel: 종료");
                 console.WriteLine("Dockerfile 경로:");
 
-                var path = ReadTrimmedLine(console);
+                var rawPath = ReadTrimmedLineOrNull(console);
+                if (rawPath is null)
+                {
+                    throw new RecipeCreateCancelledException();
+                }
+
+                var path = rawPath;
                 if (string.IsNullOrEmpty(path))
                 {
                     console.WriteLine("경로를 입력해 주세요.");
@@ -862,7 +934,13 @@ namespace NodeKit.Cli
                 console.WriteHints("/cancel: 종료");
                 console.WriteLine("내부 저장소 주소:");
 
-                var uri = ReadTrimmedLine(console);
+                var rawUri = ReadTrimmedLineOrNull(console);
+                if (rawUri is null)
+                {
+                    throw new RecipeCreateCancelledException();
+                }
+
+                var uri = rawUri;
                 if (string.IsNullOrEmpty(uri))
                 {
                     console.WriteLine("주소를 입력해 주세요.");
@@ -911,7 +989,12 @@ namespace NodeKit.Cli
                     throw new RecipeCreateCancelledException();
                 }
 
-                var line = ReadTrimmedLine(console);
+                var line = ReadTrimmedLineOrNull(console);
+                if (line is null)
+                {
+                    throw new RecipeCreateCancelledException();
+                }
+
                 switch (line)
                 {
                     case "1":
@@ -1018,6 +1101,18 @@ namespace NodeKit.Cli
             var line = (console.ReadLine() ?? string.Empty).Trim();
             RecipeCreateEscapeCommands.ThrowIfEscape(line);
             return line;
+        }
+
+        // Distinguishes true stdin EOF (null) from a genuine blank Enter (empty
+        // string) so retry loops can cancel instead of spinning forever once
+        // there is no more input left to satisfy a required prompt. Returns
+        // null only for true EOF; a real blank Enter still comes back as "".
+        private static string? ReadTrimmedLineOrNull(IRecipeConsole console)
+        {
+            var rawLine = console.ReadLine();
+            var line = (rawLine ?? string.Empty).Trim();
+            RecipeCreateEscapeCommands.ThrowIfEscape(line);
+            return rawLine is null ? null : line;
         }
 
         private static string ReadRawLine(IRecipeConsole console)
