@@ -189,6 +189,8 @@ namespace NodeKit.Cli
                 return false;
             }
 
+            recipe.Normalize();
+
             if (recipe.BuildKind is null)
             {
                 stderr.WriteLine(

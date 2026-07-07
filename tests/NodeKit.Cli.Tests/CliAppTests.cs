@@ -92,6 +92,64 @@ namespace NodeKit.Cli.Tests
             Assert.Contains("buildKind", stderr.ToString());
         }
 
+        // Review finding: System.Text.Json does not enforce C#'s non-nullable
+        // property declarations at runtime, so external JSON with an explicit
+        // "null" for a List<T>/string property crashes RecipeRenderer.Render
+        // (ArgumentNullException/NullReferenceException) instead of surfacing
+        // as a clean L1 violation — RecipeDocument.Normalize() fixes this.
+
+        private const string NullCommandRecipeJson = """
+        {
+            "BuildKind": "DockerfileFallback",
+            "ToolName": "bwa",
+            "Version": "0.7.17",
+            "BaseImage": "registry.example.com/bwa:0.7.17@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            "DockerfileContent": "FROM registry.example.com/bwa:0.7.17@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\nRUN echo ok\nUSER 1000\n",
+            "Script": "bwa mem",
+            "Command": null,
+            "Inputs": [ { "Name": "reads", "Role": "sample-fastq", "Format": "fastq", "Shape": "pair" } ],
+            "Outputs": [ { "Name": "aligned", "Role": "aligned-bam", "Format": "bam", "Shape": "single", "Class": "primary" } ]
+        }
+        """;
+
+        [Fact]
+        public void Validate_RecipeWithExplicitNullCommand_DoesNotCrash()
+        {
+            var recipePath = WriteFile("recipe.json", NullCommandRecipeJson);
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+
+            var exitCode = CliApp.Run(new[] { "validate", recipePath }, stdout, stderr);
+
+            Assert.Equal(0, exitCode);
+        }
+
+        private const string NullSourceChecksumRecipeJson = """
+        {
+            "BuildKind": "SourceBuild",
+            "ToolName": "bwa",
+            "Version": "0.7.17",
+            "BaseImage": "registry.example.com/bwa:0.7.17@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            "SourceUri": "https://example.com/bwa-0.7.17.tar.gz",
+            "SourceChecksum": null,
+            "SourceBuildCommands": [ "make", "make install" ],
+            "Script": "bwa mem"
+        }
+        """;
+
+        [Fact]
+        public void Validate_RecipeWithExplicitNullSourceChecksum_ReturnsViolationInsteadOfCrashing()
+        {
+            var recipePath = WriteFile("recipe.json", NullSourceChecksumRecipeJson);
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+
+            var exitCode = CliApp.Run(new[] { "validate", recipePath }, stdout, stderr);
+
+            Assert.Equal(1, exitCode);
+            Assert.Contains("L1-SRC-001", stderr.ToString());
+        }
+
         [Fact]
         public void Validate_ValidRecipe_ReturnsZero()
         {
