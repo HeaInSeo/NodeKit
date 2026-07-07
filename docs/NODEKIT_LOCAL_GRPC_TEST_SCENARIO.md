@@ -1,6 +1,6 @@
 # NodeKit ↔ NodeVault 로컬 gRPC 통합 테스트 시나리오
 
-Status: 실행 완료 — 버그 26건 발견(#5~#26), 전부 수정·머지 완료
+Status: 실행 완료 — 버그 30건 발견(#5~#30), 전부 수정·머지 완료
 Created: 2026-07-04
 Updated: 2026-07-07
 Scope: heain 개발 장비에서 seoy/K8s 없이 `nodekit submit` 전체 경로를 검증
@@ -599,3 +599,67 @@ resolve, `ResolveRecipe`), base image digest(`resolve_tool_spec.go`의
 NodeKit이 이 gap을 대신 메꾸는 건 CLAUDE.md 경계 규칙(K8s/빌드 오케스트레이션은
 NodeVault 담당) 위반이라 NodeKit 쪽에서 할 일은 아니다. cross-team 가시화를
 위해 NodeVault 저장소에 이슈 등록: **HeaInSeo/NodeVault#16**.
+
+## 11. §10 계약 재검토에서 파생된 NodeKit 쪽 추가 버그 4건 (#27~#30)
+
+§10에서 NodeKit↔NodeVault 계약을 검토하는 김에, 사용자가 별도로 받은 외부
+코드 리뷰(①SourceBuildCommands 위험도, ③USER 검증 강화, ④멀티스테이지 FROM
+digest, ⑤pip -r 처리) 4건을 실제 코드로 확인한 뒤 전부 수정했다. (②/⑥은
+§9에서 이미 수정된 것과 동일 항목이라 재작업 없음.)
+
+| 항목 | 확인 결과 |
+|---|---|
+| ③ USER 검증 우회 | **버그 확인**: `DockerfileParser`가 `USER root:root`를 공백 없는 한 토큰으로 넘기는데 기존 검사는 "root"/"0"과 정확히 일치하는지만 봄 → Issue #27 |
+| ④ 멀티스테이지 FROM digest 형식 | **부분적으로만 사실**: 모든 FROM의 digest *존재 여부*는 이미 검사되고 있었음(`DockerfileStructureValidator`). 다만 *hex 형식*은 첫 번째 FROM만 엄격히 검증되고 있었음 → Issue #28 |
+| ① SourceBuildCommands 위험도 | **버그 확인**: `RenderSourceBuild`가 생성하는 Dockerfile에 USER가 아예 없어 항상 root 실행 → Issue #29 |
+| ⑤ pip -r 처리 | **버그 확인**: `-r`/`--requirement`가 경고 없이 완전히 스킵됨(내용을 볼 방법이 없는데도) → Issue #30 |
+
+### Issue #27 — USER root:root / USER 0:0 / USER ${VAR} 우회
+
+`RecipeValidator.ValidateDockerfileFallbackSecurity`가 `USER` 값을 정확히
+`"root"`/`"0"`과 비교만 해서, 그룹이 붙은 형태(`root:root`, `0:0`)가
+그대로 통과했다. `USER ${RUNTIME_USER}`처럼 빌드 인자에 의존하는 값도
+정적으로 root 여부를 알 수 없는데 통과했다 — `DockerfileStructureValidator`가
+COPY/ADD 경로에서 변수 참조를 막는 것과 동일한 논리로 차단해야 했다.
+`":"` 앞의 사용자 이름만 비교하도록, `"$"` 포함 시 먼저 차단하도록 수정.
+실제 CLI로 `USER root:root` 재현 확인(수정 전 통과 → 수정 후 L1-RCP-009).
+
+### Issue #28 — 멀티스테이지 FROM digest 형식 검증 누락 (부분적 gap)
+
+조사 결과 `DockerfileStructureValidator.ValidateAllFromInstructionsPinning`은
+이미 모든 FROM(멀티스테이지 포함)에서 `latest` 태그와 digest 존재 여부를
+검사하고 있었다 — 리뷰 지적과 달리 이 부분은 이미 구현되어 있었음. 다만
+"digest 존재"는 `Contains("@sha256:")` 문자열 포함 여부만 보고, 실제 64자리
+hex 형식까지는 첫 번째 FROM만(`ImageUriValidator` 경유) 검증하고 있었다.
+`FROM builder@sha256:not-a-real-digest`처럼 형식이 엉터리인 두 번째 스테이지
+digest가 통과하는 걸 실제 CLI로 재현 확인 후, 동일한 hex 정규식 검증을 모든
+FROM에 적용(신규 규칙 L1-DOCKER-011).
+
+### Issue #29 — SourceBuild가 항상 root로 실행됨
+
+`RenderSourceBuild`가 생성하는 Dockerfile에는 USER가 없다. SourceBuildCommands는
+Conda/Micromamba/PackageMirror(고정 패키지 설치만)나 BioContainer(이미지
+참조만)와 달리 완전 자유 형식 셸 명령을 실행하는 유일한 non-dockerfile-fallback
+build kind라서, dockerfile fallback과 동등한 위험도를 갖는데도 USER 요구사항이
+전혀 적용되지 않았다. `RenderSourceBuild`가 생성하는 Dockerfile 끝에
+`USER 1000`을 고정 추가 — 빌드 명령 자체는 이미 그 이전 RUN 라인에서 끝나
+있으므로 이 변경은 이미지의 런타임 기본 사용자만 바꾼다.
+
+### Issue #30 — pip install -r/--requirement 경고 없이 완전 스킵
+
+`PackageVersionValidator`의 requirements.txt 경로(`ValidatePip`)와 Dockerfile
+RUN 경로(`ValidateDockerfilePipPackages`) 둘 다 `-r`/`--requirement`를
+값-소비 옵션으로 취급해 참조된 파일 경로를 그냥 건너뛰었다. NodeKit은 그
+파일의 내용을 recipe/BuildRequest 어디서도 볼 수 없어서, 이 경로로 미고정
+패키지를 얼마든지 숨길 수 있었다 — 이미 `-e`/`--editable`을 같은 이유로
+차단하는 선례가 있어 동일하게 차단(신규 규칙 L1-PKG-005). 실제 CLI로
+`RUN pip install -r requirements.txt` 재현 확인(수정 전 통과 → 수정 후
+L1-PKG-005).
+
+### 완료한 것 / 완료하지 않은 것 (§11)
+
+- **완료**: 4건 전부 수정. 회귀 테스트 9개 추가, `dotnet build` 0 warning,
+  전체 테스트 529개 통과. 4건 모두 실제 `nodekit` CLI 바이너리로 수정 전/후
+  차이를 직접 재현해 확인. GitHub 이슈 #27~#30 등록 후 커밋 참조와 함께
+  각각 close 완료.
+- **완료 아님**: 없음.
