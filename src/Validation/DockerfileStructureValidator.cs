@@ -17,6 +17,8 @@ namespace NodeKit.Validation
             @"\$(\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*)",
             RegexOptions.Compiled);
 
+        private static readonly Regex _sha256DigestPattern = new(@"^[0-9a-fA-F]{64}$", RegexOptions.Compiled);
+
         public ValidationResult Validate(ToolDefinition definition)
         {
             ArgumentNullException.ThrowIfNull(definition);
@@ -121,11 +123,25 @@ namespace NodeKit.Validation
                 return;
             }
 
-            if (!baseImage.Contains("@sha256:", StringComparison.OrdinalIgnoreCase))
+            var digestIndex = baseImage.IndexOf("@sha256:", StringComparison.OrdinalIgnoreCase);
+            if (digestIndex < 0)
             {
                 violations.Add(new ValidationViolation(
                     "L1-DOCKER-009",
                     $"FROM base image에 digest(@sha256:...)가 없습니다. 재현성 보장을 위해 digest 고정이 필수입니다. ({baseImage})",
+                    field));
+                return;
+            }
+
+            // 첫 번째 FROM은 ImageUriValidator가 이 hex 포맷까지 검증하지만, 두 번째
+            // 이후 FROM(멀티스테이지)은 여기서만 검사된다 — "@sha256:" 포함 여부만
+            // 보면 "@sha256:not-real-hex"처럼 형식이 엉터리인 digest도 통과했다.
+            var digest = baseImage[(digestIndex + "@sha256:".Length)..];
+            if (!_sha256DigestPattern.IsMatch(digest))
+            {
+                violations.Add(new ValidationViolation(
+                    "L1-DOCKER-011",
+                    $"FROM base image의 digest 형식이 올바르지 않습니다. sha256 digest는 64자리 16진수여야 합니다. ({baseImage})",
                     field));
             }
         }

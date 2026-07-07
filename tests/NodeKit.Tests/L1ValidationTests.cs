@@ -485,12 +485,15 @@ dependencies:
 
     public class DockerfileStructureValidatorTests
     {
+        private const string ValidDigest = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        private const string ValidDigest2 = "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210";
+
         private readonly DockerfileStructureValidator _sut = new();
 
         [Fact]
         public void Pass_WhenDockerfileHasFromAndValidCopy()
         {
-            var definition = Def("FROM ubuntu:22.04@sha256:abc123def456\nCOPY app/ /app/\nRUN echo ok\n");
+            var definition = Def($"FROM ubuntu:22.04@sha256:{ValidDigest}\nCOPY app/ /app/\nRUN echo ok\n");
 
             Assert.True(_sut.Validate(definition).IsValid);
         }
@@ -516,9 +519,35 @@ dependencies:
         [Fact]
         public void Pass_WhenFromBaseImageIsFullyPinned()
         {
-            var result = _sut.Validate(Def("FROM ubuntu:22.04@sha256:abc123def456\nRUN echo ok\n"));
+            var result = _sut.Validate(Def($"FROM ubuntu:22.04@sha256:{ValidDigest}\nRUN echo ok\n"));
 
             Assert.True(result.IsValid);
+        }
+
+        [Fact]
+        public void Fail_WhenFromBaseImageDigestIsNotValidHex()
+        {
+            var result = _sut.Validate(Def("FROM ubuntu:22.04@sha256:not-a-real-digest\nRUN echo ok\n"));
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-DOCKER-011");
+        }
+
+        [Fact]
+        public void Fail_WhenSecondStageFromDigestIsNotValidHex()
+        {
+            // The gap this closes: only the first FROM's digest format was
+            // strictly checked (via ImageUriValidator); later stages only got
+            // a "contains @sha256:" substring check, so a malformed digest in
+            // a second stage silently passed.
+            var result = _sut.Validate(Def(
+                $"FROM ubuntu:22.04@sha256:{ValidDigest} AS builder\n" +
+                "RUN echo build\n" +
+                "FROM debian:12@sha256:not-a-real-digest\n" +
+                "COPY --from=builder /x /x\n"));
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-DOCKER-011");
         }
 
         [Fact]
@@ -606,9 +635,9 @@ dependencies:
         public void Pass_WhenMultistageDockerfileEveryFromIsPinned()
         {
             var result = _sut.Validate(Def(
-                "FROM ubuntu:22.04@sha256:abc123def456 AS builder\n" +
+                $"FROM ubuntu:22.04@sha256:{ValidDigest} AS builder\n" +
                 "RUN echo build\n" +
-                "FROM debian:12@sha256:def456abc123\n" +
+                $"FROM debian:12@sha256:{ValidDigest2}\n" +
                 "COPY --from=builder /x /x\n"));
 
             Assert.True(result.IsValid);
@@ -618,7 +647,7 @@ dependencies:
         public void Fail_WhenSecondStageFromHasLatestTag()
         {
             var result = _sut.Validate(Def(
-                "FROM ubuntu:22.04@sha256:abc123def456 AS builder\n" +
+                $"FROM ubuntu:22.04@sha256:{ValidDigest} AS builder\n" +
                 "RUN echo build\n" +
                 "FROM alpine:latest\n" +
                 "COPY --from=builder /x /x\n"));
@@ -631,7 +660,7 @@ dependencies:
         public void Fail_WhenSecondStageFromHasNoDigest()
         {
             var result = _sut.Validate(Def(
-                "FROM ubuntu:22.04@sha256:abc123def456 AS builder\n" +
+                $"FROM ubuntu:22.04@sha256:{ValidDigest} AS builder\n" +
                 "RUN echo build\n" +
                 "FROM alpine:3.20\n" +
                 "COPY --from=builder /x /x\n"));
@@ -646,7 +675,7 @@ dependencies:
             var result = _sut.Validate(Def(
                 "FROM golang:latest AS builder\n" +
                 "RUN go build -o app\n" +
-                "FROM debian:12@sha256:abc123def456\n" +
+                $"FROM debian:12@sha256:{ValidDigest}\n" +
                 "COPY --from=builder /src/app /usr/local/bin/app\n"));
 
             Assert.False(result.IsValid);
@@ -658,7 +687,7 @@ dependencies:
         {
             // heredoc 본문은 Dockerfile 명령이 아니므로, 우연히 COPY로 시작하는 줄이 있어도
             // L1-DOCKER-006으로 오탐(false positive)되면 안 된다.
-            var dockerfile = "FROM ubuntu:22.04@sha256:abc123def456\n" +
+            var dockerfile = $"FROM ubuntu:22.04@sha256:{ValidDigest}\n" +
                 "RUN <<EOF\n" +
                 "COPY ../secret /app/secret\n" +
                 "EOF\n";
