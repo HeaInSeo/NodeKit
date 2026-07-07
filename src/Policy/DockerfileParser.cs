@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace NodeKit.Policy
@@ -88,8 +89,7 @@ namespace NodeKit.Policy
                 // COPY/ADD: 인자를 개별 토큰으로 분리 (--from=builder 감지용)
                 if (cmd == "COPY" || cmd == "ADD")
                 {
-                    instruction.Value = new List<string>(
-                        rest.Split(_spaceSeparators, StringSplitOptions.RemoveEmptyEntries));
+                    instruction.Value = ParseCopyOrAddArgs(rest);
                 }
                 else if (cmd == "FROM")
                 {
@@ -107,6 +107,53 @@ namespace NodeKit.Policy
             }
 
             return instructions;
+        }
+
+        // COPY/ADD도 exec-form과 마찬가지로 JSON 배열 문법(예: ADD ["url", "dest"])을
+        // 쓸 수 있다. 이전에는 공백으로만 split해서 콤마 뒤 공백이 있는 흔한 포맷에서
+        // 첫 토큰이 "[\"https://..."가 되어 DockerfileStructureValidator의 remote-source
+        // 문자열 접두어 검사(그리고 ".."/변수 참조 검사도 마찬가지로)를 우회했다.
+        // "--from=builder"처럼 배열 앞에 올 수 있는 플래그를 먼저 떼어낸 뒤, 남은
+        // 부분이 '['로 시작하면 실제 JSON 배열로 파싱한다. 형식이 JSON이 아니거나
+        // 파싱에 실패하면 기존 공백 split으로 폴백한다.
+        private static List<string> ParseCopyOrAddArgs(string rest)
+        {
+            var flags = new List<string>();
+            var remainder = rest.TrimStart();
+            while (remainder.StartsWith("--", StringComparison.Ordinal))
+            {
+                var spaceIndex = remainder.IndexOfAny(_spaceSeparators);
+                if (spaceIndex < 0)
+                {
+                    flags.Add(remainder);
+                    remainder = string.Empty;
+                    break;
+                }
+
+                flags.Add(remainder[..spaceIndex]);
+                remainder = remainder[(spaceIndex + 1)..].TrimStart();
+            }
+
+            if (remainder.StartsWith('['))
+            {
+                try
+                {
+                    var values = JsonSerializer.Deserialize<List<string>>(remainder);
+                    if (values is not null)
+                    {
+                        flags.AddRange(values);
+                        return flags;
+                    }
+                }
+                catch (JsonException)
+                {
+                    // 배열처럼 보이지만 형식이 잘못된 경우 — 아래 공백 split
+                    // 폴백으로 넘어가서 최소한 무언가는 검사받게 한다.
+                }
+            }
+
+            flags.AddRange(remainder.Split(_spaceSeparators, StringSplitOptions.RemoveEmptyEntries));
+            return flags;
         }
     }
 }

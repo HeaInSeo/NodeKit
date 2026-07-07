@@ -660,6 +660,16 @@ dependencies:
         }
 
         [Fact]
+        public void Fail_WhenAddUsesRemoteSourceInJsonArrayForm()
+        {
+            var result = _sut.Validate(Def(
+                "FROM ubuntu:22.04\nADD [\"https://example.com/tool.tar.gz\", \"/tmp/tool.tar.gz\"]\n"));
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-DOCKER-007");
+        }
+
+        [Fact]
         public void Fail_WhenCopySourceContainsVariableReference()
         {
             var result = _sut.Validate(Def("FROM ubuntu:22.04\nCOPY $APP_DIR/app /app/\n"));
