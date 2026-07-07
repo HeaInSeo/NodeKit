@@ -483,5 +483,8 @@ DockGuard 원본의 비밀 패턴 정규식(`\b(PASSWORD|SECRET|API_KEY|TOKEN|PA
 - **완료**: WasmPolicyChecker의 CLI 미배선이 의도된 설계임을 확인, DockGuard
   정책과 CLI L1 validator의 실제 커버리지 차이 전수 대조, 발견된 진짜 gap
   3건(SubmitCommand 스트림 처리, pip 버전 고정, USER/ENV 보안 규칙) 전부 수정.
-- **완료 아님**: 대화형 dockerfile fallback의 멀티라인 입력 미지원은 발견만
-  하고 고치지 않았다 — 별도 스코프의 UX 개선 작업.
+- **완료** (커밋 `76472a2`): USER/ENV 보안 규칙(#20) 도입으로 대화형
+  dockerfile fallback에서 드러난 "한 줄만 입력 가능" 제약을 `RecipeFieldDescriptor
+  .SupportsMultilineInput` + `PromptMultilineScalarField`로 해결. 빈 줄로
+  종료되는 여러 줄 입력을 지원하며, 기존 EOF-vs-빈줄 안전 패턴(#10/#11/#12)을
+  그대로 재사용. 회귀 테스트: `DockerfileContent_StdinEndsMidMultilineInput_CancelsInsteadOfLooping`.
