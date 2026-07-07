@@ -223,13 +223,14 @@ namespace NodeKit.Validation
                     .Split(_dockerfileTokenSeparators, StringSplitOptions.RemoveEmptyEntries)
                     .ToList();
 
-                if (tokens.Count < 2 || !IsPipInstallCommand(tokens))
+                var argStartIndex = GetPipInstallArgStartIndex(tokens);
+                if (argStartIndex < 0)
                 {
                     continue;
                 }
 
                 var skipNext = false;
-                for (var index = 2; index < tokens.Count; index++)
+                for (var index = argStartIndex; index < tokens.Count; index++)
                 {
                     var token = tokens[index];
                     if (skipNext)
@@ -295,11 +296,51 @@ namespace NodeKit.Validation
             }
         }
 
-        private static bool IsPipInstallCommand(List<string> tokens) =>
-            tokens.Count >= 2 &&
-            (string.Equals(tokens[0], "pip", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(tokens[0], "pip3", StringComparison.OrdinalIgnoreCase)) &&
-            string.Equals(tokens[1], "install", StringComparison.OrdinalIgnoreCase);
+        // "pip"/"pip3" exact-match만 보면 "/usr/bin/pip install"(절대 경로)나
+        // "python -m pip install"(모듈 실행)처럼 흔한 형태가 전부 우회한다 —
+        // 실행 파일 이름은 마지막 경로 구성요소(basename)로 비교하고, "python -m
+        // pip install" 4토큰 패턴도 별도로 인식한다. 매치되면 실제 패키지 인자가
+        // 시작하는 인덱스를, 매치되지 않으면 -1을 반환한다.
+        private static int GetPipInstallArgStartIndex(List<string> tokens)
+        {
+            if (tokens.Count >= 2 &&
+                IsPipExecutable(tokens[0]) &&
+                string.Equals(tokens[1], "install", StringComparison.OrdinalIgnoreCase))
+            {
+                return 2;
+            }
+
+            if (tokens.Count >= 4 &&
+                IsPythonExecutable(tokens[0]) &&
+                string.Equals(tokens[1], "-m", StringComparison.OrdinalIgnoreCase) &&
+                IsPipExecutable(tokens[2]) &&
+                string.Equals(tokens[3], "install", StringComparison.OrdinalIgnoreCase))
+            {
+                return 4;
+            }
+
+            return -1;
+        }
+
+        private static bool IsPipExecutable(string token)
+        {
+            var name = GetExecutableBasename(token);
+            return string.Equals(name, "pip", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(name, "pip3", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsPythonExecutable(string token)
+        {
+            var name = GetExecutableBasename(token);
+            return string.Equals(name, "python", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(name, "python3", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string GetExecutableBasename(string token)
+        {
+            var lastSlash = token.LastIndexOf('/');
+            return lastSlash >= 0 ? token[(lastSlash + 1)..] : token;
+        }
 
         private static IEnumerable<string> ExtractInstalledPackages(string rawInstruction)
         {

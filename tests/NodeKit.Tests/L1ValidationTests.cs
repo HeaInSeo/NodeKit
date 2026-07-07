@@ -254,6 +254,52 @@ dependencies:
             Assert.True(_sut.Validate(def).IsValid);
         }
 
+        // Review finding: only an exact "pip"/"pip3" first token was recognized,
+        // so the equally common "python -m pip install ..." and absolute-path
+        // "/usr/bin/pip install ..." forms bypassed pinning checks entirely.
+
+        [Fact]
+        public void Fail_WhenDockerfileUsesPythonModulePipInstall_Unpinned()
+        {
+            var def = new ToolDefinition
+            {
+                ImageUri = "reg/img:1.0@sha256:abc",
+                DockerfileContent = "FROM ubuntu:22.04\nRUN python -m pip install numpy\n",
+            };
+
+            var result = _sut.Validate(def);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-PKG-003" && v.Field == "DockerfileContent");
+        }
+
+        [Fact]
+        public void Fail_WhenDockerfileUsesAbsolutePathPipInstall_Unpinned()
+        {
+            var def = new ToolDefinition
+            {
+                ImageUri = "reg/img:1.0@sha256:abc",
+                DockerfileContent = "FROM ubuntu:22.04\nRUN /usr/bin/pip install numpy\n",
+            };
+
+            var result = _sut.Validate(def);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-PKG-003" && v.Field == "DockerfileContent");
+        }
+
+        [Fact]
+        public void Pass_WhenDockerfileUsesPythonModulePipInstall_FullyPinned()
+        {
+            var def = new ToolDefinition
+            {
+                ImageUri = "reg/img:1.0@sha256:abc",
+                DockerfileContent = "FROM ubuntu:22.04\nRUN python3 -m pip install numpy==1.26.4\n",
+            };
+
+            Assert.True(_sut.Validate(def).IsValid);
+        }
+
         [Fact]
         public void Fail_WhenDockerfilePip3EditableInstall_IsBlocked()
         {
