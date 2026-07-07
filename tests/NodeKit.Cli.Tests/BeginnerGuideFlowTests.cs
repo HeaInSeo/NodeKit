@@ -565,18 +565,16 @@ namespace NodeKit.Cli.Tests
         // ── Dockerfile clue ───────────────────────────────────────────────────
 
         [Fact]
-        public void DockerfileClue_AcceptWarning_ButFinalValidationNowRequiresUser()
+        public void DockerfileClue_AcceptWarning_SavesValidRecipe()
         {
-            // Issue #19 follow-up (DockGuard DSF001 parity for dockerfile
-            // fallback): DockerfileContent can only be a single line here
-            // (PromptScalarField reads one line per field, and Dockerfile
-            // syntax requires each instruction on its own line), so a
-            // single-line "FROM ..." can no longer pass final validation now
-            // that USER is required. The guided-mode warning acceptance flow
-            // itself still works; only the final save now fails with a clear
-            // reason. See RecipeCreateInteractiveTests.
-            // Dockerfile_NonInteractive_WithUserInstruction_SavesValidRecipe
-            // for the happy path (only reachable via --field).
+            // Issue #20 (DockGuard DSF001 parity for dockerfile fallback) made
+            // USER a final-validation requirement, which briefly made this
+            // scenario unreachable interactively — Dockerfile syntax needs
+            // each instruction on its own line, but PromptScalarField only
+            // ever read a single line per field. Fixed by adding multi-line
+            // support (PromptMultilineScalarField) for DockerfileContent
+            // specifically. This transcript exercises that: two separate
+            // lines (FROM, USER) for the one DockerfileContent prompt.
             var outPath = Path.Combine(_workDir, "recipe.json");
             var transcript = new[]
             {
@@ -588,19 +586,22 @@ namespace NodeKit.Cli.Tests
                 "bwa-mem", "0.7.17", "run.sh",
                 BaseImageWithDigest,           // ImageRef (BaseImage for Dockerfile method)
                 // DockerfilePath: pre-filled → skipped
-                $"FROM {BaseImageWithDigest}", // DockerfileContent (single line — no USER possible)
-                "",                            // BuildContext (Defaulted → skipped)
+                $"FROM {BaseImageWithDigest}", // DockerfileContent line 1
+                "USER 1000",                   // DockerfileContent line 2
+                "",                            // DockerfileContent: blank line ends multi-line input
+                // BuildContext (Defaulted → skipped)
                 "reads", "1", "",
                 "bam", "1", "",
-                "",                            // recovery loop: blank = cancel without saving
             };
 
-            var exitCode = RunCli(outPath, transcript, out var stdout, out var stderr);
+            var exitCode = RunCli(outPath, transcript, out var stdout, out _);
 
-            Assert.Equal(1, exitCode);
-            Assert.False(File.Exists(outPath));
+            Assert.Equal(0, exitCode);
+            Assert.True(File.Exists(outPath));
             Assert.Contains("Dockerfile fallback", stdout);
-            Assert.Contains("L1-RCP-009", stderr);
+            var json = File.ReadAllText(outPath);
+            Assert.Contains("\"BuildKind\": \"DockerfileFallback\"", json);
+            Assert.Contains("USER 1000", json);
         }
 
         [Fact]

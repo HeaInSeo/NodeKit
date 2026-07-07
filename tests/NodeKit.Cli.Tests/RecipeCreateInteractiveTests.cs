@@ -70,20 +70,17 @@ namespace NodeKit.Cli.Tests
         }
 
         [Fact]
-        public void DockerfileWarningPath_RequiresAcceptance_ButFinalValidationNowRequiresUser()
+        public void DockerfileWarningPath_RequiresAcceptanceAndSavesValidRecipe()
         {
-            // Issue #19 follow-up (DockGuard DSF001 parity for dockerfile
-            // fallback): the interactive console reads one line per field
-            // (PromptScalarField has no multi-line accumulation), and
-            // Dockerfile syntax requires each instruction on its own line —
-            // so a single-line "FROM ..." DockerfileContent can no longer
-            // reach a saved recipe once USER is required. The warning
-            // acceptance flow itself still works correctly; only the final
-            // save now fails with a clear reason instead of silently missing
-            // the USER requirement. See
-            // Dockerfile_NonInteractive_WithUserInstruction_SavesValidRecipe
-            // below for the happy path (only reachable via --field, which can
-            // carry embedded newlines).
+            // Issue #20 (DockGuard DSF001 parity for dockerfile fallback) made
+            // USER a final-validation requirement, which briefly made this
+            // scenario unreachable interactively — Dockerfile syntax needs
+            // each instruction on its own line, but PromptScalarField only
+            // ever read a single line per field. Fixed by adding multi-line
+            // support (PromptMultilineScalarField, blank line terminates,
+            // same convention as StringList fields) for DockerfileContent
+            // specifically. This transcript exercises that: two separate
+            // lines (FROM, USER) for the one DockerfileContent prompt.
             var outPath = Path.Combine(_workDir, "recipe.json");
             var transcript = new[]
             {
@@ -101,19 +98,25 @@ namespace NodeKit.Cli.Tests
                 "run.sh", // Script
                 ImageRefWithDigest, // ImageRef
                 "./Dockerfile", // DockerfilePath
-                $"FROM {ImageRefWithDigest}", // DockerfileContent (single line — no USER possible)
-                "", // recovery loop: blank = cancel without saving
+                $"FROM {ImageRefWithDigest}", // DockerfileContent line 1
+                "USER 1000", // DockerfileContent line 2
+                "", // DockerfileContent: blank line ends multi-line input
+                "reads", "1", "",
+                "bam", "1", "",
             };
 
             var stdout = new StringWriter();
             var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
-            Assert.Equal(1, exitCode);
+            Assert.Equal(0, exitCode);
             Assert.Contains("강한 주의", stdout.ToString());
-            Assert.False(File.Exists(outPath));
-            Assert.Contains("L1-RCP-009", stderr.ToString());
-            Assert.Contains("USER", stderr.ToString());
+            Assert.Empty(stderr.ToString());
+
+            var json = File.ReadAllText(outPath);
+            Assert.Contains("\"BuildContext\": \".\"", json);
+            Assert.Contains("\"BuildKind\": \"DockerfileFallback\"", json);
+            Assert.Contains("USER 1000", json);
         }
 
         [Fact]
@@ -140,6 +143,34 @@ namespace NodeKit.Cli.Tests
 
             var json = File.ReadAllText(outPath);
             Assert.Contains("\"BuildKind\": \"DockerfileFallback\"", json);
+        }
+
+        [Fact]
+        public void DockerfileContent_StdinEndsMidMultilineInput_CancelsInsteadOfLooping()
+        {
+            // Same EOF-vs-blank-line bug class as #10/#11/#12: stdin running
+            // out mid multi-line accumulation (no blank-line completion
+            // signal ever arrives) must cancel immediately rather than
+            // spinning forever re-prompting for a line that will never come.
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "2", "n", "n", "n", "n", "n", "y", "", "y",
+                "bwa-mem", "0.7.17", "run.sh",
+                ImageRefWithDigest,
+                "./Dockerfile",
+                $"FROM {ImageRefWithDigest}",
+                "USER 1000",
+                // stdin ends here — no blank line to terminate DockerfileContent
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
+
+            Assert.Equal(130, exitCode);
+            Assert.False(File.Exists(outPath));
+            Assert.Contains("recipe 생성을 취소했습니다.", stdout.ToString());
         }
 
         [Fact]

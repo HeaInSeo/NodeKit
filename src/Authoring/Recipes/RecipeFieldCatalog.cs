@@ -252,7 +252,8 @@ namespace NodeKit.Authoring.Recipes
                             "The Dockerfile content. Usable instead of DockerfilePath."),
                         Examples: Array.Empty<string>(),
                         Choices: Array.Empty<RecipeChoice>(),
-                        Apply: (recipe, value) => recipe.DockerfileContent = (string)value),
+                        Apply: (recipe, value) => recipe.DockerfileContent = (string)value,
+                        SupportsMultilineInput: true),
                     new RecipeFieldDescriptor(
                         Name: "BuildContext",
                         Type: RecipeFieldType.Scalar,

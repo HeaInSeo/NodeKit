@@ -440,6 +440,9 @@ namespace NodeKit.Cli
         {
             switch (field.Type)
             {
+                case RecipeFieldType.Scalar when field.SupportsMultilineInput:
+                    PromptMultilineScalarField(session, field, console, cancellation);
+                    break;
                 case RecipeFieldType.Scalar:
                     PromptScalarField(session, field, console, cancellation);
                     break;
@@ -526,6 +529,108 @@ namespace NodeKit.Cli
                 if (rawLine is null)
                 {
                     throw new RecipeCreateCancelledException();
+                }
+
+                PrintViolations(violations, console);
+            }
+        }
+
+        // Dockerfile 같은 값은 각 instruction이 별도 줄에 있어야 하는데, 일반
+        // PromptScalarField는 console.ReadLine() 한 번으로 필드 값 전체를 확정
+        // 짓는다 — 여러 instruction을 가진 값을 대화형으로 입력할 방법이 없었다
+        // (issue #20에서 발견: USER 요구사항 추가 후 대화형 dockerfile fallback을
+        // 완주할 수 없게 됨). PromptStringListField와 동일한 "빈 줄 = 종료"
+        // 관례를 재사용해, 한 줄씩 받아 개행으로 이어붙인 뒤 한 번에 SetField한다.
+        private static void PromptMultilineScalarField(RecipeAuthoringSession session, RecipeFieldDescriptor field, IRecipeConsole console, IRecipeCreateCancellationSource cancellation)
+        {
+            while (true)
+            {
+                if (cancellation.IsCancellationRequested)
+                {
+                    throw new RecipeCreateCancelledException();
+                }
+
+                console.WriteLine($"{field.Label.Get("ko")} — {field.Help.Get("ko")} (여러 줄 입력 가능, 빈 줄 입력 시 종료)");
+                if (field.Examples.Count > 0)
+                {
+                    console.WriteLine($"   예: {string.Join(", ", field.Examples)}");
+                }
+
+                var suggested = session.GetFieldDefault(field.Name);
+                if (suggested != null)
+                {
+                    console.WriteLine($"   제안 값: {suggested} (빈 줄만 입력해 수락, 다른 내용 입력 시 새로 작성)");
+                }
+
+                var lines = new List<string>();
+
+                while (true)
+                {
+                    var rawLine = console.ReadLine();
+                    var line = rawLine ?? string.Empty;
+
+                    if (TryHandleChangeMethod(session, line, console))
+                    {
+                        return;
+                    }
+
+                    if (TryHandleCancel(line, console))
+                    {
+                        continue;
+                    }
+
+                    RecipeCreateEscapeCommands.ThrowIfBack(line);
+
+                    if (TryHandleReview(session, line, console))
+                    {
+                        continue;
+                    }
+
+                    if (TryHandleHelp(field, line, console))
+                    {
+                        continue;
+                    }
+
+                    if (line.Length == 0)
+                    {
+                        // 빈 줄과 진짜 EOF는 둘 다 line=""로 접히지만, rawLine이
+                        // null이면(진짜 EOF) 더는 종료 신호를 못 받으므로 여기서
+                        // 계속 기다려봐야 영원히 같은 상태를 반복한다(issue #10/#11/#12와
+                        // 동일 계열) — 즉시 취소 처리한다.
+                        if (rawLine is null)
+                        {
+                            throw new RecipeCreateCancelledException();
+                        }
+
+                        break;
+                    }
+
+                    lines.Add(line);
+                }
+
+                if (lines.Count == 0 && suggested != null)
+                {
+                    var suggestedViolations = session.SetField(field.Name, suggested);
+                    if (suggestedViolations.Count == 0)
+                    {
+                        return;
+                    }
+
+                    PrintViolations(suggestedViolations, console);
+                    continue;
+                }
+
+                if (lines.Count == 0 && field.Requirement == RecipeFieldRequirement.Optional)
+                {
+                    session.SkipOptionalField(field.Name);
+                    return;
+                }
+
+                var content = lines.Count > 0 ? string.Join('\n', lines) + "\n" : string.Empty;
+                var violations = session.SetField(field.Name, content);
+                if (violations.Count == 0)
+                {
+                    return;
                 }
 
                 PrintViolations(violations, console);
