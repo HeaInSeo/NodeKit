@@ -308,6 +308,34 @@ namespace NodeKit.Cli.Tests
                 "raw_spec에 tool_name 필드가 있어야 합니다.");
         }
 
+        [Fact]
+        public void Submit_RawSpecContainsExplicitToolSpecKind()
+        {
+            // NodeVault의 encoding/json 기반 파서는 BuildKind를 열거형 이름이 아니라
+            // 정수값으로 받는다(protojson이 아니므로) — BUILD_KIND_TOOLSPEC == 1.
+            // 생략하면 BUILD_KIND_UNSPECIFIED(0)가 되는데, 지금은 NodeVault가
+            // 우연히 이를 TOOLSPEC과 동일하게 처리해 통과할 뿐이라 명시하는 게 안전하다.
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            string? capturedRawSpec = null;
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath },
+                stdout,
+                stderr,
+                toolSpecClient: new CapturingToolSpecClient(rawSpec =>
+                {
+                    capturedRawSpec = rawSpec;
+                    return new[] { new BuildEvent { Kind = BuildEventKind.Succeeded } };
+                }));
+
+            Assert.Equal(0, exitCode);
+            var doc = JsonDocument.Parse(capturedRawSpec!);
+            Assert.True(doc.RootElement.TryGetProperty("kind", out var kind), "raw_spec에 kind 필드가 있어야 합니다.");
+            Assert.Equal(1, kind.GetInt32());
+        }
+
         // ── 헬퍼 ──────────────────────────────────────────────────────────────
 
         private string WriteFile(string name, string content)
