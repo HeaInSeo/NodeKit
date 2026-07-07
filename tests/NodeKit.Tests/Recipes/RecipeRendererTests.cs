@@ -119,6 +119,24 @@ namespace NodeKit.Tests.Recipes
         }
 
         [Fact]
+        public void Render_SourceBuild_IncludesNonRootUser()
+        {
+            // SourceBuildCommands runs arbitrary shell, unlike Conda/Micromamba/
+            // PackageMirror (pinned package installs only) — closest in risk to
+            // dockerfile fallback, so its generated Dockerfile should not leave
+            // the image running as root by default.
+            var recipe = NewRecipe(RecipeBuildKind.SourceBuild);
+            recipe.BaseImage = PinnedBaseImage;
+            recipe.SourceUri = "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz";
+            recipe.SourceChecksum = "sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd";
+            recipe.SourceBuildCommands.AddRange(new[] { "make", "make install" });
+
+            var definition = RecipeRenderer.Render(recipe);
+
+            Assert.Contains("USER 1000", definition.DockerfileContent);
+        }
+
+        [Fact]
         public void Render_SourceBuild_PassesFullL1ValidatorChain()
         {
             var recipe = NewRecipe(RecipeBuildKind.SourceBuild);

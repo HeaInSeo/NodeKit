@@ -132,6 +132,14 @@ namespace NodeKit.Authoring.Recipes
             }
 
             dockerfile.Append('\n');
+
+            // SourceBuildCommands runs arbitrary shell (unlike Conda/Micromamba/
+            // PackageMirror, which only ever install pinned packages), so this is
+            // the one auto-generated build kind with real-Dockerfile-fallback-level
+            // exposure. The build itself still runs before this line (as whatever
+            // user the base image defaults to), so this only fixes the image's
+            // runtime default user, not the build step.
+            dockerfile.Append("USER 1000\n");
             definition.DockerfileContent = dockerfile.ToString();
         }
     }
