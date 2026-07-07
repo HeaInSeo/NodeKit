@@ -189,6 +189,15 @@ namespace NodeKit.Cli
                 return false;
             }
 
+            if (recipe.BuildKind is null)
+            {
+                stderr.WriteLine(
+                    $"recipe 파일에 buildKind가 없습니다: {path} " +
+                    "(Conda | Micromamba | BioContainer | SourceBuild | PackageMirror | DockerfileFallback 중 하나를 지정하세요.)");
+                recipe = null;
+                return false;
+            }
+
             return true;
         }
 

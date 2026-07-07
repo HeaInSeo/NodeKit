@@ -51,6 +51,40 @@ namespace NodeKit.Cli.Tests
         }
         """;
 
+        // 리뷰 지적: BuildKind가 없는 recipe.json은 RecipeValidationPipeline
+        // .ValidateRecipe()에서 InvalidOperationException을 던진다(대화형
+        // authoring 전용 내부 계약). SubmitCommand는 이 호출을 try/catch 밖에서
+        // 하고 있어 외부 recipe.json에 buildKind가 없으면 스택트레이스와 함께
+        // 죽었다.
+        private const string MissingBuildKindRecipeJson = """
+        {
+            "ToolName": "bwa",
+            "Version": "0.7.17",
+            "BaseImage": "registry.example.com/bwa:0.7.17@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            "DockerfileContent": "FROM registry.example.com/bwa:0.7.17@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\nRUN echo ok\nUSER 1000\n",
+            "Script": "bwa mem",
+            "Inputs": [],
+            "Outputs": []
+        }
+        """;
+
+        [Fact]
+        public void Submit_RecipeMissingBuildKind_ReturnsTwoInsteadOfThrowing()
+        {
+            var recipePath = WriteFile("recipe.json", MissingBuildKindRecipeJson);
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(new[] { new BuildEvent { Kind = BuildEventKind.Succeeded } }));
+
+            Assert.Equal(2, exitCode);
+            Assert.Contains("buildKind", stderr.ToString());
+        }
+
         // ── 공통 검증 ────────────────────────────────────────────────────────────
 
         [Fact]

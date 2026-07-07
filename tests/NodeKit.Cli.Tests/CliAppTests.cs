@@ -46,6 +46,52 @@ namespace NodeKit.Cli.Tests
         }
         """;
 
+        // Review finding: a hand-written recipe.json omitting "BuildKind"
+        // deserializes to BuildKind == null, and RecipeValidationPipeline
+        // .ValidateRecipe() throws InvalidOperationException in that case (an
+        // internal contract for interactive authoring, which always resolves
+        // BuildKind first). validate/render never caught it, so the CLI
+        // crashed with a raw stack trace instead of a clean error + exit code.
+        private const string MissingBuildKindRecipeJson = """
+        {
+            "ToolName": "bwa",
+            "Version": "0.7.17",
+            "BaseImage": "registry.example.com/bwa:0.7.17@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            "DockerfileContent": "FROM registry.example.com/bwa:0.7.17@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\nRUN echo ok\nUSER 1000\n",
+            "Script": "bwa mem",
+            "Inputs": [ { "Name": "reads", "Role": "sample-fastq", "Format": "fastq", "Shape": "pair" } ],
+            "Outputs": [ { "Name": "aligned", "Role": "aligned-bam", "Format": "bam", "Shape": "single", "Class": "primary" } ]
+        }
+        """;
+
+        [Fact]
+        public void Validate_RecipeMissingBuildKind_ReturnsTwoInsteadOfThrowing()
+        {
+            var recipePath = WriteFile("recipe.json", MissingBuildKindRecipeJson);
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+
+            var exitCode = CliApp.Run(new[] { "validate", recipePath }, stdout, stderr);
+
+            Assert.Equal(2, exitCode);
+            Assert.Contains("buildKind", stderr.ToString());
+        }
+
+        [Fact]
+        public void Render_RecipeMissingBuildKind_ReturnsTwoInsteadOfThrowing()
+        {
+            var recipePath = WriteFile("recipe.json", MissingBuildKindRecipeJson);
+            var outPath = Path.Combine(_workDir, "build-request.json");
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+
+            var exitCode = CliApp.Run(new[] { "render", recipePath, "--out", outPath }, stdout, stderr);
+
+            Assert.Equal(2, exitCode);
+            Assert.False(File.Exists(outPath));
+            Assert.Contains("buildKind", stderr.ToString());
+        }
+
         [Fact]
         public void Validate_ValidRecipe_ReturnsZero()
         {
