@@ -1,8 +1,8 @@
 # NodeKit ↔ NodeVault 로컬 gRPC 통합 테스트 시나리오
 
-Status: 실행 완료 (2026-07-05) — 버그 4건 발견, 전부 수정·머지 완료
+Status: 실행 완료 — 버그 20건 발견(#5~#20), 전부 수정·머지 완료
 Created: 2026-07-04
-Updated: 2026-07-05
+Updated: 2026-07-07
 Scope: heain 개발 장비에서 seoy/K8s 없이 `nodekit submit` 전체 경로를 검증
 
 ## 0. 배경 및 목적
@@ -426,3 +426,62 @@ seoy/NodeVault 없이 매 실행마다 자동으로 wire-level 회귀를 잡는 
   Issue #1("쉬운 안내 모드 진입점만 있고 BeginnerGuideFlow 미구현")은 이번 전수조사로
   BeginnerGuideFlow가 실제로 완전히 구현되어 있음이 확인되어 문서가 stale해 보이지만,
   이 이슈를 닫는 것은 이번 작업 범위 밖이라 손대지 않았다.
+
+## 8. "조용한 exit 0/조용한 통과" 전수조사 (#18~#20)
+
+Issue #15/#16 수정 이후 "경고 없이 조용히 exit 0으로 하는 거 전수 조사 해볼
+필요 있지 않아?"라는 질문을 받고, CLAUDE.md §11 체크리스트(gRPC 실패가 조용히
+사라지는 경우, 정책 검사가 fail-open되는 경우)를 기준으로 진행했다.
+
+| 대상 | 결과 |
+|---|---|
+| `WasmPolicyChecker`/`OpaWasmHelpers`의 fail-open 방지 | ✓ 이미 안전 — entrypoint 불일치/builtin 부트스트랩 실패를 "위반 없음"이 아니라 명시적 차단으로 처리하는 로직이 이미 있었음 |
+| `SubmitCommand`의 WatchToolBuild 스트림 처리 | **버그 발견**: 서버가 Succeeded/Failed/Interrupted 없이 스트림을 그냥 닫으면 `return 0`(성공)으로 떨어짐 — fake gRPC 서버로 재현 확인 → Issue #18. `return 1` + "결과를 확인 못 했다" 안내로 수정 |
+| `IPolicyChecker`/`WasmPolicyChecker`가 CLI 어디서도 안 쓰임 | 조사 결과 버그 아님 — GUI(`MainWindow.axaml.cs`, `ValidationViewModel.cs`)에 완전히 배선되어 있고, CLI는 동등한 규칙을 4개 하드코딩 C# validator로 재구현하도록 설계됨(Sprint 1 기록 확인) |
+| DockGuard 규칙(`policy/*.rego`)과 CLI L1 validator 대조 | DSF003(ADD 원격 URL 금지)은 이미 커버됨. **DGF002(pip 버전 고정)와 DSF001/DSF002(USER 필수, ENV 비밀 패턴)는 CLI에 전혀 없었음** → Issue #19, #20 |
+
+### Issue #19 — pip install 버전 미고정이 Dockerfile에서 전혀 안 걸림
+
+`PackageVersionValidator`가 Dockerfile의 `RUN` 명령을 스캔할 때 conda/micromamba만
+인식하고 pip/pip3는 인식하지 못해서, `RUN pip install numpy`(버전 미고정)가
+모든 build kind에서 L1을 완전히 통과했다. 실제 CLI로 재현: `nodekit validate`가
+`OK`(exit 0) 반환, 같은 걸 `conda install numpy`로 바꾸면 정확히 `L1-PKG-001`로
+차단되는 것과 대조 확인. pip/pip3 인식 로직을 추가해 수정, `-e`/`--editable`
+VCS 설치 차단과 `-r`/`--requirement` 등 값-소비 옵션 처리까지 conda 경로와
+동등하게 맞췄다.
+
+### Issue #20 — USER 필수/ENV 비밀 패턴이 dockerfile fallback에서 전혀 안 걸림
+
+DSF001(USER 필수, root 금지)/DSF002(ENV 비밀 패턴 금지)를 처음에는
+`DockerfileStructureValidator`(모든 build kind 공통)에 무조건 추가했다가
+**13개 테스트가 즉시 깨졌다** — `RecipeRenderer`가 자동 생성하는 Conda/
+Micromamba/PackageMirror/SourceBuild/BioContainer Dockerfile은 애초에 USER를
+포함하지 않아서, CLI로 만든 모든 recipe가 저장 불가능해지는 실제 회귀였다.
+즉시 되돌리고 `RecipeValidator.cs`(BuildKind를 아는 계층)로 옮겨
+`DockerfileFallback`(사용자가 Dockerfile 전체를 직접 쓰는 유일한 build kind)에만
+스코프를 좁혔다.
+
+스코프를 좁힌 뒤에도 대화형 테스트 2개가 깨졌는데, 이번엔 검증 로직이 아니라
+**대화형 콘솔이 필드당 한 줄만 읽는다는 사전 존재 제약**이 원인이었다 —
+Dockerfile은 각 instruction이 별도 줄에 있어야 하는데, USER 요구사항 추가 후
+`FROM` 한 줄만으로는 최종 검증을 통과할 방법이 없어져서 **대화형으로는
+dockerfile fallback 방식을 더 이상 완주할 수 없게 됐다**(non-interactive는
+`--field` 값에 개행을 직접 포함할 수 있어 영향 없음). 이건 새 규칙의 버그가
+아니라 기존에 있었지만 드러나지 않았던 제약이 처음 표면화된 것이라고 판단해,
+대화형 테스트는 "경고 승인은 되지만 최종 저장은 이제 실패"로 현재 동작을
+반영하도록 수정하고, 실제 happy path는 non-interactive 테스트로 옮겼다.
+
+DockGuard 원본의 비밀 패턴 정규식(`\b(PASSWORD|SECRET|API_KEY|TOKEN|PASSWD)\b`)을
+그대로 이식했는데, 단어 경계 특성상 `MY_API_KEY`처럼 접두어 붙은 변수명은 원본도
+안 잡는다는 것을 DockGuard 자체 테스트(`ENV CONDA_PATH=...` 허용 케이스)로
+확인 — 새로 만든 결함이 아니라 원본과 동일한 특성. 실제 CLI로 `ENV PASSWORD=...`
+(정확 매치, 차단)와 `ENV MY_API_KEY=...`(접두어 있음, 통과)를 둘 다 재현해 원본과
+동일함을 확인했다.
+
+### 완료한 것 / 완료하지 않은 것 (§8)
+
+- **완료**: WasmPolicyChecker의 CLI 미배선이 의도된 설계임을 확인, DockGuard
+  정책과 CLI L1 validator의 실제 커버리지 차이 전수 대조, 발견된 진짜 gap
+  3건(SubmitCommand 스트림 처리, pip 버전 고정, USER/ENV 보안 규칙) 전부 수정.
+- **완료 아님**: 대화형 dockerfile fallback의 멀티라인 입력 미지원은 발견만
+  하고 고치지 않았다 — 별도 스코프의 UX 개선 작업.
