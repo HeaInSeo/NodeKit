@@ -575,3 +575,27 @@ recipe.json을 넣으면 스택트레이스와 함께 죽었다. 실제 CLI 바�
   시나리오 둘 다 수정 전/후 차이를 직접 재현해 확인했다. GitHub 이슈
   #21~#26 등록 후 커밋 참조와 함께 각각 close 완료.
 - **완료 아님**: 없음 — 6건 모두 이번 턴에서 끝까지 처리했다.
+
+## 10. NodeKit ↔ NodeVault 책임 계약 재검토 — NodeVault 쪽 gap 발견 (cross-repo)
+
+§9 수정 이후, "NodeKit=사용자 친화적 1차 게이트, NodeVault=최종 authoritative
+게이트"라는 계약이 양쪽에 실제로 성립하는지 NodeVault를 읽기 전용으로
+확인했다(package build string / Dockerfile content / base image digest /
+metadata / bypass 방지 5개 항목).
+
+**실제로 성립하는 것**: package build string(conda/micromamba canonical
+resolve, `ResolveRecipe`), base image digest(`resolve_tool_spec.go`의
+"unpinned면 기본 reject" 로직), metadata 보존/등록(`pkg/catalog`/`pkg/index`).
+
+**성립하지 않는 것(NodeVault 쪽 gap 확인)**: `pkg/build/submit_tool_build.go:211`
+이 `req.GetDockerfileContent()`를 어떤 재검증도 없이 그대로 Buildah에
+넘긴다. `PLATFORM_MAP.md`도 "NodeVault PolicyService는 DockGuard 정책
+번들을 배포만 하고 집행하지 않는다"고 명시하고 있고, L2/L3/L4 어디에도
+정책 재검사가 없다. 즉 NodeKit CLI/GUI를 우회해 `SubmitToolBuild` gRPC를
+직접 호출하면 §9에서 고친 shell injection/USER/ENV 검증을 전부 우회한 채
+임의 Dockerfile이 그대로 빌드된다 — 지금은 "NodeKit=1차 게이트"가 아니라
+"NodeKit=유일한 게이트"다.
+
+NodeKit이 이 gap을 대신 메꾸는 건 CLAUDE.md 경계 규칙(K8s/빌드 오케스트레이션은
+NodeVault 담당) 위반이라 NodeKit 쪽에서 할 일은 아니다. cross-team 가시화를
+위해 NodeVault 저장소에 이슈 등록: **HeaInSeo/NodeVault#16**.
