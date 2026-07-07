@@ -22,11 +22,18 @@ namespace NodeKit.Validation
         private static readonly Regex _editableInstallPattern =
             new(@"^(-e|--editable)(\s|=)", RegexOptions.Compiled);
 
+        // -r/--requirement은 다른 requirements 파일을 가리키기만 할 뿐 그 안의
+        // 내용(패키지 버전 고정 여부)은 recipe/BuildRequest 어디에도 없어서
+        // NodeKit이 볼 방법이 없다 — -e/--editable과 동일한 이유로 차단한다.
+        private static readonly Regex _requirementsFileReferencePattern =
+            new(@"^(-r|--requirement)(\s|=)", RegexOptions.Compiled);
+
         // pip install 옵션 중 다음 토큰을 인자로 소비하는 것들 — 이걸 패키지명으로
-        // 오인해 버전 검사를 하면 안 된다.
+        // 오인해 버전 검사를 하면 안 된다. -r/--requirement는 여기 두지 않는다 —
+        // 값을 건너뛰기만 하면 안 되고 아래에서 차단해야 하므로 별도 처리한다.
         private static readonly HashSet<string> _pipValueOptions = new(StringComparer.Ordinal)
         {
-            "-r", "--requirement", "-c", "--constraint", "-t", "--target",
+            "-c", "--constraint", "-t", "--target",
             "-i", "--index-url", "--extra-index-url", "--trusted-host",
             "--cache-dir", "--proxy", "--retries", "--timeout", "-f", "--find-links",
         };
@@ -158,6 +165,15 @@ namespace NodeKit.Validation
                     continue;
                 }
 
+                if (_requirementsFileReferencePattern.IsMatch(line))
+                {
+                    violations.Add(new ValidationViolation(
+                        "L1-PKG-005",
+                        $"'-r'/'--requirement'로 다른 requirements 파일을 참조하는 방식은 그 안의 패키지 버전 고정 여부를 확인할 수 없어 차단됩니다: '{line}'",
+                        "EnvironmentSpec"));
+                    continue;
+                }
+
                 if (line.StartsWith('-'))
                 {
                     continue;
@@ -242,6 +258,28 @@ namespace NodeKit.Validation
                         violations.Add(new ValidationViolation(
                             "L1-PKG-004",
                             $"editable/VCS 설치는 버전을 고정할 수 없어 차단됩니다: '{token}'",
+                            field));
+                        continue;
+                    }
+
+                    // -r/--requirement도 -e/--editable과 같은 이유(그 파일 안의
+                    // 버전 고정 여부를 확인할 방법이 없음)로 값-소비 옵션처럼 건너뛰지
+                    // 않고 명시적으로 차단한다.
+                    if (token is "-r" or "--requirement")
+                    {
+                        violations.Add(new ValidationViolation(
+                            "L1-PKG-005",
+                            "'-r'/'--requirement'로 다른 requirements 파일을 참조하는 방식은 그 안의 패키지 버전 고정 여부를 확인할 수 없어 차단됩니다.",
+                            field));
+                        skipNext = true;
+                        continue;
+                    }
+
+                    if (_requirementsFileReferencePattern.IsMatch(token))
+                    {
+                        violations.Add(new ValidationViolation(
+                            "L1-PKG-005",
+                            $"'-r'/'--requirement'로 다른 requirements 파일을 참조하는 방식은 그 안의 패키지 버전 고정 여부를 확인할 수 없어 차단됩니다: '{token}'",
                             field));
                         continue;
                     }

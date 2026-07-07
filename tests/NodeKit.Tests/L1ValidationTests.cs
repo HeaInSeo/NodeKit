@@ -270,16 +270,21 @@ dependencies:
         }
 
         [Fact]
-        public void Pass_WhenDockerfilePipInstallUsesRequirementsFileFlag()
+        public void Fail_WhenDockerfilePipInstallUsesRequirementsFileFlag()
         {
-            // -r/--requirement takes a filename argument, not a package name.
+            // -r/--requirement points at a file NodeKit never sees the content of,
+            // so it cannot verify version pinning inside it — same reasoning as
+            // -e/--editable, so it is blocked rather than silently skipped.
             var def = new ToolDefinition
             {
                 ImageUri = "reg/img:1.0@sha256:abc",
                 DockerfileContent = "FROM ubuntu:22.04\nRUN pip install -r requirements.txt\n",
             };
 
-            Assert.True(_sut.Validate(def).IsValid);
+            var result = _sut.Validate(def);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-PKG-005");
         }
 
         [Fact]
@@ -381,9 +386,22 @@ dependencies:
         [Fact]
         public void Pass_WhenPipSpecHasOrdinaryDashOption()
         {
-            var def = DefWithSpec("numpy==1.26.4\n-r other-requirements.txt\n--no-cache-dir\n");
+            var def = DefWithSpec("numpy==1.26.4\n--no-cache-dir\n");
 
             Assert.True(_sut.Validate(def).IsValid);
+        }
+
+        [Fact]
+        public void Fail_WhenPipSpecReferencesAnotherRequirementsFile()
+        {
+            // -r/--requirement points at a file NodeKit never sees the content of,
+            // so it cannot verify version pinning inside it.
+            var def = DefWithSpec("numpy==1.26.4\n-r other-requirements.txt\n");
+
+            var result = _sut.Validate(def);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-PKG-005");
         }
 
         [Fact]
