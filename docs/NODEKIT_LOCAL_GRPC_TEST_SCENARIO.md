@@ -1,6 +1,6 @@
 # NodeKit ↔ NodeVault 로컬 gRPC 통합 테스트 시나리오
 
-Status: 실행 완료 — 버그 30건 발견(#5~#30), 전부 수정·머지 완료
+Status: 실행 완료 — 버그 35건 발견(#5~#35), 전부 수정·머지 완료
 Created: 2026-07-04
 Updated: 2026-07-07
 Scope: heain 개발 장비에서 seoy/K8s 없이 `nodekit submit` 전체 경로를 검증
@@ -663,3 +663,93 @@ L1-PKG-005).
   차이를 직접 재현해 확인. GitHub 이슈 #27~#30 등록 후 커밋 참조와 함께
   각각 close 완료.
 - **완료 아님**: 없음.
+
+## 12. §10/§11 이후 세 번째 외부 코드 리뷰 반영 (#31~#35)
+
+또 다른 외부 코드 리뷰 5건을 받아 전부 실제 코드로 사실 확인 후 수정했다.
+
+| 심각도 | 대상 | 결과 |
+|---|---|---|
+| High | SourceBuildCommands 개행 주입 | **버그 확인**: §11에서 고친 "USER 1000 고정 추가"와 별개로, 개행 문자 자체를 막지 않아 셸 명령이 아닌 새 Dockerfile instruction(ENV/FROM 등)을 주입할 수 있었음 → Issue #31 |
+| Medium | 외부 recipe JSON의 명시적 null | **버그 확인**: `System.Text.Json`이 non-nullable 선언을 런타임에 강제하지 않고, `RecipeValidationPipeline`이 검증 실패 여부와 무관하게 무조건 `Render`를 호출해 크래시로 이어짐 → Issue #32 |
+| Medium | raw_spec에 build kind 누락 | **부분적으로만 사실**: inputs/outputs/display/command는 NodeVault proto가 이미 reserved 처리해 NodeKit이 채워도 받을 필드가 없음(NodeVault 쪽 결정, 버그 아님). kind 생략은 지금 우연히 무해하지만 명시하는 게 안전 → Issue #33 |
+| Medium | pip pinning 검사가 흔한 형태를 놓침 | **버그 확인**: `python -m pip install`/절대경로 `pip` 둘 다 정확히 "pip"/"pip3" 토큰만 보는 검사를 우회 → Issue #34 |
+| Low/Medium | ADD JSON 배열에서 remote source 차단 우회 | **버그 확인**: 공백 split만 하는 파서가 콤마 뒤 공백이 있는 흔한 JSON 배열 포맷에서 `["https://...` 토큰을 만들어 `StartsWith("https://")` 체크를 피함 → Issue #35 |
+
+### Issue #31 — SourceBuildCommands 개행으로 Dockerfile 명령어 주입
+
+§11에서 SourceBuild가 항상 root로 실행되던 문제(Issue #29)를 고치면서
+`RenderSourceBuild` 끝에 `USER 1000`을 추가했지만, `SourceBuildCommands`
+자체는 여전히 개행을 막지 않고 있었다. `string.Join(" && ", ...)`로 합친
+값이 그대로 한 `RUN` 라인에 붙으므로, 항목에 `\n`이 있으면 셸 명령이
+아니라 완전히 새로운 Dockerfile instruction으로 해석된다 — `make\nENV
+API_KEY=abc`를 넣으면 `ENV` instruction이 그대로 주입되고, `make\nFROM
+evil@sha256:...`를 넣으면 base image 자체를 바꿔치기할 수도 있다.
+SourceBuild는 DockerfileFallback과 달리 USER/ENV 보안 재검사를 받지 않는
+build kind라 더 위험했다. 셸 메타문자(`&&`, `|`)는 이 필드의 존재 목적이라
+여전히 허용하되, `\r`/`\n`만 명시적으로 차단(신규 규칙 L1-RCP-015).
+
+### Issue #32 — 외부 recipe JSON의 null 값으로 크래시
+
+`RecipeValidationPipeline.ValidateRecipe`는 `RecipeValidator.Validate`
+결과가 invalid여도 상관없이 무조건 `RecipeRenderer.Render`를 호출한다.
+`System.Text.Json`은 C#의 non-nullable 프로퍼티 선언을 런타임에 강제하지
+않으므로, 외부 recipe.json에 `"Command": null`이나 `"SourceChecksum":
+null`이 있으면 그 프로퍼티가 실제로 null인 채로 역직렬화되고,
+`RecipeRenderer.cs`의 `new List<string>(recipe.Command)`나
+`recipe.SourceChecksum.StartsWith(...)`에서 크래시했다. 필드가 많아서
+(Command/Inputs/Outputs/Channels/Packages/SourceChecksum/...) 개별 null
+체크를 흩뿌리는 대신, `RecipeDocument.Normalize()`를 추가해 역직렬화
+직후 한 곳에서 정규화하도록 수정. `CliApp.TryLoadRecipe`와
+`SubmitCommand.Run` 양쪽에 배선.
+
+### Issue #33 — raw_spec에 build kind 명시 안 됨 (부분적으로만 사실)
+
+proto를 직접 확인한 결과, `inputs`/`outputs`/`display`/`command`는
+`BuildRequest` 메시지에서 **NodeVault 쪽이 이미 reserved 처리**해서
+스키마에서 뺀 상태였다 — NodeKit이 raw_spec에 채워 넣어도 NodeVault의 Go
+구조체에 받을 필드가 없어 조용히 버려진다. 즉 이 부분은 NodeKit의 버그가
+아니라 NodeVault의 스키마 결정이라 손댈 대상이 아니다. `kind` 생략은
+`BuildKind_BUILD_KIND_UNSPECIFIED`(0)가 되는데, NodeVault 로컬 작업 트리의
+아직 커밋되지 않은 코드(`pkg/build/validate.go`)가 UNSPECIFIED를
+`BUILD_KIND_TOOLSPEC`과 동일하게 처리하고 있어 지금은 우연히 무해하다.
+그 우연에 기대는 대신 `"kind": 1`(정수값 — raw_spec은 protojson이 아니라
+plain encoding/json이라 열거형 이름이 아닌 정수로 표현됨)을 명시하도록
+저비용으로 수정.
+
+### Issue #34 — Dockerfile pip pinning 검사가 흔한 형태를 놓침
+
+`PackageVersionValidator.IsPipInstallCommand`가 첫 토큰이 정확히
+`"pip"`/`"pip3"`인지만 봐서, `RUN python -m pip install numpy`(첫 토큰이
+`"python"`)와 `RUN /usr/bin/pip install numpy`(절대경로)가 둘 다 unpinned
+상태로 통과했다. 실행 파일 이름을 마지막 경로 구성요소(basename)로
+비교하고, `"python[3] -m pip install"` 4토큰 패턴을 별도로 인식하도록
+`GetPipInstallArgStartIndex`로 교체.
+
+### Issue #35 — ADD JSON 배열 문법에서 remote source 차단 우회
+
+`DockerfileParser`가 COPY/ADD 인자를 공백으로만 split해서, `ADD
+["https://example.com/tool.tar.gz", "/tmp/tool.tar.gz"]`처럼 콤마 뒤
+공백이 있는(흔한) JSON 배열 포맷에서 첫 토큰이 `["https://...` 형태가
+되어 `DockerfileStructureValidator.IsRemoteSource`의
+`StartsWith("https://")` 체크를 피했다 — 같은 whitespace-split 버그가
+`..` 경로 이탈 검사와 변수 참조 검사에도 영향을 미치고 있었다. `--from=`
+같은 선행 플래그를 먼저 떼어낸 뒤, 남은 부분이 `[`로 시작하면 실제 JSON
+배열로 파싱하도록 파싱 단계에서 수정(형식이 잘못되면 기존 공백 split으로
+폴백).
+
+### 완료한 것 / 완료하지 않은 것 (§12)
+
+- **완료**: 5건 전부 수정(단, #33은 raw_spec 확장이 아니라 kind 명시로
+  범위를 좁혀 수정 — inputs/outputs/display/command는 NodeVault 쪽
+  스키마 결정이라 NodeKit이 할 수 있는 게 없음을 확인). 회귀 테스트 12개
+  추가, `dotnet build` 0 warning, 전체 테스트 541개 통과. 5건 모두 실제
+  `nodekit` CLI 바이너리로 수정 전/후 차이를 직접 재현해 확인. GitHub 이슈
+  #31~#35 등록 후 각각 close 완료(#33/#34는 최초 코멘트 작성 시 서로 내용이
+  뒤바뀌어 정정 코멘트로 바로잡음).
+- **완료 아님**: 없음.
+- **참고**: NodeVault 로컬 작업 트리에서 `pkg/build/validate.go`가 아직
+  커밋되지 않은 상태(git status `??`)로 발견됨 — §10에서 등록한
+  `HeaInSeo/NodeVault#16`(Dockerfile 서버 쪽 재검증 부재)에 대응하는
+  `ValidateBuildRequest`를 구현 중인 것으로 보인다. NodeVault 쪽 작업이라
+  NodeKit에서 확인만 하고 관여하지 않았다.
