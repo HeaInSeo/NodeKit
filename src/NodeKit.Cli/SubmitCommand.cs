@@ -115,11 +115,12 @@ namespace NodeKit.Cli
         {
             using var cts = new CancellationTokenSource();
             string? buildId = null;
-            Console.CancelKeyPress += (_, e) =>
+            ConsoleCancelEventHandler onCancelKeyPress = (_, e) =>
             {
                 e.Cancel = true;
                 cts.Cancel();
             };
+            Console.CancelKeyPress += onCancelKeyPress;
 
             try
             {
@@ -167,6 +168,10 @@ namespace NodeKit.Cli
             {
                 stderr.WriteLine(BuildErrorMessages.Describe(ex));
                 return 1;
+            }
+            finally
+            {
+                Console.CancelKeyPress -= onCancelKeyPress;
             }
         }
 
