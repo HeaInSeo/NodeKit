@@ -70,8 +70,20 @@ namespace NodeKit.Cli.Tests
         }
 
         [Fact]
-        public void DockerfileWarningPath_RequiresAcceptanceAndSavesValidRecipe()
+        public void DockerfileWarningPath_RequiresAcceptance_ButFinalValidationNowRequiresUser()
         {
+            // Issue #19 follow-up (DockGuard DSF001 parity for dockerfile
+            // fallback): the interactive console reads one line per field
+            // (PromptScalarField has no multi-line accumulation), and
+            // Dockerfile syntax requires each instruction on its own line —
+            // so a single-line "FROM ..." DockerfileContent can no longer
+            // reach a saved recipe once USER is required. The warning
+            // acceptance flow itself still works correctly; only the final
+            // save now fails with a clear reason instead of silently missing
+            // the USER requirement. See
+            // Dockerfile_NonInteractive_WithUserInstruction_SavesValidRecipe
+            // below for the happy path (only reachable via --field, which can
+            // carry embedded newlines).
             var outPath = Path.Combine(_workDir, "recipe.json");
             var transcript = new[]
             {
@@ -89,19 +101,44 @@ namespace NodeKit.Cli.Tests
                 "run.sh", // Script
                 ImageRefWithDigest, // ImageRef
                 "./Dockerfile", // DockerfilePath
-                $"FROM {ImageRefWithDigest}", // DockerfileContent
+                $"FROM {ImageRefWithDigest}", // DockerfileContent (single line — no USER possible)
+                "", // recovery loop: blank = cancel without saving
             };
 
             var stdout = new StringWriter();
             var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
-            Assert.Equal(0, exitCode);
+            Assert.Equal(1, exitCode);
             Assert.Contains("강한 주의", stdout.ToString());
-            Assert.Empty(stderr.ToString());
+            Assert.False(File.Exists(outPath));
+            Assert.Contains("L1-RCP-009", stderr.ToString());
+            Assert.Contains("USER", stderr.ToString());
+        }
+
+        [Fact]
+        public void Dockerfile_NonInteractive_WithUserInstruction_SavesValidRecipe()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var exitCode = CliApp.Run(
+                new[]
+                {
+                    "recipe", "create", outPath,
+                    "--non-interactive", "--method", "dockerfile", "--accept-dockerfile-warning",
+                    "--field", "ToolName=bwa-mem",
+                    "--field", "ToolVersion=0.7.17",
+                    "--field", "Script=run.sh",
+                    "--field", $"BaseImage={ImageRefWithDigest}",
+                    "--field", $"DockerfileContent=FROM {ImageRefWithDigest}\nUSER 1000\n",
+                    "--field", "DockerfilePath=./Dockerfile",
+                },
+                new StringWriter(),
+                new StringWriter());
+
+            Assert.Equal(0, exitCode);
+            Assert.True(File.Exists(outPath));
 
             var json = File.ReadAllText(outPath);
-            Assert.Contains("\"BuildContext\": \".\"", json);
             Assert.Contains("\"BuildKind\": \"DockerfileFallback\"", json);
         }
 

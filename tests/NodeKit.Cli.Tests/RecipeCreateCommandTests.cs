@@ -313,7 +313,7 @@ namespace NodeKit.Cli.Tests
             "--field", "ToolVersion=0.7.17",
             "--field", "Script=run.sh",
             "--field", $"BaseImage={ImageRefWithDigest}",
-            "--field", $"DockerfileContent=FROM {ImageRefWithDigest}\nRUN echo ok\n",
+            "--field", $"DockerfileContent=FROM {ImageRefWithDigest}\nRUN echo ok\nUSER 1000\n",
             "--field", "DockerfilePath=./Dockerfile",
         };
 
