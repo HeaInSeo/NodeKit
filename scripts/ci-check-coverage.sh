@@ -36,3 +36,43 @@ awk -v actual="$branch_rate" -v minimum="$minimum_branch_rate" 'BEGIN { exit(act
   printf 'Branch coverage is below threshold.\n' >&2
   exit 1
 }
+
+# 전체 커버리지 하한(위)은 낮게 잡혀 있어 회귀 방어력이 약하다. 재현성/제출
+# 경로의 핵심 클래스는 별도의 더 높은 기준으로 지킨다. 임계값은 실측치
+# (2026-07 기준: GrpcToolSpecClient branch-rate 0.5555가 가장 낮음)에 약간의
+# 여유를 둔 것이지 이상적인 목표치가 아니다 — GrpcToolSpecClient의 branch
+# coverage가 현재 병목이며, 향후 테스트 추가로 끌어올릴 여지가 있다.
+declare -A core_classes=(
+  ["NodeKit.Validation.Recipes.RecipeValidationPipeline"]=1
+  ["NodeKit.Authoring.Recipes.RecipeRenderer"]=1
+  ["NodeKit.Cli.SubmitCommand"]=1
+  ["NodeKit.Cli.GrpcToolSpecClient"]=1
+  ["NodeKit.Cli.HarborImageDigestResolver"]=1
+)
+core_minimum_line_rate="${CORE_MINIMUM_LINE_RATE:-0.70}"
+core_minimum_branch_rate="${CORE_MINIMUM_BRANCH_RATE:-0.50}"
+
+for class_name in "${!core_classes[@]}"; do
+  class_escaped="${class_name//./\\.}"
+  class_attrs="$(grep -oP "(?<=<class )[^>]*name=\"${class_escaped}\"" "$coverage_file" || true)"
+
+  if [[ -z "$class_attrs" ]]; then
+    printf 'Core class not found in coverage report: %s\n' "$class_name" >&2
+    exit 1
+  fi
+
+  class_line_rate="$(grep -oP '(?<=line-rate=")[^"]*' <<<"$class_attrs")"
+  class_branch_rate="$(grep -oP '(?<=branch-rate=")[^"]*' <<<"$class_attrs")"
+
+  printf 'Core class: %s (line-rate: %s, branch-rate: %s)\n' "$class_name" "$class_line_rate" "$class_branch_rate"
+
+  awk -v actual="$class_line_rate" -v minimum="$core_minimum_line_rate" 'BEGIN { exit(actual + 0 >= minimum + 0 ? 0 : 1) }' || {
+    printf 'Line coverage for %s is below the core-class threshold (%s < %s).\n' "$class_name" "$class_line_rate" "$core_minimum_line_rate" >&2
+    exit 1
+  }
+
+  awk -v actual="$class_branch_rate" -v minimum="$core_minimum_branch_rate" 'BEGIN { exit(actual + 0 >= minimum + 0 ? 0 : 1) }' || {
+    printf 'Branch coverage for %s is below the core-class threshold (%s < %s).\n' "$class_name" "$class_branch_rate" "$core_minimum_branch_rate" >&2
+    exit 1
+  }
+done
