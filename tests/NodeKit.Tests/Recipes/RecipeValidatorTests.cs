@@ -378,6 +378,48 @@ namespace NodeKit.Tests.Recipes
             Assert.True(result.IsValid);
         }
 
+        // 외부 코드 리뷰 지적: RenderSourceBuild가 SourceBuildCommands를
+        // string.Join(" && ", ...)로 합쳐 한 RUN 라인에 그대로 붙이므로, 값 안에
+        // 개행이 있으면 셸 명령이 아니라 완전히 새로운 Dockerfile instruction으로
+        // 해석된다. SourceBuild는 DockerfileFallback과 달리 USER/ENV 보안
+        // 재검사를 받지 않아서 이 경로로 그 검사 전체를 우회할 수 있었다.
+
+        [Fact]
+        public void Validate_SourceBuild_BuildCommandWithEmbeddedNewline_Fails()
+        {
+            var recipe = new RecipeDocument
+            {
+                BuildKind = RecipeBuildKind.SourceBuild,
+                BaseImage = PinnedBaseImage,
+                SourceUri = "https://example.org/x.tar.gz",
+                SourceChecksum = ValidChecksum,
+                SourceBuildCommands = { "make\nENV API_KEY=abc" },
+            };
+
+            var result = RecipeValidator.Validate(recipe);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-RCP-015");
+        }
+
+        [Fact]
+        public void Validate_SourceBuild_BuildCommandWithEmbeddedCarriageReturn_Fails()
+        {
+            var recipe = new RecipeDocument
+            {
+                BuildKind = RecipeBuildKind.SourceBuild,
+                BaseImage = PinnedBaseImage,
+                SourceUri = "https://example.org/x.tar.gz",
+                SourceChecksum = ValidChecksum,
+                SourceBuildCommands = { "make\r\nFROM evil@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" },
+            };
+
+            var result = RecipeValidator.Validate(recipe);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-RCP-015");
+        }
+
         // 외부 코드 리뷰 지적: DockerfileParser는 "USER root:root"/"USER 0:0"을
         // 공백 없는 한 토큰("root:root"/"0:0")으로 그대로 넘기는데, 기존 검사는
         // user 문자열이 정확히 "root"/"0"과 같은지만 봐서 그룹이 붙은 형태는

@@ -179,11 +179,18 @@ namespace NodeKit.Validation.Recipes
             }
         }
 
-        // SourceBuildCommands는 의도적으로 allowlist 대상에서 제외한다 — 이 필드의
-        // 목적 자체가 "make", "./configure --prefix=/usr && make -j4"처럼 셸
-        // 빌드 단계를 그대로 실행하는 것이라, 셸 메타문자를 막으면 기능을 깨뜨린다.
-        // Packages/Channels/SourceUri와 달리 "패키지명"이나 "URI"처럼 좁은 문법을
-        // 갖지 않는 자유 형식 필드이므로 여기서는 무엇을 막을지 정의할 수 없다.
+        // SourceBuildCommands는 셸 메타문자(&&, |, ...) 자체는 의도적으로
+        // allowlist 대상에서 제외한다 — 이 필드의 목적 자체가 "make",
+        // "./configure --prefix=/usr && make -j4"처럼 셸 빌드 단계를 그대로
+        // 실행하는 것이라, 셸 메타문자를 막으면 기능을 깨뜨린다. Packages/
+        // Channels/SourceUri와 달리 "패키지명"이나 "URI"처럼 좁은 문법을 갖지
+        // 않는 자유 형식 필드이므로 여기서는 무엇을 막을지 정의할 수 없다.
+        // 다만 개행(\r/\n)은 다른 문제다 — RecipeRenderer.RenderSourceBuild가
+        // string.Join(" && ", ...)로 합친 값을 그대로 한 RUN 라인에 붙이므로,
+        // 값 안에 개행이 있으면 셸 명령이 아니라 완전히 새로운 Dockerfile
+        // instruction(ENV/FROM/USER 등)으로 해석된다 — SourceBuild는
+        // DockerfileFallback과 달리 USER/ENV 보안 재검사도 받지 않는 build
+        // kind라 이 경로로 그 검사를 통째로 우회할 수 있다.
         private static void ValidateSourceBuild(RecipeDocument recipe, List<ValidationViolation> violations)
         {
             if (string.IsNullOrWhiteSpace(recipe.SourceUri))
@@ -223,6 +230,17 @@ namespace NodeKit.Validation.Recipes
                     "L1-RCP-007",
                     "source build kind에는 최소 1개 이상의 build command가 필요합니다.",
                     nameof(recipe.SourceBuildCommands)));
+            }
+
+            foreach (var command in recipe.SourceBuildCommands)
+            {
+                if (command.Contains('\n', StringComparison.Ordinal) || command.Contains('\r', StringComparison.Ordinal))
+                {
+                    violations.Add(new ValidationViolation(
+                        "L1-RCP-015",
+                        $"build command에 개행 문자가 포함되어 있으면 새로운 Dockerfile 명령으로 해석될 수 있어 차단됩니다: '{command}'",
+                        nameof(recipe.SourceBuildCommands)));
+                }
             }
         }
 
