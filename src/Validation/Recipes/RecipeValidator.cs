@@ -19,6 +19,25 @@ namespace NodeKit.Validation.Recipes
         private static readonly Regex _sourceChecksumPattern =
             new(@"^sha256:[0-9a-fA-F]{64}$", RegexOptions.Compiled);
 
+        // RecipeRenderer는 Packages/Channels/PackageMirrorUri를 셸 인용 없이
+        // 그대로 "RUN conda install ..." / "RUN conda config --add channels ..."
+        // 줄에 이어 붙인다(RecipeRenderer.RenderInstallerFamily). PackageVersionValidator는
+        // "버전이 있는가"만 보고 "&&"/파이프/백틱 같은 셸 메타문자를 막지 않으므로,
+        // 렌더링 전 단계에서 conda 패키지/채널 문법(name=version[=build])만 허용하는
+        // allowlist로 막아야 한다.
+        private static readonly Regex _packageSpecPattern =
+            new(@"^[A-Za-z0-9_.:+-]+(=[A-Za-z0-9_.:+-]+){1,2}$", RegexOptions.Compiled);
+
+        private static readonly Regex _channelOrMirrorUriPattern =
+            new(@"^[A-Za-z0-9_.:/+-]+$", RegexOptions.Compiled);
+
+        // SourceUri는 RecipeRenderer.RenderSourceBuild에서 큰따옴표로 감싸 붙지만
+        // ("curl -fsSL -o source.tar.gz \"" + SourceUri + "\""), 값 안에 큰따옴표/
+        // 백틱/달러/백슬래시가 있으면 그 인용을 깨고 나올 수 있다. http(s) 스킴을
+        // 강제하고 그 네 가지 이스케이프 문자와 공백(개행 포함)을 차단한다.
+        private static readonly Regex _sourceUriPattern =
+            new(@"^https?://[^\s""'`$\\]+$", RegexOptions.Compiled);
+
         // DockGuard policy/security/security.rego DSF001/DSF002와 동일한 규칙.
         // WasmPolicyChecker는 GUI에만 배선되어 있고 NodeVault도 이 정책을
         // 재검사하지 않으므로(PLATFORM_MAP.md 확인), dockerfile fallback으로
@@ -43,15 +62,25 @@ namespace NodeKit.Validation.Recipes
                 case RecipeBuildKind.Micromamba:
                     ValidateBaseImagePresent(recipe, violations);
                     ValidatePackagesPresent(recipe, violations);
+                    ValidatePackageFormats(recipe, violations);
+                    ValidateChannelFormats(recipe, violations);
                     break;
                 case RecipeBuildKind.PackageMirror:
                     ValidateBaseImagePresent(recipe, violations);
                     ValidatePackagesPresent(recipe, violations);
+                    ValidatePackageFormats(recipe, violations);
                     if (string.IsNullOrWhiteSpace(recipe.PackageMirrorUri))
                     {
                         violations.Add(new ValidationViolation(
                             "L1-RCP-003",
                             "package mirror build kind에는 PackageMirrorUri가 필요합니다.",
+                            nameof(recipe.PackageMirrorUri)));
+                    }
+                    else if (!_channelOrMirrorUriPattern.IsMatch(recipe.PackageMirrorUri.Trim()))
+                    {
+                        violations.Add(new ValidationViolation(
+                            "L1-RCP-013",
+                            $"PackageMirrorUri에 허용되지 않는 문자가 포함되어 있습니다: '{recipe.PackageMirrorUri}'",
                             nameof(recipe.PackageMirrorUri)));
                     }
 
@@ -112,6 +141,49 @@ namespace NodeKit.Validation.Recipes
             }
         }
 
+        private static void ValidatePackageFormats(RecipeDocument recipe, List<ValidationViolation> violations)
+        {
+            foreach (var package in recipe.Packages)
+            {
+                if (string.IsNullOrWhiteSpace(package))
+                {
+                    continue;
+                }
+
+                if (!_packageSpecPattern.IsMatch(package.Trim()))
+                {
+                    violations.Add(new ValidationViolation(
+                        "L1-RCP-011",
+                        $"패키지 지정에 허용되지 않는 문자가 포함되어 있습니다. 'name=version' 또는 'name=version=build' 형식만 허용됩니다: '{package}'",
+                        nameof(recipe.Packages)));
+                }
+            }
+        }
+
+        private static void ValidateChannelFormats(RecipeDocument recipe, List<ValidationViolation> violations)
+        {
+            foreach (var channel in recipe.Channels)
+            {
+                if (string.IsNullOrWhiteSpace(channel))
+                {
+                    continue;
+                }
+
+                if (!_channelOrMirrorUriPattern.IsMatch(channel.Trim()))
+                {
+                    violations.Add(new ValidationViolation(
+                        "L1-RCP-012",
+                        $"채널 이름에 허용되지 않는 문자가 포함되어 있습니다: '{channel}'",
+                        nameof(recipe.Channels)));
+                }
+            }
+        }
+
+        // SourceBuildCommands는 의도적으로 allowlist 대상에서 제외한다 — 이 필드의
+        // 목적 자체가 "make", "./configure --prefix=/usr && make -j4"처럼 셸
+        // 빌드 단계를 그대로 실행하는 것이라, 셸 메타문자를 막으면 기능을 깨뜨린다.
+        // Packages/Channels/SourceUri와 달리 "패키지명"이나 "URI"처럼 좁은 문법을
+        // 갖지 않는 자유 형식 필드이므로 여기서는 무엇을 막을지 정의할 수 없다.
         private static void ValidateSourceBuild(RecipeDocument recipe, List<ValidationViolation> violations)
         {
             if (string.IsNullOrWhiteSpace(recipe.SourceUri))
@@ -135,6 +207,14 @@ namespace NodeKit.Validation.Recipes
                     "L1-SRC-002",
                     $"SourceChecksum 형식이 올바르지 않습니다. 'sha256:<64자리 16진수>' 형식이어야 합니다. ({recipe.SourceChecksum})",
                     nameof(recipe.SourceChecksum)));
+            }
+
+            if (!string.IsNullOrWhiteSpace(recipe.SourceUri) && !_sourceUriPattern.IsMatch(recipe.SourceUri.Trim()))
+            {
+                violations.Add(new ValidationViolation(
+                    "L1-RCP-014",
+                    $"SourceUri 형식이 올바르지 않거나 안전하지 않은 문자가 포함되어 있습니다. http(s) URI만 허용되며 공백/큰따옴표/작은따옴표/백틱/$/백슬래시는 사용할 수 없습니다: '{recipe.SourceUri}'",
+                    nameof(recipe.SourceUri)));
             }
 
             if (recipe.SourceBuildCommands.Count == 0)
