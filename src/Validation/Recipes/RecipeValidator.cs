@@ -247,7 +247,24 @@ namespace NodeKit.Validation.Recipes
                 foreach (var instruction in userInstructions)
                 {
                     var user = instruction.Value.Count > 0 ? instruction.Value[0] : string.Empty;
-                    if (string.Equals(user, "root", StringComparison.OrdinalIgnoreCase) || user == "0")
+
+                    // "USER ${VAR}"는 빌드 시점 인자에 따라 실제 사용자가 바뀌므로
+                    // 정적으로 root 여부를 판단할 수 없다 — DockerfileStructureValidator가
+                    // COPY/ADD 경로에서 ARG/ENV 참조를 막는 것과 같은 이유로 차단한다.
+                    if (user.Contains('$', StringComparison.Ordinal))
+                    {
+                        violations.Add(new ValidationViolation(
+                            "L1-RCP-009",
+                            $"USER에 변수 참조가 있으면 실제로 어떤 사용자로 실행될지 정적으로 확인할 수 없어 차단됩니다. 고정된 사용자를 지정하세요. ({instruction.Raw})",
+                            nameof(recipe.DockerfileContent)));
+                        continue;
+                    }
+
+                    // "USER root:root"/"USER 0:0"처럼 그룹이 붙으면 DockerfileParser가
+                    // 공백 없는 한 토큰("root:root")으로 그대로 넘기므로, 정확히
+                    // "root"/"0"과만 비교하면 우회된다 — ':' 앞의 사용자 이름만 비교한다.
+                    var userName = user.Split(':', 2)[0];
+                    if (string.Equals(userName, "root", StringComparison.OrdinalIgnoreCase) || userName == "0")
                     {
                         violations.Add(new ValidationViolation(
                             "L1-RCP-009",
