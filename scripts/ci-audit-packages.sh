@@ -1,10 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-projects=(
-  "NodeKit.csproj"
-  "tests/NodeKit.Tests/NodeKit.Tests.csproj"
-)
+mapfile -t projects < <(find . -name '*.csproj' -not -path '*/bin/*' -not -path '*/obj/*' | sort)
 
 for project in "${projects[@]}"; do
   vulnerable_output="$(dotnet list "$project" package --vulnerable --include-transitive)"
