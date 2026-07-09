@@ -70,6 +70,44 @@ namespace NodeKit.Cli.Tests
         }
 
         [Fact]
+        public void PackageMethod_VersionOnlyPin_WarnsButStillSaves()
+        {
+            // §13 R19: confirming a version-only pin (no build string) during
+            // interactive Package-method authoring should warn — non-blocking,
+            // since L1 still allows it by default — that NodeVault's final
+            // gate may reject it later.
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "2", // 빠른 설정 모드
+                "n", // IsRestrictedNetwork
+                "n", // HasInternalPackageMirror
+                "n", // HasExistingContainerImage
+                "y", // HasPackageInPublicChannels
+                "n", // HasSourceArchiveAndChecksum
+                "n", // HasExistingDockerfile
+                "", // accept recommended method (package)
+                "bioconda", // Channels item
+                "", // complete Channels
+                "0", // 기반 이미지: 직접 입력
+                "bwa-mem", // ToolName
+                "0.7.17", // ToolVersion
+                "run.sh", // Script
+                ImageRefWithDigest, // ImageRef
+                "bwa=0.7.17", // Packages item — version-only, no build string
+                "", // complete Packages
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.True(File.Exists(outPath));
+            Assert.Contains("버전만 고정되어 있습니다", stdout.ToString());
+        }
+
+        [Fact]
         public void DockerfileWarningPath_RequiresAcceptanceAndSavesValidRecipe()
         {
             // Issue #20 (DockGuard DSF001 parity for dockerfile fallback) made
