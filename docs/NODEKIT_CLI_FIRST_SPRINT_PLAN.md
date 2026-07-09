@@ -1,9 +1,10 @@
 # NodeKit Legacy-First Sprint Plan
 
-Status: Sprint 6 완료 / Sprint 7 진행 중  
+Status: Sprint 6 완료 / Sprint 7 진행 중 / R18-R21(§13) 진행 중  
 Created: 2026-06-17  
-Updated: 2026-07-06  
-Scope: NodeKit work — Sprint 0-6 완료, Sprint 7(Post-Migration Hardening) 진행 중
+Updated: 2026-07-09  
+Scope: NodeKit work — Sprint 0-6 완료, Sprint 7(Post-Migration Hardening) 진행 중,
+§13 Live Recipe Reproducibility Improvement(R18-R21) 진행 중
 
 ## 0. Resume Note For Agents
 
@@ -14,9 +15,15 @@ ToolSpec 경로(`ResolveToolSpec → SubmitToolBuild → WatchToolBuild`)로 전
 `--legacy` 플래그와 `BuildAndRegister` 경로는 CLI에서 제거됨.
 `IBuildClient` / `GrpcBuildClient`는 Avalonia(NodeKit.csproj)에만 남아 있음 — Sprint 7 대상.
 
+**§13 진행 중 (2026-07-09)**: seoy-libvirt-cilium 실 K8s 클러스터 라이브
+테스트(2026-07-08)에서 나온 NodeKit 쪽 개선 항목 R18-R21 — 자세한 내용은
+§13 참조. NodeVault 쪽 개선 항목(P0-P3)은 별도 개발 에이전트가 독립
+진행 중이라 이 세션에서 다루지 않는다.
+
 현재 NodeKit 초점:
 
 ```text
+§13 R18-R21: Live Recipe Reproducibility Improvement (진행 중, 최우선)
 Sprint 7: Avalonia GUI ToolSpec 마이그레이션
 + U5-2: seoy 원격 장비 nodekit submit 수동 테스트 (seoy 준비 후)
   — 2026-07-05: seoy 없이 heain 로컬 사전 검증 완료(TC-1~TC-13 전체), 버그 6건
@@ -1565,4 +1572,203 @@ BIOCONTAINER variant만 codes.Unimplemented로 명시적 미구현(P3, 의도된
 
 최종 결과: PackageCandidatePresenterTests 9개 + GrpcResolveRecipeClientIntegrationTests
 + RecipeCreateInteractiveTests(FixedResolveRecipeClient) 모두 통과.
+```
+
+## 13. Live Recipe Reproducibility Improvement (2026-07-08)
+
+배경: seoy-libvirt-cilium 실 K8s 클러스터에 배포된 NodeVault로 라이브
+end-to-end 테스트 2회 실행. 핵심 경로(DockerfileFallback/BioContainer/
+Conda/Micromamba/PackageMirror/SourceBuild-적절한-base)는 전부 통과,
+NodeVault 최종 게이트가 conda 버전-only pin을 실제로 거부하는 것도 확인.
+전체 보고서: `docs/NODEKIT_LOCAL_GRPC_TEST_SCENARIO.md`(로컬), NodeVault
+저장소 `docs/NODEKIT_LIVE_RECIPE_REPRO_TEST_2026-07-08.md` /
+`docs/NODEKIT_LIVE_RECIPE_EXTENDED_TEST_2026-07-08.md`(읽기 전용 참고).
+
+NodeKit 쪽 개선안 원문: `docs/NODEVAULT_LIVE_RECIPE_REPRO_IMPROVEMENT_NODEKIT.md`.
+NodeVault 쪽 개선안(P0 RegistryConfig/Harbor CA trust, P1 build_events,
+P2 SourceBuild final image 정책, P3 pinning_status)은 별도 개발 에이전트가
+독립적으로 진행 중 — NodeKit 세션은 그 항목을 구현하거나 추적하지 않는다.
+
+우선순위는 NodeVault 의존성 유무로 정렬했다: R18(NodeVault 값 없어도
+지금 바로 유용)이 가장 먼저고, R19~R21은 recipe authoring 쪽이라
+NodeVault와 무관하게 진행 가능하지만 서로 영향을 주므로 이 순서로 묶는다.
+
+### Sprint R18. Digest Observability Fallback (submit/watch)
+
+Goal:
+
+```text
+nodekit submit이 성공(Succeeded)했는데 이미지 digest를 한 번도 못 받았으면
+"NodeVault 인덱스를 직접 확인하라"는 명시적 안내를 출력한다.
+```
+
+Context:
+
+```text
+BuildEvent proto(nodevault.proto:206-213)에는 이미 digest 필드가 있고,
+SubmitCommand.PrintEvent(230-255)도 BuildEventKind.DigestAcquired를
+받으면 이미 digest를 출력하도록 되어 있다 — 코드는 이미 있다.
+문제는 라이브 테스트(F-04, extended test F-03)에서 확인된 대로 NodeVault의
+WatchToolBuild가 지금 DigestAcquired 이벤트를 실제로 보내지 않는다는
+것이다(NodeVault 쪽 P1 과제, 다른 에이전트 담당). NodeKit이 당장 할 수
+있는 건 "못 받았다"는 사실을 조용히 넘어가지 않고 명시적으로 알리는 것.
+```
+
+Tasks:
+
+```text
+1. SubmitAsync에서 DigestAcquired 이벤트 수신 여부를 추적하는 플래그 추가.
+2. Succeeded 반환 직전, 플래그가 false면 stdout에 안내 메시지 출력:
+   "이미지 digest가 서버에서 제공되지 않았습니다 — NodeVault 인덱스에서
+   직접 확인하세요 (build ID: ...)."
+3. NodeVault가 나중에 DigestAcquired를 실제로 보내기 시작하면 이 안내는
+   자동으로 나오지 않게 된다(플래그가 true가 되므로) — 별도 정리 불필요.
+```
+
+Done when:
+
+```text
+- Build: 0 warnings, 0 errors.
+- SubmitCommandTests: Succeeded without prior DigestAcquired → stdout에
+  안내 메시지 포함.
+- SubmitCommandTests: Succeeded with prior DigestAcquired → 안내 메시지
+  없음(기존 동작 유지).
+- 기존 SubmitCommandTests 전부 그대로 통과.
+```
+
+### Sprint R19. Conda/Micromamba Pin-Mode UX
+
+Goal:
+
+```text
+NodeKit이 authoring 시점에 name=version(버전-only) pin을 계속 허용하면서도,
+NodeVault가 최종적으로 거부할 것이라는 사실을 제출 전에 알려준다.
+```
+
+Context:
+
+```text
+라이브 테스트 n03에서 확인: NodeKit L1은 bwa=0.7.17을 통과시키지만
+NodeVault 최종 게이트는 "package pin bwa=0.7.17 must include
+name=version=build"로 거부한다. 지금은 submit까지 가야만 이 불일치를
+알 수 있다.
+```
+
+Tasks:
+
+```text
+1. Packages 필드 각 항목에 대해 "=" 개수로 pin 상태를 분류하는 순수
+   함수 추가: FullPin(2개 "="), VersionOnly(1개 "="), Malformed(0개).
+   (L1-RCP-011 allowlist 통과 이후에만 의미 있음 — 형식 자체가 틀리면
+   기존 규칙이 이미 막는다.)
+2. --strict-reproducible 플래그(non-interactive/submit 공통): VersionOnly
+   pin이 하나라도 있으면 submit 이전에 명확한 메시지와 함께 차단
+   (L1-RCP-016, 새 규칙).
+3. 대화형 Package method 흐름에서 VersionOnly pin을 확정할 때 "NodeVault가
+   최종 제출 시 거부할 수 있습니다" 경고를 표시(차단하지는 않음 — 로컬
+   allowlist 통과 + Recommended 수준 유지, 사용자가 감수하고 진행 가능).
+```
+
+Done when:
+
+```text
+- Build: 0 warnings, 0 errors.
+- RecipeValidatorTests: --strict-reproducible 미설정 시 VersionOnly pin
+  통과(기존 동작), 설정 시 L1-RCP-016으로 차단.
+- 대화형 테스트: VersionOnly pin 확정 시 경고 문구 출력, 저장은 계속 진행.
+- 실제 CLI로 bwa=0.7.17 + --strict-reproducible 재현: 차단 확인.
+```
+
+### Sprint R20. SourceBuild Risky Base-Image Warnings
+
+Goal:
+
+```text
+SourceBuild의 BaseImage가 fetch 도구(curl/tar/sha256sum)를 갖췄는지 불확실할
+때, 그리고 curlimages/curl처럼 최종 런타임 이미지로는 부적절해 보이는
+이미지를 선택했을 때 경고한다.
+```
+
+Context:
+
+```text
+라이브 테스트 F-01: alpine/miniforge3은 curl이 없어 빌드 실패, curlimages/curl은
+성공했지만 "production-grade final runtime base 아님". 개선안 문서가 제안하는
+진짜 해법(multi-stage fetch/builder/final 3단계 recipe 구조)은 RecipeDocument에
+새 필드(FetcherImage/BuilderImage 등)를 추가하고 RecipeRenderer.RenderSourceBuild를
+다시 설계해야 하는 훨씬 큰 작업이라 별도 스프린트(R22, 아래 미착수 항목)로
+미룬다. 이번 스프린트는 문서 자체의 "Engineering Opinion"(자동 설치보다
+검증/UX 명확성이 먼저)을 따라 경고만 추가한다 — BaseImageEngineMismatchChecker와
+같은 패턴(휴리스틱, non-blocking).
+```
+
+Tasks:
+
+```text
+1. SourceBuildBaseImageAdvisor(가칭): BaseImage 이름에 알려진 fetch-friendly
+   이미지 패턴(curl/wget/git 등을 이름에 포함)이 없으면 "curl/tar/sha256sum이
+   없을 수 있습니다" 경고, curlimages/curl류 fetch-전용 이미지 패턴이면
+   "fetch 단계용 이미지로 보입니다 — 최종 실행 이미지로는 권장하지 않습니다"
+   경고. 둘 다 non-blocking(경고만, 차단 아님).
+2. RecipeCreateCommand.RunNonInteractive와 대화형 SourceBuild BaseImage 확정
+   시점에 배선 (BaseImageEngineMismatchChecker 호출 패턴과 동일한 위치).
+```
+
+Done when:
+
+```text
+- Build: 0 warnings, 0 errors.
+- SourceBuildBaseImageAdvisorTests: alpine/미확인 이미지 → 경고, curlimages/curl
+  → 다른 문구의 경고, condaforge/miniforge3(패키지 매니저 있음, fetch 도구
+  불확실) → 경고.
+- 실제 CLI로 SourceBuild + alpine base 재현: 경고 출력 확인(차단 아님).
+```
+
+### Sprint R21. BuildDependencies Actionability Warning
+
+Goal:
+
+```text
+BuildDependencies가 채워져 있는데 렌더러가 실제로 아무것도 하지 않는다는
+사실을 조용히 넘어가지 않고 사용자에게 알린다.
+```
+
+Context:
+
+```text
+확장 라이브 테스트 F-04/#10: BuildDependencies는 recipe 표면에 존재하지만
+RecipeRenderer가 전혀 사용하지 않는다. 개선안 문서의 보수적 정책 1번
+("Treat BuildDependencies as build-stage-only metadata")과 2번("Warn if
+the current renderer cannot install or place them")을 그대로 따른다 —
+자동 설치 로직은 pin/snapshot 정책 없이 추가하면 새로운 재현성 문제를
+만든다는 문서 자체의 경고를 존중해 이번 스프린트에서는 구현하지 않는다.
+```
+
+Tasks:
+
+```text
+1. RecipeValidator.ValidateSourceBuild에 경고성 규칙 추가: BuildDependencies가
+   비어있지 않으면 "이 목록은 현재 자동 설치되지 않습니다 — BaseImage에
+   이미 포함되어 있는지 직접 확인하세요"를 non-blocking 안내로 표시
+   (Recommended 필드이므로 여전히 차단 대상 아님, 표시 방식만 명확화).
+2. NODEKIT_CLI_USAGE.md의 BuildDependencies 설명에 이 제약을 명시.
+```
+
+Done when:
+
+```text
+- Build: 0 warnings, 0 errors.
+- RecipeValidatorTests: BuildDependencies 비어있지 않을 때 안내 메시지
+  포함, IsValid는 여전히 true(다른 위반 없다면).
+- 문서 업데이트 확인.
+```
+
+### 미착수 (별도 스프린트로 분리, R22+)
+
+```text
+- SourceBuild multi-stage(fetch/builder/final) recipe 구조 — RecipeDocument
+  신규 필드 + RecipeRenderer 재설계가 필요한 큰 작업. R20의 경고 UX가
+  먼저 자리잡은 뒤 별도 설계 문서와 함께 착수.
+- NodeVault가 P1(build_events/digest 노출)을 실제로 배포하면 R18의
+  fallback 안내를 실제 digest 표시로 승격.
 ```
