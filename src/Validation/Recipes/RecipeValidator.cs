@@ -50,7 +50,7 @@ namespace NodeKit.Validation.Recipes
             @"\b(PASSWORD|SECRET|API_KEY|TOKEN|PASSWD)\b",
             RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-        public static ValidationResult Validate(RecipeDocument recipe)
+        public static ValidationResult Validate(RecipeDocument recipe, bool strictReproducible = false)
         {
             ArgumentNullException.ThrowIfNull(recipe);
 
@@ -64,11 +64,21 @@ namespace NodeKit.Validation.Recipes
                     ValidatePackagesPresent(recipe, violations);
                     ValidatePackageFormats(recipe, violations);
                     ValidateChannelFormats(recipe, violations);
+                    if (strictReproducible)
+                    {
+                        ValidateStrictPackagePinning(recipe, violations);
+                    }
+
                     break;
                 case RecipeBuildKind.PackageMirror:
                     ValidateBaseImagePresent(recipe, violations);
                     ValidatePackagesPresent(recipe, violations);
                     ValidatePackageFormats(recipe, violations);
+                    if (strictReproducible)
+                    {
+                        ValidateStrictPackagePinning(recipe, violations);
+                    }
+
                     if (string.IsNullOrWhiteSpace(recipe.PackageMirrorUri))
                     {
                         violations.Add(new ValidationViolation(
@@ -155,6 +165,25 @@ namespace NodeKit.Validation.Recipes
                     violations.Add(new ValidationViolation(
                         "L1-RCP-011",
                         $"패키지 지정에 허용되지 않는 문자가 포함되어 있습니다. 'name=version' 또는 'name=version=build' 형식만 허용됩니다: '{package}'",
+                        nameof(recipe.Packages)));
+                }
+            }
+        }
+
+        // 라이브 테스트(n03, docs/NODEKIT_CLI_FIRST_SPRINT_PLAN.md §13 R19)에서
+        // 확인: name=version(버전-only) pin은 L1-RCP-011 allowlist는 통과하지만
+        // NodeVault 최종 게이트가 "must include name=version=build"로 거부한다.
+        // --strict-reproducible이 켜졌을 때만 이 불일치를 제출 전에 미리 막는다
+        // — 기본값은 여전히 version-only를 허용(NodeVault가 최종 판단자).
+        private static void ValidateStrictPackagePinning(RecipeDocument recipe, List<ValidationViolation> violations)
+        {
+            foreach (var package in recipe.Packages)
+            {
+                if (PackagePinClassifier.Classify(package) == PackagePinStatus.VersionOnly)
+                {
+                    violations.Add(new ValidationViolation(
+                        "L1-RCP-016",
+                        $"--strict-reproducible 모드에서는 버전만 고정된 패키지가 허용되지 않습니다. name=version=build 형식으로 지정하세요: '{package}'",
                         nameof(recipe.Packages)));
                 }
             }

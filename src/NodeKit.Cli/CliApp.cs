@@ -85,7 +85,7 @@ namespace NodeKit.Cli
         {
             if (args.Length < 2)
             {
-                stderr.WriteLine("사용법: nodekit validate <recipe.json>");
+                stderr.WriteLine("사용법: nodekit validate <recipe.json> [--strict-reproducible]");
                 return 2;
             }
 
@@ -94,7 +94,7 @@ namespace NodeKit.Cli
                 return 2;
             }
 
-            var result = RecipeValidationPipeline.ValidateRecipe(recipe!);
+            var result = RecipeValidationPipeline.ValidateRecipe(recipe!, HasStrictReproducibleFlag(args));
             if (result.IsValid)
             {
                 stdout.WriteLine("OK");
@@ -109,7 +109,7 @@ namespace NodeKit.Cli
         {
             if (args.Length < 2)
             {
-                stderr.WriteLine("사용법: nodekit render <recipe.json> --out <build-request.json>");
+                stderr.WriteLine("사용법: nodekit render <recipe.json> --out <build-request.json> [--strict-reproducible]");
                 return 2;
             }
 
@@ -124,7 +124,7 @@ namespace NodeKit.Cli
                 return 2;
             }
 
-            var result = RecipeValidationPipeline.ValidateRecipe(recipe!);
+            var result = RecipeValidationPipeline.ValidateRecipe(recipe!, HasStrictReproducibleFlag(args));
             if (!result.IsValid)
             {
                 PrintViolations(result.Violations, stderr);
@@ -146,6 +146,9 @@ namespace NodeKit.Cli
 
             return 0;
         }
+
+        internal static bool HasStrictReproducibleFlag(string[] args) =>
+            Array.IndexOf(args, "--strict-reproducible") >= 0;
 
         private static string? ParseOutOption(string[] args, TextWriter stderr)
         {

@@ -13,7 +13,7 @@ namespace NodeKit.Validation.Recipes
     /// </summary>
     internal static class RecipeValidationPipeline
     {
-        public static ValidationResult ValidateRecipe(RecipeDocument recipe)
+        public static ValidationResult ValidateRecipe(RecipeDocument recipe, bool strictReproducible = false)
         {
             if (recipe.BuildKind is null)
             {
@@ -22,7 +22,7 @@ namespace NodeKit.Validation.Recipes
                     "ValidateRecipe() 호출 전에 RecipeBuildKindResolver.Resolve()를 먼저 호출하세요.");
             }
 
-            var recipeResult = RecipeValidator.Validate(recipe);
+            var recipeResult = RecipeValidator.Validate(recipe, strictReproducible);
             var definition = RecipeRenderer.Render(recipe);
 
             IValidator[] l1Validators =

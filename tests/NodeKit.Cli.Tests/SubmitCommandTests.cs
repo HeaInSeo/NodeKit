@@ -163,6 +163,38 @@ namespace NodeKit.Cli.Tests
             Assert.Contains("L1-SRC-001", stderr.ToString());
         }
 
+        // §13 R19: --strict-reproducible blocks version-only conda pins before
+        // submit, instead of letting NodeVault's final gate reject them later.
+
+        private const string VersionOnlyPinRecipeJson = """
+        {
+            "BuildKind": "Conda",
+            "ToolName": "bwa",
+            "Version": "0.7.17",
+            "BaseImage": "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            "Packages": [ "bwa=0.7.17" ],
+            "Channels": [ "bioconda" ],
+            "Script": "bwa mem"
+        }
+        """;
+
+        [Fact]
+        public void Submit_VersionOnlyPin_WithStrictFlag_ReturnsOne()
+        {
+            var recipePath = WriteFile("recipe.json", VersionOnlyPinRecipeJson);
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--strict-reproducible" },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(new[] { new BuildEvent { Kind = BuildEventKind.Succeeded } }));
+
+            Assert.Equal(1, exitCode);
+            Assert.Contains("L1-RCP-016", stderr.ToString());
+        }
+
         // ── 신규 경로 (IToolSpecBuildClient 주입) ─────────────────────────────
 
         [Fact]

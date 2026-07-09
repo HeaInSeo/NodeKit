@@ -780,6 +780,13 @@ namespace NodeKit.Cli
                 {
                     PrintViolations(violations, console);
                 }
+                else if (field.Name == "Packages" && PackagePinClassifier.Classify(line.Trim()) == PackagePinStatus.VersionOnly)
+                {
+                    // Non-blocking — L1-RCP-016(§13 R19)만 --strict-reproducible에서
+                    // 실제로 막는다. 여기서는 NodeVault 최종 게이트가 나중에 거부할
+                    // 수 있다는 걸 미리 알려주기만 한다.
+                    console.WriteLine($"⚠ '{line.Trim()}'은 버전만 고정되어 있습니다(build string 없음). NodeVault가 최종 제출 시 거부할 수 있습니다 — 가능하면 name=version=build 형식을 사용하세요.");
+                }
             }
         }
 

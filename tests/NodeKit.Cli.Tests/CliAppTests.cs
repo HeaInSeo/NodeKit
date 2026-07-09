@@ -224,6 +224,47 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(2, exitCode);
         }
 
+        // §13 R19: --strict-reproducible blocks version-only conda pins that
+        // NodeKit's L1 otherwise allows during authoring but NodeVault's final
+        // gate rejects (confirmed live, n03).
+
+        private const string VersionOnlyPinRecipeJson = """
+        {
+            "BuildKind": "Conda",
+            "ToolName": "bwa",
+            "Version": "0.7.17",
+            "BaseImage": "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            "Packages": [ "bwa=0.7.17" ],
+            "Channels": [ "bioconda" ],
+            "Script": "bwa mem"
+        }
+        """;
+
+        [Fact]
+        public void Validate_VersionOnlyPin_WithoutStrictFlag_ReturnsZero()
+        {
+            var recipePath = WriteFile("recipe.json", VersionOnlyPinRecipeJson);
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+
+            var exitCode = CliApp.Run(new[] { "validate", recipePath }, stdout, stderr);
+
+            Assert.Equal(0, exitCode);
+        }
+
+        [Fact]
+        public void Validate_VersionOnlyPin_WithStrictFlag_ReturnsOne()
+        {
+            var recipePath = WriteFile("recipe.json", VersionOnlyPinRecipeJson);
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+
+            var exitCode = CliApp.Run(new[] { "validate", recipePath, "--strict-reproducible" }, stdout, stderr);
+
+            Assert.Equal(1, exitCode);
+            Assert.Contains("L1-RCP-016", stderr.ToString());
+        }
+
         private string WriteFile(string name, string content)
         {
             var path = Path.Combine(_workDir, name);

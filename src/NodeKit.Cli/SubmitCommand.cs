@@ -35,7 +35,7 @@ namespace NodeKit.Cli
         {
             if (args.Length < 2)
             {
-                stderr.WriteLine("사용법: nodekit submit <recipe.json> [--url <nodevault-url>]");
+                stderr.WriteLine("사용법: nodekit submit <recipe.json> [--url <nodevault-url>] [--strict-reproducible]");
                 return 2;
             }
 
@@ -82,7 +82,7 @@ namespace NodeKit.Cli
                 return 2;
             }
 
-            var validation = RecipeValidationPipeline.ValidateRecipe(recipe);
+            var validation = RecipeValidationPipeline.ValidateRecipe(recipe, CliApp.HasStrictReproducibleFlag(args));
             if (!validation.IsValid)
             {
                 CliApp.PrintViolations(validation.Violations, stderr);

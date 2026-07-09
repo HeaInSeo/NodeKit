@@ -763,7 +763,7 @@ nodekit recipe create /tmp/recipe.json \
 recipe를 검증하고 NodeVault에 빌드 제출한다.
 
 ```bash
-nodekit submit recipe.json [--url <nodevault-url>] [--legacy]
+nodekit submit recipe.json [--url <nodevault-url>] [--legacy] [--strict-reproducible]
 ```
 
 기본 경로는 NodeVault Phase 1 신규 경로(`ResolveToolSpec → SubmitToolBuild →
@@ -790,13 +790,17 @@ spec 해결 완료 (digest: 8f3a1c2d...)
 |---|---|
 | `--url <url>` | NodeVault gRPC 엔드포인트 URL (환경변수 `NODEKIT_NODEVAULT_URL`이 없을 때 필수) |
 | `--legacy` | `BuildAndRegister` 레거시 경로 사용 (Phase 6 전환 완료 전 호환용) |
+| `--strict-reproducible` | conda/micromamba 패키지가 `name=version`(버전만 고정)이면 제출 전에 차단한다. NodeVault 최종 게이트는 `name=version=build` 전체 고정만 받아들이는데, NodeKit L1은 authoring 편의를 위해 버전만 고정된 값도 기본적으로 허용한다 — 이 플래그로 그 불일치를 제출 전에 미리 잡을 수 있다. |
 
-## 4. `nodekit validate <recipe.json>`
+## 4. `nodekit validate <recipe.json> [--strict-reproducible]`
 
 recipe를 검증만 한다. 파일을 만들지 않는다.
 
-1. `RecipeValidator.Validate(recipe)` — recipe 레벨 완전성 검사
-   (build kind별 필수 필드, source checksum 형식).
+1. `RecipeValidator.Validate(recipe, strictReproducible)` — recipe 레벨
+   완전성 검사(build kind별 필수 필드, source checksum 형식). `--strict-reproducible`을
+   주면 conda/micromamba `Packages`가 `name=version=build`로 완전히
+   고정됐는지도 검사(`L1-RCP-016`) — NodeVault 최종 게이트가 버전-only
+   pin을 거부하기 때문.
 2. `RecipeRenderer.Render(recipe)` — `ToolDefinition`으로 변환.
 3. 기존 L1 validator 체인 (`RequiredFieldsValidator`, `ImageUriValidator`,
    `DockerfileStructureValidator`, `PackageVersionValidator`) 실행.
@@ -818,9 +822,10 @@ $ echo $?
 1
 ```
 
-## 5. `nodekit render <recipe.json> --out <build-request.json>`
+## 5. `nodekit render <recipe.json> --out <build-request.json> [--strict-reproducible]`
 
-`validate`와 동일한 검증을 내부에서 먼저 수행한다 (fail-closed — 검증 안 된
+`validate`와 동일한 검증(§4의 `--strict-reproducible` 포함)을 내부에서 먼저
+수행한다 (fail-closed — 검증 안 된
 정의는 절대 export하지 않는다). 통과하면 `BuildRequestFactory`로
 `ToolDefinition → BuildRequest`를 매핑하고, legacy `BuildRequest` POCO 형태
 그대로(PascalCase 필드명) indented JSON으로 `--out` 경로에 쓴다. 네트워크
