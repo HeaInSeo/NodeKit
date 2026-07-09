@@ -188,6 +188,58 @@ namespace NodeKit.Cli.Tests
             Assert.Contains("[성공]", stdout.ToString());
         }
 
+        // R18 (docs/NODEKIT_CLI_FIRST_SPRINT_PLAN.md §13): live testing against a
+        // real NodeVault found that WatchToolBuild does not reliably send a
+        // DigestAcquired event, so the digest silently never appeared anywhere in
+        // the CLI output. This doesn't fix NodeVault (out of scope), but it stops
+        // NodeKit from staying silent about it.
+
+        [Fact]
+        public void Submit_BuildSucceeded_WithoutDigestAcquired_PrintsFallbackNotice()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var events = new[]
+            {
+                new BuildEvent { Kind = BuildEventKind.JobCreated, Message = "빌드 제출됨", BuildId = "build-123" },
+                new BuildEvent { Kind = BuildEventKind.Succeeded, Message = "완료" },
+            };
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(events));
+
+            Assert.Equal(0, exitCode);
+            Assert.Contains("digest가 서버에서 제공되지 않았습니다", stdout.ToString());
+            Assert.Contains("build-123", stdout.ToString());
+        }
+
+        [Fact]
+        public void Submit_BuildSucceeded_WithDigestAcquired_DoesNotPrintFallbackNotice()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var events = new[]
+            {
+                new BuildEvent { Kind = BuildEventKind.JobCreated, Message = "빌드 제출됨", BuildId = "build-123" },
+                new BuildEvent { Kind = BuildEventKind.DigestAcquired, Digest = "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" },
+                new BuildEvent { Kind = BuildEventKind.Succeeded, Message = "완료" },
+            };
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(events));
+
+            Assert.Equal(0, exitCode);
+            Assert.DoesNotContain("제공되지 않았습니다", stdout.ToString());
+        }
+
         [Fact]
         public void Submit_StreamEndsWithoutTerminalEvent_DoesNotReturnZero()
         {

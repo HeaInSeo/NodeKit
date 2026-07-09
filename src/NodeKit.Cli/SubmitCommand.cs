@@ -117,6 +117,7 @@ namespace NodeKit.Cli
         {
             using var cts = new CancellationTokenSource();
             string? buildId = null;
+            var digestReceived = false;
             ConsoleCancelEventHandler onCancelKeyPress = (_, e) =>
             {
                 e.Cancel = true;
@@ -134,8 +135,23 @@ namespace NodeKit.Cli
                         buildId = ev.BuildId;
                     }
 
+                    if (ev.Kind == BuildEventKind.DigestAcquired && !string.IsNullOrEmpty(ev.Digest))
+                    {
+                        digestReceived = true;
+                    }
+
                     if (ev.Kind == BuildEventKind.Succeeded)
                     {
+                        // NodeVault의 WatchToolBuild가 아직 DigestAcquired 이벤트를
+                        // 안정적으로 보내지 않는 경우가 있다(라이브 테스트에서 확인) —
+                        // 조용히 넘어가지 않고 어디서 확인해야 하는지 안내한다.
+                        if (!digestReceived)
+                        {
+                            stdout.WriteLine(string.IsNullOrEmpty(buildId)
+                                ? "이미지 digest가 서버에서 제공되지 않았습니다 — NodeVault 인덱스에서 직접 확인하세요."
+                                : $"이미지 digest가 서버에서 제공되지 않았습니다 — NodeVault 인덱스에서 직접 확인하세요 (build ID: {buildId}).");
+                        }
+
                         return 0;
                     }
 
