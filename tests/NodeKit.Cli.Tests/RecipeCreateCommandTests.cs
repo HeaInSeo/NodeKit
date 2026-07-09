@@ -186,6 +186,21 @@ namespace NodeKit.Cli.Tests
         }
 
         [Fact]
+        public void Source_BuildDependenciesPresent_WarnsTheyAreNotInstalled()
+        {
+            // §13 R21: BuildDependencies exists on the recipe surface but
+            // RecipeRenderer never actually installs it — this only makes
+            // that limitation visible, it doesn't add install logic.
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var stderr = new StringWriter();
+            var exitCode = RunCreate(SourceArgs(includeBuildDependencies: true), outPath, stderr: stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.Contains("BuildDependencies는 현재 자동으로 설치되지 않습니다", stderr.ToString());
+            Assert.True(File.Exists(outPath));
+        }
+
+        [Fact]
         public void Source_SourceChecksumMissing_FailsAsRequired()
         {
             var outPath = Path.Combine(_workDir, "recipe.json");

@@ -166,6 +166,12 @@ namespace NodeKit.Cli
                 stderr.WriteLine($"경고: {sourceBuildAdvisory}");
             }
 
+            var buildDependenciesAdvisory = BuildDependenciesAdvisor.Describe(document.BuildKind.Value, document.BuildDependencies);
+            if (buildDependenciesAdvisory != null)
+            {
+                stderr.WriteLine($"경고: {buildDependenciesAdvisory}");
+            }
+
             var result = RecipeValidationPipeline.ValidateRecipe(document);
             if (!result.IsValid)
             {
