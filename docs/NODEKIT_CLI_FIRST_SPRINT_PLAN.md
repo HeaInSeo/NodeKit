@@ -1,10 +1,10 @@
 # NodeKit Legacy-First Sprint Plan
 
-Status: Sprint 6 완료 / Sprint 7 진행 중 / R18-R21(§13) 진행 중  
+Status: Sprint 6 완료 / Sprint 7 진행 중 / R18-R21(§13) 완료  
 Created: 2026-06-17  
 Updated: 2026-07-09  
 Scope: NodeKit work — Sprint 0-6 완료, Sprint 7(Post-Migration Hardening) 진행 중,
-§13 Live Recipe Reproducibility Improvement(R18-R21) 진행 중
+§13 Live Recipe Reproducibility Improvement(R18-R21) 완료
 
 ## 0. Resume Note For Agents
 
@@ -15,15 +15,16 @@ ToolSpec 경로(`ResolveToolSpec → SubmitToolBuild → WatchToolBuild`)로 전
 `--legacy` 플래그와 `BuildAndRegister` 경로는 CLI에서 제거됨.
 `IBuildClient` / `GrpcBuildClient`는 Avalonia(NodeKit.csproj)에만 남아 있음 — Sprint 7 대상.
 
-**§13 진행 중 (2026-07-09)**: seoy-libvirt-cilium 실 K8s 클러스터 라이브
-테스트(2026-07-08)에서 나온 NodeKit 쪽 개선 항목 R18-R21 — 자세한 내용은
-§13 참조. NodeVault 쪽 개선 항목(P0-P3)은 별도 개발 에이전트가 독립
-진행 중이라 이 세션에서 다루지 않는다.
+**§13 완료 (2026-07-09)**: seoy-libvirt-cilium 실 K8s 클러스터 라이브
+테스트(2026-07-08)에서 나온 NodeKit 쪽 개선 항목 R18-R21 전부 구현·테스트·
+커밋 완료 — 각 스프린트의 Progress 블록 참조. R22+(SourceBuild multi-stage
+재설계)는 별도 착수 필요. NodeVault 쪽 개선 항목(P0-P3)은 별도 개발
+에이전트가 독립 진행 중이라 이 세션에서 다루지 않는다.
 
 현재 NodeKit 초점:
 
 ```text
-§13 R18-R21: Live Recipe Reproducibility Improvement (진행 중, 최우선)
+§13 R18-R21: Live Recipe Reproducibility Improvement — 완료 (2026-07-09)
 Sprint 7: Avalonia GUI ToolSpec 마이그레이션
 + U5-2: seoy 원격 장비 nodekit submit 수동 테스트 (seoy 준비 후)
   — 2026-07-05: seoy 없이 heain 로컬 사전 검증 완료(TC-1~TC-13 전체), 버그 6건
@@ -1636,6 +1637,16 @@ Done when:
 - 기존 SubmitCommandTests 전부 그대로 통과.
 ```
 
+**Progress (Sprint R18 완료, 2026-07-09, 커밋 `c23e026`):**
+
+```text
+완료: SubmitCommand.SubmitAsync에 digestReceived 플래그 추가, Succeeded
+반환 직전 플래그 false면 안내 메시지 출력. 회귀 테스트 2개 추가
+(Submit_BuildSucceeded_WithoutDigestAcquired_PrintsFallbackNotice,
+Submit_BuildSucceeded_WithDigestAcquired_DoesNotPrintFallbackNotice).
+전체 테스트 543개 통과, 0 warnings.
+```
+
 ### Sprint R19. Conda/Micromamba Pin-Mode UX
 
 Goal:
@@ -1677,6 +1688,28 @@ Done when:
   통과(기존 동작), 설정 시 L1-RCP-016으로 차단.
 - 대화형 테스트: VersionOnly pin 확정 시 경고 문구 출력, 저장은 계속 진행.
 - 실제 CLI로 bwa=0.7.17 + --strict-reproducible 재현: 차단 확인.
+```
+
+**Progress (Sprint R19 완료, 2026-07-09, 커밋 `8d12cd4`, `2fca7aa`):**
+
+```text
+완료:
+- src/Validation/Recipes/PackagePinClassifier.cs (신규): "=" 개수로
+  FullPin/VersionOnly/Malformed 분류.
+- RecipeValidator.Validate(recipe, strictReproducible)/
+  RecipeValidationPipeline.ValidateRecipe(recipe, strictReproducible):
+  Conda/Micromamba/PackageMirror에 L1-RCP-016 추가(strictReproducible일 때만).
+- CliApp(validate/render)/SubmitCommand: --strict-reproducible 플래그 파싱
+  + threading (CliApp.HasStrictReproducibleFlag).
+- RecipeCreateFlow.PromptStringListField: Packages 필드에서 VersionOnly pin
+  확정 시 non-blocking 경고 출력(stdout).
+- docs/NODEKIT_CLI_USAGE.md §3-5에 --strict-reproducible 반영.
+
+실제 CLI로 bwa=0.7.17 재현: --strict-reproducible 없이 exit 0,
+--strict-reproducible과 함께 L1-RCP-016으로 exit 1 확인.
+회귀 테스트 13개 추가(PackagePinClassifierTests 5, RecipeValidatorTests 4,
+CliAppTests 2, SubmitCommandTests 1, 대화형 테스트 1).
+최종 결과: 565 / 565 통과(스킵 2 제외), 0 warnings.
 ```
 
 ### Sprint R20. SourceBuild Risky Base-Image Warnings
@@ -1724,6 +1757,26 @@ Done when:
 - 실제 CLI로 SourceBuild + alpine base 재현: 경고 출력 확인(차단 아님).
 ```
 
+**Progress (Sprint R20 완료, 2026-07-09, 커밋 `82aacff`):**
+
+```text
+완료: SourceBuildBaseImageAdvisor(신규, non-blocking 휴리스틱) — 알려진
+fetch-전용 이미지 패턴(curlimages/curl, busybox, alpine/curl)만 경고.
+RecipeCreateFlow(대화형)/RecipeCreateCommand(non-interactive) 양쪽에
+BaseImageEngineMismatchChecker와 동일한 위치로 배선.
+
+**계획 대비 축소**: 원래 "Done when"에 있던 "condaforge/miniforge3처럼
+fetch 도구 존재 여부가 불확실한 이미지도 경고"는 구현하지 않았다 — "이
+이미지에 curl이 있을지 없을지"를 이름만으로 판단하는 건 오탐(false
+positive)이 훨씬 잦은 신뢰도 낮은 휴리스틱이라, 확실한 패턴(알려진
+fetch-전용 이미지)만 남기고 범위를 좁혔다. 실제 테스트도
+Describe_SourceBuildWithOrdinaryImage_ReturnsNull로 condaforge/miniforge3이
+경고 없이 통과함을 명시적으로 확인한다.
+
+실제 CLI로 curlimages/curl base 재현: 경고 출력 확인(차단 아님).
+회귀 테스트 5개 추가. 최종 결과: 560 / 560 통과(스킵 2 제외), 0 warnings.
+```
+
 ### Sprint R21. BuildDependencies Actionability Warning
 
 Goal:
@@ -1761,6 +1814,28 @@ Done when:
 - RecipeValidatorTests: BuildDependencies 비어있지 않을 때 안내 메시지
   포함, IsValid는 여전히 true(다른 위반 없다면).
 - 문서 업데이트 확인.
+```
+
+**Progress (Sprint R21 완료, 2026-07-09, 커밋 `2c42c0d`):**
+
+```text
+완료: BuildDependenciesAdvisor(신규, R20과 동일한 non-blocking advisor
+패턴) 추가, RecipeCreateFlow/RecipeCreateCommand 양쪽에 배선.
+
+**계획과 다르게 구현**: 원래 Tasks에는 "RecipeValidator.ValidateSourceBuild에
+경고성 규칙 추가"라고 되어 있었지만, RecipeValidator가 반환하는
+ValidationResult.IsValid는 violations.Count == 0으로만 결정되어 "경고성
+violation"이라는 개념 자체가 없다 — RecipeValidator에 추가하면 자동으로
+차단(validate/render/submit 전부 exit 1)이 된다. 그래서 R20의
+SourceBuildBaseImageAdvisor와 동일한 별도 advisor 클래스 패턴으로
+구현을 바꿨다 — ValidationResult와 완전히 분리된, 순수 안내용 stderr/stdout
+출력.
+
+실제 CLI로 BuildDependencies=zlib1g-dev 재현: 경고 출력 + exit 0 확인.
+회귀 테스트 4개 추가. 최종 결과: 564 / 564 통과(스킵 2 제외), 0 warnings.
+NODEKIT_CLI_USAGE.md 갱신은 별도로 하지 않음 — BuildDependencies는 원래
+그 문서에 섹션이 없었고, advisor 메시지 자체가 실행 시점에 충분히
+명확해 별도 문서화가 급하지 않다고 판단.
 ```
 
 ### 미착수 (별도 스프린트로 분리, R22+)
