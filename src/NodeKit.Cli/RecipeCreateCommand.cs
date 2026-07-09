@@ -160,6 +160,12 @@ namespace NodeKit.Cli
                 stderr.WriteLine($"경고: {mismatch}");
             }
 
+            var sourceBuildAdvisory = SourceBuildBaseImageAdvisor.Describe(document.BuildKind.Value, document.BaseImage);
+            if (sourceBuildAdvisory != null)
+            {
+                stderr.WriteLine($"경고: {sourceBuildAdvisory}");
+            }
+
             var result = RecipeValidationPipeline.ValidateRecipe(document);
             if (!result.IsValid)
             {

@@ -89,6 +89,14 @@ namespace NodeKit.Cli
                 console.WriteLine();
             }
 
+            var sourceBuildAdvisory = SourceBuildBaseImageAdvisor.Describe(document.BuildKind!.Value, document.BaseImage);
+            if (sourceBuildAdvisory != null)
+            {
+                console.WriteLine();
+                console.WriteLine($"⚠  {sourceBuildAdvisory}");
+                console.WriteLine();
+            }
+
             // 단계 7: 패키지 빌드 문자열 선택 (ResolveRecipe)
             if (document.Packages.Count > 0)
             {

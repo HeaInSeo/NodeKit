@@ -243,6 +243,34 @@ namespace NodeKit.Cli.Tests
             Assert.Contains("micromamba 전용 이미지로 보이는데 PackageEngine은 conda", stderr.ToString());
         }
 
+        // §13 R20: SourceBuild's BaseImage doubles as both fetch and final
+        // runtime image, so a fetch-only-looking image (curlimages/curl —
+        // confirmed as a live-test workaround, docs §13) gets a warning.
+
+        [Fact]
+        public void Source_CurlBaseImage_WarnsButStillSaves()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var stderr = new StringWriter();
+            var args = new[]
+            {
+                "--non-interactive", "--method", "source",
+                "--field", "ToolName=bwa-mem",
+                "--field", "ToolVersion=0.7.17",
+                "--field", "Script=run.sh",
+                "--field", "BaseImage=docker.io/curlimages/curl:8.8.0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "--field", "SourceUri=https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz",
+                "--field", $"SourceChecksum={DigestOnly}",
+                "--field", "SourceBuildCommands=make",
+            };
+
+            var exitCode = RunCreate(args, outPath, stderr: stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.True(File.Exists(outPath));
+            Assert.Contains("fetch 전용 이미지로 보입니다", stderr.ToString());
+        }
+
         [Fact]
         public void Mirror_MicromambaBaseImage_WarnsButStillSaves()
         {
