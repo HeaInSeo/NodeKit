@@ -1841,11 +1841,21 @@ NODEKIT_CLI_USAGE.md 갱신은 별도로 하지 않음 — BuildDependencies는 
 ### 미착수 (별도 스프린트로 분리, R22+)
 
 ```text
-- SourceBuild multi-stage(fetch/builder/final) recipe 구조 — RecipeDocument
-  신규 필드 + RecipeRenderer 재설계가 필요한 큰 작업. R20의 경고 UX가
-  먼저 자리잡은 뒤 별도 설계 문서와 함께 착수. 문제/목표 설계/열린 질문
-  전부 GitHub Issue #36에 정리해 등록(2026-07-12) — 사용자 검토 대기 중,
-  구현 착수 전.
+- SourceBuild multi-stage(fetch/builder/final) recipe 구조 — 설계 확정
+  완료(2026-07-12), 구현 미착수. 산출물: docs/NODEKIT_SOURCEBUILD_STRUCTURED_INTENT_DESIGN.md
+  (문제 정의/보안 목적/사용자 모델/책임 경계/하위 호환/migration
+  단계/non-goals/위험 요소/테스트 전략/미결정 사항 전부 포함, 결정표
+  8건). Issue #36은 이 설계로 close, 실제 구현은 후속 이슈 #37(R22-B:
+  authoring 모델)/#38(R22-C: RecipeRenderer 렌더링)/#39(R22-D: hygiene
+  advisor)로 분리 등록.
+  핵심 발견: NodeVault를 읽기 전용으로 조사한 결과, dockerfile_content가
+  NodeVault가 다시 쓰지 않는 불투명 문자열이고 NodeVault의 정적 검증이
+  이미 멀티스테이지 Dockerfile의 모든 FROM을 스테이지별로 검증한다는
+  것을 실제 테스트(TestValidateBuildRequest_RejectsEveryUnpinnedStage)로
+  확인 — 즉 NodeKit이 client-side에서 멀티스테이지 Dockerfile을 합성해
+  기존 API로 제출하면 NodeVault 코드 변경 없이 오늘 동작한다. 다만
+  이것만으로는 서버 쪽 강제가 없다는 한계(NodeVault Sprint 9/10
+  P2a/P2b 미구현)를 설계 문서와 #38에 명시해뒀다.
 - NodeVault가 P1(build_events/digest 노출)을 실제로 배포하면 R18의
   fallback 안내를 실제 digest 표시로 승격.
 ```
