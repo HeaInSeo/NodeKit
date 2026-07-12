@@ -1,10 +1,11 @@
 # NodeKit Legacy-First Sprint Plan
 
-Status: Sprint 6 완료 / Sprint 7 진행 중 / R18-R21(§13) 완료  
+Status: Sprint 6 완료 / Sprint 7 진행 중 / R18-R21(§13) 완료 / R22 설계 확정, 구현 대기(#37-39)  
 Created: 2026-06-17  
-Updated: 2026-07-09  
+Updated: 2026-07-12  
 Scope: NodeKit work — Sprint 0-6 완료, Sprint 7(Post-Migration Hardening) 진행 중,
-§13 Live Recipe Reproducibility Improvement(R18-R21) 완료
+§13 Live Recipe Reproducibility Improvement(R18-R21) 완료, R22 SourceBuild
+구조화 설계 확정(구현 미착수)
 
 ## 0. Resume Note For Agents
 
@@ -17,14 +18,27 @@ ToolSpec 경로(`ResolveToolSpec → SubmitToolBuild → WatchToolBuild`)로 전
 
 **§13 완료 (2026-07-09)**: seoy-libvirt-cilium 실 K8s 클러스터 라이브
 테스트(2026-07-08)에서 나온 NodeKit 쪽 개선 항목 R18-R21 전부 구현·테스트·
-커밋 완료 — 각 스프린트의 Progress 블록 참조. R22+(SourceBuild multi-stage
-재설계)는 별도 착수 필요. NodeVault 쪽 개선 항목(P0-P3)은 별도 개발
-에이전트가 독립 진행 중이라 이 세션에서 다루지 않는다.
+커밋 완료 — 각 스프린트의 Progress 블록 참조. NodeVault 쪽 개선 항목(P0-P3)은
+별도 개발 에이전트가 독립 진행 중이라 이 세션에서 다루지 않는다
+([[project_nodevault_parallel_agent]] 메모리 참조).
+
+**R22 설계 확정 (2026-07-12), 구현은 #37/#38/#39로 분리**: 상세는 §13 하단
+"미착수" 섹션과 `docs/NODEKIT_SOURCEBUILD_STRUCTURED_INTENT_DESIGN.md` 참조.
+**R22 구현 착수 전 반드시 다시 읽을 것 — 놓치기 쉬운 함정 2가지:**
+
+```text
+1. #38(렌더링) 구현만으로 SourceBuild 보안 문제가 "해결됐다"고 하지 말 것
+   — NodeVault 서버 쪽 강제(Sprint 9/10)가 없는 한 authoring-time UX일
+   뿐이다. §13 하단 체크리스트, 설계 문서 §2.6 Q5/§8 참조.
+2. #37(authoring 모델) 구현 시 BuildProfile/RuntimeProfile 이미지 매핑표를
+   빈 채로 두지 말 것 — 매핑이 없으면 #37 자체가 완료될 수 없다. 설계
+   문서 §16 참조.
+```
 
 현재 NodeKit 초점:
 
 ```text
-§13 R18-R21: Live Recipe Reproducibility Improvement — 완료 (2026-07-09)
+R22: SourceBuild 구조화 intent 구현 (#37 → #38 → #39, 위 함정 2가지 유의)
 Sprint 7: Avalonia GUI ToolSpec 마이그레이션
 + U5-2: seoy 원격 장비 nodekit submit 수동 테스트 (seoy 준비 후)
   — 2026-07-05: seoy 없이 heain 로컬 사전 검증 완료(TC-1~TC-13 전체), 버그 6건
@@ -1858,4 +1872,22 @@ NODEKIT_CLI_USAGE.md 갱신은 별도로 하지 않음 — BuildDependencies는 
   P2a/P2b 미구현)를 설계 문서와 #38에 명시해뒀다.
 - NodeVault가 P1(build_events/digest 노출)을 실제로 배포하면 R18의
   fallback 안내를 실제 digest 표시로 승격.
+```
+
+**⚠ R22 구현 시 절대 놓치면 안 되는 것 2가지 (2026-07-12 사용자 지시로 명시적
+추적 요청받음 — #37/#38 완료 조건에도 반영되어 있지만 여기서도 중복 기록):**
+
+```text
+1. #38(RecipeRenderer 렌더링) 구현만으로 "SourceBuild 보안 문제가
+   해결됐다"고 발표/기록하지 말 것. Phase C(client-side 멀티스테이지
+   렌더링)는 authoring-time UX 개선일 뿐, NodeVault 서버 쪽 강제
+   (Sprint 9/10, P2a/P2b)가 없는 한 실제 보안 경계가 아니다. NodeKit
+   CLI를 거치지 않고 gRPC를 직접 호출하면 여전히 아무 검사도 없다.
+   #38을 닫기 전에 이 한계를 CLI 도움말/릴리스 노트/커밋 메시지 중
+   최소 하나에 명시했는지 확인할 것.
+2. #37(authoring 모델) 구현 시 BuildProfile/RuntimeProfile의 실제
+   이미지→digest 매핑표를 반드시 채울 것 — 설계 문서(§16 미결정
+   사항)는 프레임워크만 정의했고 구체적 큐레이션은 비어 있다. 매핑이
+   없으면 wizard가 선택지를 보여줄 수 없어 #37 자체가 완료될 수 없다
+   — 즉 "나중에 채우기"로 미루고 넘어갈 수 있는 항목이 아니다.
 ```
