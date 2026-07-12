@@ -1843,7 +1843,9 @@ NODEKIT_CLI_USAGE.md 갱신은 별도로 하지 않음 — BuildDependencies는 
 ```text
 - SourceBuild multi-stage(fetch/builder/final) recipe 구조 — RecipeDocument
   신규 필드 + RecipeRenderer 재설계가 필요한 큰 작업. R20의 경고 UX가
-  먼저 자리잡은 뒤 별도 설계 문서와 함께 착수.
+  먼저 자리잡은 뒤 별도 설계 문서와 함께 착수. 문제/목표 설계/열린 질문
+  전부 GitHub Issue #36에 정리해 등록(2026-07-12) — 사용자 검토 대기 중,
+  구현 착수 전.
 - NodeVault가 P1(build_events/digest 노출)을 실제로 배포하면 R18의
   fallback 안내를 실제 digest 표시로 승격.
 ```
