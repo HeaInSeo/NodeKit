@@ -12,10 +12,9 @@ Read these first when resuming work:
 Active planning rule:
 
 - NodeVault is a Kubernetes data-plane app. NodeKit integrates with it through the documented gRPC/REST API surface, not by calling the Kubernetes API directly.
-- Do not add a production `ToolSpecRequest`, `ResolveToolSpec`, or `SubmitToolBuild` path yet.
-- Keep the current `BuildRequest` / `BuildAndRegister` legacy gRPC path working.
-- NodeKit migrates only after NodeVault Phase 1 is complete and `PLATFORM_SCHEDULE.md` Phase 6 has begun.
-- Current work should focus on legacy path stability, L1 validation, BuildRequest mapping, gRPC client resilience, CI, lint, tests, and coverage.
+- **NodeVault Phase 1 gate opened 2026-07-02.** The CLI (`src/NodeKit.Cli/`) has already migrated to the production `ToolSpecRequest` path (`ResolveToolSpec → SubmitToolBuild → WatchToolBuild`); the `--legacy` flag and the `BuildAndRegister` path were removed from the CLI. Do not reintroduce a `--legacy`-style path in the CLI.
+- `IBuildClient` / `GrpcBuildClient` (the legacy `BuildRequest` / `BuildAndRegister` gRPC path) remain only in the Avalonia GUI project (`NodeKit.csproj`) — migrating the GUI to `GrpcToolSpecClient` is Sprint 7, still in progress. Do not remove the legacy client code from the GUI project until that migration lands.
+- Current work should focus on: Sprint 7 (Avalonia GUI ToolSpec migration), `docs/NODEKIT_CLI_FIRST_SPRINT_PLAN.md` §13 (R18-R21, completed) follow-up work, R22 SourceBuild structured-intent implementation (Issues #37-39, design finalized in `docs/NODEKIT_SOURCEBUILD_STRUCTURED_INTENT_DESIGN.md`), L1 validation, BuildRequest mapping, gRPC client resilience, CI, lint, tests, and coverage.
 - New application state should follow the DagEdit direction: ReactiveUI / System.Reactive first, with DynamicData when collection change streams are useful.
 - The existing UI is still largely code-behind/event-handler based. Do not expand that pattern for new validation, submission progress, or result state; introduce focused reactive ViewModel/state objects instead.
 - CI includes reactive architecture guard tests. If `MainWindow.axaml.cs` grows, gains more click subscriptions, or gains more `async void` handlers, move the work into reactive ViewModel/state code instead of raising the baseline.
