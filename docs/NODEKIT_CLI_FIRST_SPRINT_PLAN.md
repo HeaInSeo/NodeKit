@@ -1,11 +1,11 @@
 # NodeKit Legacy-First Sprint Plan
 
-Status: Sprint 6 완료 / Sprint 7 진행 중 / R18-R21(§13) 완료 / R22-B(§13) 완료, R22-C/D 대기(#38-39)  
+Status: Sprint 6 완료 / Sprint 7 진행 중 / R18-R21(§13) 완료 / R22-B/C(§13) 완료, R22-D 대기(#39)  
 Created: 2026-06-17  
 Updated: 2026-07-13  
 Scope: NodeKit work — Sprint 0-6 완료, Sprint 7(Post-Migration Hardening) 진행 중,
-§13 Live Recipe Reproducibility Improvement(R18-R21) 완료, R22-B(SourceBuild
-구조화 intent authoring 모델) 완료, R22-C/D 진행 대기
+§13 Live Recipe Reproducibility Improvement(R18-R21) 완료, R22-B/C(SourceBuild
+구조화 intent authoring 모델 + 2-stage 렌더링) 완료, R22-D 진행 대기
 
 ## 0. Resume Note For Agents
 
@@ -32,24 +32,31 @@ wizard 미배선, `--non-interactive --method source-structured`로만
 (§11 Phase B 임시 단일 스테이지 placeholder — #38이 진짜 2-stage로
 교체 예정). 상세는 §13 R22-B Progress 블록 참조. Issue #37 close.
 
-**R22-C/D 진행 대기**: 설계는 2026-07-12에 확정됐고(Issue #36 close),
-§13에 Sprint R22-C(#38)/R22-D(#39) 형식으로 Goal/Context/Tasks/Done-when이
-등록되어 있음. 2-stage(Build/Runtime, fetch/builder/final 3-stage 아님)는
-확정(설계 문서 §10 D-2b). 상세는 §13 R22-C/D 섹션과
+**R22-C 완료 (2026-07-13, 커밋 `3117f8a`)**: `RecipeRenderer
+.RenderSourceBuildStructured`가 R22-B의 단일 스테이지 placeholder를
+실제 2-stage Dockerfile("FROM ... AS builder" → "FROM <runtime>" +
+`COPY --from=builder /nodekit/output/ /`)로 교체. 로컬 `buildah bud`로
+실제 빌드해 최종 이미지에 curl/wget/git/gcc가 없고(builder 스테이지에는
+있음을 대조 확인) 설치한 바이너리가 정상 동작하며 `USER=1000`임을
+실증. 상세는 §13 R22-C Progress 블록 참조. Issue #38 close.
+
+**R22-D 진행 대기**: 설계는 2026-07-12에 확정됐고(Issue #36 close),
+§13에 Sprint R22-D(#39) 형식으로 Goal/Context/Tasks/Done-when이
+등록되어 있음. 상세는 §13 R22-D 섹션과
 `docs/NODEKIT_SOURCEBUILD_STRUCTURED_INTENT_DESIGN.md` 참조.
-**R22-C 구현 착수 전 반드시 다시 읽을 것 — 놓치기 쉬운 함정:**
+**R22-D 구현 착수 전 반드시 다시 읽을 것 — 놓치기 쉬운 함정:**
 
 ```text
-R22-C(#38, 렌더링) 구현만으로 SourceBuild 보안 문제가 "해결됐다"고 하지
-말 것 — NodeVault 서버 쪽 강제(Sprint 9/10)가 없는 한 authoring-time
-UX일 뿐이다. §13 하단 체크리스트, 설계 문서 §2.6 Q5/§8 참조.
+R22-B/C 구현만으로 SourceBuild 보안 문제가 "해결됐다"고 하지 말 것 —
+NodeVault 서버 쪽 강제(Sprint 9/10)가 없는 한 authoring-time UX일
+뿐이다. §13 하단 체크리스트 항목 1, 설계 문서 §2.6 Q5/§8 참조.
 ```
 
 현재 NodeKit 초점:
 
 ```text
-R22-B 완료 → R22-C(#38) → R22-D(#39): SourceBuild 구조화 intent 구현
-  (§13, 위 함정 유의)
+R22-B/C 완료 → R22-D(#39): SourceBuild 구조화 intent RuntimeProfile
+  hygiene advisor (§13, 위 함정 유의)
 Sprint 7: Avalonia GUI ToolSpec 마이그레이션
 + U5-2: seoy 원격 장비 nodekit submit 수동 테스트 (seoy 준비 후)
   — 2026-07-05: seoy 없이 heain 로컬 사전 검증 완료(TC-1~TC-13 전체), 버그 6건
@@ -2010,6 +2017,54 @@ Done when:
   항목 1 참조 — NodeVault 서버 쪽 강제는 별도 upstream 작업).
 ```
 
+**Progress (Sprint R22-C 완료, 2026-07-13, 커밋 `3117f8a`):**
+
+```text
+완료:
+- RecipeRenderer.RenderSourceBuildStructured: R22-B의 단일 스테이지
+  placeholder를 실제 2-stage 템플릿으로 교체. builder 스테이지
+  (BuildProfileImage, "AS builder") → fetch+checksum(sha256sum -c)+
+  extract+mkdir -p /nodekit/output+SourceBuildCommands, runtime 스테이지
+  (RuntimeProfileImage) → COPY --from=builder /nodekit/output/ /,
+  USER 1000. ENTRYPOINT 없음(D-6), USER는 runtime 스테이지에만(D-7).
+  ExportRoot 상수를 SA1201 때문에 클래스 최상단으로 이동.
+- RecipeFieldCatalog: SourceBuildCommands 도움말/예시를
+  "/nodekit/output/ 아래에만 설치 — 그 경로만 런타임 이미지로 복사됨"으로
+  갱신(예시: "make install DESTDIR=/nodekit/output").
+- RecipeRendererTests: 느슨한 Contains 기반 검증 2개를 엄격한 검증으로
+  교체 — FROM 2개 존재, 첫 FROM에 " AS builder" 접미사, COPY
+  --from=builder 존재, mkdir -p 존재, ENTRYPOINT 부재, USER 문자열
+  위치가 두 번째 FROM 이후(문자열 인덱스 비교)임을 확인. R22-B 시점
+  테스트는 2-stage 출력에도 우연히 통과할 만큼 느슨해서 실제 보안
+  속성(빌드 도구가 새지 않음)을 검증하지 못했음을 인지하고 자발적으로
+  강화함.
+
+**실 인프라 검증(seoy 클러스터가 아니라 로컬 buildah bud — Done-when의
+"가능하면" 조건 충족, 유닛 테스트만으로 끝내지 않음):**
+- `nodekit recipe create --non-interactive --method source-structured`
+  → `nodekit validate`(OK) → `nodekit render --out -`로 실제
+  build-request.json의 dockerfile_content 추출.
+- `buildah bud --network host`로 추출한 Dockerfile을 실제 2-stage
+  빌드(로컬 HTTP 서버로 source tarball 제공, `RUN curl` 단계가 호스트
+  네트워크로 fetch).
+- 최종 이미지(runtime 스테이지)에서 `command -v curl/wget/git/gcc`
+  전부 부재 확인, 설치한 바이너리(`/usr/local/bin/hello`) 정상 실행
+  확인, `buildah inspect`로 `Config.User == "1000"` 확인.
+- 대조 검증: `--target builder`로 builder 스테이지만 별도로 빌드해
+  그 안에는 curl이 실제로 존재함을 확인 — runtime 이미지의 curl 부재가
+  우연이 아니라 스테이지 분리 때문임을 증명.
+- 기존 RenderSourceBuild(legacy) 무변경 — 회귀 테스트 전부 그대로 통과.
+
+최종 결과: 587 / 587 통과(스킵 2 제외), 0 warnings, dotnet format 클린.
+
+⚠ 미해결 그대로 남음(§13 체크리스트 항목 1과 동일): 이번 스프린트는
+client-side 렌더링만 다룬다. NodeVault가 dockerfile_content를 그대로
+받아들이고(재작성 없음) 런타임 스테이지 내용을 서버에서 강제하지
+않으므로, authoring 시점에 "안전한 recipe.json"을 만들 수는 있어도
+누군가 손으로 dockerfile_content를 다시 조작해 제출하는 경로를 막지는
+못한다. NodeVault Sprint 9/10(unimplemented)이 이 gap의 담당.
+```
+
 ### Sprint R22-D. SourceBuild 구조화 Intent — RuntimeProfile hygiene advisor (Issue #39)
 
 Goal:
@@ -2066,11 +2121,15 @@ Done when:
 중복 기록):**
 
 ```text
-1. R22-C(#38) 구현만으로 "SourceBuild 보안 문제가 해결됐다"고 발표/기록
-   하지 말 것. client-side 멀티스테이지 렌더링은 authoring-time UX
-   개선일 뿐, NodeVault 서버 쪽 강제(Sprint 9/10, P2a/P2b)가 없는 한
-   실제 보안 경계가 아니다. NodeKit CLI를 거치지 않고 gRPC를 직접
-   호출하면 여전히 아무 검사도 없다. R22-C 착수 시 다시 확인할 것.
+1. (구현 완료, 2026-07-13 — 경고는 계속 유효) R22-C(#38)에서 실제
+   2-stage 렌더링을 구현하고 로컬 buildah bud로 curl 미유출을
+   실증했지만, 이것만으로 "SourceBuild 보안 문제가 해결됐다"고
+   발표/기록하지 말 것. client-side 멀티스테이지 렌더링은
+   authoring-time UX 개선일 뿐, NodeVault 서버 쪽 강제(Sprint 9/10,
+   P2a/P2b)가 없는 한 실제 보안 경계가 아니다. NodeKit CLI를 거치지
+   않고 gRPC를 직접 호출하면 여전히 아무 검사도 없다. R22-D(#39)
+   착수 시에도, 그리고 NodeVault Sprint 9/10 완료 여부를 확인하기
+   전까지는 계속 이 문구를 유지할 것.
 2. (완료, 2026-07-13) R22-B(#37)에서 BuildProfile/RuntimeProfile의 실제
    이미지→digest 매핑표를 채웠다 — SourceBuildProfileCatalog(generic/
    minimal), 둘 다 buildah run으로 실제 도구 존재를 확인한 뒤 pinning.
