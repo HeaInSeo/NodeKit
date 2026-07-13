@@ -1,11 +1,11 @@
 # NodeKit Legacy-First Sprint Plan
 
-Status: Sprint 6 완료 / Sprint 7 진행 중 / R18-R21(§13) 완료 / R22 설계 확정, 구현 대기(#37-39)  
+Status: Sprint 6 완료 / Sprint 7 진행 중 / R18-R21(§13) 완료 / R22-B/C/D(§13) 일정 확정, 구현 대기(#37-39)  
 Created: 2026-06-17  
-Updated: 2026-07-12  
+Updated: 2026-07-13  
 Scope: NodeKit work — Sprint 0-6 완료, Sprint 7(Post-Migration Hardening) 진행 중,
-§13 Live Recipe Reproducibility Improvement(R18-R21) 완료, R22 SourceBuild
-구조화 설계 확정(구현 미착수)
+§13 Live Recipe Reproducibility Improvement(R18-R21) 완료, R22-B/C/D(SourceBuild
+구조화 intent) 스프린트 일정 확정(구현 미착수)
 
 ## 0. Resume Note For Agents
 
@@ -22,23 +22,28 @@ ToolSpec 경로(`ResolveToolSpec → SubmitToolBuild → WatchToolBuild`)로 전
 별도 개발 에이전트가 독립 진행 중이라 이 세션에서 다루지 않는다
 ([[project_nodevault_parallel_agent]] 메모리 참조).
 
-**R22 설계 확정 (2026-07-12), 구현은 #37/#38/#39로 분리**: 상세는 §13 하단
-"미착수" 섹션과 `docs/NODEKIT_SOURCEBUILD_STRUCTURED_INTENT_DESIGN.md` 참조.
+**R22-B/C/D 스프린트 일정 확정 (2026-07-13)**: 설계는 2026-07-12에 이미
+확정됐고(Issue #36 close), 이번에 §13에 Sprint R22-B(#37)/R22-C(#38)/
+R22-D(#39) 형식으로 Goal/Context/Tasks/Done-when을 갖춘 정식 스프린트
+항목으로 등록. 2-stage(Build/Runtime, fetch/builder/final 3-stage 아님)도
+이번에 확정(설계 문서 §10 D-2b). 상세는 §13 R22-B/C/D 섹션과
+`docs/NODEKIT_SOURCEBUILD_STRUCTURED_INTENT_DESIGN.md` 참조.
 **R22 구현 착수 전 반드시 다시 읽을 것 — 놓치기 쉬운 함정 2가지:**
 
 ```text
-1. #38(렌더링) 구현만으로 SourceBuild 보안 문제가 "해결됐다"고 하지 말 것
-   — NodeVault 서버 쪽 강제(Sprint 9/10)가 없는 한 authoring-time UX일
-   뿐이다. §13 하단 체크리스트, 설계 문서 §2.6 Q5/§8 참조.
-2. #37(authoring 모델) 구현 시 BuildProfile/RuntimeProfile 이미지 매핑표를
-   빈 채로 두지 말 것 — 매핑이 없으면 #37 자체가 완료될 수 없다. 설계
-   문서 §16 참조.
+1. R22-C(#38, 렌더링) 구현만으로 SourceBuild 보안 문제가 "해결됐다"고
+   하지 말 것 — NodeVault 서버 쪽 강제(Sprint 9/10)가 없는 한
+   authoring-time UX일 뿐이다. §13 하단 체크리스트, 설계 문서 §2.6 Q5/§8
+   참조.
+2. R22-B(#37, authoring 모델) 구현 시 BuildProfile/RuntimeProfile 이미지
+   매핑표를 빈 채로 두지 말 것 — 매핑이 없으면 R22-B 자체가 완료될 수
+   없다. 설계 문서 §16 참조.
 ```
 
 현재 NodeKit 초점:
 
 ```text
-R22: SourceBuild 구조화 intent 구현 (#37 → #38 → #39, 위 함정 2가지 유의)
+R22-B → R22-C → R22-D: SourceBuild 구조화 intent 구현 (§13, 위 함정 2가지 유의)
 Sprint 7: Avalonia GUI ToolSpec 마이그레이션
 + U5-2: seoy 원격 장비 nodekit submit 수동 테스트 (seoy 준비 후)
   — 2026-07-05: seoy 없이 heain 로컬 사전 검증 완료(TC-1~TC-13 전체), 버그 6건
@@ -1852,42 +1857,176 @@ NODEKIT_CLI_USAGE.md 갱신은 별도로 하지 않음 — BuildDependencies는 
 명확해 별도 문서화가 급하지 않다고 판단.
 ```
 
-### 미착수 (별도 스프린트로 분리, R22+)
+### Sprint R22-B. SourceBuild 구조화 Intent — Authoring 모델 (Issue #37)
+
+Goal:
 
 ```text
-- SourceBuild multi-stage(fetch/builder/final) recipe 구조 — 설계 확정
-  완료(2026-07-12), 구현 미착수. 산출물: docs/NODEKIT_SOURCEBUILD_STRUCTURED_INTENT_DESIGN.md
-  (문제 정의/보안 목적/사용자 모델/책임 경계/하위 호환/migration
-  단계/non-goals/위험 요소/테스트 전략/미결정 사항 전부 포함, 결정표
-  8건). Issue #36은 이 설계로 close, 실제 구현은 후속 이슈 #37(R22-B:
-  authoring 모델)/#38(R22-C: RecipeRenderer 렌더링)/#39(R22-D: hygiene
-  advisor)로 분리 등록.
-  핵심 발견: NodeVault를 읽기 전용으로 조사한 결과, dockerfile_content가
-  NodeVault가 다시 쓰지 않는 불투명 문자열이고 NodeVault의 정적 검증이
-  이미 멀티스테이지 Dockerfile의 모든 FROM을 스테이지별로 검증한다는
-  것을 실제 테스트(TestValidateBuildRequest_RejectsEveryUnpinnedStage)로
-  확인 — 즉 NodeKit이 client-side에서 멀티스테이지 Dockerfile을 합성해
-  기존 API로 제출하면 NodeVault 코드 변경 없이 오늘 동작한다. 다만
-  이것만으로는 서버 쪽 강제가 없다는 한계(NodeVault Sprint 9/10
-  P2a/P2b 미구현)를 설계 문서와 #38에 명시해뒀다.
+새 RecipeBuildKind.SourceBuildStructured와 관련 필드를 authoring 모델에
+도입한다. 기존 RecipeBuildKind.SourceBuild(legacy)는 절대 변경하지 않는다.
+NodeVault 쪽 코드/API는 전혀 건드리지 않는다.
+```
+
+Context:
+
+```text
+설계: docs/NODEKIT_SOURCEBUILD_STRUCTURED_INTENT_DESIGN.md §5, §10
+D-1/D-2/D-8. 스테이지 개수는 2026-07-13 사용자 확인으로 2-profile
+(Build/Runtime)로 확정(§10 D-2b) — fetch/builder/final 3-stage가
+아니다. Issue #36 설계 검토에서 분리된 첫 구현 단계.
+```
+
+Tasks:
+
+```text
+1. RecipeBuildKind.SourceBuildStructured 추가.
+2. RecipeDocument에 BuildProfile / BuildProfileImage / RuntimeProfile /
+   RuntimeProfileImage / RuntimeDependencies 필드 추가.
+3. RecipeFieldCatalog에 새 kind 전용 필드 목록 추가 — BuildProfile/
+   RuntimeProfile은 큐레이션된 Choice 선택지 + "advanced: custom image"
+   override(BaseImageField() 패턴 재사용).
+4. BuildProfile/RuntimeProfile의 실제 이미지→digest 매핑표 작성(초기
+   큐레이션 — BaseImageCatalog의 기존 후보 재사용 가능 여부부터 검토).
+5. RecipeBuildKindResolver.Resolve에 RecipeMethodId.Source →
+   SourceBuildStructured 분기 조건 추가(사용자가 구조화 방식을 선택했을
+   때만 — 기존 legacy 매핑은 그대로 유지).
+6. RecipeValidator.Validate에 새 kind 분기 추가 — BuildProfileImage/
+   RuntimeProfileImage 둘 다 digest pinning 검증, 기존 L1-RCP-015류
+   (개행 차단) SourceBuildCommands에 재적용.
+```
+
+Done when:
+
+```text
+- Build: 0 warnings, 0 errors.
+- 새 kind로 non-interactive recipe create → nodekit validate 통과.
+- 기존 RecipeBuildKind.SourceBuild(legacy) 관련 테스트 82줄/11개 파일
+  전부 무변경 통과(회귀 없음).
+- BuildProfile/RuntimeProfile 이미지 매핑표가 실제로 채워짐 — 빈 상태로
+  이 스프린트를 완료 처리하지 않는다(아래 체크리스트 항목 2 참조).
+```
+
+### Sprint R22-C. SourceBuild 구조화 Intent — RecipeRenderer 멀티스테이지 렌더링 (Issue #38)
+
+Goal:
+
+```text
+RecipeRenderer가 R22-B의 구조화된 intent로부터 client-side에서 완성된
+2-stage Dockerfile 문자열을 합성한다. BuildRequest/raw_spec 와이어
+프로토콜은 전혀 바꾸지 않는다 — 기존 dockerfile_content 필드에 그대로
+담아 보낸다.
+```
+
+Context:
+
+```text
+설계: 설계 문서 §2.6 Q1/Q5, §5, §7, §10 D-3/D-6/D-7. 선행: R22-B(#37).
+NodeVault가 dockerfile_content를 다시 쓰지 않고(§2.1), 멀티스테이지
+Dockerfile의 모든 FROM을 스테이지별로 digest pinning 검증한다는 것을
+실제 테스트(TestValidateBuildRequest_RejectsEveryUnpinnedStage)로 이미
+확인했으므로, NodeVault 코드 변경 없이 이 스프린트만으로 기존 API 위에서
+동작한다.
+```
+
+Tasks:
+
+```text
+1. RecipeRenderer.RenderSourceBuildStructured 신규 메서드 — 기존
+   RenderSourceBuild(legacy 전용)는 그대로 둔다. Render()의 switch에
+   새 분기 추가.
+2. 2-stage 템플릿(설계 문서 §5): builder 스테이지(BuildProfileImage +
+   fetch+checksum+extract+SourceBuildCommands) → runtime 스테이지
+   (RuntimeProfileImage + COPY --from=builder 고정 export root +
+   USER 1000).
+3. ENTRYPOINT는 추가하지 않는다(D-6 — Script/Command가 이미 그 역할).
+   USER는 runtime 스테이지에만 부여한다(D-7).
+4. 산출물 export는 고정 export root 관례로 처리 — 신규 사용자 필드
+   추가하지 않음. SourceBuildCommands 도움말/예시 문구에 관례를
+   문서화(예: "빌드 결과물을 /nodekit/output/ 아래에 설치하세요").
+```
+
+Done when:
+
+```text
+- Build: 0 warnings, 0 errors.
+- RecipeRendererTests: 새 렌더 메서드가 유효한 2-stage Dockerfile 문자열을
+  만드는지(FROM 2개, 둘 다 digest pinned, USER는 마지막 스테이지에만,
+  ENTRYPOINT 없음) 확인.
+- nodekit render로 생성한 build-request.json의 dockerfile_content가
+  실제로 유효한 멀티스테이지 Dockerfile.
+- (가능하면) 실 seoy 클러스터 라이브 테스트로 alpine 등 fetch 도구 없는
+  이미지를 BuildProfileImage로 선택해도 빌드 성공, 최종 이미지에 curl이
+  없음을 확인.
+- 기존 RenderSourceBuild(legacy) 무변경 확인.
+- 이 스프린트가 "SourceBuild 보안 문제를 해결했다"는 게 아니라는 한계를
+  CLI 도움말/릴리스 노트/커밋 메시지 중 최소 하나에 명시(아래 체크리스트
+  항목 1 참조 — NodeVault 서버 쪽 강제는 별도 upstream 작업).
+```
+
+### Sprint R22-D. SourceBuild 구조화 Intent — RuntimeProfile hygiene advisor (Issue #39)
+
+Goal:
+
+```text
+새 kind의 RuntimeProfile/RuntimeProfileImage(최종 스테이지)만 대상으로
+하는 non-blocking 휴리스틱 경고를 추가한다. 기존 SourceBuildBaseImageAdvisor는
+legacy SourceBuild kind 전용으로 범위를 명확히 한다.
+```
+
+Context:
+
+```text
+설계: 설계 문서 §10 D-5. 선행: R22-B(#37), R22-C(#38) — RuntimeProfile
+필드와 렌더링 로직이 있어야 검사 대상이 생긴다.
+```
+
+Tasks:
+
+```text
+1. 신규 RuntimeProfileHygieneAdvisor(가칭, src/NodeKit.Cli/) —
+   SourceBuildBaseImageAdvisor와 같은 패턴(internal static class,
+   Describe(...) → string? null-or-warning).
+2. SourceBuildBaseImageAdvisor 클래스 doc 주석 갱신 — "legacy
+   RecipeBuildKind.SourceBuild 전용" 명시.
+3. RecipeCreateFlow.cs / RecipeCreateCommand.cs에 새 advisor 배선(R20/R21과
+   동일한 위치·패턴).
+4. 이미지 이름 문자열만으로 내부 도구 존재를 확정하지 않는다 — 경고
+   문구에 "추정"임을 표시하고, 실제 검사(NodeVault Sprint 9/10, 이
+   저장소 범위 밖)와 명확히 구분.
+```
+
+Done when:
+
+```text
+- Build: 0 warnings, 0 errors.
+- 신규 advisor 단위 테스트 + RecipeCreateCommandTests: 새 kind + risky
+  RuntimeProfileImage 조합에서 경고 출력, 저장은 계속 진행(non-blocking).
+- SourceBuildBaseImageAdvisorTests 기존 테스트(legacy kind 대상) 전부
+  무변경 통과.
+- 실제 CLI로 RuntimeProfileImage에 fetch 전용 이미지를 넣었을 때 경고
+  출력 확인(차단 아님).
+```
+
+### 참고 (R22와 무관, 별도 트리거)
+
+```text
 - NodeVault가 P1(build_events/digest 노출)을 실제로 배포하면 R18의
   fallback 안내를 실제 digest 표시로 승격.
 ```
 
 **⚠ R22 구현 시 절대 놓치면 안 되는 것 2가지 (2026-07-12 사용자 지시로 명시적
-추적 요청받음 — #37/#38 완료 조건에도 반영되어 있지만 여기서도 중복 기록):**
+추적 요청받음 — 각 스프린트의 "Done when"에도 반영되어 있지만 여기서도
+중복 기록):**
 
 ```text
-1. #38(RecipeRenderer 렌더링) 구현만으로 "SourceBuild 보안 문제가
-   해결됐다"고 발표/기록하지 말 것. Phase C(client-side 멀티스테이지
-   렌더링)는 authoring-time UX 개선일 뿐, NodeVault 서버 쪽 강제
-   (Sprint 9/10, P2a/P2b)가 없는 한 실제 보안 경계가 아니다. NodeKit
-   CLI를 거치지 않고 gRPC를 직접 호출하면 여전히 아무 검사도 없다.
-   #38을 닫기 전에 이 한계를 CLI 도움말/릴리스 노트/커밋 메시지 중
-   최소 하나에 명시했는지 확인할 것.
-2. #37(authoring 모델) 구현 시 BuildProfile/RuntimeProfile의 실제
-   이미지→digest 매핑표를 반드시 채울 것 — 설계 문서(§16 미결정
-   사항)는 프레임워크만 정의했고 구체적 큐레이션은 비어 있다. 매핑이
-   없으면 wizard가 선택지를 보여줄 수 없어 #37 자체가 완료될 수 없다
-   — 즉 "나중에 채우기"로 미루고 넘어갈 수 있는 항목이 아니다.
+1. R22-C(#38) 구현만으로 "SourceBuild 보안 문제가 해결됐다"고 발표/기록
+   하지 말 것. client-side 멀티스테이지 렌더링은 authoring-time UX
+   개선일 뿐, NodeVault 서버 쪽 강제(Sprint 9/10, P2a/P2b)가 없는 한
+   실제 보안 경계가 아니다. NodeKit CLI를 거치지 않고 gRPC를 직접
+   호출하면 여전히 아무 검사도 없다.
+2. R22-B(#37) 구현 시 BuildProfile/RuntimeProfile의 실제 이미지→digest
+   매핑표를 반드시 채울 것 — 설계 문서(§16 미결정 사항)는 프레임워크만
+   정의했고 구체적 큐레이션은 비어 있다. 매핑이 없으면 wizard가 선택지를
+   보여줄 수 없어 R22-B 자체가 완료될 수 없다 — "나중에 채우기"로 미루고
+   넘어갈 수 있는 항목이 아니다.
 ```

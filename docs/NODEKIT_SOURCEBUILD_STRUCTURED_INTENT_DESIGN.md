@@ -259,7 +259,7 @@ toolchain/Python/Rust/기타)과 "런타임 프로필"(예: 최소 런타임/Pyt
   "빌드 환경이 뭐가 필요한지 모른다"고 답해도 프로필 기본값으로
   진행할 수 있다.
 
-### 추가 결정: 3-profile이 아니라 2-profile(Build/Runtime)로 단순화 제안
+### 확정 결정 (2026-07-13): 3-profile이 아니라 2-profile(Build/Runtime)
 
 원본 목표 설계(`NODEVAULT_LIVE_RECIPE_REPRO_IMPROVEMENT_NODEKIT.md`)는
 fetch/builder/final 3-stage를 제시했다. 하지만:
@@ -270,11 +270,14 @@ fetch/builder/final 3-stage를 제시했다. 하지만:
   BaseImage였다는 점에 주목).
 - 프로필 질문이 3개에서 2개로 줄면 초보자 wizard 진입장벽이 낮아진다.
 
-이건 **권장**이지 확정된 강제 사항은 아니다 — §10 결정표에 "포기한
-대안"으로 3-profile 옵션도 남겨둔다. 실제 큐레이션 작업(어떤 이미지가
-정말 fetch 도구를 포함하는지) 과정에서 2-profile로 충분하지 않다고
-판명되면 3-profile로 되돌릴 수 있게 설계를 열어둔다(내부 렌더링
-로직만 바뀌고 사용자 모델은 영향받지 않도록).
+2026-07-13 사용자 확인으로 **2-profile(Build/Runtime)을 확정**한다 —
+더 이상 "권장, 확정 아님" 상태가 아니다. §10 결정표 D-2b, §11 Phase B의
+`RecipeFieldCatalog` 작업은 이 결정을 전제로 진행한다. 다만 실제
+큐레이션 작업(어떤 이미지가 정말 fetch 도구를 포함하는지, Sprint R22-B
+범위) 과정에서 2-profile로 도저히 충분하지 않다고 판명되면 3-profile로
+되돌릴 수 있게 렌더러 내부 로직은 확장 가능하게 설계한다(사용자 모델
+자체는 영향받지 않도록) — 이건 "재검토 가능성"이지 지금 결정을
+번복하는 게 아니다.
 
 ## 5. Resolved Build Plan — 내부 모델 (NodeKit 전용, 와이어 프로토콜 불변)
 
@@ -454,7 +457,7 @@ NodeVault Sprint 9/10이 구현해야 생긴다 — §11에서 upstream 의존�
 |---|---|---|---|---|---|
 | D-1. 하위 호환 | (1) legacy 항상 단일-stage (2) 자동 추론 (3) 명시적 migration (4) legacy 읽기 전용, 신규 생성 금지 (5) legacy 경고/차단 | (1)+(4) 조합: legacy 렌더링 유지 + wizard가 신규 생성으로 더는 제시하지 않음 | (2)는 명시적 마커 원칙 위반(보안 의미가 조용히 바뀜). (5)는 기존 자동화 스크립트를 깨뜨림. (3)은 사용자에게 강제 작업을 요구해 UX상 과함 | (2) 자동 추론, (5) 강제 차단 | 새 `RecipeBuildKind.SourceBuildStructured` 필요(§9) |
 | D-2. 사용자 모델 | 방식 A(이미지 직접) vs 방식 B(profile) | 방식 B 기본 + 방식 A는 advanced override | 기존 `PackageEngine`/`BaseImageCatalog` UX 패턴과 일치, 초보자 wizard 철학과 일치 | 방식 A를 기본으로 하는 안 | `BuildProfile`/`RuntimeProfile` Choice 필드 + advanced override 필드 필요 |
-| D-2b. 스테이지 개수 | 3-stage(fetch/build/final) vs 2-stage(build/final) | 2-stage 권장(확정 아님) | 프로필 질문 수 감소, fetch 도구를 build profile 큐레이션 책임으로 흡수 가능 | 3-stage 고정 | 큐레이션 작업에서 fetch 도구 부족이 반복되면 3-stage로 되돌릴 수 있게 렌더러 내부를 설계 |
+| D-2b. 스테이지 개수 | 3-stage(fetch/build/final) vs 2-stage(build/final) | **2-stage 확정(2026-07-13)** | 프로필 질문 수 감소, fetch 도구를 build profile 큐레이션 책임으로 흡수 가능 | 3-stage 고정 | 큐레이션 작업에서 fetch 도구 부족이 반복되면 3-stage로 되돌릴 수 있게 렌더러 내부를 설계 |
 | D-3. 산출물 export | (1) 단일 BuiltArtifactPath (2) 여러 artifact mapping (3) 고정 export root (4) install/export 명령 분리 (5) profile이 export 규칙 제공 | (3) 고정 export root | 파일 개수/종류에 무관하게 "디렉터리 복사" 하나로 일반화됨, 신규 필드 불필요 | (1)은 복수 파일 케이스를 못 다룸, (2)/(4)는 필드가 늘어나 UX 복잡도 증가 | `SourceBuildCommands` 도움말에 관례 문서화 필요, 사용자 필드는 추가하지 않음 |
 | D-4. 이 설계의 소유 계층 | NodeKit 내부 모델 / legacy BuildRequest 확장 / 신규 ToolSpec API | NodeKit 내부 모델만 (지금 가능한 범위) | 와이어 프로토콜 불변 — legacy도 신규 경로도 안 건드림(§2.6 Q3) | BuildRequest 확장(§2.1이 "불투명 문자열" 설계라 부적합함을 증명) | NodeVault 쪽 진짜 구조화 API는 별도 upstream 의존성(§11)으로 분리, 지금 만들지 않음 |
 | D-5. SourceBuildBaseImageAdvisor 거취 | 유지 / 폐기 / runtime hygiene advisor로 변경 / heuristic-실제검사 분리 | 레거시 `SourceBuild` kind에는 그대로 유지, `SourceBuildStructured`에는 새 advisor(RuntimeProfileHygieneAdvisor류) 별도 작성 | 레거시 recipe는 여전히 단일 BaseImage 구조라 기존 advisor 로직이 계속 맞음; 새 kind는 profile 기반이라 다른 휴리스틱이 필요 | 완전 폐기(레거시 recipe에 대한 경고가 없어짐) | 새 advisor는 최종 스테이지(RuntimeProfileImage)만 검사하도록 범위를 좁혀야 함 |
