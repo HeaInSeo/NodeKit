@@ -291,8 +291,10 @@ namespace NodeKit.Authoring.Recipes
                         Requirement: RecipeFieldRequirement.Required,
                         DefaultValue: null,
                         Label: Text("빌드 명령", "Build commands"),
-                        Help: Text("source를 빌드하는 명령어 목록입니다.", "The list of commands that build the source."),
-                        Examples: new[] { "make", "make install" },
+                        Help: Text(
+                            "source를 빌드하는 명령어 목록입니다. 최종 이미지에 남길 파일만 /nodekit/output/ 아래에 설치하세요(예: make install DESTDIR=/nodekit/output) — 그 경로 아래 내용만 런타임 이미지로 복사되고, 컴파일러/curl 등 빌드 도구는 남지 않습니다.",
+                            "The list of commands that build the source. Install only the files you want in the final image under /nodekit/output/ (e.g. make install DESTDIR=/nodekit/output) — only that path is copied into the runtime image, so build tools like compilers/curl don't leak through."),
+                        Examples: new[] { "make", "make install DESTDIR=/nodekit/output" },
                         Choices: Array.Empty<RecipeChoice>(),
                         Apply: (recipe, value) => recipe.SourceBuildCommands.Add((string)value),
                         ClearList: recipe => recipe.SourceBuildCommands.Clear()),

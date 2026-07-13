@@ -13,6 +13,12 @@ namespace NodeKit.Authoring.Recipes
     /// </summary>
     internal static class RecipeRenderer
     {
+        // §13 R22-C. Fixed convention, not a user-facing field — SourceBuildCommands's
+        // help text tells authors to install final-image files here (see
+        // RecipeFieldCatalog's SourceBuildCommands descriptor for
+        // RecipeMethodId.SourceStructured).
+        private const string ExportRoot = "/nodekit/output";
+
         public static ToolDefinition Render(RecipeDocument recipe)
         {
             ArgumentNullException.ThrowIfNull(recipe);
@@ -146,21 +152,29 @@ namespace NodeKit.Authoring.Recipes
             definition.DockerfileContent = dockerfile.ToString();
         }
 
-        // §13 R22-B TEMPORARY placeholder — proves the new authoring model
-        // (BuildProfile/RuntimeProfile/RuntimeDependencies) round-trips
-        // through validate/render/submit correctly. Issue #38 (R22-C)
-        // replaces this single-stage body with the real builder+runtime
-        // 2-stage split (COPY --from, USER only on the runtime stage, no
-        // ENTRYPOINT — see
-        // docs/NODEKIT_SOURCEBUILD_STRUCTURED_INTENT_DESIGN.md §5/§11 Phase
-        // C). This placeholder does NOT keep build tools out of the final
-        // image the way the real design does — it renders BuildProfileImage
-        // as both the fetch/build AND the final image, same shape as legacy
-        // RenderSourceBuild. Do not treat this as the security fix; RuntimeProfile
-        // is validated (RecipeValidator) but not yet used by this renderer.
+        // §13 R22-C. Real 2-stage split — this is the actual security fix
+        // R22-B's placeholder deferred. "builder" fetches/verifies/extracts/
+        // builds the source using BuildProfileImage (curated to include
+        // curl/tar/sha256sum, see SourceBuildProfileCatalog). Only the fixed
+        // export root (ExportRoot) is copied into the runtime stage, so
+        // RuntimeProfileImage never sees curl, compilers, source trees, or
+        // build caches from the builder stage. USER applies to the runtime
+        // stage only (fetch/build may run as root — design doc §7/D-7); no
+        // ENTRYPOINT is added (Script/Command already carry that contract
+        // via BuildRequest/ToolDefinition, not the Dockerfile — design doc
+        // §7/D-6). L1-RCP-015's newline guard on SourceBuildCommands still
+        // applies since those commands still collapse onto one RUN line.
+        //
+        // ⚠ This closes the client-side half of the gap only. NodeVault has
+        // no server-side enforcement that the runtime stage stays clean
+        // (tracked upstream as NodeVault's own Sprint 9/10, unimplemented) —
+        // do not describe this alone as "the SourceBuild security problem is
+        // solved." See docs/NODEKIT_SOURCEBUILD_STRUCTURED_INTENT_DESIGN.md
+        // §2.6 Q5/§8.
         private static void RenderSourceBuildStructured(RecipeDocument recipe, ToolDefinition definition)
         {
             var buildImage = ResolveProfileImage(recipe.BuildProfile, recipe.BuildProfileImage, SourceBuildProfileCatalog.FindBuildProfile);
+            var runtimeImage = ResolveProfileImage(recipe.RuntimeProfile, recipe.RuntimeProfileImage, SourceBuildProfileCatalog.FindRuntimeProfile);
             definition.ImageUri = buildImage;
 
             var buildCommands = recipe.SourceBuildCommands.Count > 0
@@ -172,10 +186,11 @@ namespace NodeKit.Authoring.Recipes
                 : recipe.SourceChecksum;
 
             var dockerfile = new StringBuilder();
-            dockerfile.Append("FROM ").Append(buildImage).Append('\n');
+            dockerfile.Append("FROM ").Append(buildImage).Append(" AS builder\n");
             dockerfile.Append("RUN curl -fsSL -o source.tar.gz \"").Append(recipe.SourceUri).Append("\" && ")
                 .Append("echo \"").Append(checksumHex).Append("  source.tar.gz\" | sha256sum -c - && ")
-                .Append("tar -xzf source.tar.gz");
+                .Append("tar -xzf source.tar.gz && ")
+                .Append("mkdir -p ").Append(ExportRoot);
 
             if (buildCommands.Length > 0)
             {
@@ -183,6 +198,9 @@ namespace NodeKit.Authoring.Recipes
             }
 
             dockerfile.Append('\n');
+            dockerfile.Append('\n');
+            dockerfile.Append("FROM ").Append(runtimeImage).Append('\n');
+            dockerfile.Append("COPY --from=builder ").Append(ExportRoot).Append("/ /\n");
             dockerfile.Append("USER 1000\n");
             definition.DockerfileContent = dockerfile.ToString();
         }

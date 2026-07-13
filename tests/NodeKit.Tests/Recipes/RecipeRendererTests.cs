@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using NodeKit.Authoring;
 using NodeKit.Authoring.Recipes;
@@ -151,38 +152,53 @@ namespace NodeKit.Tests.Recipes
             Assert.Empty(violations);
         }
 
-        // §13 R22-B (docs/NODEKIT_SOURCEBUILD_STRUCTURED_INTENT_DESIGN.md §5,
-        // §11 Phase B). RenderSourceBuildStructured is a TEMPORARY single-stage
-        // placeholder — it proves the new field model round-trips through
-        // render/validate correctly, not the real 2-stage security fix
-        // (that's #38/R22-C).
+        // §13 R22-C (docs/NODEKIT_SOURCEBUILD_STRUCTURED_INTENT_DESIGN.md §5,
+        // §11 Phase C). Real 2-stage split: builder (fetch/verify/extract/
+        // build, curated to include curl/tar/sha256sum) -> runtime (only the
+        // fixed export root copied in, USER applied here only, no
+        // ENTRYPOINT). This replaced R22-B's single-stage placeholder — the
+        // security fix these tests assert didn't exist before this sprint.
 
         [Fact]
-        public void Render_SourceBuildStructured_CuratedBuildProfile_ResolvesToProfileImage()
+        public void Render_SourceBuildStructured_CuratedProfiles_ProducesTwoStageDockerfile()
         {
             var recipe = NewRecipe(RecipeBuildKind.SourceBuildStructured);
             recipe.BuildProfile = "generic";
             recipe.RuntimeProfile = "minimal";
             recipe.SourceUri = "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz";
             recipe.SourceChecksum = "sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd";
-            recipe.SourceBuildCommands.Add("make");
+            recipe.SourceBuildCommands.Add("make install DESTDIR=/nodekit/output");
 
             var definition = RecipeRenderer.Render(recipe);
+            var dockerfile = definition.DockerfileContent;
 
-            var expectedImage = SourceBuildProfileCatalog.FindBuildProfile("generic")!.ImageReference;
-            Assert.Equal(expectedImage, definition.ImageUri);
-            Assert.Contains($"FROM {expectedImage}", definition.DockerfileContent);
-            Assert.Contains("USER 1000", definition.DockerfileContent);
-            Assert.DoesNotContain("ENTRYPOINT", definition.DockerfileContent);
+            var buildImage = SourceBuildProfileCatalog.FindBuildProfile("generic")!.ImageReference;
+            var runtimeImage = SourceBuildProfileCatalog.FindRuntimeProfile("minimal")!.ImageReference;
+
+            Assert.Equal(buildImage, definition.ImageUri);
+            Assert.Contains($"FROM {buildImage} AS builder", dockerfile);
+            Assert.Contains($"FROM {runtimeImage}", dockerfile);
+            Assert.Contains("COPY --from=builder /nodekit/output/ /", dockerfile);
+            Assert.Contains("mkdir -p /nodekit/output", dockerfile);
+            Assert.DoesNotContain("ENTRYPOINT", dockerfile);
+
+            // USER must apply to the runtime stage only — it should appear
+            // strictly after the second FROM, not before it (i.e. not on the
+            // builder stage).
+            var secondFromIndex = dockerfile.IndexOf($"FROM {runtimeImage}", StringComparison.Ordinal);
+            var userIndex = dockerfile.IndexOf("USER 1000", StringComparison.Ordinal);
+            Assert.True(userIndex > secondFromIndex, "USER 1000 must come after the runtime stage's FROM");
         }
 
         [Fact]
-        public void Render_SourceBuildStructured_AdvancedBuildProfile_UsesBuildProfileImage()
+        public void Render_SourceBuildStructured_AdvancedBuildAndRuntimeProfiles_UseCustomImages()
         {
+            const string customRuntimeImage = "debian:bookworm@sha256:1111111111111111111111111111111111111111111111111111111111111a";
             var recipe = NewRecipe(RecipeBuildKind.SourceBuildStructured);
             recipe.BuildProfile = "advanced";
             recipe.BuildProfileImage = PinnedBaseImage;
-            recipe.RuntimeProfile = "minimal";
+            recipe.RuntimeProfile = "advanced";
+            recipe.RuntimeProfileImage = customRuntimeImage;
             recipe.SourceUri = "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz";
             recipe.SourceChecksum = "sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd";
             recipe.SourceBuildCommands.Add("make");
@@ -190,7 +206,8 @@ namespace NodeKit.Tests.Recipes
             var definition = RecipeRenderer.Render(recipe);
 
             Assert.Equal(PinnedBaseImage, definition.ImageUri);
-            Assert.Contains($"FROM {PinnedBaseImage}", definition.DockerfileContent);
+            Assert.Contains($"FROM {PinnedBaseImage} AS builder", definition.DockerfileContent);
+            Assert.Contains($"FROM {customRuntimeImage}", definition.DockerfileContent);
         }
 
         [Fact]
