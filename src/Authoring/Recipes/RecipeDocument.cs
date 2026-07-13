@@ -70,6 +70,36 @@ namespace NodeKit.Authoring.Recipes
         /// <summary>source method authoring field, Recommended (not blocking) — see design doc Section 9.6.</summary>
         public List<string> BuildDependencies { get; set; } = new();
 
+        // ── SourceBuild (structured, RecipeBuildKind.SourceBuildStructured) ──
+        // SourceUri/SourceChecksum/SourceBuildCommands/BuildDependencies above
+        // are reused as-is — see
+        // docs/NODEKIT_SOURCEBUILD_STRUCTURED_INTENT_DESIGN.md §5. These
+        // fields only apply to the structured kind.
+
+        /// <summary>
+        /// Key into SourceBuildProfileCatalog.BuildProfiles, or
+        /// SourceBuildProfileCatalog.AdvancedKey ("advanced") to use
+        /// BuildProfileImage directly instead of a curated profile.
+        /// </summary>
+        public string BuildProfile { get; set; } = string.Empty;
+
+        /// <summary>Only read when BuildProfile == SourceBuildProfileCatalog.AdvancedKey.</summary>
+        public string BuildProfileImage { get; set; } = string.Empty;
+
+        /// <summary>Key into SourceBuildProfileCatalog.RuntimeProfiles, or "advanced".</summary>
+        public string RuntimeProfile { get; set; } = string.Empty;
+
+        /// <summary>Only read when RuntimeProfile == SourceBuildProfileCatalog.AdvancedKey.</summary>
+        public string RuntimeProfileImage { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Distinct from BuildDependencies (fetch/build-stage-only) — these
+        /// are expected to remain in the final runtime image. Recommended,
+        /// not actionable yet (no auto-install — see design doc §10 D-8,
+        /// same conservative policy as R21/BuildDependenciesAdvisor).
+        /// </summary>
+        public List<string> RuntimeDependencies { get; set; } = new();
+
         // ── DockerfileFallback ───────────────────────────────────────────────
         public string DockerfileContent { get; set; } = string.Empty;
 
@@ -128,6 +158,11 @@ namespace NodeKit.Authoring.Recipes
             SourceChecksum ??= string.Empty;
             SourceBuildCommands ??= new List<string>();
             BuildDependencies ??= new List<string>();
+            BuildProfile ??= string.Empty;
+            BuildProfileImage ??= string.Empty;
+            RuntimeProfile ??= string.Empty;
+            RuntimeProfileImage ??= string.Empty;
+            RuntimeDependencies ??= new List<string>();
             DockerfileContent ??= string.Empty;
             DockerfilePath ??= string.Empty;
             BuildContext ??= string.Empty;

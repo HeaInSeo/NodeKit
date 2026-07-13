@@ -24,6 +24,7 @@ namespace NodeKit.Authoring.Recipes
                 RecipeMethodId.Container => RecipeBuildKind.BioContainer,
                 RecipeMethodId.Mirror => RecipeBuildKind.PackageMirror,
                 RecipeMethodId.Source => RecipeBuildKind.SourceBuild,
+                RecipeMethodId.SourceStructured => RecipeBuildKind.SourceBuildStructured,
                 RecipeMethodId.Dockerfile => RecipeBuildKind.DockerfileFallback,
 
                 RecipeMethodId.Package => document.PackageEngine == "micromamba"

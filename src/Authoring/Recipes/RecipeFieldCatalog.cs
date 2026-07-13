@@ -226,6 +226,127 @@ namespace NodeKit.Authoring.Recipes
                         Apply: (recipe, value) => recipe.BuildDependencies.Add((string)value),
                         ClearList: recipe => recipe.BuildDependencies.Clear()),
                 },
+
+                // §13 R22-B. Advanced/opt-in — not offered by the interactive
+                // wizard (RecipeMethodRecommender/MethodRecommendationPresenter/
+                // BeginnerGuideFlow are unaware of this method by design; see
+                // RecipeMethodId.SourceStructured's doc comment). Reachable via
+                // `nodekit recipe create --non-interactive --method
+                // source-structured`. SourceUri/SourceChecksum/
+                // SourceBuildCommands/BuildDependencies fields are identical to
+                // [RecipeMethodId.Source] above — same reproducibility contract,
+                // just a different base-image model (BuildProfile/RuntimeProfile
+                // instead of one BaseImage).
+                [RecipeMethodId.SourceStructured] = new[]
+                {
+                    new RecipeFieldDescriptor(
+                        Name: "BuildProfile",
+                        Type: RecipeFieldType.Choice,
+                        Requirement: RecipeFieldRequirement.Required,
+                        DefaultValue: null,
+                        Label: Text("빌드 환경", "Build environment"),
+                        Help: Text(
+                            "소스를 내려받고 빌드하는 환경입니다. curl/tar/sha256sum 등 fetch 도구가 이미 포함된 이미지 중에서 고르거나, advanced를 선택해 BuildProfileImage에 직접 이미지를 지정하세요.",
+                            "The environment used to fetch and build the source. Pick from images that already include fetch tools, or choose advanced and specify BuildProfileImage directly."),
+                        Examples: Array.Empty<string>(),
+                        Choices: BuildProfileChoices(),
+                        Apply: (recipe, value) => recipe.BuildProfile = (string)value),
+                    new RecipeFieldDescriptor(
+                        Name: "BuildProfileImage",
+                        Type: RecipeFieldType.Scalar,
+                        Requirement: RecipeFieldRequirement.Optional,
+                        DefaultValue: null,
+                        Label: Text("빌드 환경 커스텀 이미지", "Custom build environment image"),
+                        Help: Text(
+                            "BuildProfile을 advanced로 선택했을 때만 사용됩니다. @sha256:... digest를 포함해야 합니다.",
+                            "Only used when BuildProfile is advanced. Must include an @sha256:... digest."),
+                        Examples: _baseImageFieldExamples,
+                        Choices: Array.Empty<RecipeChoice>(),
+                        Apply: (recipe, value) => recipe.BuildProfileImage = (string)value),
+                    new RecipeFieldDescriptor(
+                        Name: "SourceUri",
+                        Type: RecipeFieldType.Scalar,
+                        Requirement: RecipeFieldRequirement.Required,
+                        DefaultValue: null,
+                        Label: Text("소스 URI", "Source URI"),
+                        Help: Text("source archive 또는 release URI입니다.", "The source archive or release URI."),
+                        Examples: new[] { "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz" },
+                        Choices: Array.Empty<RecipeChoice>(),
+                        Apply: (recipe, value) => recipe.SourceUri = (string)value),
+                    new RecipeFieldDescriptor(
+                        Name: "SourceChecksum",
+                        Type: RecipeFieldType.Scalar,
+                        Requirement: RecipeFieldRequirement.Required,
+                        DefaultValue: null,
+                        Label: Text("소스 체크섬", "Source checksum"),
+                        Help: Text(
+                            "v1에서는 sha256:<64 hex> 형식만 허용합니다.",
+                            "v1 only accepts the sha256:<64 hex> format."),
+                        Examples: new[] { "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" },
+                        Choices: Array.Empty<RecipeChoice>(),
+                        Apply: (recipe, value) => recipe.SourceChecksum = (string)value),
+                    new RecipeFieldDescriptor(
+                        Name: "SourceBuildCommands",
+                        Type: RecipeFieldType.StringList,
+                        Requirement: RecipeFieldRequirement.Required,
+                        DefaultValue: null,
+                        Label: Text("빌드 명령", "Build commands"),
+                        Help: Text("source를 빌드하는 명령어 목록입니다.", "The list of commands that build the source."),
+                        Examples: new[] { "make", "make install" },
+                        Choices: Array.Empty<RecipeChoice>(),
+                        Apply: (recipe, value) => recipe.SourceBuildCommands.Add((string)value),
+                        ClearList: recipe => recipe.SourceBuildCommands.Clear()),
+                    new RecipeFieldDescriptor(
+                        Name: "BuildDependencies",
+                        Type: RecipeFieldType.StringList,
+                        Requirement: RecipeFieldRequirement.Recommended,
+                        DefaultValue: null,
+                        Label: Text("빌드 의존성", "Build dependencies"),
+                        Help: Text(
+                            "빌드에 필요한 dependency 목록입니다 — 없어도 되지만 재현성을 위해 명시를 권장합니다.",
+                            "The dependencies the build needs — optional, but recommended for reproducibility."),
+                        Examples: Array.Empty<string>(),
+                        Choices: Array.Empty<RecipeChoice>(),
+                        Apply: (recipe, value) => recipe.BuildDependencies.Add((string)value),
+                        ClearList: recipe => recipe.BuildDependencies.Clear()),
+                    new RecipeFieldDescriptor(
+                        Name: "RuntimeProfile",
+                        Type: RecipeFieldType.Choice,
+                        Requirement: RecipeFieldRequirement.Required,
+                        DefaultValue: null,
+                        Label: Text("런타임 환경", "Runtime environment"),
+                        Help: Text(
+                            "도구를 실제로 실행할 최종 이미지입니다. 빌드 도구가 남지 않은 최소 이미지 중에서 고르거나, advanced를 선택해 RuntimeProfileImage에 직접 이미지를 지정하세요.",
+                            "The final image the tool actually runs in. Pick a minimal image with no leftover build tools, or choose advanced and specify RuntimeProfileImage directly."),
+                        Examples: Array.Empty<string>(),
+                        Choices: RuntimeProfileChoices(),
+                        Apply: (recipe, value) => recipe.RuntimeProfile = (string)value),
+                    new RecipeFieldDescriptor(
+                        Name: "RuntimeProfileImage",
+                        Type: RecipeFieldType.Scalar,
+                        Requirement: RecipeFieldRequirement.Optional,
+                        DefaultValue: null,
+                        Label: Text("런타임 커스텀 이미지", "Custom runtime image"),
+                        Help: Text(
+                            "RuntimeProfile을 advanced로 선택했을 때만 사용됩니다. @sha256:... digest를 포함해야 합니다.",
+                            "Only used when RuntimeProfile is advanced. Must include an @sha256:... digest."),
+                        Examples: _baseImageFieldExamples,
+                        Choices: Array.Empty<RecipeChoice>(),
+                        Apply: (recipe, value) => recipe.RuntimeProfileImage = (string)value),
+                    new RecipeFieldDescriptor(
+                        Name: "RuntimeDependencies",
+                        Type: RecipeFieldType.StringList,
+                        Requirement: RecipeFieldRequirement.Recommended,
+                        DefaultValue: null,
+                        Label: Text("런타임 의존성", "Runtime dependencies"),
+                        Help: Text(
+                            "최종 이미지에 남아있어야 하는 dependency 목록입니다 — 현재는 자동 설치되지 않습니다(경고만 표시).",
+                            "The dependencies expected to remain in the final image — not auto-installed yet (warning only)."),
+                        Examples: Array.Empty<string>(),
+                        Choices: Array.Empty<RecipeChoice>(),
+                        Apply: (recipe, value) => recipe.RuntimeDependencies.Add((string)value),
+                        ClearList: recipe => recipe.RuntimeDependencies.Clear()),
+                },
                 [RecipeMethodId.Dockerfile] = new[]
                 {
                     BaseImageField(),
@@ -301,6 +422,25 @@ namespace NodeKit.Authoring.Recipes
             Examples: _baseImageFieldExamples,
             Choices: Array.Empty<RecipeChoice>(),
             Apply: (recipe, value) => recipe.BaseImage = (string)value);
+
+        private static List<RecipeChoice> BuildProfileChoices() =>
+            SourceBuildProfileCatalog.BuildProfiles
+                .Select(p => new RecipeChoice(p.Key, p.Label, p.Description))
+                .Append(AdvancedChoice())
+                .ToList();
+
+        private static List<RecipeChoice> RuntimeProfileChoices() =>
+            SourceBuildProfileCatalog.RuntimeProfiles
+                .Select(p => new RecipeChoice(p.Key, p.Label, p.Description))
+                .Append(AdvancedChoice())
+                .ToList();
+
+        private static RecipeChoice AdvancedChoice() => new(
+            SourceBuildProfileCatalog.AdvancedKey,
+            Text("직접 지정 (고급)", "Specify directly (advanced)"),
+            Text(
+                "큐레이션된 이미지 대신 직접 이미지를 입력합니다 — 함께 있는 *Image 필드를 채우세요.",
+                "Enter a custom image instead of a curated one — fill in the accompanying *Image field."));
 
         private static LocalizedText Text(string ko, string en) =>
             new(new Dictionary<string, string> { ["ko"] = ko, ["en"] = en });

@@ -151,6 +151,64 @@ namespace NodeKit.Tests.Recipes
             Assert.Empty(violations);
         }
 
+        // §13 R22-B (docs/NODEKIT_SOURCEBUILD_STRUCTURED_INTENT_DESIGN.md §5,
+        // §11 Phase B). RenderSourceBuildStructured is a TEMPORARY single-stage
+        // placeholder — it proves the new field model round-trips through
+        // render/validate correctly, not the real 2-stage security fix
+        // (that's #38/R22-C).
+
+        [Fact]
+        public void Render_SourceBuildStructured_CuratedBuildProfile_ResolvesToProfileImage()
+        {
+            var recipe = NewRecipe(RecipeBuildKind.SourceBuildStructured);
+            recipe.BuildProfile = "generic";
+            recipe.RuntimeProfile = "minimal";
+            recipe.SourceUri = "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz";
+            recipe.SourceChecksum = "sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd";
+            recipe.SourceBuildCommands.Add("make");
+
+            var definition = RecipeRenderer.Render(recipe);
+
+            var expectedImage = SourceBuildProfileCatalog.FindBuildProfile("generic")!.ImageReference;
+            Assert.Equal(expectedImage, definition.ImageUri);
+            Assert.Contains($"FROM {expectedImage}", definition.DockerfileContent);
+            Assert.Contains("USER 1000", definition.DockerfileContent);
+            Assert.DoesNotContain("ENTRYPOINT", definition.DockerfileContent);
+        }
+
+        [Fact]
+        public void Render_SourceBuildStructured_AdvancedBuildProfile_UsesBuildProfileImage()
+        {
+            var recipe = NewRecipe(RecipeBuildKind.SourceBuildStructured);
+            recipe.BuildProfile = "advanced";
+            recipe.BuildProfileImage = PinnedBaseImage;
+            recipe.RuntimeProfile = "minimal";
+            recipe.SourceUri = "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz";
+            recipe.SourceChecksum = "sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd";
+            recipe.SourceBuildCommands.Add("make");
+
+            var definition = RecipeRenderer.Render(recipe);
+
+            Assert.Equal(PinnedBaseImage, definition.ImageUri);
+            Assert.Contains($"FROM {PinnedBaseImage}", definition.DockerfileContent);
+        }
+
+        [Fact]
+        public void Render_SourceBuildStructured_PassesFullL1ValidatorChain()
+        {
+            var recipe = NewRecipe(RecipeBuildKind.SourceBuildStructured);
+            recipe.BuildProfile = "generic";
+            recipe.RuntimeProfile = "minimal";
+            recipe.SourceUri = "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz";
+            recipe.SourceChecksum = "sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd";
+            recipe.SourceBuildCommands.AddRange(new[] { "make", "make install" });
+
+            var definition = RecipeRenderer.Render(recipe);
+            var violations = RunFullL1Chain(definition);
+
+            Assert.Empty(violations);
+        }
+
         [Fact]
         public void Render_DockerfileFallback_PassesThroughVerbatim()
         {

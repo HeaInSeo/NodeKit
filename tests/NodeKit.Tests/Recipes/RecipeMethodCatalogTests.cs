@@ -7,8 +7,12 @@ namespace NodeKit.Tests.Recipes
     public class RecipeMethodCatalogTests
     {
         [Fact]
-        public void Methods_ContainsAllFiveMethodsExactlyOnce()
+        public void Methods_ContainsAllSixMethodsExactlyOnce()
         {
+            // §13 R22-B added RecipeMethodId.SourceStructured (5 -> 6) — see
+            // docs/NODEKIT_SOURCEBUILD_STRUCTURED_INTENT_DESIGN.md. It's
+            // intentionally listed right after Source, since it's an
+            // advanced/opt-in variant of the same method.
             var methods = RecipeMethodCatalog.Methods.Select(m => m.Method).ToList();
 
             Assert.Equal(
@@ -18,6 +22,7 @@ namespace NodeKit.Tests.Recipes
                     RecipeMethodId.Package,
                     RecipeMethodId.Mirror,
                     RecipeMethodId.Source,
+                    RecipeMethodId.SourceStructured,
                     RecipeMethodId.Dockerfile,
                 },
                 methods);

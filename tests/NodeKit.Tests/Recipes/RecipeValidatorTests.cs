@@ -577,5 +577,164 @@ namespace NodeKit.Tests.Recipes
 
             Assert.DoesNotContain(result.Violations, v => v.RuleId is "L1-RCP-009" or "L1-RCP-010");
         }
+
+        // §13 R22-B (docs/NODEKIT_SOURCEBUILD_STRUCTURED_INTENT_DESIGN.md §5,
+        // §10 D-1/D-2/D-8). RecipeBuildKind.SourceBuildStructured reuses
+        // SourceUri/SourceChecksum/SourceBuildCommands validation from legacy
+        // SourceBuild (ValidateSourceFetchFields) and adds BuildProfile/
+        // RuntimeProfile selection validation.
+
+        [Fact]
+        public void Validate_SourceBuildStructured_WithCuratedProfiles_Passes()
+        {
+            var recipe = new RecipeDocument
+            {
+                BuildKind = RecipeBuildKind.SourceBuildStructured,
+                BuildProfile = "generic",
+                RuntimeProfile = "minimal",
+                SourceUri = "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz",
+                SourceChecksum = ValidChecksum,
+                SourceBuildCommands = { "make" },
+            };
+
+            var result = RecipeValidator.Validate(recipe);
+
+            Assert.True(result.IsValid);
+        }
+
+        [Fact]
+        public void Validate_SourceBuildStructured_MissingBuildProfile_Fails()
+        {
+            var recipe = new RecipeDocument
+            {
+                BuildKind = RecipeBuildKind.SourceBuildStructured,
+                RuntimeProfile = "minimal",
+                SourceUri = "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz",
+                SourceChecksum = ValidChecksum,
+                SourceBuildCommands = { "make" },
+            };
+
+            var result = RecipeValidator.Validate(recipe);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-RCP-017" && v.Field == "BuildProfile");
+        }
+
+        [Fact]
+        public void Validate_SourceBuildStructured_UnknownBuildProfile_Fails()
+        {
+            var recipe = new RecipeDocument
+            {
+                BuildKind = RecipeBuildKind.SourceBuildStructured,
+                BuildProfile = "not-a-real-profile",
+                RuntimeProfile = "minimal",
+                SourceUri = "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz",
+                SourceChecksum = ValidChecksum,
+                SourceBuildCommands = { "make" },
+            };
+
+            var result = RecipeValidator.Validate(recipe);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-RCP-017" && v.Field == "BuildProfile");
+        }
+
+        [Fact]
+        public void Validate_SourceBuildStructured_AdvancedBuildProfileWithoutImage_Fails()
+        {
+            var recipe = new RecipeDocument
+            {
+                BuildKind = RecipeBuildKind.SourceBuildStructured,
+                BuildProfile = "advanced",
+                RuntimeProfile = "minimal",
+                SourceUri = "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz",
+                SourceChecksum = ValidChecksum,
+                SourceBuildCommands = { "make" },
+            };
+
+            var result = RecipeValidator.Validate(recipe);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-RCP-017" && v.Field == "BuildProfileImage");
+        }
+
+        [Fact]
+        public void Validate_SourceBuildStructured_AdvancedBuildProfileWithUnpinnedImage_Fails()
+        {
+            var recipe = new RecipeDocument
+            {
+                BuildKind = RecipeBuildKind.SourceBuildStructured,
+                BuildProfile = "advanced",
+                BuildProfileImage = "ubuntu:22.04",
+                RuntimeProfile = "minimal",
+                SourceUri = "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz",
+                SourceChecksum = ValidChecksum,
+                SourceBuildCommands = { "make" },
+            };
+
+            var result = RecipeValidator.Validate(recipe);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-RCP-017" && v.Field == "BuildProfileImage");
+        }
+
+        [Fact]
+        public void Validate_SourceBuildStructured_AdvancedBuildProfileWithPinnedImage_Passes()
+        {
+            var recipe = new RecipeDocument
+            {
+                BuildKind = RecipeBuildKind.SourceBuildStructured,
+                BuildProfile = "advanced",
+                BuildProfileImage = PinnedBaseImage,
+                RuntimeProfile = "minimal",
+                SourceUri = "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz",
+                SourceChecksum = ValidChecksum,
+                SourceBuildCommands = { "make" },
+            };
+
+            var result = RecipeValidator.Validate(recipe);
+
+            Assert.True(result.IsValid);
+        }
+
+        [Fact]
+        public void Validate_SourceBuildStructured_MissingRuntimeProfile_Fails()
+        {
+            var recipe = new RecipeDocument
+            {
+                BuildKind = RecipeBuildKind.SourceBuildStructured,
+                BuildProfile = "generic",
+                SourceUri = "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz",
+                SourceChecksum = ValidChecksum,
+                SourceBuildCommands = { "make" },
+            };
+
+            var result = RecipeValidator.Validate(recipe);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-RCP-018" && v.Field == "RuntimeProfile");
+        }
+
+        [Fact]
+        public void Validate_SourceBuildStructured_ReusesSourceFetchFieldValidation()
+        {
+            // SourceUri/SourceChecksum/SourceBuildCommands checks are shared
+            // with legacy SourceBuild (ValidateSourceFetchFields) — confirm
+            // the newline-injection guard (#31/L1-RCP-015) still applies here.
+            var recipe = new RecipeDocument
+            {
+                BuildKind = RecipeBuildKind.SourceBuildStructured,
+                BuildProfile = "generic",
+                RuntimeProfile = "minimal",
+                SourceUri = "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz",
+                SourceChecksum = ValidChecksum,
+                SourceBuildCommands = { "make\nENV API_KEY=abc" },
+            };
+
+            var result = RecipeValidator.Validate(recipe);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-RCP-015");
+        }
     }
 }

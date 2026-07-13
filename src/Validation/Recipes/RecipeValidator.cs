@@ -107,7 +107,10 @@ namespace NodeKit.Validation.Recipes
                     break;
                 case RecipeBuildKind.SourceBuild:
                     ValidateBaseImagePresent(recipe, violations);
-                    ValidateSourceBuild(recipe, violations);
+                    ValidateSourceFetchFields(recipe, violations);
+                    break;
+                case RecipeBuildKind.SourceBuildStructured:
+                    ValidateSourceBuildStructured(recipe, violations);
                     break;
                 case RecipeBuildKind.DockerfileFallback:
                     ValidateBaseImagePresent(recipe, violations);
@@ -214,13 +217,18 @@ namespace NodeKit.Validation.Recipes
         // 실행하는 것이라, 셸 메타문자를 막으면 기능을 깨뜨린다. Packages/
         // Channels/SourceUri와 달리 "패키지명"이나 "URI"처럼 좁은 문법을 갖지
         // 않는 자유 형식 필드이므로 여기서는 무엇을 막을지 정의할 수 없다.
-        // 다만 개행(\r/\n)은 다른 문제다 — RecipeRenderer.RenderSourceBuild가
-        // string.Join(" && ", ...)로 합친 값을 그대로 한 RUN 라인에 붙이므로,
-        // 값 안에 개행이 있으면 셸 명령이 아니라 완전히 새로운 Dockerfile
-        // instruction(ENV/FROM/USER 등)으로 해석된다 — SourceBuild는
-        // DockerfileFallback과 달리 USER/ENV 보안 재검사도 받지 않는 build
-        // kind라 이 경로로 그 검사를 통째로 우회할 수 있다.
-        private static void ValidateSourceBuild(RecipeDocument recipe, List<ValidationViolation> violations)
+        // 다만 개행(\r/\n)은 다른 문제다 — RecipeRenderer.RenderSourceBuild/
+        // RenderSourceBuildStructured가 string.Join(" && ", ...)로 합친 값을
+        // 그대로 한 RUN 라인에 붙이므로, 값 안에 개행이 있으면 셸 명령이 아니라
+        // 완전히 새로운 Dockerfile instruction(ENV/FROM/USER 등)으로 해석된다
+        // — SourceBuild류는 DockerfileFallback과 달리 USER/ENV 보안 재검사도
+        // 받지 않는 build kind라 이 경로로 그 검사를 통째로 우회할 수 있다.
+        //
+        // RecipeBuildKind.SourceBuild(legacy)와 SourceBuildStructured가
+        // SourceUri/SourceChecksum/SourceBuildCommands 필드를 그대로 재사용하므로
+        // (docs/NODEKIT_SOURCEBUILD_STRUCTURED_INTENT_DESIGN.md §5), 검증
+        // 로직도 공유한다 — legacy 쪽 동작은 이 추출로 전혀 바뀌지 않는다.
+        private static void ValidateSourceFetchFields(RecipeDocument recipe, List<ValidationViolation> violations)
         {
             if (string.IsNullOrWhiteSpace(recipe.SourceUri))
             {
@@ -270,6 +278,80 @@ namespace NodeKit.Validation.Recipes
                         $"build command에 개행 문자가 포함되어 있으면 새로운 Dockerfile 명령으로 해석될 수 있어 차단됩니다: '{command}'",
                         nameof(recipe.SourceBuildCommands)));
                 }
+            }
+        }
+
+        // §13 R22-B. BuildProfile/RuntimeProfile 둘 다 큐레이션된 키이거나
+        // "advanced"(+ 대응하는 *ProfileImage에 digest 포함 이미지)여야 한다.
+        // SourceUri/SourceChecksum/SourceBuildCommands는 legacy SourceBuild와
+        // 같은 검증을 그대로 재사용(ValidateSourceFetchFields).
+        private static void ValidateSourceBuildStructured(RecipeDocument recipe, List<ValidationViolation> violations)
+        {
+            ValidateProfileSelection(
+                recipe.BuildProfile,
+                recipe.BuildProfileImage,
+                SourceBuildProfileCatalog.FindBuildProfile,
+                "L1-RCP-017",
+                nameof(recipe.BuildProfile),
+                nameof(recipe.BuildProfileImage),
+                violations);
+
+            ValidateProfileSelection(
+                recipe.RuntimeProfile,
+                recipe.RuntimeProfileImage,
+                SourceBuildProfileCatalog.FindRuntimeProfile,
+                "L1-RCP-018",
+                nameof(recipe.RuntimeProfile),
+                nameof(recipe.RuntimeProfileImage),
+                violations);
+
+            ValidateSourceFetchFields(recipe, violations);
+        }
+
+        private static void ValidateProfileSelection(
+            string profile,
+            string profileImage,
+            Func<string, SourceBuildProfileEntry?> findProfile,
+            string ruleId,
+            string profileField,
+            string profileImageField,
+            List<ValidationViolation> violations)
+        {
+            if (string.IsNullOrWhiteSpace(profile))
+            {
+                violations.Add(new ValidationViolation(
+                    ruleId,
+                    $"{profileField}가 필요합니다.",
+                    profileField));
+                return;
+            }
+
+            if (profile == SourceBuildProfileCatalog.AdvancedKey)
+            {
+                if (string.IsNullOrWhiteSpace(profileImage))
+                {
+                    violations.Add(new ValidationViolation(
+                        ruleId,
+                        $"{profileField}를 advanced로 선택했으면 {profileImageField}에 digest가 포함된 이미지를 직접 지정해야 합니다.",
+                        profileImageField));
+                }
+                else if (!profileImage.Contains("@sha256:", StringComparison.OrdinalIgnoreCase))
+                {
+                    violations.Add(new ValidationViolation(
+                        ruleId,
+                        $"{profileImageField}에 digest(@sha256:...)가 없습니다. 재현성 보장을 위해 digest 고정이 필수입니다. ({profileImage})",
+                        profileImageField));
+                }
+
+                return;
+            }
+
+            if (findProfile(profile) is null)
+            {
+                violations.Add(new ValidationViolation(
+                    ruleId,
+                    $"{profileField}에 알 수 없는 값입니다: '{profile}'. 큐레이션된 프로필 중 하나를 고르거나 advanced를 선택하세요.",
+                    profileField));
             }
         }
 

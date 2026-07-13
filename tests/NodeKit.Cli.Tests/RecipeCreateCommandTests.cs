@@ -200,6 +200,51 @@ namespace NodeKit.Cli.Tests
             Assert.True(File.Exists(outPath));
         }
 
+        // §13 R22-B (docs/NODEKIT_SOURCEBUILD_STRUCTURED_INTENT_DESIGN.md).
+        // Only reachable via --non-interactive --method source-structured —
+        // intentionally not offered by the interactive wizard yet.
+
+        [Fact]
+        public void SourceStructured_CuratedProfiles_CreatesRecipeThatPassesValidate()
+        {
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var exitCode = RunCreate(SourceStructuredArgs(), outPath);
+
+            Assert.Equal(0, exitCode);
+            Assert.True(File.Exists(outPath));
+
+            var validateStdout = new StringWriter();
+            var validateStderr = new StringWriter();
+            var validateExitCode = CliApp.Run(new[] { "validate", outPath }, validateStdout, validateStderr);
+
+            Assert.Equal(0, validateExitCode);
+            Assert.Contains("OK", validateStdout.ToString());
+        }
+
+        [Fact]
+        public void SourceStructured_UnknownMethodName_StillRejected()
+        {
+            // "source-build-structured" is the *internal* RecipeBuildKind
+            // name, not the CLI --method value ("source-structured") —
+            // confirms the friendly-error guard covers the new kind too.
+            var exitCode = Run("--non-interactive", "--method", "source-build-structured");
+
+            Assert.Equal(2, exitCode);
+        }
+
+        private static string[] SourceStructuredArgs() => new[]
+        {
+            "--non-interactive", "--method", "source-structured",
+            "--field", "ToolName=bwa-mem",
+            "--field", "ToolVersion=0.7.17",
+            "--field", "Script=run.sh",
+            "--field", "BuildProfile=generic",
+            "--field", "SourceUri=https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz",
+            "--field", $"SourceChecksum={DigestOnly}",
+            "--field", "SourceBuildCommands=make",
+            "--field", "RuntimeProfile=minimal",
+        };
+
         [Fact]
         public void Source_SourceChecksumMissing_FailsAsRequired()
         {

@@ -48,6 +48,9 @@ namespace NodeKit.Authoring.Recipes
                 case RecipeBuildKind.SourceBuild:
                     RenderSourceBuild(recipe, definition);
                     break;
+                case RecipeBuildKind.SourceBuildStructured:
+                    RenderSourceBuildStructured(recipe, definition);
+                    break;
                 case RecipeBuildKind.DockerfileFallback:
                     definition.ImageUri = recipe.BaseImage;
                     definition.DockerfileContent = recipe.DockerfileContent;
@@ -141,6 +144,65 @@ namespace NodeKit.Authoring.Recipes
             // runtime default user, not the build step.
             dockerfile.Append("USER 1000\n");
             definition.DockerfileContent = dockerfile.ToString();
+        }
+
+        // §13 R22-B TEMPORARY placeholder — proves the new authoring model
+        // (BuildProfile/RuntimeProfile/RuntimeDependencies) round-trips
+        // through validate/render/submit correctly. Issue #38 (R22-C)
+        // replaces this single-stage body with the real builder+runtime
+        // 2-stage split (COPY --from, USER only on the runtime stage, no
+        // ENTRYPOINT — see
+        // docs/NODEKIT_SOURCEBUILD_STRUCTURED_INTENT_DESIGN.md §5/§11 Phase
+        // C). This placeholder does NOT keep build tools out of the final
+        // image the way the real design does — it renders BuildProfileImage
+        // as both the fetch/build AND the final image, same shape as legacy
+        // RenderSourceBuild. Do not treat this as the security fix; RuntimeProfile
+        // is validated (RecipeValidator) but not yet used by this renderer.
+        private static void RenderSourceBuildStructured(RecipeDocument recipe, ToolDefinition definition)
+        {
+            var buildImage = ResolveProfileImage(recipe.BuildProfile, recipe.BuildProfileImage, SourceBuildProfileCatalog.FindBuildProfile);
+            definition.ImageUri = buildImage;
+
+            var buildCommands = recipe.SourceBuildCommands.Count > 0
+                ? string.Join(" && ", recipe.SourceBuildCommands)
+                : string.Empty;
+
+            var checksumHex = recipe.SourceChecksum.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase)
+                ? recipe.SourceChecksum["sha256:".Length..]
+                : recipe.SourceChecksum;
+
+            var dockerfile = new StringBuilder();
+            dockerfile.Append("FROM ").Append(buildImage).Append('\n');
+            dockerfile.Append("RUN curl -fsSL -o source.tar.gz \"").Append(recipe.SourceUri).Append("\" && ")
+                .Append("echo \"").Append(checksumHex).Append("  source.tar.gz\" | sha256sum -c - && ")
+                .Append("tar -xzf source.tar.gz");
+
+            if (buildCommands.Length > 0)
+            {
+                dockerfile.Append(" && ").Append(buildCommands);
+            }
+
+            dockerfile.Append('\n');
+            dockerfile.Append("USER 1000\n");
+            definition.DockerfileContent = dockerfile.ToString();
+        }
+
+        // 프로필이 미확정/알 수 없는 값이어도(RecipeValidationPipeline이
+        // 검증 실패 여부와 무관하게 Render를 무조건 호출하므로 — issue #32와
+        // 같은 이유) 크래시하지 않고 빈 문자열을 반환한다. 그러면 다운스트림
+        // ImageUriValidator가 "이미지 URI가 비어있습니다"로 정상적인 L1
+        // violation을 만든다.
+        private static string ResolveProfileImage(
+            string profile,
+            string profileImage,
+            Func<string, SourceBuildProfileEntry?> findProfile)
+        {
+            if (profile == SourceBuildProfileCatalog.AdvancedKey)
+            {
+                return profileImage;
+            }
+
+            return findProfile(profile)?.ImageReference ?? string.Empty;
         }
     }
 }

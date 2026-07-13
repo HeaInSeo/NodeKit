@@ -52,6 +52,8 @@
     <Compile Include="..\Authoring\ToolOutput.cs" Link="Authoring\ToolOutput.cs" />
     <Compile Include="..\Authoring\Recipes\RecipeDocument.cs" Link="Authoring\Recipes\RecipeDocument.cs" />
     <Compile Include="..\Authoring\Recipes\RecipeBuildKind.cs" Link="Authoring\Recipes\RecipeBuildKind.cs" />
+    <Compile Include="..\Authoring\Recipes\SourceBuildProfileEntry.cs" Link="Authoring\Recipes\SourceBuildProfileEntry.cs" />
+    <Compile Include="..\Authoring\Recipes\SourceBuildProfileCatalog.cs" Link="Authoring\Recipes\SourceBuildProfileCatalog.cs" />
     <Compile Include="..\Authoring\Recipes\RecipeRenderer.cs" Link="Authoring\Recipes\RecipeRenderer.cs" />
     <Compile Include="..\Authoring\Recipes\RecipeAuthoringSession.cs" Link="Authoring\Recipes\RecipeAuthoringSession.cs" />
     <Compile Include="..\Authoring\Recipes\RecipeAuthoringSnapshot.cs" Link="Authoring\Recipes\RecipeAuthoringSnapshot.cs" />

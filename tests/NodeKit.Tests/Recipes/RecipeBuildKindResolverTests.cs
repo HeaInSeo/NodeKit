@@ -69,6 +69,14 @@ namespace NodeKit.Tests.Recipes
         }
 
         [Fact]
+        public void Resolve_SourceStructured_ResolvesToSourceBuildStructured()
+        {
+            var result = RecipeBuildKindResolver.Resolve(RecipeMethodId.SourceStructured, new RecipeDocument());
+
+            Assert.Equal(RecipeBuildKind.SourceBuildStructured, result);
+        }
+
+        [Fact]
         public void Resolve_Dockerfile_ResolvesToDockerfileFallback()
         {
             var result = RecipeBuildKindResolver.Resolve(RecipeMethodId.Dockerfile, new RecipeDocument());

@@ -12,6 +12,7 @@ namespace NodeKit.Tests.Recipes
             RecipeMethodId.Package,
             RecipeMethodId.Mirror,
             RecipeMethodId.Source,
+            RecipeMethodId.SourceStructured,
             RecipeMethodId.Dockerfile,
         };
 
@@ -55,6 +56,55 @@ namespace NodeKit.Tests.Recipes
             var recommended = RecipeFieldCatalog.RecommendedFieldsFor(RecipeMethodId.Source);
 
             Assert.Equal(new[] { "BuildDependencies" }, recommended.Select(f => f.Name).ToList());
+        }
+
+        // §13 R22-B (docs/NODEKIT_SOURCEBUILD_STRUCTURED_INTENT_DESIGN.md §5).
+
+        [Fact]
+        public void SourceStructured_HasBuildAndRuntimeProfileFields()
+        {
+            var names = RecipeFieldCatalog.MethodFields[RecipeMethodId.SourceStructured]
+                .Select(f => f.Name)
+                .ToList();
+
+            Assert.Equal(
+                new[]
+                {
+                    "BuildProfile", "BuildProfileImage", "SourceUri", "SourceChecksum",
+                    "SourceBuildCommands", "BuildDependencies", "RuntimeProfile",
+                    "RuntimeProfileImage", "RuntimeDependencies",
+                },
+                names);
+        }
+
+        [Fact]
+        public void SourceStructured_BuildProfileAndRuntimeProfile_OfferAdvancedChoice()
+        {
+            var buildProfile = RecipeFieldCatalog.MethodFields[RecipeMethodId.SourceStructured]
+                .Single(f => f.Name == "BuildProfile");
+            var runtimeProfile = RecipeFieldCatalog.MethodFields[RecipeMethodId.SourceStructured]
+                .Single(f => f.Name == "RuntimeProfile");
+
+            Assert.Contains(buildProfile.Choices, c => c.Value == "advanced");
+            Assert.Contains(buildProfile.Choices, c => c.Value == "generic");
+            Assert.Contains(runtimeProfile.Choices, c => c.Value == "advanced");
+            Assert.Contains(runtimeProfile.Choices, c => c.Value == "minimal");
+        }
+
+        [Fact]
+        public void SourceStructured_ProfileImageFields_AreOptionalNotBlocking()
+        {
+            // Required-ness of *ProfileImage is conditional on the profile
+            // choice being "advanced" — that condition is enforced by
+            // RecipeValidator, not the field catalog's static Requirement tier
+            // (RecipeFieldRequirement has no "conditionally required" concept).
+            var buildImage = RecipeFieldCatalog.MethodFields[RecipeMethodId.SourceStructured]
+                .Single(f => f.Name == "BuildProfileImage");
+            var runtimeImage = RecipeFieldCatalog.MethodFields[RecipeMethodId.SourceStructured]
+                .Single(f => f.Name == "RuntimeProfileImage");
+
+            Assert.Equal(RecipeFieldRequirement.Optional, buildImage.Requirement);
+            Assert.Equal(RecipeFieldRequirement.Optional, runtimeImage.Requirement);
         }
 
         [Fact]

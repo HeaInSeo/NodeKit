@@ -35,12 +35,13 @@ namespace NodeKit.Cli
                 ["package"] = RecipeMethodId.Package,
                 ["mirror"] = RecipeMethodId.Mirror,
                 ["source"] = RecipeMethodId.Source,
+                ["source-structured"] = RecipeMethodId.SourceStructured,
                 ["dockerfile"] = RecipeMethodId.Dockerfile,
             };
 
         private static readonly string[] _internalBuildKindNames =
         {
-            "conda", "micromamba", "source-build", "dockerfile-fallback",
+            "conda", "micromamba", "source-build", "source-build-structured", "dockerfile-fallback",
         };
 
         public static int Run(string? outPathHint, string[] options, IRecipeConsole console, TextWriter stdout, TextWriter stderr)
@@ -230,7 +231,7 @@ namespace NodeKit.Cli
 
             if (methodRaw != null && _internalBuildKindNames.Contains(methodRaw, StringComparer.Ordinal))
             {
-                return Error($"--method {methodRaw}는 내부 build kind 이름입니다. container/package/mirror/source/dockerfile 중 하나를 사용하세요.");
+                return Error($"--method {methodRaw}는 내부 build kind 이름입니다. container/package/mirror/source/source-structured/dockerfile 중 하나를 사용하세요.");
             }
 
             RecipeMethodId? method = null;
@@ -238,7 +239,7 @@ namespace NodeKit.Cli
             {
                 if (!_publicMethodNames.TryGetValue(methodRaw, out var resolvedMethod))
                 {
-                    return Error($"알 수 없는 method입니다: {methodRaw} (container | package | mirror | source | dockerfile)");
+                    return Error($"알 수 없는 method입니다: {methodRaw} (container | package | mirror | source | source-structured | dockerfile)");
                 }
 
                 method = resolvedMethod;

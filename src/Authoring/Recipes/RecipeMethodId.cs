@@ -13,5 +13,15 @@ namespace NodeKit.Authoring.Recipes
         Mirror,
         Source,
         Dockerfile,
+
+        /// <summary>
+        /// §13 R22-B. Advanced/opt-in method resolving to
+        /// RecipeBuildKind.SourceBuildStructured. Intentionally not wired into
+        /// RecipeMethodRecommender/MethodRecommendationPresenter/BeginnerGuideFlow
+        /// yet — reachable only via `nodekit recipe create --non-interactive
+        /// --method source-structured`, not the interactive wizard. See
+        /// docs/NODEKIT_SOURCEBUILD_STRUCTURED_INTENT_DESIGN.md.
+        /// </summary>
+        SourceStructured,
     }
 }
