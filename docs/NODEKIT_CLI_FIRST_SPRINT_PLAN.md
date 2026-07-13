@@ -47,9 +47,12 @@ wizard 미배선, `--non-interactive --method source-structured`로만
 **R22-D 구현 착수 전 반드시 다시 읽을 것 — 놓치기 쉬운 함정:**
 
 ```text
-R22-B/C 구현만으로 SourceBuild 보안 문제가 "해결됐다"고 하지 말 것 —
-NodeVault 서버 쪽 강제(Sprint 9/10)가 없는 한 authoring-time UX일
-뿐이다. §13 하단 체크리스트 항목 1, 설계 문서 §2.6 Q5/§8 참조.
+R22-B/C 구현만으로 SourceBuild 보안 문제가 "완전히 해결됐다"고 하지
+말 것 — NodeVault Sprint 9(2026-07-13 완료)가 최종 스테이지 RUN의
+risky tool은 정적으로 거부하지만, base image에 이미 포함된 도구는
+Sprint 10(미구현)이 필요하다. "서버 쪽 강제가 전혀 없다"는 표현은
+더 이상 정확하지 않음 — §13 하단 체크리스트 항목 1(2026-07-13
+갱신), 설계 문서 §2.6 Q5/§8(2026-07-13 갱신) 참조.
 ```
 
 현재 NodeKit 초점:
@@ -2114,6 +2117,12 @@ Done when:
 ```text
 - NodeVault가 P1(build_events/digest 노출)을 실제로 배포하면 R18의
   fallback 안내를 실제 digest 표시로 승격.
+  → 트리거 발생함(2026-07-13, NodeVault 커밋 `03f5025` "Sprint 7 P1a":
+    BuildEvent에 image_ref/image_digest/spec_referrer_digest/
+    integrity_health 필드 추가, "NodeKit이 로그 스크래핑 없이 읽을 수
+    있도록" 명시). 다만 NodeKit이 아직 vendored proto를 재벤더링하지
+    않아서 이 필드들을 실제로 소비하지 못하는 상태 — 적대적 리뷰
+    Major-1(Issue #41) 항목 3/4로 추적 중.
 ```
 
 **⚠ R22 구현 시 절대 놓치면 안 되는 것 (2026-07-12 사용자 지시로 명시적
@@ -2121,15 +2130,19 @@ Done when:
 중복 기록):**
 
 ```text
-1. (구현 완료, 2026-07-13 — 경고는 계속 유효) R22-C(#38)에서 실제
-   2-stage 렌더링을 구현하고 로컬 buildah bud로 curl 미유출을
-   실증했지만, 이것만으로 "SourceBuild 보안 문제가 해결됐다"고
-   발표/기록하지 말 것. client-side 멀티스테이지 렌더링은
-   authoring-time UX 개선일 뿐, NodeVault 서버 쪽 강제(Sprint 9/10,
-   P2a/P2b)가 없는 한 실제 보안 경계가 아니다. NodeKit CLI를 거치지
-   않고 gRPC를 직접 호출하면 여전히 아무 검사도 없다. R22-D(#39)
-   착수 시에도, 그리고 NodeVault Sprint 9/10 완료 여부를 확인하기
-   전까지는 계속 이 문구를 유지할 것.
+1. (구현 완료, 2026-07-13 — 문구는 2026-07-13에 한 번 더 좁혀 갱신됨,
+   적대적 리뷰 Major-1/Issue #41) R22-C(#38)에서 실제 2-stage
+   렌더링을 구현하고 로컬 buildah bud로 curl 미유출을 실증했다.
+   같은 날 NodeVault Sprint 9 P2a(커밋 `645c594`)가 실제로 머지되어
+   최종 스테이지 RUN의 risky tool을 서버 쪽에서 정적으로 거부하기
+   시작했다 — "NodeVault 서버 쪽 강제가 전혀 없다"는 이전 문구는 더
+   이상 정확하지 않다. 여전히 정확한 것: base image에 이미 포함된
+   risky tool은 Sprint 10(post-build 이미지 스캔, 미구현)이 있어야
+   탐지되므로, client-side 렌더링 + Sprint 9만으로 "SourceBuild 보안
+   문제가 완전히 해결됐다"고 발표/기록하지는 말 것. R22-D(#39) 착수
+   시에도, 그리고 NodeVault Sprint 10 완료 여부를 확인하기 전까지는
+   "base image 콘텐츠까지는 아직 서버가 못 본다"는 좁혀진 문구를
+   유지할 것.
 2. (완료, 2026-07-13) R22-B(#37)에서 BuildProfile/RuntimeProfile의 실제
    이미지→digest 매핑표를 채웠다 — SourceBuildProfileCatalog(generic/
    minimal), 둘 다 buildah run으로 실제 도구 존재를 확인한 뒤 pinning.

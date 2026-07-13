@@ -204,18 +204,42 @@ Phase 1 gate 열림"을 전제로 열렸던 것과 같은 패턴 — 즉 NodeVau
 **Q5. 현재 API에 필요한 정보가 없는데도 NodeKit renderer만 수정해
 문제가 해결된 것처럼 만들 위험은 없는가?**
 
-**있다. 이게 이 설계에서 가장 중요하게 짚어야 할 위험이다.**
-클라이언트 쪽 멀티스테이지 렌더링(§2.1의 "당장 가능한" 경로)만
-구현하고 멈추면, 최종 이미지가 깨끗해 보이는 결과는 얻지만
-**서버 쪽에는 그걸 강제하는 장치가 전혀 없다.** Sprint 9(마지막
-스테이지 도구 스캔)/10(빌드 후 이미지 스캔)은 로드맵에 있을 뿐
-구현되어 있지 않다(§2.5). 즉 NodeKit CLI를 거치지 않고 누구든
-`SubmitToolBuild`/`BuildAndRegister`를 직접 호출하면, 최종 스테이지에
-`curl`/컴파일러/시크릿이 남아있는 Dockerfile을 그대로 제출해도 지금은
-아무도 막지 않는다 — 이건 이전에 이미 등록한 `HeaInSeo/NodeVault#16`
-("SubmitToolBuild이 DockerfileContent를 서버 쪽 재검증 없이 그대로
-Buildah에 넘김")과 정확히 같은 클래스의 gap이다. 이번 설계에서
-구현하는 어떤 것도 그 서버 쪽 gap을 대신 메꾸지 않는다 — §8에서
+**있었다 — 이 설계에서 가장 중요하게 짚어야 할 위험이었고, 지금은
+부분적으로만 남아 있다(2026-07-13 갱신, 적대적 리뷰 Major-1 대응,
+Issue #41).**
+
+원래 이 문단을 쓸 당시(설계 확정 시점) 클라이언트 쪽 멀티스테이지
+렌더링(§2.1의 "당장 가능한" 경로)만 구현하고 멈추면 서버 쪽에는 그걸
+강제하는 장치가 전혀 없다고 판단했다. 그런데 NodeVault가 같은 날
+(2026-07-13) **Sprint 9 P2a를 실제로 머지했다**(`pkg/build/validate.go`,
+커밋 `645c594`) — 최종 스테이지 RUN 라인에서 curl/wget/git/make 등
+risky tool을 정적으로 스캔해 거부하는 서버 쪽 검사가 지금 실제로
+동작한다. 그래서 이 위험은 다음과 같이 좁혀졌다:
+
+- **이제 있음**: 최종 스테이지 RUN이 risky tool을 직접 호출/설치하면
+  NodeVault가 거부한다(정적 텍스트 스캔). `SourceBuildStructured`의
+  2-stage 출력은 최종 스테이지에 RUN이 아예 없어 이 검사를 자연스럽게
+  통과한다.
+- **여전히 없음**: base image 자체가 이미 risky tool을 포함하는
+  경우(예: `curlimages/curl`을 RuntimeProfileImage로 직접 지정)는
+  정적 텍스트 스캔으로 탐지 불가능하다 — 빌드된 이미지의 실제 콘텐츠를
+  봐야 하는 Sprint 10(post-build 이미지 스캔)이 필요하고, 이건 아직
+  미구현(podbridge5 issue #2 선행 필요, NodeVault
+  `docs/PLATFORM_SCHEDULE.md` 확인).
+- NodeKit CLI를 거치지 않고 `SubmitToolBuild`/`BuildAndRegister`를
+  직접 호출해도 Sprint 9 검사는 서버 쪽에서 여전히 적용된다(클라이언트
+  우회 불가) — 다만 Sprint 10 몫인 "이미 포함된 도구" 케이스는 그
+  검사망에도 안 걸린다.
+- 이전에 등록한 `HeaInSeo/NodeVault#16`("SubmitToolBuild이
+  DockerfileContent를 서버 쪽 재검증 없이 그대로 Buildah에 넘김")은
+  이제 정확한 설명이 아니다 — dockerfile_content는 여전히 재작성되지
+  않지만(§2.1), 최소한 risky-tool 정책 재검증은 이제 존재한다. 해당
+  이슈도 좁혀서 갱신이 필요하다(NodeVault 담당, NodeKit이 대신 닫지
+  않음).
+
+이번 설계(및 R22-C 구현)가 "SourceBuild 보안 문제를 완전히
+해결했다"는 주장은 여전히 하지 않는다 — Sprint 10이 남아 있는 한
+"base image에 이미 있는 도구" 클래스는 열려 있다. §8에서
 NodeKit/NodeVault/NodeSentinel 책임 경계를 명시하고, §11에서
 NodeVault 쪽 upstream 의존성으로 명확히 분리해 기록한다.
 
@@ -491,8 +515,11 @@ Phase C — RecipeRenderer가 client-side 멀티스테이지 Dockerfile을 합�
   기존 dockerfile_content 필드/BuildRequest/raw_spec 와이어 계약은
   전혀 바꾸지 않는다(§2.6 Q1의 "지금 가능한 경로").
   이 Phase가 끝나면 최종 이미지에서 빌드 도구가 빠지는 실질적 효과가
-  생긴다 — 그러나 §2.6 Q5의 경고대로, 서버 쪽 강제는 여전히 없다는
-  점을 릴리스 노트/문서에 명시해야 한다.
+  생긴다 — 릴리스 노트/문서에는 §2.6 Q5(2026-07-13 갱신)대로
+  "최종 스테이지 RUN 정적 검사는 서버 쪽에 있음(Sprint 9), base
+  image에 이미 포함된 도구 탐지는 아직 없음(Sprint 10 필요)"으로
+  명시해야 한다 — "서버 쪽 강제가 전혀 없다"는 표현은 더 이상
+  정확하지 않다.
 
 Phase D — NodeKit 쪽 hygiene advisor 갱신
   RuntimeProfileHygieneAdvisor(가칭) 작성 — RuntimeProfileImage/
@@ -501,12 +528,15 @@ Phase D — NodeKit 쪽 hygiene advisor 갱신
   축소.
 
 Phase E — NodeVault 쪽 서버 강제 (upstream 의존성, NodeKit이 만들지 않음)
-  NodeVault Sprint 9(P2a, static risky-tool RUN scan) 구현 대기.
-  NodeVault Sprint 10(P2b, post-build image scan) 구현 대기 — podbridge5
-  상류 이슈 해소 필요.
-  이 Phase가 끝나야 §8에서 지적한 "서버 쪽 강제 부재" 위험이 실제로
-  해소된다. NodeKit 세션은 이 Phase를 추적만 한다
-  ([[project_nodevault_parallel_agent]] 메모리 참조).
+  NodeVault Sprint 9(P2a, static risky-tool RUN scan) — **완료**
+  (2026-07-13, 커밋 `645c594`). 최종 스테이지 RUN의 risky tool을
+  정적으로 거부.
+  NodeVault Sprint 10(P2b, post-build image scan) — 아직 구현 대기,
+  podbridge5 상류 이슈 해소 필요.
+  Sprint 9가 끝나서 §8/§2.6 Q5의 위험이 절반 해소됐다 — "base image에
+  이미 포함된 도구" 케이스만 Sprint 10을 더 기다려야 한다. NodeKit
+  세션은 이 Phase를 추적만 한다([[project_nodevault_parallel_agent]]
+  메모리 참조).
 
 Phase F — legacy SourceBuild migration/제거 정책
   Phase B/C/D가 충분히 안정화된 뒤 판단. 이번 문서에서는 결정하지
@@ -547,18 +577,24 @@ Phase F — legacy SourceBuild migration/제거 정책
 - NodeVault의 실제 이미지 콘텐츠 스캔(Sprint 10/P2b) — NodeKit이 대신
   구현하지 않는다.
 - DockerfileFallback을 SourceBuild의 구조화된 계약으로 강제 전환하는 것
-  — DockerfileFallback은 별도 escape hatch로 그대로 유지한다. 다만
-  최종 이미지 hygiene 정책(risky tool 경고 등)이 NodeVault 쪽에
-  구현되면(Phase E) 그 정책은 build kind에 무관하게 최종 이미지
-  기준으로 적용될 것이므로, DockerfileFallback 사용자도 똑같이
-  적용받는다 — 이건 NodeVault 쪽 작업이라 지금 결정할 필요가 없다.
+  — DockerfileFallback은 별도 escape hatch로 그대로 유지한다. 최종
+  이미지 hygiene 정책(risky tool 경고 등)은 NodeVault Sprint 9
+  (2026-07-13 완료)부터 build kind에 무관하게 `dockerfile_content`
+  문자열 기준으로 적용된다 — 즉 DockerfileFallback으로 손으로 쓴
+  Dockerfile도 최종(유일한) 스테이지에 curl/make 등이 있으면 똑같이
+  거부당한다. NodeKit이 이걸 로컬에서 미리 막을지는 별도 결정 사항
+  (이 문서에서는 결정하지 않음).
 
 ## 14. 위험 요소
 
-- **§2.6 Q5의 위험이 가장 크다**: Phase C만 구현하고 Phase E를
-  영원히 하지 않으면, "문제가 해결된 것처럼 보이지만 실제로는
-  authoring-time UX 개선일 뿐 보안 경계가 아닌" 상태가 고착될 수
-  있다. 후속 이슈(§15)에 이 경고를 명시적으로 남긴다.
+- **§2.6 Q5의 위험**: NodeVault Sprint 9(2026-07-13 완료)가 최종
+  스테이지 RUN의 risky tool을 정적으로 거부하기 시작해서 위험의
+  절반은 해소됐다 — Phase C(client-side 렌더링)만으로 "완전히
+  해결됐다"고 오인할 위험은 여전히 남아 있지만, 이제 "authoring-time
+  UX 개선일 뿐 서버 쪽엔 아무 장치도 없다"는 이전 표현은 부정확하다.
+  남은 절반(base image에 이미 포함된 도구, Sprint 10)은 여전히
+  진행 중이므로 그 경계까지 정확히 문서화해야 한다. 후속 이슈(§15)에
+  이 경고를 명시적으로 남긴다.
 - 2-stage 축소(D-2b)가 실제 큐레이션에서 실패할 위험 — 초기 profile
   이미지들이 실제로 fetch 도구를 포함하지 않으면 3-stage로 되돌려야
   한다. 렌더러 내부 구조를 그렇게 확장 가능하게 짜야 한다(Phase C
