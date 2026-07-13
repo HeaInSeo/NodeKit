@@ -72,6 +72,9 @@ namespace NodeKit.Cli
                 {
                     "BaseImage(ImageRef)는 digest로 고정되어야 합니다.",
                     "SourceChecksum은 sha256 형식이어야 합니다.",
+                    "이 방식(단일 스테이지)은 NodeVault의 최종 스테이지 risky-tool 정책(Sprint 9, 2026-07-13)으로 " +
+                        "거부될 가능성이 매우 높습니다 — 가능하면 nodekit recipe create --non-interactive " +
+                        "--method source-structured를 사용하세요.",
                     },
                 [RecipeMethodId.Dockerfile] = new[]
                 {
@@ -208,6 +211,11 @@ namespace NodeKit.Cli
                 var info = RecipeMethodCatalog.For(m);
                 console.WriteLine($"[{i + 1}] {info.Label.Get("ko")}");
                 console.WriteLine($"    {info.Description.Get("ko")}");
+                foreach (var caution in _cautions[m])
+                {
+                    console.WriteLine($"    주의: {caution}");
+                }
+
                 console.WriteLine();
             }
 
