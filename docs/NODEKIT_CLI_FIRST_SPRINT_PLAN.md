@@ -1,11 +1,11 @@
 # NodeKit Legacy-First Sprint Plan
 
-Status: Sprint 6 완료 / Sprint 7 진행 중 / R18-R21(§13) 완료 / R22-B/C/D(§13) 일정 확정, 구현 대기(#37-39)  
+Status: Sprint 6 완료 / Sprint 7 진행 중 / R18-R21(§13) 완료 / R22-B(§13) 완료, R22-C/D 대기(#38-39)  
 Created: 2026-06-17  
 Updated: 2026-07-13  
 Scope: NodeKit work — Sprint 0-6 완료, Sprint 7(Post-Migration Hardening) 진행 중,
-§13 Live Recipe Reproducibility Improvement(R18-R21) 완료, R22-B/C/D(SourceBuild
-구조화 intent) 스프린트 일정 확정(구현 미착수)
+§13 Live Recipe Reproducibility Improvement(R18-R21) 완료, R22-B(SourceBuild
+구조화 intent authoring 모델) 완료, R22-C/D 진행 대기
 
 ## 0. Resume Note For Agents
 
@@ -22,28 +22,34 @@ ToolSpec 경로(`ResolveToolSpec → SubmitToolBuild → WatchToolBuild`)로 전
 별도 개발 에이전트가 독립 진행 중이라 이 세션에서 다루지 않는다
 ([[project_nodevault_parallel_agent]] 메모리 참조).
 
-**R22-B/C/D 스프린트 일정 확정 (2026-07-13)**: 설계는 2026-07-12에 이미
-확정됐고(Issue #36 close), 이번에 §13에 Sprint R22-B(#37)/R22-C(#38)/
-R22-D(#39) 형식으로 Goal/Context/Tasks/Done-when을 갖춘 정식 스프린트
-항목으로 등록. 2-stage(Build/Runtime, fetch/builder/final 3-stage 아님)도
-이번에 확정(설계 문서 §10 D-2b). 상세는 §13 R22-B/C/D 섹션과
+**R22-B 완료 (2026-07-13, 커밋 `d4b1656`)**: `RecipeBuildKind
+.SourceBuildStructured` + `RecipeMethodId.SourceStructured`(대화형
+wizard 미배선, `--non-interactive --method source-structured`로만
+접근), `BuildProfile`/`RuntimeProfile`/`RuntimeDependencies` 필드,
+`SourceBuildProfileCatalog`(generic/minimal 프로필, 둘 다 `buildah run`
+으로 실제 도구 존재를 로컬에서 확인한 뒤 digest pinning), `RecipeValidator`
+새 규칙(L1-RCP-017/018), `RecipeRenderer.RenderSourceBuildStructured`
+(§11 Phase B 임시 단일 스테이지 placeholder — #38이 진짜 2-stage로
+교체 예정). 상세는 §13 R22-B Progress 블록 참조. Issue #37 close.
+
+**R22-C/D 진행 대기**: 설계는 2026-07-12에 확정됐고(Issue #36 close),
+§13에 Sprint R22-C(#38)/R22-D(#39) 형식으로 Goal/Context/Tasks/Done-when이
+등록되어 있음. 2-stage(Build/Runtime, fetch/builder/final 3-stage 아님)는
+확정(설계 문서 §10 D-2b). 상세는 §13 R22-C/D 섹션과
 `docs/NODEKIT_SOURCEBUILD_STRUCTURED_INTENT_DESIGN.md` 참조.
-**R22 구현 착수 전 반드시 다시 읽을 것 — 놓치기 쉬운 함정 2가지:**
+**R22-C 구현 착수 전 반드시 다시 읽을 것 — 놓치기 쉬운 함정:**
 
 ```text
-1. R22-C(#38, 렌더링) 구현만으로 SourceBuild 보안 문제가 "해결됐다"고
-   하지 말 것 — NodeVault 서버 쪽 강제(Sprint 9/10)가 없는 한
-   authoring-time UX일 뿐이다. §13 하단 체크리스트, 설계 문서 §2.6 Q5/§8
-   참조.
-2. R22-B(#37, authoring 모델) 구현 시 BuildProfile/RuntimeProfile 이미지
-   매핑표를 빈 채로 두지 말 것 — 매핑이 없으면 R22-B 자체가 완료될 수
-   없다. 설계 문서 §16 참조.
+R22-C(#38, 렌더링) 구현만으로 SourceBuild 보안 문제가 "해결됐다"고 하지
+말 것 — NodeVault 서버 쪽 강제(Sprint 9/10)가 없는 한 authoring-time
+UX일 뿐이다. §13 하단 체크리스트, 설계 문서 §2.6 Q5/§8 참조.
 ```
 
 현재 NodeKit 초점:
 
 ```text
-R22-B → R22-C → R22-D: SourceBuild 구조화 intent 구현 (§13, 위 함정 2가지 유의)
+R22-B 완료 → R22-C(#38) → R22-D(#39): SourceBuild 구조화 intent 구현
+  (§13, 위 함정 유의)
 Sprint 7: Avalonia GUI ToolSpec 마이그레이션
 + U5-2: seoy 원격 장비 nodekit submit 수동 테스트 (seoy 준비 후)
   — 2026-07-05: seoy 없이 heain 로컬 사전 검증 완료(TC-1~TC-13 전체), 버그 6건
@@ -1906,6 +1912,47 @@ Done when:
   이 스프린트를 완료 처리하지 않는다(아래 체크리스트 항목 2 참조).
 ```
 
+**Progress (Sprint R22-B 완료, 2026-07-13, 커밋 `d4b1656`):**
+
+```text
+완료:
+- RecipeBuildKind.SourceBuildStructured, RecipeMethodId.SourceStructured
+  (--method source-structured, 대화형 wizard에는 미배선 — 의도된 설계).
+- RecipeDocument: BuildProfile/BuildProfileImage/RuntimeProfile/
+  RuntimeProfileImage/RuntimeDependencies 필드 + Normalize() 반영.
+- SourceBuildProfileCatalog(신규, 2개 파일로 분리: Entry record + Catalog):
+  Build profile "generic"(buildpack-deps:bookworm), Runtime profile
+  "minimal"(debian:bookworm-slim) — 둘 다 buildah run으로 curl/tar/
+  sha256sum(generic)과 sh/bash(minimal) 실제 존재를 로컬에서 직접 확인한
+  뒤 digest pinning(2026-07-13). 기존 BaseImageCatalog의 condaforge/
+  miniforge3 후보는 curl이 없어 재사용 불가함을 재확인.
+- RecipeFieldCatalog: SourceStructured 필드 목록(9개) + BuildProfileChoices/
+  RuntimeProfileChoices 헬퍼("advanced" 이스케이프 해치 포함).
+- RecipeValidator: ValidateSourceBuild를 ValidateSourceFetchFields로 추출해
+  legacy SourceBuild와 SourceBuildStructured가 공유(legacy 동작 무변경,
+  기존 테스트로 확인). 새 규칙 L1-RCP-017(BuildProfile)/L1-RCP-018
+  (RuntimeProfile) 추가.
+- RecipeRenderer.RenderSourceBuildStructured: §11 Phase B 임시 단일
+  스테이지 placeholder(주석으로 명시 — #38이 진짜 2-stage로 교체 예정).
+  RecipeValidationPipeline이 nodekit validate에서도 항상 Render를
+  호출하므로(#32 교훈) 이게 없으면 crash한다 — 원래 계획엔 없었지만
+  구조적으로 필요해서 이번 스프린트 범위에 포함.
+- RecipeCreateCommand: --method source-structured 매핑 +
+  "source-build-structured"(내부 이름) 오타 가드.
+
+실제 CLI로 전체 경로(create --non-interactive --method source-structured
+→ validate → render) 재현 확인, 큐레이션 매핑이 실제 이미지 참조로
+렌더링됨을 확인. hand-authored JSON으로 authoring session을 우회한
+경로(L1-RCP-017)도 별도로 재현 확인(#32 패턴과 동일하게 crash 없이
+정상 violation).
+
+회귀 테스트 22개 추가(SourceBuildProfileCatalogTests 5,
+RecipeFieldCatalogTests 3, RecipeBuildKindResolverTests 1,
+RecipeMethodCatalogTests 갱신 1, RecipeValidatorTests 9,
+RecipeRendererTests 3, RecipeCreateCommandTests 2 — 정확한 개수는 커밋
+참조). 최종 결과: 587 / 587 통과(스킵 2 제외), 0 warnings.
+```
+
 ### Sprint R22-C. SourceBuild 구조화 Intent — RecipeRenderer 멀티스테이지 렌더링 (Issue #38)
 
 Goal:
@@ -2014,7 +2061,7 @@ Done when:
   fallback 안내를 실제 digest 표시로 승격.
 ```
 
-**⚠ R22 구현 시 절대 놓치면 안 되는 것 2가지 (2026-07-12 사용자 지시로 명시적
+**⚠ R22 구현 시 절대 놓치면 안 되는 것 (2026-07-12 사용자 지시로 명시적
 추적 요청받음 — 각 스프린트의 "Done when"에도 반영되어 있지만 여기서도
 중복 기록):**
 
@@ -2023,10 +2070,9 @@ Done when:
    하지 말 것. client-side 멀티스테이지 렌더링은 authoring-time UX
    개선일 뿐, NodeVault 서버 쪽 강제(Sprint 9/10, P2a/P2b)가 없는 한
    실제 보안 경계가 아니다. NodeKit CLI를 거치지 않고 gRPC를 직접
-   호출하면 여전히 아무 검사도 없다.
-2. R22-B(#37) 구현 시 BuildProfile/RuntimeProfile의 실제 이미지→digest
-   매핑표를 반드시 채울 것 — 설계 문서(§16 미결정 사항)는 프레임워크만
-   정의했고 구체적 큐레이션은 비어 있다. 매핑이 없으면 wizard가 선택지를
-   보여줄 수 없어 R22-B 자체가 완료될 수 없다 — "나중에 채우기"로 미루고
-   넘어갈 수 있는 항목이 아니다.
+   호출하면 여전히 아무 검사도 없다. R22-C 착수 시 다시 확인할 것.
+2. (완료, 2026-07-13) R22-B(#37)에서 BuildProfile/RuntimeProfile의 실제
+   이미지→digest 매핑표를 채웠다 — SourceBuildProfileCatalog(generic/
+   minimal), 둘 다 buildah run으로 실제 도구 존재를 확인한 뒤 pinning.
+   R22-B Progress 블록 참조.
 ```
