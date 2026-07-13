@@ -2112,17 +2112,26 @@ Done when:
   출력 확인(차단 아님).
 ```
 
-### 참고 (R22와 무관, 별도 트리거)
+### 참고 (R22와 무관, 별도 트리거) — 완료
 
 ```text
 - NodeVault가 P1(build_events/digest 노출)을 실제로 배포하면 R18의
   fallback 안내를 실제 digest 표시로 승격.
-  → 트리거 발생함(2026-07-13, NodeVault 커밋 `03f5025` "Sprint 7 P1a":
+  → 완료(2026-07-13). NodeVault 커밋 `03f5025`("Sprint 7 P1a")가
     BuildEvent에 image_ref/image_digest/spec_referrer_digest/
-    integrity_health 필드 추가, "NodeKit이 로그 스크래핑 없이 읽을 수
-    있도록" 명시). 다만 NodeKit이 아직 vendored proto를 재벤더링하지
-    않아서 이 필드들을 실제로 소비하지 못하는 상태 — 적대적 리뷰
-    Major-1(Issue #41) 항목 3/4로 추적 중.
+    integrity_health 필드를 추가했고, NodeKit이 vendored proto를
+    재벤더링(`protos/nodevault/v1/nodevault.proto`, NodeVault 원본과
+    diff 결과 동일)한 뒤 실제로 소비하도록 배선함:
+    `Grpc.BuildEvent`에 4개 필드 추가, `GrpcToolSpecClient.MapWatchEvent`
+    에서 매핑, `SubmitCommand.SubmitAsync`가 Succeeded 시 ImageDigest가
+    있으면 "이미지 digest: <ref>@<digest>"를 출력하고 legacy fallback
+    안내는 건너뜀 — 기존 DigestAcquired/Digest 경로(legacy
+    BuildAndRegister 전용)는 손대지 않고 safety-net으로 유지.
+    `allow_runtime_tools`/`allow_runtime_tools_reason`(같은 커밋에서
+    추가된 다른 필드, Sprint 9 관련)은 의도적으로 UI/CLI에 배선하지
+    않음 — R22의 취지(risky tool을 최종 이미지에서 빼는 것)와 반대
+    방향의 탈출구이기 때문. 적대적 리뷰 Major-1(Issue #41) 항목 3/4
+    완료.
 ```
 
 **⚠ R22 구현 시 절대 놓치면 안 되는 것 (2026-07-12 사용자 지시로 명시적
