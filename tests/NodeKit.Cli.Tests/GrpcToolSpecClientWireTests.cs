@@ -105,6 +105,46 @@ namespace NodeKit.Cli.Tests
         }
 
         [Fact]
+        public async Task ResolveAndBuildAsync_ImageDigestFields_SurviveRealProtoRoundTrip()
+        {
+            // Adversarial review Major-1 follow-up (Issue #41 item 3/4): NodeVault
+            // Sprint 7 P1a added image_ref/image_digest/spec_referrer_digest/
+            // integrity_health to BuildEvent (proto field numbers 7-10) so
+            // WatchToolBuild can expose them directly. This round-trips them
+            // through a real in-process gRPC server/client (not a hand-built C#
+            // object) so a field-number or mapping mistake in
+            // GrpcToolSpecClient.MapWatchEvent would actually fail here.
+            using var server = new GrpcTestServer();
+            server.Fake.WatchEvents = new List<BuildEvent>
+            {
+                new()
+                {
+                    Kind = BuildEventKind.Log,
+                    Status = "Running",
+                    BuildId = "b-5",
+                    ImageRef = "registry.internal/library/bwa-mem:0.7.17",
+                    ImageDigest = "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                    SpecReferrerDigest = "sha256:fedcba9876543210fedcba9876543210fedcba9876543210fedcba98765432",
+                    IntegrityHealth = "Healthy",
+                },
+                new() { Kind = BuildEventKind.Log, Status = "Succeeded", BuildId = "b-5" },
+            };
+            using var client = new GrpcToolSpecClient(server.Channel);
+
+            var events = new List<NodeKit.Grpc.BuildEvent>();
+            await foreach (var ev in client.ResolveAndBuildAsync("bwa", "0.7.17", "{}", CancellationToken.None))
+            {
+                events.Add(ev);
+            }
+
+            var withDigest = Assert.Single(events, e => !string.IsNullOrEmpty(e.ImageDigest));
+            Assert.Equal("registry.internal/library/bwa-mem:0.7.17", withDigest.ImageRef);
+            Assert.Equal("sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", withDigest.ImageDigest);
+            Assert.Equal("sha256:fedcba9876543210fedcba9876543210fedcba9876543210fedcba98765432", withDigest.SpecReferrerDigest);
+            Assert.Equal("Healthy", withDigest.IntegrityHealth);
+        }
+
+        [Fact]
         public async Task CancelBuildAsync_CallsFakeServerCancelToolBuild()
         {
             using var server = new GrpcTestServer();

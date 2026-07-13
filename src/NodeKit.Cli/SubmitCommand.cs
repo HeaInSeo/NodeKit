@@ -118,6 +118,8 @@ namespace NodeKit.Cli
             using var cts = new CancellationTokenSource();
             string? buildId = null;
             var digestReceived = false;
+            string? lastImageDigest = null;
+            string? lastImageRef = null;
             ConsoleCancelEventHandler onCancelKeyPress = (_, e) =>
             {
                 e.Cancel = true;
@@ -140,13 +142,36 @@ namespace NodeKit.Cli
                         digestReceived = true;
                     }
 
+                    // ToolSpec 경로(WatchToolBuild)는 Kind가 항상 LOG이고 위
+                    // DigestAcquired/Digest는 절대 채워지지 않는다 — 대신 매
+                    // 이벤트마다 buildstate.Record를 그대로 실어 보내는
+                    // ImageDigest/ImageRef를 채운다(NodeVault Sprint 7 P1a,
+                    // commit 03f5025). 이 값이 오면 legacy digestReceived와
+                    // 동등하게 취급해 아래 fallback 안내를 건너뛴다.
+                    if (!string.IsNullOrEmpty(ev.ImageDigest))
+                    {
+                        digestReceived = true;
+                        lastImageDigest = ev.ImageDigest;
+                        lastImageRef = ev.ImageRef;
+                    }
+
                     if (ev.Kind == BuildEventKind.Succeeded)
                     {
-                        // NodeVault의 WatchToolBuild가 아직 DigestAcquired 이벤트를
-                        // 안정적으로 보내지 않는 경우가 있다(라이브 테스트에서 확인) —
-                        // 조용히 넘어가지 않고 어디서 확인해야 하는지 안내한다.
-                        if (!digestReceived)
+                        if (!string.IsNullOrEmpty(lastImageDigest))
                         {
+                            stdout.WriteLine(string.IsNullOrEmpty(lastImageRef)
+                                ? $"이미지 digest: {lastImageDigest}"
+                                : $"이미지 digest: {lastImageRef}@{lastImageDigest}");
+                        }
+                        else if (!digestReceived)
+                        {
+                            // NodeVault의 WatchToolBuild가 아직 digest 정보를
+                            // 안정적으로 보내지 않는 경우가 있다(라이브 테스트에서
+                            // 확인) — 조용히 넘어가지 않고 어디서 확인해야 하는지
+                            // 안내한다. NodeVault Sprint 7 P1a 이후로는 정상 경로
+                            // (위 ImageDigest 분기)가 대신 실행되므로, 이 분기는
+                            // 옛 NodeVault 버전이나 예상 못한 회귀에 대한
+                            // safety-net으로만 남는다.
                             stdout.WriteLine(string.IsNullOrEmpty(buildId)
                                 ? "이미지 digest가 서버에서 제공되지 않았습니다 — NodeVault 인덱스에서 직접 확인하세요."
                                 : $"이미지 digest가 서버에서 제공되지 않았습니다 — NodeVault 인덱스에서 직접 확인하세요 (build ID: {buildId}).");

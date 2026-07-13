@@ -225,6 +225,15 @@ namespace NodeKit.Cli.Tests
         // DigestAcquired event, so the digest silently never appeared anywhere in
         // the CLI output. This doesn't fix NodeVault (out of scope), but it stops
         // NodeKit from staying silent about it.
+        //
+        // Superseded by NodeVault Sprint 7 P1a (commit 03f5025, 2026-07-13):
+        // WatchToolBuild's events now carry ImageDigest/ImageRef directly (see
+        // GrpcToolSpecClient.MapWatchEvent) instead of ever emitting
+        // DigestAcquired/Digest — that pair is legacy-BuildAndRegister-only and
+        // WatchToolBuild's Kind is always Log, so the two tests below still
+        // exercise a real code path (the safety-net branch for an unexpected
+        // NodeVault version or regression) even though it's no longer the
+        // common case. Adversarial review Major-1 follow-up, Issue #41 item 4.
 
         [Fact]
         public void Submit_BuildSucceeded_WithoutDigestAcquired_PrintsFallbackNotice()
@@ -269,6 +278,39 @@ namespace NodeKit.Cli.Tests
                 toolSpecClient: new StubToolSpecClient(events));
 
             Assert.Equal(0, exitCode);
+            Assert.DoesNotContain("제공되지 않았습니다", stdout.ToString());
+        }
+
+        [Fact]
+        public void Submit_BuildSucceeded_WithImageDigestFromWatchToolBuild_PrintsDigestSummary()
+        {
+            // The actual shape WatchToolBuild sends today: Kind is always Log
+            // (buildStateEvent in NodeVault's submit_tool_build.go), digest
+            // travels via ImageDigest/ImageRef, never via DigestAcquired/Digest.
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var events = new[]
+            {
+                new BuildEvent { Kind = BuildEventKind.JobCreated, Message = "빌드 제출됨", BuildId = "build-123" },
+                new BuildEvent
+                {
+                    Kind = BuildEventKind.Log,
+                    Status = "Running",
+                    ImageRef = "registry.internal/library/bwa-mem:0.7.17",
+                    ImageDigest = "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                },
+                new BuildEvent { Kind = BuildEventKind.Succeeded, Message = "완료" },
+            };
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(events));
+
+            Assert.Equal(0, exitCode);
+            Assert.Contains("registry.internal/library/bwa-mem:0.7.17@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", stdout.ToString());
             Assert.DoesNotContain("제공되지 않았습니다", stdout.ToString());
         }
 

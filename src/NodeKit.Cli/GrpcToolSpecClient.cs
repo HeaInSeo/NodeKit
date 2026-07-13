@@ -164,6 +164,10 @@ namespace NodeKit.Cli
                 Digest = ev.Digest,
                 BuildId = ev.BuildId,
                 Status = ev.Status,
+                ImageRef = ev.ImageRef,
+                ImageDigest = ev.ImageDigest,
+                SpecReferrerDigest = ev.SpecReferrerDigest,
+                IntegrityHealth = ev.IntegrityHealth,
             };
         }
 
