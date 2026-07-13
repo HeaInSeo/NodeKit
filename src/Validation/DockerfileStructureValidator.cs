@@ -17,7 +17,10 @@ namespace NodeKit.Validation
             @"\$(\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*)",
             RegexOptions.Compiled);
 
-        private static readonly Regex _sha256DigestPattern = new(@"^[0-9a-fA-F]{64}$", RegexOptions.Compiled);
+        // \z, not $ — .NET's $ (without RegexOptions.Multiline) tolerates one
+        // trailing '\n', which would let a digest value with an embedded
+        // newline pass this check (see RecipeValidator's matching fix note).
+        private static readonly Regex _sha256DigestPattern = new(@"\A[0-9a-fA-F]{64}\z", RegexOptions.Compiled);
 
         public ValidationResult Validate(ToolDefinition definition)
         {

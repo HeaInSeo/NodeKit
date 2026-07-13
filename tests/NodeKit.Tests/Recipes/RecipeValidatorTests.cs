@@ -357,6 +357,58 @@ namespace NodeKit.Tests.Recipes
             Assert.Contains(result.Violations, v => v.RuleId == "L1-RCP-014");
         }
 
+        // RecipeRendererPropertyTests/RecipeValidatorFuzzTests (CsCheck) found
+        // two real bugs on their first run, both from the same root cause:
+        //
+        // 1. _sourceUriPattern/_packageSpecPattern/_channelOrMirrorUriPattern
+        //    were matched against a *trimmed* copy of the field while
+        //    RecipeRenderer embeds the *raw* value — a value with a stray
+        //    leading/trailing space validated as clean but still rendered
+        //    with that whitespace in the Dockerfile.
+        // 2. All four "^...$"-anchored regexes in this file relied on .NET's
+        //    $ semantics, which (without RegexOptions.Multiline) match either
+        //    the true end of string OR the position right before a single
+        //    trailing '\n' — so a value ending in exactly one embedded
+        //    newline (e.g. "bwa=0.7.17\n") incorrectly validated as clean.
+        //
+        // Both are fixed by matching the raw (untrimmed) value against \A...\z
+        // anchors instead of ^...$. These two cases pin the exact fuzz-found
+        // counterexamples as permanent regressions.
+
+        [Fact]
+        public void Validate_SourceBuild_SourceUriWithTrailingSpace_Fails()
+        {
+            var recipe = new RecipeDocument
+            {
+                BuildKind = RecipeBuildKind.SourceBuild,
+                BaseImage = PinnedBaseImage,
+                SourceUri = "https://example.org/x.tar.gz ",
+                SourceChecksum = ValidChecksum,
+                SourceBuildCommands = { "make" },
+            };
+
+            var result = RecipeValidator.Validate(recipe);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-RCP-014");
+        }
+
+        [Fact]
+        public void Validate_Conda_PackageWithTrailingEmbeddedNewline_Fails()
+        {
+            var recipe = new RecipeDocument
+            {
+                BuildKind = RecipeBuildKind.Conda,
+                BaseImage = PinnedBaseImage,
+                Packages = { "bwa=0.7.17\n" },
+            };
+
+            var result = RecipeValidator.Validate(recipe);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-RCP-011");
+        }
+
         [Fact]
         public void Validate_SourceBuild_BuildCommandsMayStillContainShellOperators()
         {

@@ -16,8 +16,15 @@ namespace NodeKit.Validation.Recipes
     /// </summary>
     internal static class RecipeValidator
     {
+        // All four patterns below anchor with \z, not $. .NET's $ (without
+        // RegexOptions.Multiline) matches either the true end of the string
+        // OR the position immediately before a single trailing '\n' — so
+        // "bwa=0.7.17\n" (or any of these fields with one trailing newline)
+        // would incorrectly pass a $-anchored pattern despite containing a
+        // raw newline (fuzz-test-discovered: RecipeValidatorFuzzTests).
+        // \z matches only the absolute end of the string, closing that hole.
         private static readonly Regex _sourceChecksumPattern =
-            new(@"^sha256:[0-9a-fA-F]{64}$", RegexOptions.Compiled);
+            new(@"\Asha256:[0-9a-fA-F]{64}\z", RegexOptions.Compiled);
 
         // RecipeRenderer는 Packages/Channels/PackageMirrorUri를 셸 인용 없이
         // 그대로 "RUN conda install ..." / "RUN conda config --add channels ..."
@@ -26,17 +33,17 @@ namespace NodeKit.Validation.Recipes
         // 렌더링 전 단계에서 conda 패키지/채널 문법(name=version[=build])만 허용하는
         // allowlist로 막아야 한다.
         private static readonly Regex _packageSpecPattern =
-            new(@"^[A-Za-z0-9_.:+-]+(=[A-Za-z0-9_.:+-]+){1,2}$", RegexOptions.Compiled);
+            new(@"\A[A-Za-z0-9_.:+-]+(=[A-Za-z0-9_.:+-]+){1,2}\z", RegexOptions.Compiled);
 
         private static readonly Regex _channelOrMirrorUriPattern =
-            new(@"^[A-Za-z0-9_.:/+-]+$", RegexOptions.Compiled);
+            new(@"\A[A-Za-z0-9_.:/+-]+\z", RegexOptions.Compiled);
 
         // SourceUri는 RecipeRenderer.RenderSourceBuild에서 큰따옴표로 감싸 붙지만
         // ("curl -fsSL -o source.tar.gz \"" + SourceUri + "\""), 값 안에 큰따옴표/
         // 백틱/달러/백슬래시가 있으면 그 인용을 깨고 나올 수 있다. http(s) 스킴을
         // 강제하고 그 네 가지 이스케이프 문자와 공백(개행 포함)을 차단한다.
         private static readonly Regex _sourceUriPattern =
-            new(@"^https?://[^\s""'`$\\]+$", RegexOptions.Compiled);
+            new(@"\Ahttps?://[^\s""'`$\\]+\z", RegexOptions.Compiled);
 
         // DockGuard policy/security/security.rego DSF001/DSF002와 동일한 규칙.
         // WasmPolicyChecker는 GUI에만 배선되어 있고 NodeVault도 이 정책을
@@ -86,7 +93,7 @@ namespace NodeKit.Validation.Recipes
                             "package mirror build kind에는 PackageMirrorUri가 필요합니다.",
                             nameof(recipe.PackageMirrorUri)));
                     }
-                    else if (!_channelOrMirrorUriPattern.IsMatch(recipe.PackageMirrorUri.Trim()))
+                    else if (!_channelOrMirrorUriPattern.IsMatch(recipe.PackageMirrorUri))
                     {
                         violations.Add(new ValidationViolation(
                             "L1-RCP-013",
@@ -163,7 +170,11 @@ namespace NodeKit.Validation.Recipes
                     continue;
                 }
 
-                if (!_packageSpecPattern.IsMatch(package.Trim()))
+                // Raw value, not trimmed — RecipeRenderer joins recipe.Packages
+                // unquoted into "RUN conda install ..." as-is (see
+                // RenderInstallerFamily), so a value only valid after trimming
+                // is still rendered with its untrimmed characters intact.
+                if (!_packageSpecPattern.IsMatch(package))
                 {
                     violations.Add(new ValidationViolation(
                         "L1-RCP-011",
@@ -201,7 +212,8 @@ namespace NodeKit.Validation.Recipes
                     continue;
                 }
 
-                if (!_channelOrMirrorUriPattern.IsMatch(channel.Trim()))
+                // Raw value, not trimmed — same rationale as ValidatePackageFormats.
+                if (!_channelOrMirrorUriPattern.IsMatch(channel))
                 {
                     violations.Add(new ValidationViolation(
                         "L1-RCP-012",
@@ -253,7 +265,12 @@ namespace NodeKit.Validation.Recipes
                     nameof(recipe.SourceChecksum)));
             }
 
-            if (!string.IsNullOrWhiteSpace(recipe.SourceUri) && !_sourceUriPattern.IsMatch(recipe.SourceUri.Trim()))
+            // Matched against the raw value, not a trimmed copy — RecipeRenderer
+            // embeds recipe.SourceUri as-is (see RenderSourceBuild/
+            // RenderSourceBuildStructured), so validating a trimmed copy could
+            // pass a value whose actual leading/trailing whitespace still lands
+            // in the rendered Dockerfile (fuzz-test-discovered mismatch).
+            if (!string.IsNullOrWhiteSpace(recipe.SourceUri) && !_sourceUriPattern.IsMatch(recipe.SourceUri))
             {
                 violations.Add(new ValidationViolation(
                     "L1-RCP-014",
