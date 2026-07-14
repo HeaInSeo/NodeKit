@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
+using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
@@ -21,12 +22,10 @@ namespace NodeKit.UI
     internal partial class MainWindow : Window, IDisposable
     {
         private readonly ValidationViewModel _validationViewModel;
+        private readonly BuildSubmissionViewModel _buildSubmissionViewModel = new();
         private WasmPolicyChecker? _policyChecker;
-        private GrpcBuildClient? _buildClient;
         private HttpCatalogClient? _catalogClient;
         private GrpcPolicyBundleProvider? _policyProvider;
-        private CancellationTokenSource? _buildCts;
-        private string? _buildClientAddress;
         private string? _catalogClientAddress;
         private string? _policyProviderAddress;
         private bool _disposed;
@@ -139,7 +138,7 @@ namespace NodeKit.UI
 #pragma warning restore CA1031
 
             // 캐시된 클라이언트 폐기 — 다음 요청 시 새 주소로 재생성
-            _buildClientAddress = null;
+            _buildSubmissionViewModel.InvalidateClient();
             _catalogClientAddress = null;
             _policyProviderAddress = null;
 
@@ -166,7 +165,7 @@ namespace NodeKit.UI
 
             _settings = resetSettings;
             ApplySettingsToUI();
-            _buildClientAddress = null;
+            _buildSubmissionViewModel.InvalidateClient();
             _catalogClientAddress = null;
             _policyProviderAddress = null;
             StatusBar.Text = "기본값으로 초기화되었습니다.";
@@ -319,8 +318,6 @@ namespace NodeKit.UI
                 return;
             }
 
-            var request = BuildRequestFactory.FromToolDefinition(definition);
-
             // UI 초기화
             BuildLogPanel.IsVisible = true;
             BuildLogBox.Text = string.Empty;
@@ -329,23 +326,26 @@ namespace NodeKit.UI
             SendBuildButton.IsEnabled = false;
             StatusBar.Text = "빌드 요청 전송 중...";
 
-            _buildCts?.Cancel();
-            _buildCts = new CancellationTokenSource();
-            var cts = _buildCts;
-
             try
             {
-                var buildClient = GetBuildClient(address);
+                // BuildSubmissionViewModel이 클라이언트 수명/취소/build ID 추적을
+                // 전부 소유한다 — 새 빌드가 이전 빌드를 대체할 때 서버 쪽
+                // best-effort 취소(CancelBuildAsync)도 그 안에서 처리된다.
 #pragma warning disable CA2007 // IAsyncEnumerable does not support ConfigureAwait directly
-                await foreach (var ev in buildClient.BuildAndRegisterAsync(request, cts.Token))
+                await foreach (var ev in _buildSubmissionViewModel.SubmitAsync(definition, address))
 #pragma warning restore CA2007
                 {
                     var captured = ev;
                     Dispatcher.UIThread.Post(() => HandleBuildEvent(captured));
                 }
             }
+            catch (OperationCanceledException)
+            {
+                // 새 빌드가 이전 빌드를 대체했다 — ViewModel이 이미 서버 취소를
+                // best-effort로 시도했으므로 여기서는 조용히 넘어간다.
+            }
 #pragma warning disable CA1031
-            catch (Exception ex) when (!cts.IsCancellationRequested)
+            catch (Exception ex)
             {
                 var message = BuildErrorMessages.Describe(ex);
                 Dispatcher.UIThread.Post(() =>
@@ -367,6 +367,13 @@ namespace NodeKit.UI
         {
             var line = $"[{ev.Timestamp:HH:mm:ss}] [{ev.Kind}] {ev.Message}";
             AppendLog(line);
+
+            if (!string.IsNullOrEmpty(ev.ImageDigest))
+            {
+                BuildDigestLabel.Text = string.IsNullOrEmpty(ev.ImageRef)
+                    ? $"digest: {ev.ImageDigest}"
+                    : $"digest: {ev.ImageRef}@{ev.ImageDigest}";
+            }
 
             switch (ev.Kind)
             {
@@ -612,18 +619,6 @@ namespace NodeKit.UI
                 .ToList();
         }
 
-        private GrpcBuildClient GetBuildClient(string address)
-        {
-            if (_buildClient == null || !string.Equals(_buildClientAddress, address, StringComparison.Ordinal))
-            {
-                _buildClient?.Dispose();
-                _buildClient = new GrpcBuildClient(address);
-                _buildClientAddress = address;
-            }
-
-            return _buildClient;
-        }
-
         private HttpCatalogClient GetCatalogClient(string address)
         {
             if (_catalogClient == null || !string.Equals(_catalogClientAddress, address, StringComparison.Ordinal))
@@ -655,9 +650,7 @@ namespace NodeKit.UI
                 return;
             }
 
-            _buildCts?.Cancel();
-            _buildCts?.Dispose();
-            _buildClient?.Dispose();
+            _buildSubmissionViewModel.Dispose();
             _catalogClient?.Dispose();
             _policyProvider?.Dispose();
             _policyChecker?.Dispose();
