@@ -1,6 +1,6 @@
 # NodeKit Legacy-First Sprint Plan
 
-Status: Sprint 6 완료 / Sprint 7 진행 중 / R18-R21(§13) 완료 / R22-B/C/D(§13) 완료 / 적대적 리뷰 Major-1(#41) 완료, wizard 통합(#42) 완료  
+Status: Sprint 6 완료 / Sprint 7 진행 중(Task 1 완료, Task 2 대기) / R18-R21(§13) 완료 / R22-B/C/D(§13) 완료 / 적대적 리뷰 Major-1(#41) 완료, wizard 통합(#42) 완료  
 Created: 2026-06-17  
 Updated: 2026-07-14  
 Scope: NodeKit work — Sprint 0-6 완료, Sprint 7(Post-Migration Hardening) 진행 중,
@@ -376,10 +376,10 @@ Make the new path reliable enough to replace all legacy usage.
 Tasks:
 
 ```text
-○ 1. Avalonia GUI(NodeKit.csproj)를 IBuildClient/GrpcBuildClient에서 GrpcToolSpecClient로 전환.
-     IBuildClient / GrpcBuildClient는 현재 NodeKit.csproj(Avalonia)에만 남아 있음.
+✓ 1. Avalonia GUI(NodeKit.csproj)를 IBuildClient/GrpcBuildClient에서 GrpcToolSpecClient로 전환.
+     IBuildClient / GrpcBuildClient는 완전히 제거됨.
 ○ 2. U5-2: seoy 원격 장비에서 nodekit submit 수동 테스트 통과.
-○ 3. NodeVault 측 BuildAndRegister RPC deprecated 표시 (NodeVault 담당).
+✓ 3. NodeVault 측 BuildAndRegister RPC deprecated 표시 (NodeVault 담당, 확인 완료).
 ```
 
 Done when:
@@ -388,6 +388,46 @@ Done when:
 - Avalonia GUI도 ToolSpec 경로로 전환 완료.
 - CLI end-to-end 수동 테스트 통과 (seoy 장비).
 - IBuildClient / GrpcBuildClient 완전 제거 또는 명시적 ADR 후 유지 결정.
+```
+
+**Progress (Task 1 완료, 2026-07-14, 커밋 `f7f34b1`/`9ccda57`, Issue #44):**
+
+```text
+완료:
+- GrpcToolSpecClient/IToolSpecBuildClient를 src/NodeKit.Cli/(NodeKit.Cli
+  네임스페이스, Avalonia 프로젝트에서 안 보임 — NodeKit.csproj가
+  src/NodeKit.Cli/**를 명시적으로 제외)에서 src/Grpc/(NodeKit.Grpc
+  네임스페이스, CLI/GUI 공유 위치)로 이동.
+- SubmitCommand의 private BuildRawSpec을 공유 ToolSpecRawSpecFactory로
+  추출 — raw_spec JSON 형태는 CLI/GUI 두 제출 경로가 반드시 동일해야
+  하는 wire 계약이라 중복 시 조용히 갈라질 위험이 있었음.
+- UI/ViewModels/BuildSubmissionViewModel.cs(신규, ReactiveObject) —
+  GrpcToolSpecClient 수명, in-flight build ID 추적, best-effort 서버
+  취소를 전담. MainWindow 코드-비하인드에 직접 추가하지 않고
+  ViewModel로 분리한 이유: 이 저장소의 기존 방향(DagEdit 스타일
+  ReactiveUI/System.Reactive, 코드-비하인드 확장 금지)과
+  ReactiveArchitectureGuardTests의 줄 수 baseline(667줄) — 코드-비하인드에
+  직접 추가했다면 746줄로 baseline을 초과했을 것, 분리 후 660줄.
+- 단순 줄 수 회피가 아니라 실제로 필요한 분리였음: WatchToolBuild는
+  관찰용 스트림이라, legacy BuildAndRegister(취소 = 곧 서버 빌드 중단)와
+  달리 클라이언트 취소만으로는 서버 빌드가 멈추지 않는다. 새 빌드가
+  이전 빌드를 대체하거나 창을 닫을 때 CancelBuildAsync를 best-effort로
+  호출하도록 새로 추가(CLI의 SubmitCommand.CancelServerBuildBestEffort와
+  동일 패턴).
+- HandleBuildEvent가 WatchToolBuild 고유 필드(ImageRef/ImageDigest)도
+  표시하도록 확장 — CLI의 R18 digest fallback 교체와 같은 이유(legacy
+  DigestAcquired/Digest는 WatchToolBuild에서 절대 안 옴).
+- IBuildClient/GrpcBuildClient 완전 제거(그 테스트 2개 파일도 함께 제거) —
+  ADR 없이 제거 쪽으로 결정, CLI가 Phase 6에서 이미 같은 선택을 한 전례를
+  따름.
+- 612/612 통과(옵트인 NodeVault 통합 테스트 1개 스킵), 0 warnings,
+  dotnet format 클린.
+
+**알려진 한계**: 이 환경에는 디스플레이 서버가 없어(XOpenDisplay 실패)
+실제 GUI를 실행/스모크테스트하지 못했고, 이 저장소에는 headless Avalonia
+테스트 하네스도 없다. 빌드 경고 0개/테스트 전체 통과/모든 변경 지점 수동
+코드 리뷰로 대신 검증함 — 실제 GUI 라이브 검증은 아직 안 된 상태로 남아
+있음. Issue #44에 기록.
 ```
 
 **Progress (Task 2 / U5-2 사전 검증, 2026-07-05, 2차 실행까지 반영):**
