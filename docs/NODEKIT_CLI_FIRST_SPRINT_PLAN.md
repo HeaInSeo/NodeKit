@@ -1,11 +1,11 @@
 # NodeKit Legacy-First Sprint Plan
 
-Status: Sprint 6 완료 / Sprint 7 진행 중 / R18-R21(§13) 완료 / R22-B/C(§13) 완료, R22-D 대기(#39) / 적대적 리뷰 Major-1(#41) 완료, wizard 통합(#42) 완료  
+Status: Sprint 6 완료 / Sprint 7 진행 중 / R18-R21(§13) 완료 / R22-B/C/D(§13) 완료 / 적대적 리뷰 Major-1(#41) 완료, wizard 통합(#42) 완료  
 Created: 2026-06-17  
 Updated: 2026-07-14  
 Scope: NodeKit work — Sprint 0-6 완료, Sprint 7(Post-Migration Hardening) 진행 중,
-§13 Live Recipe Reproducibility Improvement(R18-R21) 완료, R22-B/C(SourceBuild
-구조화 intent authoring 모델 + 2-stage 렌더링) 완료, R22-D 진행 대기,
+§13 Live Recipe Reproducibility Improvement(R18-R21) 완료, R22-B/C/D(SourceBuild
+구조화 intent authoring 모델 + 2-stage 렌더링 + RuntimeProfile hygiene advisor) 완료,
 NodeKit↔NodeVault 적대적 리뷰 Major-1(#41) 및 그 후속 SourceStructured
 wizard 통합(#42) 완료
 
@@ -70,12 +70,19 @@ Issue #42 close, 커밋 `301ba4d`)**: 대화형 wizard 옵션 6번으로 추가,
 SourceStructured를 추천(legacy는 수동 선택 "4"로 계속 접근 가능).
 쉬운 안내 모드(BeginnerGuideFlow)는 의도적으로 범위 밖(#42 참조).
 
+**R22-D 완료 (2026-07-14, Issue #39 close, 커밋 `bf3caca`)**:
+`RuntimeProfileHygieneAdvisor` 신설 — SourceBuildStructured의
+RuntimeProfile이 advanced일 때만, RuntimeProfileImage가 이름 기준으로
+risky(curl 전용/buildpack-deps 등)하면 non-blocking 경고. 상세는 §13
+R22-D Progress 블록 참조. **R22(SourceBuild 구조화 intent) 이니셔티브
+전체(R22-B/C/D) 완료.**
+
 현재 NodeKit 초점:
 
 ```text
-R22-B/C 완료, 적대적 리뷰 Major-1(#41)/wizard 통합(#42) 완료 →
-  R22-D(#39): SourceBuild 구조화 intent RuntimeProfile hygiene advisor
-  (§13, 위 함정 유의)
+R22-B/C/D 완료, 적대적 리뷰 Major-1(#41)/wizard 통합(#42) 완료 →
+  다음 후보: Sprint 7 Task 1(Avalonia GUI ToolSpec 마이그레이션) 또는
+  U5-2(seoy 수동 테스트) — 사용자 확인 필요
 Sprint 7: Avalonia GUI ToolSpec 마이그레이션
 + U5-2: seoy 원격 장비 nodekit submit 수동 테스트 (seoy 준비 후)
   — 2026-07-05: seoy 없이 heain 로컬 사전 검증 완료(TC-1~TC-13 전체), 버그 6건
@@ -2126,6 +2133,38 @@ Done when:
   무변경 통과.
 - 실제 CLI로 RuntimeProfileImage에 fetch 전용 이미지를 넣었을 때 경고
   출력 확인(차단 아님).
+```
+
+**Progress (Sprint R22-D 완료, 2026-07-14, 커밋 `bf3caca`):**
+
+```text
+완료:
+- RuntimeProfileHygieneAdvisor(신규, src/NodeKit.Cli/): SourceBuildBaseImageAdvisor와
+  동일 패턴(internal static class, Describe(...) → string? null-or-warning).
+  RecipeBuildKind.SourceBuildStructured + RuntimeProfile == "advanced" +
+  RuntimeProfileImage가 curlimages/curl, busybox, alpine/curl, buildpack-deps
+  중 하나와 이름이 겹칠 때만 경고 — 큐레이션된 프로필(generic/minimal)은
+  이미 buildah로 검증됐으므로 advanced 이스케이프 해치에만 적용.
+  경고 문구에 "추정"임을 명시하고 실제 검증(NodeVault Sprint 9 완료/
+  Sprint 10 미구현)과 분리 — 이미지 이름만으로 콘텐츠를 확정하지 않음.
+- SourceBuildBaseImageAdvisor doc 주석 갱신 — legacy SourceBuild 전용임을
+  명시, RuntimeProfileHygieneAdvisor와 체크리스트를 공유하지 않는 이유
+  설명(legacy는 BaseImage가 fetch+runtime 역할을 겸하는 게 설계 결함
+  그 자체이므로).
+- RecipeCreateFlow.cs(interactive) / RecipeCreateCommand.cs(non-interactive)
+  양쪽에 동일 위치·패턴으로 배선(R20/R21과 동일).
+- 신규 테스트: RuntimeProfileHygieneAdvisorTests 6개(advanced+risky 경고,
+  advanced+buildpack-deps 경고, advanced+ordinary null, curated+risky도
+  null, non-SourceBuildStructured null, null image null) +
+  RecipeCreateCommandTests 1개(advanced RuntimeProfile + fetch 전용
+  이미지 → stderr 경고 + exit 0 + 파일 저장 확인).
+- 실제 CLI로 advanced+curlimages/curl(경고 발생, exit 0) 및
+  minimal(경고 없음, exit 0) 둘 다 직접 실행 확인.
+- SourceStructured가 이제 wizard 통합됐다는 사실을 반영해 관련 테스트
+  주석의 stale 문구("대화형 wizard에서는 아직 제공하지 않습니다")도
+  같이 정리(#42 완료 반영).
+
+623/623 통과(스킵 2), 0 warnings, dotnet format clean. Issue #39 close.
 ```
 
 ### 참고 (R22와 무관, 별도 트리거) — 완료
