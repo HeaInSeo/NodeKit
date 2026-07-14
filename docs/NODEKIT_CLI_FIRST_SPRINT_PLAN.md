@@ -1,11 +1,13 @@
 # NodeKit Legacy-First Sprint Plan
 
-Status: Sprint 6 완료 / Sprint 7 진행 중 / R18-R21(§13) 완료 / R22-B/C(§13) 완료, R22-D 대기(#39)  
+Status: Sprint 6 완료 / Sprint 7 진행 중 / R18-R21(§13) 완료 / R22-B/C(§13) 완료, R22-D 대기(#39) / 적대적 리뷰 Major-1(#41) 완료, wizard 통합(#42) 완료  
 Created: 2026-06-17  
-Updated: 2026-07-13  
+Updated: 2026-07-14  
 Scope: NodeKit work — Sprint 0-6 완료, Sprint 7(Post-Migration Hardening) 진행 중,
 §13 Live Recipe Reproducibility Improvement(R18-R21) 완료, R22-B/C(SourceBuild
-구조화 intent authoring 모델 + 2-stage 렌더링) 완료, R22-D 진행 대기
+구조화 intent authoring 모델 + 2-stage 렌더링) 완료, R22-D 진행 대기,
+NodeKit↔NodeVault 적대적 리뷰 Major-1(#41) 및 그 후속 SourceStructured
+wizard 통합(#42) 완료
 
 ## 0. Resume Note For Agents
 
@@ -55,11 +57,25 @@ Sprint 10(미구현)이 필요하다. "서버 쪽 강제가 전혀 없다"는 �
 갱신), 설계 문서 §2.6 Q5/§8(2026-07-13 갱신) 참조.
 ```
 
+**적대적 리뷰 Major-1 완료 (2026-07-13/14, Issue #41 close, 커밋
+`2e9fdf7`/`f99508a`/`c9944f4`/`c144425`)**: `docs/NODEKIT_NODEVAULT_
+ADVERSARIAL_REVIEW_BRIEFING.md` 기반 별도 에이전트 리뷰에서 나온
+Major-1 지적(legacy SourceBuild vs NodeVault Sprint 9 정책 충돌) 6개
+항목 전부 대응 — `SourceBuildBaseImageAdvisor` 무조건 경고,
+proto 재벤더링(`allow_runtime_tools`는 의도적으로 미노출), R18 digest
+fallback을 `BuildEvent.image_digest` 등 새 필드 소비로 교체, 문서
+표현 narrowing. 이어서 **SourceStructured wizard 통합 완료 (2026-07-14,
+Issue #42 close, 커밋 `301ba4d`)**: 대화형 wizard 옵션 6번으로 추가,
+`HasSourceArchiveAndChecksum` 신호가 이제 legacy Source 대신
+SourceStructured를 추천(legacy는 수동 선택 "4"로 계속 접근 가능).
+쉬운 안내 모드(BeginnerGuideFlow)는 의도적으로 범위 밖(#42 참조).
+
 현재 NodeKit 초점:
 
 ```text
-R22-B/C 완료 → R22-D(#39): SourceBuild 구조화 intent RuntimeProfile
-  hygiene advisor (§13, 위 함정 유의)
+R22-B/C 완료, 적대적 리뷰 Major-1(#41)/wizard 통합(#42) 완료 →
+  R22-D(#39): SourceBuild 구조화 intent RuntimeProfile hygiene advisor
+  (§13, 위 함정 유의)
 Sprint 7: Avalonia GUI ToolSpec 마이그레이션
 + U5-2: seoy 원격 장비 nodekit submit 수동 테스트 (seoy 준비 후)
   — 2026-07-05: seoy 없이 heain 로컬 사전 검증 완료(TC-1~TC-13 전체), 버그 6건
