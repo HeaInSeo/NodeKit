@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using NodeKit.Cli.Tests.Fakes;
 using Nodevault.V1;
 using Xunit;
+using GrpcToolSpecClient = NodeKit.Grpc.GrpcToolSpecClient;
 
 namespace NodeKit.Cli.Tests
 {

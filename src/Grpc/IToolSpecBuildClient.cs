@@ -1,12 +1,14 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using NodeKit.Grpc;
 
-namespace NodeKit.Cli
+namespace NodeKit.Grpc
 {
     /// <summary>
     /// NodeVault 신규 경로: ResolveToolSpec → SubmitToolBuild → WatchToolBuild.
+    /// Shared by the CLI (SubmitCommand) and the Avalonia GUI (MainWindow) —
+    /// this is the one production submit path since Sprint 7 (legacy
+    /// BuildAndRegister/IBuildClient removed).
     /// </summary>
     internal interface IToolSpecBuildClient
     {

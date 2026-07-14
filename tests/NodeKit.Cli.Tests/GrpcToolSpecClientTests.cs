@@ -1,6 +1,7 @@
 using Nodevault.V1;
 using Xunit;
 using GrpcBuildEventKind = NodeKit.Grpc.BuildEventKind;
+using GrpcToolSpecClient = NodeKit.Grpc.GrpcToolSpecClient;
 
 namespace NodeKit.Cli.Tests
 {

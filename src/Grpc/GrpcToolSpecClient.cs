@@ -6,15 +6,14 @@ using System.Threading.Tasks;
 using Grpc.Core;
 using Grpc.Net.Client;
 using Nodevault.V1;
-using GrpcBuildEvent = NodeKit.Grpc.BuildEvent;
-using GrpcBuildEventKind = NodeKit.Grpc.BuildEventKind;
 
-namespace NodeKit.Cli
+namespace NodeKit.Grpc
 {
     /// <summary>
     /// NodeVault 신규 빌드 경로 클라이언트:
     /// ResolveToolSpec → SubmitToolBuild → WatchToolBuild.
-    /// 활성화: NODEKIT_NODEVAULT_URL 환경변수 또는 --url 옵션.
+    /// CLI 활성화: NODEKIT_NODEVAULT_URL 환경변수 또는 --url 옵션.
+    /// GUI 활성화: 설정 화면의 NodeVault 주소.
     /// </summary>
     internal sealed class GrpcToolSpecClient : IToolSpecBuildClient, IDisposable
     {
@@ -47,7 +46,7 @@ namespace NodeKit.Cli
             _disposed = true;
         }
 
-        public async IAsyncEnumerable<GrpcBuildEvent> ResolveAndBuildAsync(
+        public async IAsyncEnumerable<BuildEvent> ResolveAndBuildAsync(
             string toolName,
             string version,
             string rawSpec,
@@ -68,24 +67,26 @@ namespace NodeKit.Cli
                     },
                     cancellationToken: cancellationToken);
             }
+#pragma warning disable CA1031 // any failure (RPC error, cancellation race, etc.) must surface as a Failed event, not crash the caller
             catch (Exception ex)
+#pragma warning restore CA1031
             {
                 resolveEx = ex;
             }
 
             if (resolveEx != null)
             {
-                yield return new GrpcBuildEvent
+                yield return new BuildEvent
                 {
-                    Kind = GrpcBuildEventKind.Failed,
-                    Message = NodeKit.Grpc.BuildErrorMessages.Describe(resolveEx),
+                    Kind = BuildEventKind.Failed,
+                    Message = BuildErrorMessages.Describe(resolveEx),
                 };
                 yield break;
             }
 
-            yield return new GrpcBuildEvent
+            yield return new BuildEvent
             {
-                Kind = GrpcBuildEventKind.Log,
+                Kind = BuildEventKind.Log,
                 Message = $"spec 해결 완료 (digest: {resolveResp!.ToolSpecDigest[..Math.Min(16, resolveResp.ToolSpecDigest.Length)]}...)",
             };
 
@@ -102,24 +103,26 @@ namespace NodeKit.Cli
                     },
                     cancellationToken: cancellationToken);
             }
+#pragma warning disable CA1031 // any failure (RPC error, cancellation race, etc.) must surface as a Failed event, not crash the caller
             catch (Exception ex)
+#pragma warning restore CA1031
             {
                 submitEx = ex;
             }
 
             if (submitEx != null)
             {
-                yield return new GrpcBuildEvent
+                yield return new BuildEvent
                 {
-                    Kind = GrpcBuildEventKind.Failed,
-                    Message = NodeKit.Grpc.BuildErrorMessages.Describe(submitEx),
+                    Kind = BuildEventKind.Failed,
+                    Message = BuildErrorMessages.Describe(submitEx),
                 };
                 yield break;
             }
 
-            yield return new GrpcBuildEvent
+            yield return new BuildEvent
             {
-                Kind = GrpcBuildEventKind.JobCreated,
+                Kind = BuildEventKind.JobCreated,
                 Message = $"빌드 제출됨 (build ID: {submitResp!.BuildId})",
                 BuildId = submitResp.BuildId,
                 Status = submitResp.Status,
@@ -130,7 +133,9 @@ namespace NodeKit.Cli
                 new WatchToolBuildRequest { BuildId = submitResp.BuildId },
                 cancellationToken: cancellationToken);
 
+#pragma warning disable CA2007 // IAsyncEnumerable does not support ConfigureAwait directly
             while (await watchCall.ResponseStream.MoveNext(cancellationToken))
+#pragma warning restore CA2007
             {
                 yield return MapWatchEvent(watchCall.ResponseStream.Current);
             }
@@ -143,20 +148,20 @@ namespace NodeKit.Cli
                 cancellationToken: cancellationToken);
         }
 
-        internal static GrpcBuildEvent MapWatchEvent(BuildEvent ev)
+        internal static BuildEvent MapWatchEvent(Nodevault.V1.BuildEvent ev)
         {
             // WatchToolBuild은 모든 이벤트를 LOG 종류로 보낸다.
             // status 필드(buildstate.Status 그대로, PascalCase)로 terminal 상태를
             // 판별해 적절한 Kind로 변환한다.
             var kind = ev.Status switch
             {
-                "Succeeded" => GrpcBuildEventKind.Succeeded,
-                "Failed" => GrpcBuildEventKind.Failed,
-                "Interrupted" => GrpcBuildEventKind.Failed,
+                "Succeeded" => BuildEventKind.Succeeded,
+                "Failed" => BuildEventKind.Failed,
+                "Interrupted" => BuildEventKind.Failed,
                 _ => MapProtoKind(ev.Kind),
             };
 
-            return new GrpcBuildEvent
+            return new BuildEvent
             {
                 Kind = kind,
                 Message = ev.Message,
@@ -171,16 +176,16 @@ namespace NodeKit.Cli
             };
         }
 
-        private static GrpcBuildEventKind MapProtoKind(Nodevault.V1.BuildEventKind kind) => kind switch
+        private static BuildEventKind MapProtoKind(Nodevault.V1.BuildEventKind kind) => kind switch
         {
-            Nodevault.V1.BuildEventKind.Log => GrpcBuildEventKind.Log,
-            Nodevault.V1.BuildEventKind.JobCreated => GrpcBuildEventKind.JobCreated,
-            Nodevault.V1.BuildEventKind.JobRunning => GrpcBuildEventKind.JobRunning,
-            Nodevault.V1.BuildEventKind.PushSucceeded => GrpcBuildEventKind.RegistryPushSucceeded,
-            Nodevault.V1.BuildEventKind.DigestAcquired => GrpcBuildEventKind.DigestAcquired,
-            Nodevault.V1.BuildEventKind.Succeeded => GrpcBuildEventKind.Succeeded,
-            Nodevault.V1.BuildEventKind.Failed => GrpcBuildEventKind.Failed,
-            _ => GrpcBuildEventKind.Log,
+            Nodevault.V1.BuildEventKind.Log => BuildEventKind.Log,
+            Nodevault.V1.BuildEventKind.JobCreated => BuildEventKind.JobCreated,
+            Nodevault.V1.BuildEventKind.JobRunning => BuildEventKind.JobRunning,
+            Nodevault.V1.BuildEventKind.PushSucceeded => BuildEventKind.RegistryPushSucceeded,
+            Nodevault.V1.BuildEventKind.DigestAcquired => BuildEventKind.DigestAcquired,
+            Nodevault.V1.BuildEventKind.Succeeded => BuildEventKind.Succeeded,
+            Nodevault.V1.BuildEventKind.Failed => BuildEventKind.Failed,
+            _ => BuildEventKind.Log,
         };
     }
 }
