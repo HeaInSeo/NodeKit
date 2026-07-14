@@ -165,12 +165,14 @@ namespace NodeKit.Authoring.Recipes
         // §7/D-6). L1-RCP-015's newline guard on SourceBuildCommands still
         // applies since those commands still collapse onto one RUN line.
         //
-        // ⚠ This closes the client-side half of the gap only. NodeVault has
-        // no server-side enforcement that the runtime stage stays clean
-        // (tracked upstream as NodeVault's own Sprint 9/10, unimplemented) —
-        // do not describe this alone as "the SourceBuild security problem is
-        // solved." See docs/NODEKIT_SOURCEBUILD_STRUCTURED_INTENT_DESIGN.md
-        // §2.6 Q5/§8.
+        // ⚠ This closes the client-side half of the gap. NodeVault's Sprint 9
+        // (final-stage RUN static risky-tool scan, live since 2026-07-13)
+        // covers an explicit "RUN curl ..." in the runtime stage server-side;
+        // Sprint 10 (post-build image content scan, still unimplemented) is
+        // what would catch a runtime image that already ships curl/etc.
+        // without any RUN line — do not describe this alone as "the
+        // SourceBuild security problem is solved" until that ships too. See
+        // docs/NODEKIT_SOURCEBUILD_STRUCTURED_INTENT_DESIGN.md §2.6 Q5/§8.
         private static void RenderSourceBuildStructured(RecipeDocument recipe, ToolDefinition definition)
         {
             var buildImage = ResolveProfileImage(recipe.BuildProfile, recipe.BuildProfileImage, SourceBuildProfileCatalog.FindBuildProfile);

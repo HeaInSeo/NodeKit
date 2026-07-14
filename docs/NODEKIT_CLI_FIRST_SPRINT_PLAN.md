@@ -2083,12 +2083,19 @@ Done when:
 
 최종 결과: 587 / 587 통과(스킵 2 제외), 0 warnings, dotnet format 클린.
 
-⚠ 미해결 그대로 남음(§13 체크리스트 항목 1과 동일): 이번 스프린트는
-client-side 렌더링만 다룬다. NodeVault가 dockerfile_content를 그대로
-받아들이고(재작성 없음) 런타임 스테이지 내용을 서버에서 강제하지
+⚠ 미해결 그대로 남음(당시 기준, §13 체크리스트 항목 1과 동일): 이번
+스프린트는 client-side 렌더링만 다룬다. NodeVault가 dockerfile_content를
+그대로 받아들이고(재작성 없음) 런타임 스테이지 내용을 서버에서 강제하지
 않으므로, authoring 시점에 "안전한 recipe.json"을 만들 수는 있어도
 누군가 손으로 dockerfile_content를 다시 조작해 제출하는 경로를 막지는
-못한다. NodeVault Sprint 9/10(unimplemented)이 이 gap의 담당.
+못한다. NodeVault Sprint 9/10(당시 unimplemented)이 이 gap의 담당.
+
+**이후 갱신(2026-07-13 같은 날 늦게, 적대적 리뷰 Major-1/Issue #41)**:
+NodeVault Sprint 9가 실제로 머지되어(`645c594`) 위 문단이 stale해짐 —
+최종 스테이지 RUN의 정적 검사는 이제 서버 쪽에 존재한다("dockerfile_content를
+손으로 조작해도 아무도 안 막는다"는 더 이상 사실이 아님). Sprint
+10(base image에 이미 포함된 도구 탐지)만 여전히 미구현. 최신 상태는
+§13 하단 체크리스트 항목 1과 설계 문서 §2.6 Q5(2026-07-13 갱신) 참조.
 ```
 
 ### Sprint R22-D. SourceBuild 구조화 Intent — RuntimeProfile hygiene advisor (Issue #39)

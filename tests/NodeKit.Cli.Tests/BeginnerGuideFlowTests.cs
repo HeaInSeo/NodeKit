@@ -413,8 +413,18 @@ namespace NodeKit.Cli.Tests
         // ── Source clue ───────────────────────────────────────────────────────
 
         [Fact]
-        public void SourceClue_WithChecksum_SavesValidRecipe()
+        public void SourceClue_WithChecksum_SavesValidSourceStructuredRecipe()
         {
+            // Adversarial review Major-1 follow-up (Issue #43): the guided
+            // beginner source-clue path used to select legacy
+            // RecipeBuildKind.SourceBuild — rejected almost unconditionally
+            // by NodeVault's Sprint 9 policy (#41). It now selects
+            // SourceStructured with the curated generic/minimal profiles
+            // pre-filled (BeginnerGuideFlow.SelectSourceStructured), so
+            // there's no separate build/runtime-environment question for a
+            // beginner to answer, and — since SourceStructured has no
+            // BaseImage field — the base-image-selection step no longer
+            // appears at all for this path.
             var outPath = Path.Combine(_workDir, "recipe.json");
             var transcript = new[]
             {
@@ -422,14 +432,14 @@ namespace NodeKit.Cli.Tests
                 "4",  // source
                 "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz",
                 "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-                "0",   // 기반 이미지: 직접 입력
-                // RunFieldLoop (SourceUri + SourceChecksum pre-filled):
+                // RunFieldLoop (SourceUri/SourceChecksum/BuildProfile/RuntimeProfile
+                // pre-filled — NextField() skips them; no BaseImage field at all):
                 "bwa-mem", "0.7.17", "run.sh",
-                BaseImageWithDigest,  // ImageRef (BaseImage for Source method)
-                // SourceUri: pre-filled
-                // SourceChecksum: pre-filled
-                "make", "make install", "",  // SourceBuildCommands
-                "",                          // BuildDependencies (Recommended → skipped)
+                "",                           // BuildProfileImage (advanced-only, optional) — skip
+                "make", "make install", "",   // SourceBuildCommands
+                "",                           // BuildDependencies (Recommended → skipped)
+                "",                           // RuntimeProfileImage (advanced-only, optional) — skip
+                "",                           // RuntimeDependencies (Recommended → skipped)
                 "reads", "1", "",
                 "bam", "1", "",
             };
@@ -439,7 +449,9 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(0, exitCode);
             Assert.True(File.Exists(outPath));
             var json = File.ReadAllText(outPath);
-            Assert.Contains("\"BuildKind\": \"SourceBuild\"", json);
+            Assert.Contains("\"BuildKind\": \"SourceBuildStructured\"", json);
+            Assert.Contains("\"BuildProfile\": \"generic\"", json);
+            Assert.Contains("\"RuntimeProfile\": \"minimal\"", json);
         }
 
         [Fact]

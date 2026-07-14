@@ -771,10 +771,7 @@ namespace NodeKit.Cli
                 var checksum = rawChecksum;
                 if (!string.IsNullOrEmpty(checksum))
                 {
-                    session.SelectMethod(RecipeMethodId.Source);
-                    session.SetField("SourceUri", uri);
-                    session.SetField("SourceChecksum", checksum);
-                    return RecipeMethodId.Source;
+                    return SelectSourceStructured(session, uri, checksum);
                 }
 
                 RecipeCreateScreen.ClearForNewStep(console);
@@ -817,10 +814,7 @@ namespace NodeKit.Cli
                             var newChecksum = rawNewChecksum;
                             if (!string.IsNullOrEmpty(newChecksum))
                             {
-                                session.SelectMethod(RecipeMethodId.Source);
-                                session.SetField("SourceUri", uri);
-                                session.SetField("SourceChecksum", newChecksum);
-                                return RecipeMethodId.Source;
+                                return SelectSourceStructured(session, uri, newChecksum);
                             }
                             console.WriteLine("checksum이 비어 있습니다. 다시 시도합니다.");
                             continue;
@@ -836,6 +830,27 @@ namespace NodeKit.Cli
                 }
 
             }
+        }
+
+        // 적대적 리뷰 Major-1 후속(Issue #43): 이 경로는 예전에
+        // RecipeMethodId.Source(legacy, single-stage)를 선택했다 — NodeVault
+        // Sprint 9 정책상 사실상 항상 거부되는 방식(§13 R22, Issue #41).
+        // SourceStructured(2-stage)로 바꾸되, 초보자에게 build/runtime 환경
+        // 분리 개념을 따로 물어보지 않기 위해 큐레이션된 프로필(buildah로
+        // 검증된 generic/minimal, SourceBuildProfileCatalog)을 기본값으로
+        // 미리 세팅한다 — RecipeAuthoringSession.NextField()는 이미 값이
+        // 채워진 필드를 건너뛰므로, 이후 필드 루프는 BuildProfile/
+        // RuntimeProfile을 다시 묻지 않는다. BuildProfileImage/
+        // RuntimeProfileImage(advanced 전용, Optional)는 그대로 한 번씩
+        // 스킵 가능한 프롬프트로 남는다.
+        private static RecipeMethodId SelectSourceStructured(RecipeAuthoringSession session, string sourceUri, string sourceChecksum)
+        {
+            session.SelectMethod(RecipeMethodId.SourceStructured);
+            session.SetField("SourceUri", sourceUri);
+            session.SetField("SourceChecksum", sourceChecksum);
+            session.SetField("BuildProfile", "generic");
+            session.SetField("RuntimeProfile", "minimal");
+            return RecipeMethodId.SourceStructured;
         }
 
         // ── Section 12: Dockerfile 기반 흐름 ────────────────────────────────────
