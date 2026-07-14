@@ -173,6 +173,12 @@ namespace NodeKit.Cli
                 stderr.WriteLine($"경고: {buildDependenciesAdvisory}");
             }
 
+            var runtimeProfileAdvisory = RuntimeProfileHygieneAdvisor.Describe(document.BuildKind.Value, document.RuntimeProfile, document.RuntimeProfileImage);
+            if (runtimeProfileAdvisory != null)
+            {
+                stderr.WriteLine($"경고: {runtimeProfileAdvisory}");
+            }
+
             var result = RecipeValidationPipeline.ValidateRecipe(document);
             if (!result.IsValid)
             {

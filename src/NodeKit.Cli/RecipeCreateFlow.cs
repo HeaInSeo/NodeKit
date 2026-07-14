@@ -105,6 +105,14 @@ namespace NodeKit.Cli
                 console.WriteLine();
             }
 
+            var runtimeProfileAdvisory = RuntimeProfileHygieneAdvisor.Describe(document.BuildKind!.Value, document.RuntimeProfile, document.RuntimeProfileImage);
+            if (runtimeProfileAdvisory != null)
+            {
+                console.WriteLine();
+                console.WriteLine($"⚠  {runtimeProfileAdvisory}");
+                console.WriteLine();
+            }
+
             // 단계 7: 패키지 빌드 문자열 선택 (ResolveRecipe)
             if (document.Packages.Count > 0)
             {

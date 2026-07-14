@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using NodeKit.Cli;
 using Xunit;
 
@@ -201,8 +202,8 @@ namespace NodeKit.Cli.Tests
         }
 
         // §13 R22-B (docs/NODEKIT_SOURCEBUILD_STRUCTURED_INTENT_DESIGN.md).
-        // Only reachable via --non-interactive --method source-structured —
-        // intentionally not offered by the interactive wizard yet.
+        // Wizard-integrated as option 6 since Issue #42 (2026-07-14) — these
+        // non-interactive tests still cover the CLI-level contract directly.
 
         [Fact]
         public void SourceStructured_CuratedProfiles_CreatesRecipeThatPassesValidate()
@@ -219,6 +220,30 @@ namespace NodeKit.Cli.Tests
 
             Assert.Equal(0, validateExitCode);
             Assert.Contains("OK", validateStdout.ToString());
+        }
+
+        [Fact]
+        public void SourceStructured_AdvancedRuntimeProfileWithFetchOnlyImage_WarnsButStillSaves()
+        {
+            // §13 R22-D (Issue #39): RuntimeProfileHygieneAdvisor is
+            // non-blocking — a risky-looking RuntimeProfileImage gets a
+            // warning on stderr, not a rejection.
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var stderr = new StringWriter();
+            var args = RemoveField(SourceStructuredArgs(), "RuntimeProfile")
+                .Concat(new[]
+                {
+                    "--field", "RuntimeProfile=advanced",
+                    "--field",
+                    "RuntimeProfileImage=docker.io/library/buildpack-deps:bookworm@sha256:4efddd9a54ddc095e672b2fdf514f1ee4d3bb6e1f6ffc988b022c75e6ea99383",
+                })
+                .ToArray();
+
+            var exitCode = RunCreate(args, outPath, stderr: stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.Contains("추정", stderr.ToString());
+            Assert.True(File.Exists(outPath));
         }
 
         [Fact]

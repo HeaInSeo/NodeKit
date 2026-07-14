@@ -12,7 +12,7 @@ namespace NodeKit.Cli
     /// step but ships as a production final image with little else in it.
     ///
     /// Broadened after the NodeVault↔NodeKit adversarial review (2026-07-13,
-    /// Major 1, Issue TBD): NodeVault's Sprint 9 P2a
+    /// Major 1, Issue #41): NodeVault's Sprint 9 P2a
     /// (pkg/build/validate.go, commit 645c594) now statically rejects a
     /// final-stage RUN line that invokes curl/wget/git/make/etc. Legacy
     /// SourceBuild is single-stage, so its one RUN line (curl fetch +
@@ -25,6 +25,14 @@ namespace NodeKit.Cli
     /// given submission (though NodeKit has no UI for that field yet).
     /// RecipeBuildKind.SourceBuildStructured (2-stage, no RUN in the final
     /// stage) is not affected by this NodeVault policy.
+    ///
+    /// Scope note (R22-D, Issue #39): this advisor is legacy
+    /// RecipeBuildKind.SourceBuild only. SourceBuildStructured's own final
+    /// stage (RuntimeProfile/RuntimeProfileImage) is covered by the sibling
+    /// RuntimeProfileHygieneAdvisor instead — legacy SourceBuild's BaseImage
+    /// plays both fetch-source and final-runtime roles, which is exactly the
+    /// design flaw SourceBuildStructured's BuildProfile/RuntimeProfile split
+    /// fixes, so the two advisors intentionally don't share a checklist.
     /// </summary>
     internal static class SourceBuildBaseImageAdvisor
     {
