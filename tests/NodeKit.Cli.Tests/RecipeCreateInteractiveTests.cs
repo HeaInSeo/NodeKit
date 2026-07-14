@@ -70,6 +70,54 @@ namespace NodeKit.Cli.Tests
         }
 
         [Fact]
+        public void BwaSourceStructuredHappyPath_CuratedProfiles_SavesValidRecipe()
+        {
+            // Adversarial review Major-1 follow-up (Issue #41): SourceStructured
+            // is now wizard-reachable (previously --non-interactive only) and
+            // is what the source-archive signal recommends instead of legacy
+            // Source. This drives the full interactive field loop — including
+            // the BuildProfile/RuntimeProfile Choice fields and their Optional
+            // *ProfileImage siblings — end to end, not just unit-level pieces.
+            var outPath = Path.Combine(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "2", // 빠른 설정 모드
+                "n", // IsRestrictedNetwork
+                "n", // HasInternalPackageMirror
+                "n", // HasExistingContainerImage
+                "n", // HasPackageInPublicChannels
+                "y", // HasSourceArchiveAndChecksum
+                "n", // HasExistingDockerfile
+                "", // accept recommended method (source-structured)
+                "bwa-mem", // ToolName
+                "0.7.17", // ToolVersion
+                "run.sh", // Script
+                "1", // BuildProfile: curated "generic"
+                "", // BuildProfileImage — optional, skip (curated profile chosen)
+                "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz", // SourceUri
+                DigestOnly, // SourceChecksum
+                "make install DESTDIR=/nodekit/output", "", // SourceBuildCommands + complete
+                "", // BuildDependencies — recommended, leave empty
+                "1", // RuntimeProfile: curated "minimal"
+                "", // RuntimeProfileImage — optional, skip (curated profile chosen)
+                "", // RuntimeDependencies — recommended, leave empty
+            };
+
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.Empty(stderr.ToString());
+
+            var json = File.ReadAllText(outPath);
+            Assert.Contains("\"BuildKind\": \"SourceBuildStructured\"", json);
+            Assert.Contains("\"BuildProfile\": \"generic\"", json);
+            Assert.Contains("\"RuntimeProfile\": \"minimal\"", json);
+            Assert.Contains("bwa-mem", json);
+        }
+
+        [Fact]
         public void PackageMethod_VersionOnlyPin_WarnsButStillSaves()
         {
             // §13 R19: confirming a version-only pin (no build string) during

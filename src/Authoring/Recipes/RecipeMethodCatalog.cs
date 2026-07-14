@@ -58,8 +58,8 @@ namespace NodeKit.Authoring.Recipes
                 RecipeMethodId.SourceStructured,
                 Text("소스코드로 직접 빌드하기 (구조화, 고급)", "Build directly from source (structured, advanced)"),
                 Text(
-                    "빌드 환경과 런타임 환경을 분리해서 최종 이미지에 빌드 도구가 남지 않게 합니다. 대화형 wizard에서는 아직 제공하지 않습니다 — --non-interactive --method source-structured로만 사용 가능합니다.",
-                    "Separates the build environment from the runtime environment so build tools don't leak into the final image. Not yet offered by the interactive wizard — only reachable via --non-interactive --method source-structured."),
+                    "빌드 환경과 런타임 환경을 분리해서 최종 이미지에 빌드 도구가 남지 않게 합니다.",
+                    "Separates the build environment from the runtime environment so build tools don't leak into the final image."),
                 Text(
                     "SourceUri, SourceChecksum(sha256), BuildProfile, RuntimeProfile이 필요합니다.",
                     "You need a SourceUri, a SourceChecksum (sha256), a BuildProfile, and a RuntimeProfile."),

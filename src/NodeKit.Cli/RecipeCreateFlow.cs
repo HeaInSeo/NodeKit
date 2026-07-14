@@ -887,7 +887,7 @@ namespace NodeKit.Cli
                 return false;
             }
 
-            console.WriteLine("변경할 방법 번호를 입력하세요: [1] container [2] package [3] mirror [4] source [5] dockerfile");
+            console.WriteLine("변경할 방법 번호를 입력하세요: [1] container [2] package [3] mirror [4] source [5] dockerfile [6] source-structured");
             var selection = (console.ReadLine() ?? string.Empty).Trim();
             RecipeCreateEscapeCommands.ThrowIfCancel(selection);
             if (RecipeCreateEscapeCommands.IsBack(selection))

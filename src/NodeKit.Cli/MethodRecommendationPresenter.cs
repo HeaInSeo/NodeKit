@@ -6,11 +6,16 @@ namespace NodeKit.Cli
     /// <summary>
     /// Section 16 post-recommendation summary screen: shows recommended method,
     /// reason, effects, upcoming fields, and cautions; handles accept/reject
-    /// and manual method selection from a fixed 1-5 menu.
+    /// and manual method selection from a fixed 1-6 menu.
     /// See docs/NODEKIT_CLI_RECIPE_AUTHORING_UX_V0.9.2.md Section 16.
     /// </summary>
     internal static class MethodRecommendationPresenter
     {
+        // SourceStructured is appended at the end (6), not inserted after Source,
+        // so existing numeric bindings (1-5) don't shift under anyone already
+        // using them (non-interactive --method uses keywords, not numbers, so
+        // only interactive muscle memory is at stake — still not worth breaking
+        // for no reason).
         private static readonly IReadOnlyList<RecipeMethodId> _methodOrder = new[]
         {
             RecipeMethodId.Container,
@@ -18,6 +23,7 @@ namespace NodeKit.Cli
             RecipeMethodId.Mirror,
             RecipeMethodId.Source,
             RecipeMethodId.Dockerfile,
+            RecipeMethodId.SourceStructured,
         };
 
         private static readonly IReadOnlyDictionary<RecipeMethodId, IReadOnlyList<string>> _effects =
@@ -47,6 +53,12 @@ namespace NodeKit.Cli
                 [RecipeMethodId.Dockerfile] = new[]
                 {
                     "Dockerfile을 직접 사용하는 recipe를 생성합니다.",
+                    "나중에 legacy BuildRequest로 render할 수 있습니다.",
+                },
+                [RecipeMethodId.SourceStructured] = new[]
+                {
+                    "source archive를 빌드 환경(builder)과 런타임 환경(final)으로 분리된 " +
+                        "2-stage recipe로 생성합니다 — 빌드 도구가 최종 이미지에 남지 않습니다.",
                     "나중에 legacy BuildRequest로 render할 수 있습니다.",
                 },
             };
@@ -79,6 +91,14 @@ namespace NodeKit.Cli
                 [RecipeMethodId.Dockerfile] = new[]
                 {
                     "Dockerfile 내 모든 FROM 이미지는 latest 태그 없이 digest로 고정되어야 합니다.",
+                    },
+                [RecipeMethodId.SourceStructured] = new[]
+                {
+                    "BuildProfile/RuntimeProfile은 큐레이션된 항목 중에서 고르거나, advanced를 " +
+                        "선택하고 대응하는 *ProfileImage에 digest 포함 이미지를 직접 입력해야 합니다.",
+                    "SourceChecksum은 sha256 형식이어야 합니다.",
+                    "SourceBuildCommands가 설치한 파일 중 최종 이미지에 남길 것만 " +
+                        "/nodekit/output/ 아래에 두세요 — 그 경로만 runtime 스테이지로 복사됩니다.",
                     },
             };
 
@@ -124,7 +144,7 @@ namespace NodeKit.Cli
         }
 
         /// <summary>
-        /// Parses a 1-5 / keyword method selection. Used by both this presenter
+        /// Parses a 1-6 / keyword method selection. Used by both this presenter
         /// and RecipeCreateInteractiveRunner.TryHandleChangeMethod.
         /// </summary>
         internal static bool TryParseMethodSelection(string selection, out RecipeMethodId method)
@@ -150,6 +170,10 @@ namespace NodeKit.Cli
                 case "5":
                 case "dockerfile":
                     method = RecipeMethodId.Dockerfile;
+                    return true;
+                case "6":
+                case "source-structured":
+                    method = RecipeMethodId.SourceStructured;
                     return true;
                 default:
                     method = default;

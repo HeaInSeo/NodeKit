@@ -18,22 +18,29 @@ namespace NodeKit.Authoring.Recipes
         private const string RestrictedNetworkUnknownWarning =
             "내부망인지 확실하지 않다고 답했습니다. 내부망이라면 public channel, 외부 registry, GitHub source 접근이 실패할 수 있습니다.";
 
+        // RecipeMethodId.Source (legacy, single-stage) is deliberately not
+        // recommended here anymore — adversarial review Major-1 (Issue #41):
+        // NodeVault's Sprint 9 risky-tool policy rejects legacy SourceBuild's
+        // single-stage Dockerfile almost unconditionally. SourceStructured
+        // (2-stage) is recommended instead; legacy Source is still reachable
+        // as a manual choice (MethodRecommendationPresenter._methodOrder) for
+        // anyone who explicitly wants it.
         private static readonly (RecipeMethodId Method, Func<RecipeMethodAnswers, Answer> Signal, string Reason)[] _generalPriority =
         {
             (RecipeMethodId.Container, a => a.HasExistingContainerImage, "이미 있는 이미지를 쓰는 것이 가장 빠르고 단순합니다."),
             (RecipeMethodId.Package, a => a.HasPackageInPublicChannels, "일반적인 bioinformatics 도구에 적합합니다."),
-            (RecipeMethodId.Source, a => a.HasSourceArchiveAndChecksum, "패키지가 없거나 특정 소스가 필요할 때 사용합니다."),
+            (RecipeMethodId.SourceStructured, a => a.HasSourceArchiveAndChecksum, "패키지가 없거나 특정 소스가 필요할 때 사용합니다 — 빌드 도구가 최종 이미지에 남지 않도록 빌드/런타임 환경을 분리합니다."),
             (RecipeMethodId.Dockerfile, a => a.HasExistingDockerfile, "마지막 수단이지만 기존 Dockerfile이 있으면 가능합니다."),
         };
 
         private static readonly RecipeMethodId[] _mirrorYesAlternatives =
         {
-            RecipeMethodId.Source, RecipeMethodId.Container, RecipeMethodId.Dockerfile,
+            RecipeMethodId.SourceStructured, RecipeMethodId.Container, RecipeMethodId.Dockerfile,
         };
 
         private static readonly RecipeMethodId[] _mirrorUnknownAlternatives =
         {
-            RecipeMethodId.Mirror, RecipeMethodId.Source, RecipeMethodId.Container, RecipeMethodId.Dockerfile,
+            RecipeMethodId.Mirror, RecipeMethodId.SourceStructured, RecipeMethodId.Container, RecipeMethodId.Dockerfile,
         };
 
         private static readonly string[] _mirrorYesEvidence =
@@ -127,7 +134,7 @@ namespace NodeKit.Authoring.Recipes
             }
 
             if (answers.IsRestrictedNetwork == Answer.Unknown
-                && recommendation.RecommendedMethod is RecipeMethodId.Container or RecipeMethodId.Package or RecipeMethodId.Source)
+                && recommendation.RecommendedMethod is RecipeMethodId.Container or RecipeMethodId.Package or RecipeMethodId.SourceStructured)
             {
                 recommendation = recommendation with
                 {
@@ -146,7 +153,7 @@ namespace NodeKit.Authoring.Recipes
         private static string RestrictedAlternativeReason(RecipeMethodId method) => method switch
         {
             RecipeMethodId.Mirror => "내부 mirror URI가 필요합니다.",
-            RecipeMethodId.Source => "SourceUri가 내부 mirror 또는 접근 가능한 위치에 있어야 합니다.",
+            RecipeMethodId.SourceStructured => "SourceUri가 내부 mirror 또는 접근 가능한 위치에 있어야 합니다.",
             RecipeMethodId.Container => "ImageRef가 내부 registry에서 접근 가능해야 합니다.",
             RecipeMethodId.Dockerfile => "base image와 build dependency가 내부망에서 접근 가능해야 합니다.",
             _ => throw new ArgumentOutOfRangeException(nameof(method), method, "package는 restricted network 대안에 포함되지 않습니다."),
@@ -158,7 +165,7 @@ namespace NodeKit.Authoring.Recipes
         {
             RecipeMethodId.Container => "기존 컨테이너 이미지 URI가 있다고 답했습니다.",
             RecipeMethodId.Package => "public channel 패키지가 있다고 답했습니다.",
-            RecipeMethodId.Source => "source URL과 checksum이 있다고 답했습니다.",
+            RecipeMethodId.SourceStructured => "source URL과 checksum이 있다고 답했습니다.",
             RecipeMethodId.Dockerfile => "기존 Dockerfile이 있다고 답했습니다.",
             _ => throw new ArgumentOutOfRangeException(nameof(method), method, "지원하지 않는 method입니다."),
         };
@@ -167,7 +174,7 @@ namespace NodeKit.Authoring.Recipes
         {
             RecipeMethodId.Container => "기존 컨테이너 이미지 URI가 있는지",
             RecipeMethodId.Package => "public channel 패키지가 있는지",
-            RecipeMethodId.Source => "source URL과 checksum이 있는지",
+            RecipeMethodId.SourceStructured => "source URL과 checksum이 있는지",
             RecipeMethodId.Dockerfile => "기존 Dockerfile이 있는지",
             _ => throw new ArgumentOutOfRangeException(nameof(method), method, "지원하지 않는 method입니다."),
         };
