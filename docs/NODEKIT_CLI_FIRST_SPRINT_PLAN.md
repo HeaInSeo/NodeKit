@@ -1,8 +1,8 @@
 # NodeKit Legacy-First Sprint Plan
 
-Status: Sprint 6 완료 / Sprint 7 진행 중(Task 1 완료, Task 2 대기) / R18-R21(§13) 완료 / R22-B/C/D(§13) 완료 / 적대적 리뷰 Major-1(#41) 완료, wizard 통합(#42) 완료  
+Status: Sprint 6 완료 / Sprint 7 진행 중(Task 1 완료, Task 2 대기) / R18-R21(§13) 완료 / R22-B/C/D(§13) 완료 / 적대적 리뷰 Major-1(#41)/wizard 통합(#42)/3차 리뷰 follow-up(#45) 완료  
 Created: 2026-06-17  
-Updated: 2026-07-14  
+Updated: 2026-07-15  
 Scope: NodeKit work — Sprint 0-6 완료, Sprint 7(Post-Migration Hardening) 진행 중,
 §13 Live Recipe Reproducibility Improvement(R18-R21) 완료, R22-B/C/D(SourceBuild
 구조화 intent authoring 모델 + 2-stage 렌더링 + RuntimeProfile hygiene advisor) 완료,
@@ -428,6 +428,36 @@ Done when:
 테스트 하네스도 없다. 빌드 경고 0개/테스트 전체 통과/모든 변경 지점 수동
 코드 리뷰로 대신 검증함 — 실제 GUI 라이브 검증은 아직 안 된 상태로 남아
 있음. Issue #44에 기록.
+```
+
+**Progress (3차 적대적 리뷰 follow-up 완료, 2026-07-15, 커밋
+`4113ef7`/`cd4fa82`/`57cb552`, Issue #45):**
+
+```text
+Task 1 완료 후 세 번째 적대적 리뷰에서 나온 4개 요청 사항 중 3개 대응
+(4번째 "briefing 문서는 참고용으로만" 항목은 순수 프로세스 규범, 코드
+변경 없음):
+
+- BuildErrorMessages가 StatusCode.Unimplemented + ToolSpec RPC 이름을
+  인식해 "NodeVault가 구버전" 안내로 변환(원래는 "unknown method
+  ResolveToolSpec..." gRPC 원문이 그대로 노출됐음).
+- docs/fixtures/seoy-smoke/*.json 3개(structured 성공/legacy 거부/digest
+  확인) 고정 — 전부 실제 데이터(진짜 bwa 0.7.17 소스+checksum, 진짜
+  alpine 이미지 digest) 사용, fixture 1은 로컬 buildah bud로 실제 2-stage
+  빌드까지 실행해 검증(그 과정에서 bwa 0.7.17이 GCC 10+ 기본 설정에서
+  링크 실패하는 실제 문제를 발견·우회). docs/NODEKIT_SEOY_SMOKE_FIXTURES.md
+  참조.
+- GrpcToolSpecClientIntegrationTests(신규, opt-in, NODEKIT_NODEVAULT_URL
+  게이팅) — digest-referrer-check.json fixture로 실제 전체 제출 경로를
+  검증. 스캐폴딩 자체는 존재하지 않는 주소로 실행해 확인(fixture 로드→
+  파싱→로컬 검증→실제 gRPC 호출 시도까지 전부 정상, 연결 실패 시점에서만
+  실패) — 이 과정에서 JsonStringEnumConverter 누락 버그도 하나 발견·수정.
+
+618/618 통과(옵트인 통합 테스트 2개 스킵), 0 warnings, dotnet format 클린.
+
+**알려진 한계**: 세 fixture와 신규 integration gate 전부 실제 live seoy
+NodeVault에 제출해본 적 없음 — 이 환경엔 seoy 접근 권한이 없다. 다음 seoy
+세션에서 실제 실행 필요(U5-2와 함께 처리 가능).
 ```
 
 **Progress (Task 2 / U5-2 사전 검증, 2026-07-05, 2차 실행까지 반영):**
