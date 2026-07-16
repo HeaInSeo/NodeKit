@@ -267,14 +267,32 @@ ResolveRecipe 정책 분기, 저장, 실제 submit, 취소)을 TC-1~TC-13 전체
 네트워크(Docker Hub/quay.io digest 조회, NodeVault ResolveRecipe→Anaconda.org,
 실제 빌드+Harbor push)로 검증됨 — stub/fixture가 아니라 완전한 end-to-end.
 
-**남은 절반(폐쇄망 × 두 모드)**: `HarborImageDigestResolver`가 조회하는
-`harbor.lab.local`(`10.113.24.96`)은 seoy 자신만 라우팅 가능하고 이 세션
-환경에서는 직접 도달 불가(§ infra-lab#34 조사 당시 확인한 것과 동일한 네트워크
-경계). 폐쇄망 조합을 실제로 확인하려면 `nodekit` 바이너리를 seoy 호스트에서
-직접 실행해야 하는데, 이 세션의 자동 승인 정책이 "공유 원격 호스트에 바이너리
-복사 + 실행"을 별도 승인 없이 허용하지 않아 보류됨. 이 항목은 여전히
-미완료(○) 상태를 유지한다 — 폐쇄망 절반은 별도 승인 또는 seoy 접근 방식
-합의 후 진행 필요.
+**폐쇄망 × 두 모드 — 시도했으나 미완료, NodeKit 버그 1건 발견(Issue #49):**
+사용자 승인 후 self-contained `NodeKit.Cli` 바이너리를 seoy에 복사해 직접 실행,
+`NODEKIT_HARBOR_URL=https://harbor.lab.local` 설정 후 두 모드 모두 시도:
+
+- **빠른 설정 모드**: Package 방식(폐쇄망은 기본 추천 안 됨 — 의도된 설계,
+  `RecipeMethodRecommender.RecommendForRestrictedNetwork` 참조 — 수동으로
+  선택) → base image 후보 [1] 선택 → **`digest 조회 실패: 이미지 주소 형식을
+  인식할 수 없습니다`**로 즉시 실패. 원인 확인: `BaseImageCatalog`의 후보들이
+  호스트 없는 Docker-Hub 스타일 이름(`condaforge/miniforge3:24.3.0-0`)인데,
+  `HarborImageDigestResolver`는 이미지 URI의 호스트가 `NODEKIT_HARBOR_URL`과
+  정확히 일치해야만 조회를 시도함 — 후보 카탈로그 자체가 애초에 Harbor
+  자동조회와 호환 불가능한 구조. Harbor 인증/연결 여부와 무관하게 항상 실패.
+  Issue #49로 등록(NodeKit 코드 버그, 설계 결정 필요해서 inline fix 안 함).
+- **쉬운 안내 모드**: 컨테이너 이미지 clue에 `harbor.lab.local/...` 참조를
+  직접 입력하는 경로(`BeginnerGuideFlow.TryResolveImageDigest`)는 위와 달리
+  Harbor로 올바르게 라우팅되는 것을 확인함(코드 경로 자체는 정상). 다만 이번
+  시도에서는 `~/.config/infra-lab/certs/harbor-ca.crt`로도 TLS handshake가
+  `RSA_padding_check_PKCS1_type_1: invalid padding`으로 실패 — `curl --cacert`로도
+  동일하게 재현되어 NodeKit 코드 문제가 아니라 로컬에 있는 CA cert와 현재
+  `harbor.lab.local`이 제시하는 서버 인증서가 서로 안 맞는 것으로 보임(오래된
+  CA cert 사본이거나 Harbor 쪽 인증서가 재발급됐을 가능성). 이 TLS 불일치는
+  더 깊이 파고들지 않고 여기서 멈춤 — infra 쪽 확인이 필요한 별도 사안.
+
+이 항목은 미완료(○) 상태를 유지한다 — 폐쇄망 절반을 마치려면 (1) Issue #49의
+base image catalog/Harbor host-matching 설계를 먼저 결정·구현하고, (2) TLS
+CA cert 불일치 원인을 확인해야 한다.
 
 ### U5-3. 커밋 + GitHub push
 
