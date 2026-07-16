@@ -483,20 +483,9 @@ namespace NodeKit.Cli.Tests
             using var stdout = new StringWriter();
 
             // 호출자가 stderr를 넘기면 그쪽이 내용을 검사한 뒤 자신의 using으로 소유·해제한다 —
-            // 여기서는 그 인스턴스를 만들지 않았을 때만(callee-owned) 직접 dispose한다.
-            var ownsStderr = stderr is null;
-            stderr ??= new StringWriter();
-            try
-            {
-                return CliApp.Run(fullArgs.ToArray(), stdout, stderr);
-            }
-            finally
-            {
-                if (ownsStderr)
-                {
-                    stderr.Dispose();
-                }
-            }
+            // 여기서 만든 경우(ownedStderr != null)에만 스코프 종료 시 dispose된다.
+            using var ownedStderr = stderr is null ? new StringWriter() : null;
+            return CliApp.Run(fullArgs.ToArray(), stdout, stderr ?? ownedStderr!);
         }
     }
 }

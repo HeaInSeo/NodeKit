@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -30,7 +31,7 @@ namespace NodeKit.Policy
             var instructions = new List<DockerfileInstruction>();
             var lines = dockerfile.Split('\n', StringSplitOptions.None);
 
-            string pending = string.Empty;
+            var pending = new StringBuilder();
 
             for (var i = 0; i < lines.Length; i++)
             {
@@ -45,12 +46,12 @@ namespace NodeKit.Policy
                 // 줄 이음 처리 (백슬래시 연속)
                 if (line.EndsWith('\\'))
                 {
-                    pending += line[..^1] + " ";
+                    pending.Append(line[..^1]).Append(' ');
                     continue;
                 }
 
-                var fullLine = (pending + line).Trim();
-                pending = string.Empty;
+                var fullLine = (pending.ToString() + line).Trim();
+                pending.Clear();
 
                 if (string.IsNullOrWhiteSpace(fullLine))
                 {
