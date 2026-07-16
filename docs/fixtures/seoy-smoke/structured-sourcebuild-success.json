@@ -16,7 +16,7 @@
   "SourceChecksum": "sha256:980b9591b61c60042c4a39b9e31ccaad8d17ff179d44d347997825da3fdf47fd",
   "SourceBuildCommands": [
     "cd bwa-0.7.17 \u0026\u0026 make CFLAGS=\u0022-g -Wall -Wno-unused-function -O2 -DHAVE_PTHREAD -DUSE_MALLOC_WRAPPERS -fcommon\u0022",
-    "install -D bwa-0.7.17/bwa /nodekit/output/usr/local/bin/bwa"
+    "install -D bwa /nodekit/output/usr/local/bin/bwa"
   ],
   "BuildDependencies": [],
   "BuildProfile": "generic",
