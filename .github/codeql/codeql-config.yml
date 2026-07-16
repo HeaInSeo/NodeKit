@@ -2,8 +2,17 @@ name: "NodeKit CodeQL config"
 
 # obj/ and bin/ are build output (generated protobuf/gRPC code, xUnit's
 # auto-generated test entry points) — not checked in, not something anyone
-# can fix, regenerated on every build. Scanning them was producing ~37
-# unactionable alerts (2026-07-16 audit).
+# can fix, regenerated on every build. These entries are kept as a
+# statement of intent, but per GitHub's own docs, paths-ignore only
+# filters results for a compiled language "when you analyze [it] without
+# building the code" (build-mode: none) —
+# https://docs.github.com/en/code-security/code-scanning/creating-an-advanced-setup-for-code-scanning/customizing-your-advanced-setup-for-code-scanning
+# codeql.yml runs a real `dotnet build` and traces it (the default,
+# higher-fidelity build mode), so this filter does NOT actually remove
+# obj/bin alerts from the results (confirmed empirically 2026-07-16: alert
+# counts for obj/-only rules were unchanged before/after adding this file).
+# Those alerts are dismissed individually on GitHub instead, with this
+# finding as the stated reason — do not assume this file is doing that job.
 paths-ignore:
   - "**/obj/**"
   - "**/bin/**"
