@@ -87,6 +87,9 @@ namespace NodeKit.Cli.Tests
             {
                 var uri = request.RequestUri!.ToString();
 
+                // Both responses below are handed to the caller (HttpClient) via
+                // HttpMessageHandler.SendAsync's contract, which disposes them after
+                // reading — disposing here first would break the returned object.
                 if (uri.Contains("auth.docker.io", System.StringComparison.Ordinal))
                 {
                     TokenRequestUri = uri;
