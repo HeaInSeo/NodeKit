@@ -1,8 +1,8 @@
 # NodeKit CLI UX 개선 스프린트 계획
 
-Status: U1-U4 완료 / U5 진행 중 (U5-2만 잔류)  
+Status: U1-U4 완료 / U5 진행 중 (U5-2 오픈망 2/4 완료, 폐쇄망 2/4 잔류)  
 Created: 2026-06-30  
-Updated: 2026-07-06  
+Updated: 2026-07-16  
 Scope: CLI UX 품질을 상업용 수준으로 끌어올리는 4개 스프린트
 
 이 계획은 `NODEKIT_CLI_FIRST_SPRINT_PLAN.md`의 Sprint 0-5 완료 이후 진행한다.
@@ -43,7 +43,7 @@ Phase 6(ToolSpec 경로 전환)은 2026-07-02 완료됨 — 이 문서의 UX 항
  U4 저장 경로 마지막 확정  [4/4]  ██████████ (U4-2 draft save 제외, 범위 밖)
  U5 문서 + 최종 검증       [2/3]  ███████░░░
    ✓ U5-1  NODEKIT_CLI_USAGE.md 업데이트 (2026-07-02)
-   ○ U5-2  사용자 수동 테스트 통과 (seoy 원격 장비 필요)
+   ◐ U5-2  사용자 수동 테스트 통과 (오픈망 2/4 완료, 폐쇄망 2/4 잔류)
    ✓ U5-3  커밋 + GitHub push
 ═══════════════════════════════════════════════════════
 ```
@@ -246,8 +246,35 @@ ResolveRecipe 정책 분기, 저장, 실제 submit, 취소)을 TC-1~TC-13 전체
 - #9 네트워크 실패를 조용히 성공 처리 (NodeVault `605a98d` + NodeKit `1749a58`)
 - #10 recipe create stdin EOF 무한 루프 (NodeKit `f1b5b37`)
 
-상세는 docs/NODEKIT_LOCAL_GRPC_TEST_SCENARIO.md §7 참조. **여전히 seoy 원격
-장비에서의 실제 수동 테스트가 남아있어 이 항목은 미완료(○) 상태를 유지한다.**
+상세는 docs/NODEKIT_LOCAL_GRPC_TEST_SCENARIO.md §7 참조.
+
+**Progress (seoy live 오픈망 2/4 완료, 2026-07-16):** infra-lab#34(Harbor 라우팅)
+해결 확인 후, 처음으로 실제 live seoy NodeVault(`http://100.123.80.48:50051`)
+대상으로 대화형 wizard를 직접 구동해 확인. 오픈망 조합 2개 전부 성공:
+
+- **빠른 설정 모드 × 오픈망**: Q&A → package 방식 추천 → bioconda 채널 확정 →
+  base image 후보 [1] 선택 → digest 실시간 조회 성공
+  (`condaforge/miniforge3:24.3.0-0@sha256:f412616c...`, PublicRegistryImageDigestResolver
+  경유) → `samtools=1.17` 입력 → NodeVault ResolveRecipe가 실제 Anaconda.org에서
+  bioconda 채널 후보 6개 반환 → 저장 → `nodekit validate` OK → `nodekit submit`
+  성공(`build_id=a983f299-6353-46c9-a661-dc9973683f92`).
+- **쉬운 안내 모드 × 오픈망**: 설치 명령(`micromamba install -c bioconda samtools=1.17`)
+  파싱 → 채널 확인 수락 → base image 후보 선택 → 동일하게 실시간 digest 조회 +
+  ResolveRecipe 후보 6개 반환 → 저장 → validate OK → submit 성공
+  (`build_id=650652f2-4c8b-4bdb-a8a2-6c57ccfccc80`).
+
+두 조합 모두 wizard 실행부터 `nodekit submit` 성공까지 전체 경로가 실제
+네트워크(Docker Hub/quay.io digest 조회, NodeVault ResolveRecipe→Anaconda.org,
+실제 빌드+Harbor push)로 검증됨 — stub/fixture가 아니라 완전한 end-to-end.
+
+**남은 절반(폐쇄망 × 두 모드)**: `HarborImageDigestResolver`가 조회하는
+`harbor.lab.local`(`10.113.24.96`)은 seoy 자신만 라우팅 가능하고 이 세션
+환경에서는 직접 도달 불가(§ infra-lab#34 조사 당시 확인한 것과 동일한 네트워크
+경계). 폐쇄망 조합을 실제로 확인하려면 `nodekit` 바이너리를 seoy 호스트에서
+직접 실행해야 하는데, 이 세션의 자동 승인 정책이 "공유 원격 호스트에 바이너리
+복사 + 실행"을 별도 승인 없이 허용하지 않아 보류됨. 이 항목은 여전히
+미완료(○) 상태를 유지한다 — 폐쇄망 절반은 별도 승인 또는 seoy 접근 방식
+합의 후 진행 필요.
 
 ### U5-3. 커밋 + GitHub push
 
@@ -280,7 +307,7 @@ ResolveRecipe 정책 분기, 저장, 실제 submit, 취소)을 TC-1~TC-13 전체
 | U4-3 | U4 | 저장 경로 확정 UI (PromptSavePath) | ✓ |
 | U4-4 | U4 | SavePathConfirmationTests + 빌드 검증 | ✓ |
 | U5-1 | U5 | NODEKIT_CLI_USAGE.md 업데이트 | ✓ |
-| U5-2 | U5 | 사용자 수동 테스트 통과 | ○ (seoy 원격 장비 필요) |
+| U5-2 | U5 | 사용자 수동 테스트 통과 | ◐ (오픈망 2/4 완료, 폐쇄망 2/4 — seoy 바이너리 실행 승인 필요) |
 | U5-3 | U5 | 커밋 + GitHub push | ○ |
 
 ---
