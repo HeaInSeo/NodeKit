@@ -33,13 +33,10 @@ jobs:
         with:
           languages: csharp
           queries: security-and-quality
-          # obj/ and bin/ are build output (generated protobuf/gRPC code,
-          # xUnit's auto-generated test entry points) — not checked in, not
-          # something anyone can fix, regenerated on every build. Scanning
-          # them was producing ~37 unactionable alerts (2026-07-16 audit).
-          paths-ignore:
-            - "**/obj/**"
-            - "**/bin/**"
+          # codeql-action/init has no paths-ignore input of its own (verified
+          # against its action.yml, 2026-07-16) — path filtering for compiled
+          # languages goes through a separate CodeQL config file instead.
+          config-file: ./.github/codeql/codeql-config.yml
 
       - name: Restore
         run: dotnet restore NodeKit.sln --locked-mode
