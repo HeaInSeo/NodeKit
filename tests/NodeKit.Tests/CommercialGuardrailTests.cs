@@ -81,7 +81,7 @@ namespace NodeKit.Tests
             File.ReadAllText(RepoPath(paths));
 
         private static string RepoPath(params string[] paths) =>
-            Path.Combine(new[] { RepoRoot }.Concat(paths).ToArray());
+            Path.Join(new[] { RepoRoot }.Concat(paths).ToArray());
 
         private static string[] RepoFiles(string pattern) =>
             Directory.GetFiles(RepoRoot, pattern, SearchOption.AllDirectories)
@@ -91,7 +91,7 @@ namespace NodeKit.Tests
                 .ToArray();
 
         private static string[] SourceFiles() =>
-            Directory.GetFiles(Path.Combine(RepoRoot, "src"), "*.cs", SearchOption.AllDirectories)
+            Directory.GetFiles(Path.Join(RepoRoot, "src"), "*.cs", SearchOption.AllDirectories)
                 .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
                 .ToArray();
 
@@ -100,7 +100,7 @@ namespace NodeKit.Tests
             get
             {
                 var dir = new DirectoryInfo(AppContext.BaseDirectory);
-                while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "NodeKit.sln")))
+                while (dir is not null && !File.Exists(Path.Join(dir.FullName, "NodeKit.sln")))
                 {
                     dir = dir.Parent;
                 }

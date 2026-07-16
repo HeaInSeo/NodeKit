@@ -19,7 +19,7 @@ namespace NodeKit.Cli.Tests
         private const string DigestOnly =
             "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
-        private readonly string _workDir = Path.Combine(Path.GetTempPath(), "nodekit-recipe-create-tests-" + Guid.NewGuid());
+        private readonly string _workDir = Path.Join(Path.GetTempPath(), "nodekit-recipe-create-tests-" + Guid.NewGuid());
         private readonly IDisposable _resolveClientOverride =
             ResolveRecipeClientTestOverride.Use(NullResolveRecipeClient.Instance);
 
@@ -107,7 +107,7 @@ namespace NodeKit.Cli.Tests
         {
             // TrySplitOnce uses IndexOf('='), so "Packages=bwa=0.7.17=h5bf99c6_8"
             // splits into Name="Packages", Value="bwa=0.7.17=h5bf99c6_8".
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var exitCode = RunCreate(PackageArgs(engine: null), outPath);
 
             Assert.Equal(0, exitCode);
@@ -120,7 +120,7 @@ namespace NodeKit.Cli.Tests
             // Repeated --field for StringList fields (Packages, Channels,
             // SourceBuildCommands, BuildDependencies, Command) accumulates;
             // the last value does not overwrite earlier ones.
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var args = new[]
             {
                 "--non-interactive", "--method", "package",
@@ -148,7 +148,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void Package_PackageEngineMissing_DefaultsToConda()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var exitCode = RunCreate(PackageArgs(engine: null), outPath);
 
             Assert.Equal(0, exitCode);
@@ -158,8 +158,8 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void Container_ImageDigestMissing_FailsAsRequired()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
-            var stderr = new StringWriter();
+            var outPath = Path.Join(_workDir, "recipe.json");
+            using var stderr = new StringWriter();
             var exitCode = RunCreate(
                 new[]
                 {
@@ -180,8 +180,8 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void Source_BuildDependenciesMissing_WarnsAndContinues()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
-            var stderr = new StringWriter();
+            var outPath = Path.Join(_workDir, "recipe.json");
+            using var stderr = new StringWriter();
             var exitCode = RunCreate(SourceArgs(includeBuildDependencies: false), outPath, stderr: stderr);
 
             Assert.Equal(0, exitCode);
@@ -195,8 +195,8 @@ namespace NodeKit.Cli.Tests
             // §13 R21: BuildDependencies exists on the recipe surface but
             // RecipeRenderer never actually installs it — this only makes
             // that limitation visible, it doesn't add install logic.
-            var outPath = Path.Combine(_workDir, "recipe.json");
-            var stderr = new StringWriter();
+            var outPath = Path.Join(_workDir, "recipe.json");
+            using var stderr = new StringWriter();
             var exitCode = RunCreate(SourceArgs(includeBuildDependencies: true), outPath, stderr: stderr);
 
             Assert.Equal(0, exitCode);
@@ -211,14 +211,14 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void SourceStructured_CuratedProfiles_CreatesRecipeThatPassesValidate()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var exitCode = RunCreate(SourceStructuredArgs(), outPath);
 
             Assert.Equal(0, exitCode);
             Assert.True(File.Exists(outPath));
 
-            var validateStdout = new StringWriter();
-            var validateStderr = new StringWriter();
+            using var validateStdout = new StringWriter();
+            using var validateStderr = new StringWriter();
             var validateExitCode = CliApp.Run(new[] { "validate", outPath }, validateStdout, validateStderr);
 
             Assert.Equal(0, validateExitCode);
@@ -231,8 +231,8 @@ namespace NodeKit.Cli.Tests
             // §13 R22-D (Issue #39): RuntimeProfileHygieneAdvisor is
             // non-blocking — a risky-looking RuntimeProfileImage gets a
             // warning on stderr, not a rejection.
-            var outPath = Path.Combine(_workDir, "recipe.json");
-            var stderr = new StringWriter();
+            var outPath = Path.Join(_workDir, "recipe.json");
+            using var stderr = new StringWriter();
             var args = RemoveField(SourceStructuredArgs(), "RuntimeProfile")
                 .Concat(new[]
                 {
@@ -276,8 +276,8 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void Source_SourceChecksumMissing_FailsAsRequired()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
-            var stderr = new StringWriter();
+            var outPath = Path.Join(_workDir, "recipe.json");
+            using var stderr = new StringWriter();
             var exitCode = RunCreate(RemoveField(SourceArgs(includeBuildDependencies: true), "SourceChecksum"), outPath, stderr: stderr);
 
             Assert.Equal(1, exitCode);
@@ -288,7 +288,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void Dockerfile_BuildContextMissing_DefaultsToCurrentDirectory()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var exitCode = RunCreate(DockerfileArgs(), outPath);
 
             Assert.Equal(0, exitCode);
@@ -298,8 +298,8 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void Mirror_MirrorKindMissing_ContinuesWithoutWarning()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
-            var stderr = new StringWriter();
+            var outPath = Path.Join(_workDir, "recipe.json");
+            using var stderr = new StringWriter();
             var exitCode = RunCreate(MirrorArgs(), outPath, stderr: stderr);
 
             Assert.Equal(0, exitCode);
@@ -311,8 +311,8 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void Package_MicromambaBaseImage_EngineFlagOmitted_WarnsButStillSaves()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
-            var stderr = new StringWriter();
+            var outPath = Path.Join(_workDir, "recipe.json");
+            using var stderr = new StringWriter();
             var args = new[]
             {
                 "--non-interactive", "--method", "package",
@@ -338,8 +338,8 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void Source_CurlBaseImage_WarnsButStillSaves()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
-            var stderr = new StringWriter();
+            var outPath = Path.Join(_workDir, "recipe.json");
+            using var stderr = new StringWriter();
             var args = new[]
             {
                 "--non-interactive", "--method", "source",
@@ -362,8 +362,8 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void Mirror_MicromambaBaseImage_WarnsButStillSaves()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
-            var stderr = new StringWriter();
+            var outPath = Path.Join(_workDir, "recipe.json");
+            using var stderr = new StringWriter();
             var args = new[]
             {
                 "--non-interactive", "--method", "mirror",
@@ -470,17 +470,17 @@ namespace NodeKit.Cli.Tests
 
         private int Run(params string[] options)
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             return RunCreate(options, outPath);
         }
 
         private int RunCreate(string[] options, string? outPath = null, StringWriter? stderr = null)
         {
-            outPath ??= Path.Combine(_workDir, "recipe.json");
+            outPath ??= Path.Join(_workDir, "recipe.json");
             var fullArgs = new System.Collections.Generic.List<string> { "recipe", "create", outPath };
             fullArgs.AddRange(options);
 
-            var stdout = new StringWriter();
+            using var stdout = new StringWriter();
             stderr ??= new StringWriter();
             return CliApp.Run(fullArgs.ToArray(), stdout, stderr);
         }

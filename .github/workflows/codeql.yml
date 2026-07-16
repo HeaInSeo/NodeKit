@@ -33,6 +33,10 @@ jobs:
         with:
           languages: csharp
           queries: security-and-quality
+          # codeql-action/init has no paths-ignore input of its own (verified
+          # against its action.yml, 2026-07-16) — path filtering for compiled
+          # languages goes through a separate CodeQL config file instead.
+          config-file: ./.github/codeql/codeql-config.yml
 
       - name: Restore
         run: dotnet restore NodeKit.sln --locked-mode

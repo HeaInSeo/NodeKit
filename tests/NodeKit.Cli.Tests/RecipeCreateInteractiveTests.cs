@@ -19,7 +19,7 @@ namespace NodeKit.Cli.Tests
         private const string DigestOnly =
             "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
-        private readonly string _workDir = Path.Combine(Path.GetTempPath(), "nodekit-recipe-interactive-tests-" + Guid.NewGuid());
+        private readonly string _workDir = Path.Join(Path.GetTempPath(), "nodekit-recipe-interactive-tests-" + Guid.NewGuid());
         private readonly IDisposable _resolveClientOverride =
             ResolveRecipeClientTestOverride.Use(NullResolveRecipeClient.Instance);
 
@@ -37,7 +37,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void BwaPackageHappyPath_SavesValidRecipe()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -59,8 +59,8 @@ namespace NodeKit.Cli.Tests
                 "", // complete Packages
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -81,7 +81,7 @@ namespace NodeKit.Cli.Tests
             // Source. This drives the full interactive field loop — including
             // the BuildProfile/RuntimeProfile Choice fields and their Optional
             // *ProfileImage siblings — end to end, not just unit-level pieces.
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -106,8 +106,8 @@ namespace NodeKit.Cli.Tests
                 "", // RuntimeDependencies — recommended, leave empty
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -127,7 +127,7 @@ namespace NodeKit.Cli.Tests
             // interactive Package-method authoring should warn — non-blocking,
             // since L1 still allows it by default — that NodeVault's final
             // gate may reject it later.
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -149,8 +149,8 @@ namespace NodeKit.Cli.Tests
                 "", // complete Packages
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -170,7 +170,7 @@ namespace NodeKit.Cli.Tests
             // same convention as StringList fields) for DockerfileContent
             // specifically. This transcript exercises that: two separate
             // lines (FROM, USER) for the one DockerfileContent prompt.
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -194,8 +194,8 @@ namespace NodeKit.Cli.Tests
                 "bam", "1", "",
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -211,7 +211,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void Dockerfile_NonInteractive_WithUserInstruction_SavesValidRecipe()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var exitCode = CliApp.Run(
                 new[]
                 {
@@ -241,7 +241,7 @@ namespace NodeKit.Cli.Tests
             // out mid multi-line accumulation (no blank-line completion
             // signal ever arrives) must cancel immediately rather than
             // spinning forever re-prompting for a line that will never come.
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", "n", "n", "n", "n", "n", "y", "", "y",
@@ -253,8 +253,8 @@ namespace NodeKit.Cli.Tests
                 // stdin ends here — no blank line to terminate DockerfileContent
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(130, exitCode);
@@ -265,7 +265,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void InteractiveAndNonInteractive_ProduceIdenticalRecipeDocument_ForSameLogicalAnswers()
         {
-            var interactiveOutPath = Path.Combine(_workDir, "interactive.json");
+            var interactiveOutPath = Path.Join(_workDir, "interactive.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -282,7 +282,7 @@ namespace NodeKit.Cli.Tests
                 new StringWriter(),
                 new StringWriter());
 
-            var nonInteractiveOutPath = Path.Combine(_workDir, "non-interactive.json");
+            var nonInteractiveOutPath = Path.Join(_workDir, "non-interactive.json");
             var nonInteractiveExitCode = CliApp.Run(
                 new[]
                 {
@@ -309,7 +309,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void DockerfileWarningPath_DeclinedCancelsWithoutSaving()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -318,8 +318,8 @@ namespace NodeKit.Cli.Tests
                 "n", // decline dockerfile warning
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(1, exitCode);
@@ -329,7 +329,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void RestrictedNetworkGatePath_RecommendsMirror_SavesValidRecipe()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -348,8 +348,8 @@ namespace NodeKit.Cli.Tests
                 "", // MirrorKind optional — skip
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -362,7 +362,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void RestrictedNetworkUnknownPath_WarnsOnPackageRecommendation_SavesValidRecipe()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -379,8 +379,8 @@ namespace NodeKit.Cli.Tests
                 "bwa=0.7.17=h5bf99c6_8", "",
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -394,7 +394,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void UnknownHeavyAnswers_WithholdsRecommendation_RequiresExplicitMethodSelection()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -411,8 +411,8 @@ namespace NodeKit.Cli.Tests
                 "bwa=0.7.17=h5bf99c6_8", "",
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -431,7 +431,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void UnknownHeavyAnswers_StdinEndsAtManualMethodPrompt_CancelsInsteadOfLooping()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -444,8 +444,8 @@ namespace NodeKit.Cli.Tests
                 // 여기서 transcript가 끝남 — 수동 방식 선택 프롬프트에서 stdin EOF
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(130, exitCode);
@@ -458,7 +458,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void PackageMethodSelected_StdinEndsAtChannelPrompt_CancelsInsteadOfLooping()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -467,8 +467,8 @@ namespace NodeKit.Cli.Tests
                 // 여기서 transcript가 끝남 — 채널 입력 프롬프트에서 stdin EOF
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(130, exitCode);
@@ -482,7 +482,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void PackageMethodFields_StdinEndsAtPackagesPrompt_CancelsInsteadOfLooping()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -494,8 +494,8 @@ namespace NodeKit.Cli.Tests
                 // 여기서 transcript가 끝남 — Packages 입력 프롬프트에서 stdin EOF
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(130, exitCode);
@@ -509,7 +509,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void MirrorMethodSelected_StdinEndsAtToolNamePrompt_CancelsInsteadOfLooping()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -518,8 +518,8 @@ namespace NodeKit.Cli.Tests
                 // 여기서 transcript가 끝남 — ToolName(필수 스칼라 필드) 입력에서 stdin EOF
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(130, exitCode);
@@ -529,7 +529,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void ChangeMethodMidFieldEntry_PackageToSource_PreservesToolNameAndDiscardsPackageFields()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -548,8 +548,8 @@ namespace NodeKit.Cli.Tests
                 "", // BuildDependencies — leave empty (Recommended, always complete), skipped
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -564,7 +564,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void ChangeMethodAfterCommonFieldsFilled_PackageToMirror_InvalidatedImageRefDoesNotBlockBuild()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -581,8 +581,8 @@ namespace NodeKit.Cli.Tests
                 "", // MirrorKind optional — skip
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -595,7 +595,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void CrossFieldImageDigestViolation_TriggersEditRelatedFieldsRecovery_FixesAndSaves()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -610,8 +610,8 @@ namespace NodeKit.Cli.Tests
                 DigestOnly, // re-enter ImageDigest, corrected
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -626,7 +626,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void HelpCommand_AtFieldPrompt_PrintsFieldHelpThenRetriesSameField()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -640,8 +640,8 @@ namespace NodeKit.Cli.Tests
                 "", // Command optional list — skip
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -659,7 +659,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void ReviewCommand_AtFieldPrompt_ShowsSetAndUnsetFieldsThenRetriesSameField()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -674,8 +674,8 @@ namespace NodeKit.Cli.Tests
                 "", // Command optional list — skip
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -692,14 +692,14 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void CancelCommand_AtModeSelector_ExitsWithCode130WithoutSaving()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "/cancel",
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(130, exitCode);
@@ -712,15 +712,15 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void CancelCommand_AtQuickSetupQuestion_ExitsWithCode130WithoutSaving()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
                 "/cancel",
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(130, exitCode);
@@ -732,7 +732,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void BackCommand_AtGuidedCluePicker_ReturnsToModeSelector()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "1", // 쉬운 안내 모드
@@ -740,8 +740,8 @@ namespace NodeKit.Cli.Tests
                 "3", // CI usage, then exit 0
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -755,7 +755,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void BackCommand_AtQuickSetupQuestion_ReturnsToModeSelector()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -763,8 +763,8 @@ namespace NodeKit.Cli.Tests
                 "3", // CI usage, then exit 0
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -778,7 +778,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void CancelCommand_DeclinedAtFieldPrompt_ContinuesAndSavesValidRecipe()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -794,8 +794,8 @@ namespace NodeKit.Cli.Tests
                 "", // Command optional list — skip
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -807,7 +807,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void BackCommand_AtFieldPrompt_RepromptsPreviousField()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -823,8 +823,8 @@ namespace NodeKit.Cli.Tests
                 "", // Command optional list — skip
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -840,7 +840,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void BackCommand_AtFirstFieldPrompt_ReturnsToModeSelector()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -858,8 +858,8 @@ namespace NodeKit.Cli.Tests
                 "", // Command optional list — skip
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -870,7 +870,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void CancelCommand_ConfirmedAtFieldPrompt_ExitsWithCode130WithoutSaving()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -881,8 +881,8 @@ namespace NodeKit.Cli.Tests
                 "1", // confirm cancellation
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(130, exitCode);
@@ -894,7 +894,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void QuitCommand_ConfirmedAtFieldPrompt_ExitsWithCode130WithoutSaving()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -905,8 +905,8 @@ namespace NodeKit.Cli.Tests
                 "1", // confirm cancellation
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(130, exitCode);
@@ -916,7 +916,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void ExitCommand_ConfirmedAtFieldPrompt_ExitsWithCode130WithoutSaving()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -927,8 +927,8 @@ namespace NodeKit.Cli.Tests
                 "1", // confirm cancellation
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(130, exitCode);
@@ -938,7 +938,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void SimulatedCtrlC_AtFirstFieldPrompt_ExitsWithCode130WithoutSavingOrStackTrace()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -946,8 +946,8 @@ namespace NodeKit.Cli.Tests
                 "", // accept recommended method
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var cancellation = new SequencedCancellationSource(checksBeforeCancellation: 0);
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 outPath,
@@ -968,7 +968,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void SimulatedCtrlC_AndCancelCommand_ProduceIdenticalExitCodeAndMessage()
         {
-            var cancelOutPath = Path.Combine(_workDir, "cancel.json");
+            var cancelOutPath = Path.Join(_workDir, "cancel.json");
             var cancelTranscript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -979,14 +979,14 @@ namespace NodeKit.Cli.Tests
                 "1", // confirm cancellation
             };
 
-            var cancelStdout = new StringWriter();
+            using var cancelStdout = new StringWriter();
             var cancelExitCode = CliApp.Run(
                 new[] { "recipe", "create", cancelOutPath },
                 new StringReader(string.Join("\n", cancelTranscript)),
                 cancelStdout,
                 new StringWriter());
 
-            var ctrlCOutPath = Path.Combine(_workDir, "ctrlc.json");
+            var ctrlCOutPath = Path.Join(_workDir, "ctrlc.json");
             var ctrlCTranscript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -994,7 +994,7 @@ namespace NodeKit.Cli.Tests
                 "", // accept recommended method
             };
 
-            var ctrlCStdout = new StringWriter();
+            using var ctrlCStdout = new StringWriter();
             var ctrlCExitCode = RecipeCreateInteractiveRunner.Run(
                 ctrlCOutPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
@@ -1015,14 +1015,14 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void ModeSelector_CiModeChoice_PrintsUsageAndExitsWithCode0WithoutQa()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "3", // CI 모드 사용법 보기
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(
                 new[] { "recipe", "create", outPath },
                 new StringReader(string.Join("\n", transcript)),
@@ -1043,7 +1043,7 @@ namespace NodeKit.Cli.Tests
         {
             // GuidedBeginner mode (Sprint R13) now runs BeginnerGuideFlow (Section 8.2).
             // Replaces the R11-era "FallsBackToQuickSetupFlowWithNotice" test.
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "1",  // 쉬운 안내 모드
@@ -1058,8 +1058,8 @@ namespace NodeKit.Cli.Tests
                 // PackageEngine: Defaulted, skipped
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(
                 new[] { "recipe", "create", outPath },
                 new StringReader(string.Join("\n", transcript)),
@@ -1081,7 +1081,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void RecommendationReject_ManualMethodSelection_SavesValidRecipe()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -1094,8 +1094,8 @@ namespace NodeKit.Cli.Tests
                 "", // Command optional list — skip
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(
                 new[] { "recipe", "create", outPath },
                 new StringReader(string.Join("\n", transcript)),
@@ -1118,7 +1118,7 @@ namespace NodeKit.Cli.Tests
             // Regression: items typed before /back inside a list field must not
             // survive to the next pass of the same field. Without the fix,
             // "samtools=1.18" would appear alongside "bwa=0.7.17=h5bf99c6_8".
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -1138,8 +1138,8 @@ namespace NodeKit.Cli.Tests
                 "",                   // complete Packages
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -1155,7 +1155,7 @@ namespace NodeKit.Cli.Tests
         {
             // Regression: /back inside a recovery re-edit field previously propagated
             // as an unhandled exception. Now it prints a message and re-shows the menu.
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -1173,8 +1173,8 @@ namespace NodeKit.Cli.Tests
                 DigestOnly,     // re-enter ImageDigest, corrected
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -1191,7 +1191,7 @@ namespace NodeKit.Cli.Tests
         {
             // Regression guard: empty input at the recovery menu means "save 없이 종료".
             // RunRecoveryLoop returns false → main loop writes stderr message and returns 1.
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -1204,8 +1204,8 @@ namespace NodeKit.Cli.Tests
                 "",             // empty selection at recovery menu → return false
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(1, exitCode);
@@ -1218,7 +1218,7 @@ namespace NodeKit.Cli.Tests
         {
             // Out-of-range or non-numeric selection prints "알 수 없는 선택입니다." and
             // re-shows the recovery menu. The user then picks a valid action.
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -1233,8 +1233,8 @@ namespace NodeKit.Cli.Tests
                 "condaforge/miniforge3:24.3.0-0", DigestOnly, // fix the digest
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -1248,7 +1248,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void RecoveryLoop_CancelCommand_ExitsWithCode130WithoutSaving()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -1261,8 +1261,8 @@ namespace NodeKit.Cli.Tests
                 "/cancel", // at recovery menu → ThrowIfCancel → exit 130
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(130, exitCode);
@@ -1275,7 +1275,7 @@ namespace NodeKit.Cli.Tests
         {
             // /back typed at the method-number prompt inside /change-method cancels the change
             // and re-prompts the same field (no method switch occurs).
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -1290,8 +1290,8 @@ namespace NodeKit.Cli.Tests
                 "bwa=0.7.17=h5bf99c6_8", "", // Packages
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -1306,7 +1306,7 @@ namespace NodeKit.Cli.Tests
         public void ChangeMethod_InvalidNumber_PrintsErrorAndRepromptsCurrentField()
         {
             // An unrecognized method number cancels the change and re-prompts the current field.
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -1321,8 +1321,8 @@ namespace NodeKit.Cli.Tests
                 "bwa=0.7.17=h5bf99c6_8", "",
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -1337,7 +1337,7 @@ namespace NodeKit.Cli.Tests
         public void ChangeMethod_ConfirmDeclined_DoesNotSwitchMethodAndRepromptsCurrentField()
         {
             // Typing N at the "계속할까요?" step cancels the method change in place.
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -1353,8 +1353,8 @@ namespace NodeKit.Cli.Tests
                 "bwa=0.7.17=h5bf99c6_8", "",
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -1370,7 +1370,7 @@ namespace NodeKit.Cli.Tests
         {
             // CompleteListField throws when a Required list has no items yet.
             // PromptStringListField prints the exception message and continues collecting.
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -1383,8 +1383,8 @@ namespace NodeKit.Cli.Tests
                 "bwa=0.7.17=h5bf99c6_8", "",  // correct entry + complete
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -1400,7 +1400,7 @@ namespace NodeKit.Cli.Tests
         {
             // /cancel typed at the Dockerfile warning confirmation bypasses the warning
             // and exits with 130 (same as any other /cancel).
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -1409,8 +1409,8 @@ namespace NodeKit.Cli.Tests
                 "/cancel", // at dockerfile warning prompt → ThrowIfCancel → exit 130
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(130, exitCode);
@@ -1423,7 +1423,7 @@ namespace NodeKit.Cli.Tests
         {
             // /back at Q&A question N>0 decrements the index to N-1, re-prompting
             // the previous question. The first answer is replaced by the re-entered one.
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2",     // 빠른 설정 모드
@@ -1442,8 +1442,8 @@ namespace NodeKit.Cli.Tests
                 "bwa=0.7.17=h5bf99c6_8", "",
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -1459,7 +1459,7 @@ namespace NodeKit.Cli.Tests
             // Sprint R17: when resolver returns ExternalSource + multiple candidates,
             // PackageCandidatePresenter prompts the user; "1" picks the first candidate's
             // FullPin and that replaces the version-only pin in the saved document.
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var resolveResult = new ResolveRecipeResult(
                 RecipeResolutionSource.ExternalSource,
                 new[]
@@ -1480,8 +1480,8 @@ namespace NodeKit.Cli.Tests
                 "1",               // PackageCandidatePresenter: pick first candidate
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 outPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
@@ -1504,7 +1504,7 @@ namespace NodeKit.Cli.Tests
             // Sprint R17: when resolver returns NotFound with no candidates,
             // a ⚠ advisory is printed but the file is still saved with the
             // original version-only pins (no candidate picker is shown).
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var resolveResult = new ResolveRecipeResult(
                 RecipeResolutionSource.NotFound,
                 Array.Empty<PackageResolution>());
@@ -1517,8 +1517,8 @@ namespace NodeKit.Cli.Tests
                 "bwa=0.7.17", "",
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 outPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
@@ -1541,7 +1541,7 @@ namespace NodeKit.Cli.Tests
             // covers the curated candidate list — typing a micromamba-style
             // image manually (via "0" direct entry) bypasses it entirely, so
             // this needs its own warning to avoid a silent 100%-fail combo.
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             const string micromambaImageWithDigest =
                 "mambaorg/micromamba:1.5.8@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
             var transcript = new[]
@@ -1553,8 +1553,8 @@ namespace NodeKit.Cli.Tests
                 "bwa=0.7.17=h5bf99c6_8", "",
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 outPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
@@ -1576,7 +1576,7 @@ namespace NodeKit.Cli.Tests
             // ResolveRecipe가 RpcException을 던져도(예: NodeVault가
             // package_mirror_uri required로 거부) 프로세스 전체가 크래시하는 대신
             // 경고만 출력하고 저장까지 정상 완료되어야 한다.
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var resolveClient = new ThrowingResolveRecipeClient(
                 new RpcException(new Status(StatusCode.InvalidArgument,
                     "package_mirror_uri is required for PACKAGE_MIRROR variant")));
@@ -1592,8 +1592,8 @@ namespace NodeKit.Cli.Tests
                 "mirrortool=1.0", "",   // Packages, blank로 목록 종료
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 outPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
@@ -1613,7 +1613,7 @@ namespace NodeKit.Cli.Tests
         {
             // Sprint R17: /cancel inside PackageCandidatePresenter throws
             // RecipeCreateCancelledException → caught by outer handler → exit 130.
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var resolveResult = new ResolveRecipeResult(
                 RecipeResolutionSource.ExternalSource,
                 new[]
@@ -1634,8 +1634,8 @@ namespace NodeKit.Cli.Tests
                 "/cancel",         // during PackageCandidatePresenter → exit 130
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 outPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),

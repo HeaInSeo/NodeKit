@@ -15,7 +15,7 @@ internal static class SettingsService
     private static readonly JsonSerializerOptions _writeOptions = new() { WriteIndented = true };
 
     /// <summary>Full path to the settings JSON file.</summary>
-    public static string FilePath { get; } = Path.Combine(
+    public static string FilePath { get; } = Path.Join(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "NodeKit",
         "settings.json");
@@ -58,7 +58,7 @@ internal static class SettingsService
         var directory = Path.GetDirectoryName(FilePath)!;
         Directory.CreateDirectory(directory);
 
-        var tempPath = Path.Combine(directory, $"{Path.GetFileName(FilePath)}.tmp");
+        var tempPath = Path.Join(directory, $"{Path.GetFileName(FilePath)}.tmp");
         File.WriteAllText(tempPath, JsonSerializer.Serialize(settings, _writeOptions));
         File.Move(tempPath, FilePath, overwrite: true);
     }

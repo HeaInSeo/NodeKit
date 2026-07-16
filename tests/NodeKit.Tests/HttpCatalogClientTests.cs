@@ -351,7 +351,8 @@ namespace NodeKit.Tests
         [Fact]
         public void Dispose_CanBeCalledMultipleTimes()
         {
-            var client = new HttpCatalogClient("http://localhost:8080");
+            using var client = new HttpCatalogClient("http://localhost:8080");
+
             client.Dispose();
             client.Dispose(); // 두 번 호출해도 예외 없음
         }

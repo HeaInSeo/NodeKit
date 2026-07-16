@@ -26,7 +26,7 @@ namespace NodeKit.Cli.Tests
         private const string BaseImageWithDigest =
             "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
-        private readonly string _workDir = Path.Combine(
+        private readonly string _workDir = Path.Join(
             Path.GetTempPath(), "nodekit-beginner-guide-tests-" + Guid.NewGuid());
 
         private static readonly NoOpCancellationSource _noCancellation = new();
@@ -50,7 +50,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void CancelCommand_AtGuidedCluePicker_ExitsWithCode130WithoutFile()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "1",       // GuidedBeginner
@@ -69,7 +69,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void NoClue_ExitsWithCode0WithoutFile()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "1",  // GuidedBeginner
@@ -89,7 +89,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void ToolName_ThenNoClue_ExitsWithCode0WithoutFile()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "1",    // GuidedBeginner
@@ -108,7 +108,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void NoClue_InvalidInputThenExit_RepromptsAndExits()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "1",    // GuidedBeginner
@@ -127,7 +127,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void RunToolNameFlow_PrintsBiocondaAndBioContainersUrls()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "1",    // GuidedBeginner
@@ -148,7 +148,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void RunToolNameFlow_EmptyToolName_AsksAgain()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "1",    // GuidedBeginner
@@ -170,7 +170,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void RunNoClueFlow_CanRouteToToolNameLookup()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "1",    // GuidedBeginner
@@ -194,7 +194,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void InstallCommand_ParsedCommand_PrePopulatesAndSavesRecipe()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "1",   // GuidedBeginner
@@ -228,7 +228,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void InstallCommand_FailedCommand_CanSwitchToManualPackage()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "1",            // GuidedBeginner
@@ -256,7 +256,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void InstallCommand_PartiallyParsed_ShowsMissingFields()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "1",   // GuidedBeginner
@@ -285,7 +285,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void InstallCommand_SwitchMethod_GoesBackToCluePicker()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "1",    // GuidedBeginner
@@ -314,7 +314,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void ContainerClue_WithEmbeddedDigest_SavesValidRecipe()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "1",                // GuidedBeginner
@@ -341,7 +341,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void ContainerClue_NoDigest_ThenReenter_SavesValidRecipe()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "1",                    // GuidedBeginner
@@ -369,7 +369,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void ContainerClue_NoDigest_ThenSeparateDigest_SavesValidRecipe()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "1",                // GuidedBeginner
@@ -396,7 +396,7 @@ namespace NodeKit.Cli.Tests
         public void ContainerClue_MissingDigest_SwitchMethod_GoesBackToCluePicker()
         {
             // Verifies that [3] 다른 작성 방식 from MissingDigest screen loops back to clue picker.
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "1",                // GuidedBeginner
@@ -429,7 +429,7 @@ namespace NodeKit.Cli.Tests
             // beginner to answer, and — since SourceStructured has no
             // BaseImage field — the base-image-selection step no longer
             // appears at all for this path.
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "1",  // GuidedBeginner
@@ -461,7 +461,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void SourceFlow_MissingChecksum_PrintsCurlSha256sumGuidance()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var sourceUri = "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz";
             var transcript = new[]
             {
@@ -486,7 +486,7 @@ namespace NodeKit.Cli.Tests
         public void ContainerImageFlow_WhenResolverReturnsDigest_AsksToUseDigest()
         {
             var session = new RecipeAuthoringSession();
-            var stdout = new StringWriter();
+            using var stdout = new StringWriter();
             var stdin = new StringReader(string.Join("\n", new[]
             {
                 "3",               // container image
@@ -510,7 +510,7 @@ namespace NodeKit.Cli.Tests
         public void ContainerImageFlow_WhenResolverUnsupported_FallsBackToManualDigestInput()
         {
             var session = new RecipeAuthoringSession();
-            var stdout = new StringWriter();
+            using var stdout = new StringWriter();
             var stdin = new StringReader(string.Join("\n", new[]
             {
                 "3",               // container image
@@ -534,7 +534,7 @@ namespace NodeKit.Cli.Tests
         public void ContainerImageFlow_WhenResolverFails_PrintsHumanReadableReason()
         {
             var session = new RecipeAuthoringSession();
-            var stdout = new StringWriter();
+            using var stdout = new StringWriter();
             var stdin = new StringReader(string.Join("\n", new[]
             {
                 "3",               // container image
@@ -557,7 +557,7 @@ namespace NodeKit.Cli.Tests
         public void ContainerImageFlow_WhenUserRejectsResolvedDigest_AsksManualDigest()
         {
             var session = new RecipeAuthoringSession();
-            var stdout = new StringWriter();
+            using var stdout = new StringWriter();
             var stdin = new StringReader(string.Join("\n", new[]
             {
                 "3",               // container image
@@ -591,7 +591,7 @@ namespace NodeKit.Cli.Tests
             // support (PromptMultilineScalarField) for DockerfileContent
             // specifically. This transcript exercises that: two separate
             // lines (FROM, USER) for the one DockerfileContent prompt.
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "1",           // GuidedBeginner
@@ -623,7 +623,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void DockerfileClue_RejectWarning_GoesBackToCluePicker()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "1",           // GuidedBeginner
@@ -646,7 +646,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void MirrorClue_SavesValidRecipe()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "1",  // GuidedBeginner
@@ -676,7 +676,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void InvalidClueChoice_RepromptsUntilValid()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "1",    // GuidedBeginner
@@ -704,7 +704,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void CluePicker_StdinEndsWithoutChoice_CancelsInsteadOfLooping()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[] { "1" }; // GuidedBeginner, then EOF at the clue picker itself
 
             var exitCode = RunCli(outPath, transcript, out var stdout, out _);
@@ -717,7 +717,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void ToolNameFlow_StdinEndsAtNamePrompt_CancelsInsteadOfLooping()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[] { "1", "1" }; // GuidedBeginner, clue: tool name, then EOF
 
             var exitCode = RunCli(outPath, transcript, out var stdout, out _);
@@ -730,7 +730,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void InstallCommandFlow_StdinEndsAtFailedParseChoice_CancelsInsteadOfLooping()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[] { "1", "2", "notarealcommand" }; // EOF at the failed-parse choice prompt
 
             var exitCode = RunCli(outPath, transcript, out var stdout, out _);
@@ -743,7 +743,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void SourceFlow_StdinEndsAtChecksumPrompt_CancelsInsteadOfLooping()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[] { "1", "4", "https://example.org/tool.tar.gz" }; // EOF at SourceChecksum prompt
 
             var exitCode = RunCli(outPath, transcript, out var stdout, out _);
@@ -760,7 +760,7 @@ namespace NodeKit.Cli.Tests
             // while(true) (not its own loop) after the user picks "직접 입력"
             // (2) for a missing digest. Confirmed pre-fix this reached the
             // digest prompt cleanly but then hung forever once stdin ran dry.
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[] { "1", "3", ContainerImageRef, "2" }; // EOF right at "ImageDigest:"
 
             var exitCode = RunCli(outPath, transcript, out var stdout, out _);
@@ -773,7 +773,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void MirrorFlow_StdinEndsAtUriPrompt_CancelsInsteadOfLooping()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[] { "1", "6" }; // GuidedBeginner, clue: internal mirror, then EOF
 
             var exitCode = RunCli(outPath, transcript, out var stdout, out _);
@@ -786,7 +786,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void DockerfileFlow_StdinEndsAtPathPrompt_CancelsInsteadOfLooping()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[] { "1", "5" }; // GuidedBeginner, clue: Dockerfile, then EOF
 
             var exitCode = RunCli(outPath, transcript, out var stdout, out _);
@@ -799,7 +799,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void NoClueFlow_StdinEndsWithoutChoice_CancelsInsteadOfLooping()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[] { "1", "7" }; // GuidedBeginner, 잘 모르겠다, then EOF at NoClue's choice
 
             var exitCode = RunCli(outPath, transcript, out var stdout, out _);
@@ -813,8 +813,8 @@ namespace NodeKit.Cli.Tests
 
         private static int RunCli(string outPath, string[] transcript, out string stdout, out string stderr)
         {
-            var stdoutWriter = new StringWriter();
-            var stderrWriter = new StringWriter();
+            using var stdoutWriter = new StringWriter();
+            using var stderrWriter = new StringWriter();
             var exitCode = CliApp.Run(
                 new[] { "recipe", "create", outPath },
                 new StringReader(string.Join("\n", transcript)),

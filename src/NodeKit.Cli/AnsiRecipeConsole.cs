@@ -21,8 +21,20 @@ namespace NodeKit.Cli
         public void BeginStep()
         {
             _pendingHints = null;
-            try { Console.Clear(); }
-            catch (Exception) { }
+            try
+            {
+                Console.Clear();
+            }
+            catch (IOException)
+            {
+                // Console.Clear()'s only documented failure mode: the console
+                // handle isn't a real interactive terminal (redirected output,
+                // CI runner, etc.) even though the caller couldn't detect that
+                // up front. Nothing was written yet, so skipping the clear and
+                // falling through to draw the next screen normally is safe —
+                // the user just doesn't get a cleared screen, no data loss.
+            }
+
             _ansi.Write(new Rule().RuleStyle("grey dim"));
             _ansi.WriteLine();
         }

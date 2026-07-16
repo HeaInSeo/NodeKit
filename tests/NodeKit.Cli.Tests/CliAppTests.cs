@@ -7,7 +7,7 @@ namespace NodeKit.Cli.Tests
 {
     public class CliAppTests : IDisposable
     {
-        private readonly string _workDir = Path.Combine(Path.GetTempPath(), "nodekit-cli-tests-" + Guid.NewGuid());
+        private readonly string _workDir = Path.Join(Path.GetTempPath(), "nodekit-cli-tests-" + Guid.NewGuid());
         private readonly IDisposable _resolveClientOverride =
             ResolveRecipeClientTestOverride.Use(NullResolveRecipeClient.Instance);
 
@@ -71,8 +71,8 @@ namespace NodeKit.Cli.Tests
         public void Validate_RecipeMissingBuildKind_ReturnsTwoInsteadOfThrowing()
         {
             var recipePath = WriteFile("recipe.json", MissingBuildKindRecipeJson);
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
 
             var exitCode = CliApp.Run(new[] { "validate", recipePath }, stdout, stderr);
 
@@ -84,9 +84,9 @@ namespace NodeKit.Cli.Tests
         public void Render_RecipeMissingBuildKind_ReturnsTwoInsteadOfThrowing()
         {
             var recipePath = WriteFile("recipe.json", MissingBuildKindRecipeJson);
-            var outPath = Path.Combine(_workDir, "build-request.json");
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            var outPath = Path.Join(_workDir, "build-request.json");
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
 
             var exitCode = CliApp.Run(new[] { "render", recipePath, "--out", outPath }, stdout, stderr);
 
@@ -119,8 +119,8 @@ namespace NodeKit.Cli.Tests
         public void Validate_RecipeWithExplicitNullCommand_DoesNotCrash()
         {
             var recipePath = WriteFile("recipe.json", NullCommandRecipeJson);
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
 
             var exitCode = CliApp.Run(new[] { "validate", recipePath }, stdout, stderr);
 
@@ -144,8 +144,8 @@ namespace NodeKit.Cli.Tests
         public void Validate_RecipeWithExplicitNullSourceChecksum_ReturnsViolationInsteadOfCrashing()
         {
             var recipePath = WriteFile("recipe.json", NullSourceChecksumRecipeJson);
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
 
             var exitCode = CliApp.Run(new[] { "validate", recipePath }, stdout, stderr);
 
@@ -157,8 +157,8 @@ namespace NodeKit.Cli.Tests
         public void Validate_ValidRecipe_ReturnsZero()
         {
             var recipePath = WriteFile("recipe.json", ValidRecipeJson);
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
 
             var exitCode = CliApp.Run(new[] { "validate", recipePath }, stdout, stderr);
 
@@ -171,8 +171,8 @@ namespace NodeKit.Cli.Tests
         public void Validate_InvalidRecipe_ReturnsOneAndPrintsViolations()
         {
             var recipePath = WriteFile("recipe.json", InvalidRecipeJson);
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
 
             var exitCode = CliApp.Run(new[] { "validate", recipePath }, stdout, stderr);
 
@@ -185,9 +185,9 @@ namespace NodeKit.Cli.Tests
         public void Render_ValidRecipe_WritesLegacyBuildRequestJsonAndReturnsZero()
         {
             var recipePath = WriteFile("recipe.json", ValidRecipeJson);
-            var outPath = Path.Combine(_workDir, "build-request.json");
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            var outPath = Path.Join(_workDir, "build-request.json");
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
 
             var exitCode = CliApp.Run(new[] { "render", recipePath, "--out", outPath }, stdout, stderr);
 
@@ -204,9 +204,9 @@ namespace NodeKit.Cli.Tests
         public void Render_InvalidRecipe_ReturnsOneAndDoesNotWriteOutputFile()
         {
             var recipePath = WriteFile("recipe.json", InvalidRecipeJson);
-            var outPath = Path.Combine(_workDir, "build-request.json");
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            var outPath = Path.Join(_workDir, "build-request.json");
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
 
             var exitCode = CliApp.Run(new[] { "render", recipePath, "--out", outPath }, stdout, stderr);
 
@@ -219,8 +219,8 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void Run_UnknownCommand_ReturnsTwo()
         {
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
 
             var exitCode = CliApp.Run(new[] { "submit", "recipe.json" }, stdout, stderr);
 
@@ -247,8 +247,8 @@ namespace NodeKit.Cli.Tests
         public void Validate_VersionOnlyPin_WithoutStrictFlag_ReturnsZero()
         {
             var recipePath = WriteFile("recipe.json", VersionOnlyPinRecipeJson);
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
 
             var exitCode = CliApp.Run(new[] { "validate", recipePath }, stdout, stderr);
 
@@ -259,8 +259,8 @@ namespace NodeKit.Cli.Tests
         public void Validate_VersionOnlyPin_WithStrictFlag_ReturnsOne()
         {
             var recipePath = WriteFile("recipe.json", VersionOnlyPinRecipeJson);
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
 
             var exitCode = CliApp.Run(new[] { "validate", recipePath, "--strict-reproducible" }, stdout, stderr);
 
@@ -270,7 +270,7 @@ namespace NodeKit.Cli.Tests
 
         private string WriteFile(string name, string content)
         {
-            var path = Path.Combine(_workDir, name);
+            var path = Path.Join(_workDir, name);
             File.WriteAllText(path, content);
             return path;
         }

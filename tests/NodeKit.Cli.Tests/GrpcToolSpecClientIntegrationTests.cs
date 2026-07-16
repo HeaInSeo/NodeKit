@@ -98,7 +98,7 @@ namespace NodeKit.Cli.Tests
         private static string FindFixturePath(string fileName)
         {
             var dir = new DirectoryInfo(AppContext.BaseDirectory);
-            while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "NodeKit.sln")))
+            while (dir is not null && !File.Exists(Path.Join(dir.FullName, "NodeKit.sln")))
             {
                 dir = dir.Parent;
             }
@@ -108,7 +108,7 @@ namespace NodeKit.Cli.Tests
                 throw new FileNotFoundException("repo root(NodeKit.sln)를 찾지 못했습니다.");
             }
 
-            var path = Path.Combine(dir.FullName, "docs", "fixtures", "seoy-smoke", fileName);
+            var path = Path.Join(dir.FullName, "docs", "fixtures", "seoy-smoke", fileName);
             if (!File.Exists(path))
             {
                 throw new FileNotFoundException($"fixture not found: {path}");

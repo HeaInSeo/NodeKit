@@ -17,7 +17,7 @@ namespace NodeKit.Cli.Tests
             new FixedCancellationSource(false);
 
         private readonly string _workDir =
-            Path.Combine(Path.GetTempPath(), "nodekit-savepath-tests-" + Guid.NewGuid());
+            Path.Join(Path.GetTempPath(), "nodekit-savepath-tests-" + Guid.NewGuid());
 
         private readonly IDisposable _resolveClientOverride =
             ResolveRecipeClientTestOverride.Use(NullResolveRecipeClient.Instance);
@@ -46,8 +46,8 @@ namespace NodeKit.Cli.Tests
                 "/cancel",  // immediately cancel at clue picker
                 "1",        // confirm cancel
             };
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(
                 new[] { "recipe", "create" },
                 new StringReader(string.Join("\n", transcript)),
@@ -62,8 +62,8 @@ namespace NodeKit.Cli.Tests
         public void CliApp_RecipeCreate_FlagWithoutPath_IsAccepted()
         {
             // "nodekit recipe create --method package" (path comes from flags only)
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(
                 new[] { "recipe", "create", "--non-interactive", "--method", "package" },
                 new StringReader(string.Empty),
@@ -98,8 +98,8 @@ namespace NodeKit.Cli.Tests
                 "",     // Enter → use default path (bwa-mem-0.7.17.json in current dir)
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 null,   // no path hint
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
@@ -111,7 +111,7 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(0, exitCode);
             Assert.Empty(stderr.ToString());
             // Default file is created in working directory
-            var defaultFile = Path.Combine(Directory.GetCurrentDirectory(), "bwa-mem-0.7.17.json");
+            var defaultFile = Path.Join(Directory.GetCurrentDirectory(), "bwa-mem-0.7.17.json");
             Assert.True(File.Exists(defaultFile));
             File.Delete(defaultFile); // cleanup
         }
@@ -119,7 +119,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void NullOutPath_Step9_PromptsForPath_UserEntersCustomPath()
         {
-            var customPath = Path.Combine(_workDir, "custom-output.json");
+            var customPath = Path.Join(_workDir, "custom-output.json");
             var transcript = new[]
             {
                 "2",    // 빠른 설정 모드
@@ -136,8 +136,8 @@ namespace NodeKit.Cli.Tests
                 customPath, // user enters full custom path
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 null,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
@@ -168,8 +168,8 @@ namespace NodeKit.Cli.Tests
                 "",
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 _workDir,   // directory hint
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
@@ -179,7 +179,7 @@ namespace NodeKit.Cli.Tests
                 resolveClient: NullResolveRecipeClient.Instance);
 
             Assert.Equal(0, exitCode);
-            var expectedPath = Path.Combine(_workDir, "bwa-mem-0.7.17.json");
+            var expectedPath = Path.Join(_workDir, "bwa-mem-0.7.17.json");
             Assert.True(File.Exists(expectedPath));
         }
 
@@ -187,7 +187,7 @@ namespace NodeKit.Cli.Tests
         public void ExplicitFilePath_Step9_ShowsSaveOrRestartChoice()
         {
             // Existing behavior: explicit outPath → [y/n] save or restart.
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "2",    // 빠른 설정 모드
@@ -202,8 +202,8 @@ namespace NodeKit.Cli.Tests
                 "",     // Enter = save
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 outPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
@@ -221,7 +221,7 @@ namespace NodeKit.Cli.Tests
         {
             // If user enters "n" at the path prompt, the wizard restarts.
             // On the second attempt, enter a concrete path to save.
-            var outPath = Path.Combine(_workDir, "recipe-second.json");
+            var outPath = Path.Join(_workDir, "recipe-second.json");
             const string imageRef =
                 "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
@@ -250,8 +250,8 @@ namespace NodeKit.Cli.Tests
                 outPath,  // Step 9: save to concrete path
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 null,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),

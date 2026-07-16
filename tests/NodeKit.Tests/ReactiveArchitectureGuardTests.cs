@@ -51,7 +51,7 @@ namespace NodeKit.Tests
         [Fact]
         public void ViewModelFiles_UseReactiveBaseTypesOrCommands()
         {
-            var viewModelRoot = Path.Combine(RepoRoot, "UI", "ViewModels");
+            var viewModelRoot = Path.Join(RepoRoot, "UI", "ViewModels");
             if (!Directory.Exists(viewModelRoot))
             {
                 return;
@@ -81,14 +81,14 @@ namespace NodeKit.Tests
             File.ReadAllText(RepoPath(paths));
 
         private static string RepoPath(params string[] paths) =>
-            Path.Combine(new[] { RepoRoot }.Concat(paths).ToArray());
+            Path.Join(new[] { RepoRoot }.Concat(paths).ToArray());
 
         private static string RepoRoot
         {
             get
             {
                 var dir = new DirectoryInfo(AppContext.BaseDirectory);
-                while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "NodeKit.sln")))
+                while (dir is not null && !File.Exists(Path.Join(dir.FullName, "NodeKit.sln")))
                 {
                     dir = dir.Parent;
                 }

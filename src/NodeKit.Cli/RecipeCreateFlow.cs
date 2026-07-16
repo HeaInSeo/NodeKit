@@ -1184,13 +1184,19 @@ namespace NodeKit.Cli
             IRecipeConsole console,
             IRecipeCreateCancellationSource cancellation)
         {
-            var toolName = document.ToolName ?? "recipe";
-            var version = document.Version ?? "1.0.0";
+            // ToolName/Version are free-text wizard fields with no character
+            // restriction (RecipeFieldCatalog only requires non-empty) — a
+            // value like "bwa/mem" or "/etc/passwd" would otherwise flow
+            // straight into a file path. Sanitize before it becomes part of
+            // defaultName, so Path.Join below can never see a path separator
+            // or a rooted segment here.
+            var toolName = SanitizeForFileNameSegment(document.ToolName ?? "recipe");
+            var version = SanitizeForFileNameSegment(document.Version ?? "1.0.0");
             var defaultName = $"{toolName}-{version}.json";
             var dir = !string.IsNullOrEmpty(dirHint)
                 ? dirHint
                 : Directory.GetCurrentDirectory();
-            var defaultPath = Path.Combine(dir, defaultName);
+            var defaultPath = Path.Join(dir, defaultName);
 
             console.WriteLine("저장 위치를 확인하세요.");
             console.WriteLine();
@@ -1232,6 +1238,17 @@ namespace NodeKit.Cli
 
                 console.WriteLine("다른 경로를 입력하세요:");
             }
+        }
+
+        // Replaces filesystem-unsafe characters (both OSes' invalid filename
+        // chars, plus '/' and '\' explicitly since Path.GetInvalidFileNameChars()
+        // only returns the current OS's set) with '_', so a free-text field can
+        // never smuggle a path separator or a rooted segment into a filename.
+        private static string SanitizeForFileNameSegment(string value)
+        {
+            var invalid = Path.GetInvalidFileNameChars();
+            var chars = value.Select(c => invalid.Contains(c) || c is '/' or '\\' ? '_' : c).ToArray();
+            return new string(chars);
         }
 
         private static void PrintDocumentSummary(RecipeDocument document, IRecipeConsole console)

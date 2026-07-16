@@ -28,7 +28,7 @@ namespace NodeKit.Cli.Tests
             "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
         private readonly string _workDir =
-            Path.Combine(Path.GetTempPath(), "nodekit-harbor-base-image-tests-" + Guid.NewGuid());
+            Path.Join(Path.GetTempPath(), "nodekit-harbor-base-image-tests-" + Guid.NewGuid());
 
         private readonly string? _originalMap = Environment.GetEnvironmentVariable("NODEKIT_HARBOR_IMAGE_MAP");
 
@@ -48,7 +48,7 @@ namespace NodeKit.Cli.Tests
         {
             Environment.SetEnvironmentVariable("NODEKIT_HARBOR_IMAGE_MAP", "docker.io=harbor.lab.local/dockerhub-proxy");
 
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             using var innerResolver = HarborImageDigestResolver.CreateForTest(
                 "https://harbor.lab.local", new FixedDigestHandler(ExpectedDigest));
             var resolver = new MappedHarborImageDigestResolver(innerResolver);
@@ -69,8 +69,8 @@ namespace NodeKit.Cli.Tests
                 "bwa=0.7.17=h5bf99c6_8", "",
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 outPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
@@ -101,7 +101,7 @@ namespace NodeKit.Cli.Tests
         {
             Environment.SetEnvironmentVariable("NODEKIT_HARBOR_IMAGE_MAP", "docker.io=harbor.lab.local/dockerhub-proxy");
 
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             using var innerResolver = HarborImageDigestResolver.CreateForTest(
                 "https://harbor.lab.local", new FixedDigestHandler(ExpectedDigest));
             var resolver = new MappedHarborImageDigestResolver(innerResolver);
@@ -116,8 +116,8 @@ namespace NodeKit.Cli.Tests
                 "bwa=0.7.17=h5bf99c6_8", "",
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 outPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
@@ -141,7 +141,7 @@ namespace NodeKit.Cli.Tests
         {
             Environment.SetEnvironmentVariable("NODEKIT_HARBOR_IMAGE_MAP", null);
 
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             using var innerResolver = HarborImageDigestResolver.CreateForTest(
                 "https://harbor.lab.local", new NoCallHandler());
             var resolver = new MappedHarborImageDigestResolver(innerResolver);
@@ -155,8 +155,8 @@ namespace NodeKit.Cli.Tests
                 "/cancel",
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             RecipeCreateInteractiveRunner.Run(
                 outPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
@@ -178,7 +178,7 @@ namespace NodeKit.Cli.Tests
         {
             Environment.SetEnvironmentVariable("NODEKIT_HARBOR_IMAGE_MAP", null);
 
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             using var innerResolver = HarborImageDigestResolver.CreateForTest(
                 "https://harbor.lab.local", new FixedDigestHandler(ExpectedDigest));
             var resolver = new MappedHarborImageDigestResolver(innerResolver);
@@ -195,8 +195,8 @@ namespace NodeKit.Cli.Tests
                 "bwa=0.7.17=h5bf99c6_8", "",
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 outPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
