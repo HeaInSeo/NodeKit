@@ -593,9 +593,17 @@ dotnet restore NodeKit.sln --locked-mode
 ./scripts/ci-audit-packages.sh
 dotnet format NodeKit.sln --no-restore --verify-no-changes --verbosity minimal
 dotnet build NodeKit.sln --no-restore --configuration Release /p:TreatWarningsAsErrors=true /p:EnforceCodeStyleInBuild=true
-dotnet test --solution NodeKit.sln --no-build --configuration Release --results-directory TestResults --coverage --coverage-output coverage.cobertura.xml --coverage-output-format cobertura
-./scripts/ci-check-coverage.sh
+dotnet test --project tests/NodeKit.Tests --no-build --configuration Release --results-directory TestResults/NodeKit.Tests --coverage --coverage-output coverage.cobertura.xml --coverage-output-format cobertura
+dotnet test --project tests/NodeKit.Cli.Tests --no-build --configuration Release --results-directory TestResults/NodeKit.Cli.Tests --coverage --coverage-output coverage.cobertura.xml --coverage-output-format cobertura
+./scripts/ci-check-coverage.py
 ```
+
+(2026-07-16 정정: 예전엔 `dotnet test --solution NodeKit.sln ...`로 두 프로젝트를
+한 번에 돌리면서 커버리지 출력 경로가 겹쳐, 두 프로젝트 중 하나가 다른 하나를
+덮어썼다 — `NodeKit.Cli.Tests`가 거의 항상 졌고, 그 결과 `SubmitCommand` 같은
+CLI 전용 핵심 클래스가 게이트에서 실제로는 한 번도 검사되지 않고 있었다. 지금은
+프로젝트별로 별도 디렉터리에 쓰고, `ci-check-coverage.py`가 모든 리포트를
+찾아 클래스별로 합산한다.)
 
 Latest local result (2026-07-02):
 
