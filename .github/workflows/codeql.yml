@@ -23,6 +23,9 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v6
 
+      - name: SARIF filter script self-test
+        run: python3 scripts/test_filter_codeql_sarif.py -v
+
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v5
         with:
@@ -33,10 +36,6 @@ jobs:
         with:
           languages: csharp
           queries: security-and-quality
-          # codeql-action/init has no paths-ignore input of its own (verified
-          # against its action.yml, 2026-07-16) — path filtering for compiled
-          # languages goes through a separate CodeQL config file instead.
-          config-file: ./.github/codeql/codeql-config.yml
 
       - name: Restore
         run: dotnet restore NodeKit.sln --locked-mode
@@ -44,7 +43,43 @@ jobs:
       - name: Build
         run: dotnet build NodeKit.sln --no-restore --configuration Release /p:TreatWarningsAsErrors=true /p:EnforceCodeStyleInBuild=true
 
-      - name: Perform CodeQL analysis
+      # We keep full build tracing (source-linked files, multi-project
+      # references, and real compiled-protobuf cross-references all depend
+      # on it) rather than switching to build-mode: none, so paths-ignore
+      # is not an option here — per GitHub's own docs, it only filters a
+      # compiled language's results "when you analyze [it] without
+      # building the code". Instead: produce the raw SARIF without
+      # auto-uploading it, filter out results for generated obj/ files
+      # this repo doesn't track, then upload the filtered SARIF under the
+      # same category so GitHub still correlates/auto-closes prior alerts.
+      - name: Perform CodeQL analysis (raw, not auto-uploaded)
         uses: github/codeql-action/analyze@v4
         with:
           category: "/language:csharp"
+          output: codeql-results-raw
+          upload: failure-only
+
+      - name: Filter CodeQL SARIF (drop untracked obj/ generated-code results)
+        run: |
+          mkdir -p codeql-results-filtered
+          raw_sarif=$(find codeql-results-raw -maxdepth 1 -name '*.sarif' | head -n1)
+          if [ -z "$raw_sarif" ]; then
+            echo "No SARIF file found in codeql-results-raw/" >&2
+            exit 1
+          fi
+          python3 scripts/filter-codeql-sarif.py "$raw_sarif" codeql-results-filtered/csharp.sarif
+
+      - name: Upload filtered SARIF
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: codeql-results-filtered/csharp.sarif
+          category: "/language:csharp"
+
+      - name: Upload SARIF artifacts (raw + filtered, for audit)
+        uses: actions/upload-artifact@v7
+        with:
+          name: codeql-sarif
+          path: |
+            codeql-results-raw/*.sarif
+            codeql-results-filtered/*.sarif
+          if-no-files-found: error
