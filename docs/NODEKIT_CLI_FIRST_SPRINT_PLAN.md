@@ -1,8 +1,8 @@
 # NodeKit Legacy-First Sprint Plan
 
-Status: Sprint 6 완료 / Sprint 7 진행 중(Task 1 완료, Task 2 대기) / R18-R21(§13) 완료 / R22-B/C/D(§13) 완료 / 적대적 리뷰 Major-1(#41)/wizard 통합(#42)/3차 리뷰 follow-up(#45) 완료  
+Status: Sprint 6 완료 / Sprint 7 진행 중(Task 1 완료, Task 2 대기 — infra-lab#34 라우팅 이슈로 블록) / R18-R21(§13) 완료 / R22-B/C/D(§13) 완료 / 적대적 리뷰 Major-1(#41)/wizard 통합(#42)/3차 리뷰 follow-up(#45)/4차 리뷰 follow-up(proto+docs) 완료  
 Created: 2026-06-17  
-Updated: 2026-07-15  
+Updated: 2026-07-16  
 Scope: NodeKit work — Sprint 0-6 완료, Sprint 7(Post-Migration Hardening) 진행 중,
 §13 Live Recipe Reproducibility Improvement(R18-R21) 완료, R22-B/C/D(SourceBuild
 구조화 intent authoring 모델 + 2-stage 렌더링 + RuntimeProfile hygiene advisor) 완료,
@@ -455,9 +455,54 @@ Task 1 완료 후 세 번째 적대적 리뷰에서 나온 4개 요청 사항 �
 
 618/618 통과(옵트인 통합 테스트 2개 스킵), 0 warnings, dotnet format 클린.
 
-**알려진 한계**: 세 fixture와 신규 integration gate 전부 실제 live seoy
-NodeVault에 제출해본 적 없음 — 이 환경엔 seoy 접근 권한이 없다. 다음 seoy
-세션에서 실제 실행 필요(U5-2와 함께 처리 가능).
+**알려진 한계 (2026-07-15 작성 시점)**: 세 fixture와 신규 integration gate
+전부 실제 live seoy NodeVault에 제출해본 적 없음 — 이 환경엔 seoy 접근
+권한이 없다고 판단했었음. 다음 seoy 세션에서 실제 실행 필요(U5-2와 함께
+처리 가능).
+
+**정정 (2026-07-16)**: 위 "seoy 접근 권한 없음" 판단은 틀렸음 — 이 환경은
+Tailscale로 seoy(`100.123.80.48`)에 직접 SSH 가능(`seoy@100.123.80.48`,
+`heain@...` 아님). `~/.config/infra-lab` 확인 후 실제 접속해 두 가지를
+발견:
+1. NodeVault systemd crash loop(`/etc/containers/storage.conf`의
+   `runroot`가 unit의 `XDG_RUNTIME_DIR` isolation을 무시하고 우선 적용돼
+   비특권 `nodevault` 사용자가 storage root에 못 씀) — NodeVault 쪽에서
+   해결 확인함(2026-07-16 재확인, 8분+ 안정 실행, crash loop 없음).
+2. Harbor push 시 `dial tcp 10.113.24.96:80: i/o timeout` — seoy host에서
+   K8s 클러스터(`test-wizard-env`)의 Cilium LB IP로 라우팅 안 됨(VM
+   3대는 모두 `running`, `ping`/`ip route get` 모두 `virbr0` 경유
+   미전달 확인). NodeKit/NodeVault 코드 문제 아니라 infra-lab 환경
+   라우팅 문제로 판단, `infra-lab` 저장소 GitHub Issue #34로 등록.
+
+즉 fixture/integration gate 스캐폴딩 자체는 검증됐지만(2번 이슈로 인해
+fixture 3은 Harbor push 단계에서 막힘, fixture 1/2는 아직 실제 seoy에
+제출 시도 안 함), **Sprint 7 Task 2 / U5-2(seoy 수동 테스트)는 여전히
+미완료** — infra-lab#34 라우팅 이슈가 해결돼야 fixture 1/2/3 전부를 실제
+NodeVault에 제출해 end-to-end로 검증할 수 있음.
+```
+
+**Progress (4차 적대적 리뷰 follow-up 완료, 2026-07-16, 커밋 `e572a1b`/`cecd739`):**
+
+```text
+4차 적대적 리뷰에서 나온 Major 2건 대응:
+
+- Major-1: 벤더링된 protos/nodevault/v1/nodevault.proto가 NodeVault
+  원본의 `option deprecated = true;`(BuildAndRegister RPC, 실제
+  C# [Obsolete] 컴파일러 경고 생성용) 반영 안 된 상태였음 — NodeVault
+  canonical 사본에서 그대로 재벤더링(diff 동일 확인), 재빌드 후 CS0618
+  경고 0개 확인(= 저장소 어디에도 BuildAndRegister를 참조하는 코드가
+  없다는 검증이기도 함). 커밋 `e572a1b`.
+- Major-2: README.md/ARCHITECTURE.md/AGENTS.md/NODEKIT_CLI_USAGE.md에
+  남아있던 `--legacy`/BuildAndRegister를 "현재 유지 중"으로 설명하는
+  구절 전부 수정. 리뷰가 직접 지적한 두 지점(CLI_USAGE.md:766,
+  README/ARCHITECTURE의 "당분간 유지" 문구) 외에도 grep으로 추가 발견한
+  스테일 지점까지 함께 수정: CLI_USAGE.md 옵션 표의 `--legacy` 행,
+  "범위/제한사항" 절의 레거시 경로 설명, ARCHITECTURE.md의 삭제된
+  GrpcBuildClientIntegrationTests/NODEVAULT_INTEGRATION env var 참조
+  (→ GrpcToolSpecClientIntegrationTests/NODEKIT_NODEVAULT_URL로 교체).
+  커밋 `cecd739`.
+
+618/618 통과(옵트인 통합 테스트 2개 스킵), 0 warnings, dotnet format 클린.
 ```
 
 **Progress (Task 2 / U5-2 사전 검증, 2026-07-05, 2차 실행까지 반영):**
