@@ -951,7 +951,8 @@ namespace NodeKit.Cli.Tests
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
                 new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
                 stderr,
-                cancellation);
+                cancellation,
+                resolveClient: NullResolveRecipeClient.Instance);
 
             Assert.Equal(130, exitCode);
             Assert.False(File.Exists(outPath));
@@ -996,7 +997,8 @@ namespace NodeKit.Cli.Tests
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
                 new PlainTextRecipeConsole(new StringReader(string.Join("\n", ctrlCTranscript)), ctrlCStdout),
                 new StringWriter(),
-                new SequencedCancellationSource(checksBeforeCancellation: 0));
+                new SequencedCancellationSource(checksBeforeCancellation: 0),
+                resolveClient: NullResolveRecipeClient.Instance);
 
             Assert.Equal(cancelExitCode, ctrlCExitCode);
             Assert.False(File.Exists(cancelOutPath));
@@ -1555,7 +1557,8 @@ namespace NodeKit.Cli.Tests
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
                 new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
                 stderr,
-                new SequencedCancellationSource(checksBeforeCancellation: 1000));
+                new SequencedCancellationSource(checksBeforeCancellation: 1000),
+                resolveClient: NullResolveRecipeClient.Instance);
 
             Assert.Equal(0, exitCode);
             Assert.True(File.Exists(outPath));

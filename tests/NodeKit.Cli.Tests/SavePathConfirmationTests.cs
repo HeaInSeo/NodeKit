@@ -101,7 +101,8 @@ namespace NodeKit.Cli.Tests
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
                 new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
                 stderr,
-                _noCancellation);
+                _noCancellation,
+                resolveClient: NullResolveRecipeClient.Instance);
 
             Assert.Equal(0, exitCode);
             Assert.Empty(stderr.ToString());
@@ -138,7 +139,8 @@ namespace NodeKit.Cli.Tests
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
                 new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
                 stderr,
-                _noCancellation);
+                _noCancellation,
+                resolveClient: NullResolveRecipeClient.Instance);
 
             Assert.Equal(0, exitCode);
             Assert.True(File.Exists(customPath));
@@ -169,7 +171,8 @@ namespace NodeKit.Cli.Tests
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
                 new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
                 stderr,
-                _noCancellation);
+                _noCancellation,
+                resolveClient: NullResolveRecipeClient.Instance);
 
             Assert.Equal(0, exitCode);
             var expectedPath = Path.Combine(_workDir, "bwa-mem-0.7.17.json");
@@ -202,7 +205,8 @@ namespace NodeKit.Cli.Tests
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
                 new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
                 stderr,
-                _noCancellation);
+                _noCancellation,
+                resolveClient: NullResolveRecipeClient.Instance);
 
             Assert.Equal(0, exitCode);
             Assert.True(File.Exists(outPath));
@@ -249,7 +253,8 @@ namespace NodeKit.Cli.Tests
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
                 new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
                 stderr,
-                _noCancellation);
+                _noCancellation,
+                resolveClient: NullResolveRecipeClient.Instance);
 
             Assert.Equal(0, exitCode);
             Assert.True(File.Exists(outPath));

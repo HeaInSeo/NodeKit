@@ -120,6 +120,7 @@ namespace NodeKit.Cli.Tests
                 new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
                 stderr,
                 _noCancellation,
+                resolveClient: NullResolveRecipeClient.Instance,
                 imageDigestResolver: StubImageDigestResolver.Instance);
 
             Assert.Equal(0, exitCode);
@@ -162,6 +163,7 @@ namespace NodeKit.Cli.Tests
                 new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
                 stderr,
                 _noCancellation,
+                resolveClient: NullResolveRecipeClient.Instance,
                 imageDigestResolver: StubImageDigestResolver.Instance);
 
             Assert.Equal(0, exitCode);
@@ -199,6 +201,7 @@ namespace NodeKit.Cli.Tests
                 new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
                 stderr,
                 _noCancellation,
+                resolveClient: NullResolveRecipeClient.Instance,
                 imageDigestResolver: StubImageDigestResolver.Instance);
 
             Assert.Equal(0, exitCode);
@@ -239,6 +242,7 @@ namespace NodeKit.Cli.Tests
                 new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
                 stderr,
                 _noCancellation,
+                resolveClient: NullResolveRecipeClient.Instance,
                 imageDigestResolver: StubImageDigestResolver.Instance);
 
             Assert.Equal(0, exitCode);
@@ -277,6 +281,7 @@ namespace NodeKit.Cli.Tests
                 new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
                 stderr,
                 _noCancellation,
+                resolveClient: NullResolveRecipeClient.Instance,
                 imageDigestResolver: StubImageDigestResolver.Instance);
 
             Assert.Equal(0, exitCode);
@@ -317,6 +322,7 @@ namespace NodeKit.Cli.Tests
                 new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
                 stderr,
                 _noCancellation,
+                resolveClient: NullResolveRecipeClient.Instance,
                 imageDigestResolver: null);
 
             Assert.Equal(0, exitCode);
@@ -363,6 +369,7 @@ namespace NodeKit.Cli.Tests
                 new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
                 stderr,
                 _noCancellation,
+                resolveClient: NullResolveRecipeClient.Instance,
                 imageDigestResolver: StubImageDigestResolver.Instance);
 
             Assert.Equal(0, exitCode);
@@ -401,6 +408,7 @@ namespace NodeKit.Cli.Tests
                 new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
                 stderr,
                 _noCancellation,
+                resolveClient: NullResolveRecipeClient.Instance,
                 imageDigestResolver: failingResolver);
 
             Assert.Equal(0, exitCode);
@@ -441,6 +449,7 @@ namespace NodeKit.Cli.Tests
                 new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
                 stderr,
                 _noCancellation,
+                resolveClient: NullResolveRecipeClient.Instance,
                 imageDigestResolver: StubImageDigestResolver.Instance);
 
             Assert.Equal(0, exitCode);
