@@ -1,6 +1,6 @@
 # NodeKit Legacy-First Sprint Plan
 
-Status: Sprint 6 완료 / Sprint 7 진행 중(Task 1 완료, Task 2 대기 — infra-lab#34 라우팅 이슈로 블록) / R18-R21(§13) 완료 / R22-B/C/D(§13) 완료 / 적대적 리뷰 Major-1(#41)/wizard 통합(#42)/3차 리뷰 follow-up(#45)/4차 리뷰 follow-up(proto+docs) 완료  
+Status: Sprint 6 완료 / Sprint 7 진행 중(Task 1 완료, Task 2 — seoy fixture 3개 live 확인 완료, 전체 wizard 수동 테스트는 대기) / R18-R21(§13) 완료 / R22-B/C/D(§13) 완료 / 적대적 리뷰 Major-1(#41)/wizard 통합(#42)/3차 리뷰 follow-up(#45)/4차 리뷰 follow-up(proto+docs) 완료  
 Created: 2026-06-17  
 Updated: 2026-07-16  
 Scope: NodeKit work — Sprint 0-6 완료, Sprint 7(Post-Migration Hardening) 진행 중,
@@ -388,6 +388,30 @@ Done when:
 - Avalonia GUI도 ToolSpec 경로로 전환 완료.
 - CLI end-to-end 수동 테스트 통과 (seoy 장비).
 - IBuildClient / GrpcBuildClient 완전 제거 또는 명시적 ADR 후 유지 결정.
+```
+
+**Progress (Task 2 — seoy smoke fixture 3개 live 확인 완료, 2026-07-16, 커밋
+`b9aa23b`, Issue #47):**
+
+```text
+infra-lab#34(Harbor push 라우팅) 해결 확인 후, docs/NODEKIT_SEOY_SMOKE_FIXTURES.md의
+세 fixture를 처음으로 실제 live seoy NodeVault(http://100.123.80.48:50051)에
+제출해 전부 확인:
+
+- fixture 3(digest-referrer-check) — 성공, ImageDigest 정상 반환.
+- fixture 2(legacy-sourcebuild-rejected) — 예상대로 거부(curl risky tool,
+  Sprint 9 정책 실제 작동 확인).
+- fixture 1(structured-sourcebuild-success) — 첫 제출에서 실패
+  (install: cannot stat 'bwa-0.7.17/bwa') → NodeVault가 아니라 fixture의
+  SourceBuildCommands 자체 버그로 확인(로컬 buildah bud로 동일 재현,
+  NodeVault는 NodeKit이 보낸 Dockerfile을 충실히 실행했을 뿐). 경로 수정 후
+  로컬 buildah 재검증 + live 재제출 둘 다 성공
+  (build_id=8d05196a-3d2d-4198-b930-62d614f48abb).
+
+**주의**: 이건 U5-2의 좁은 부분집합이다 — "쉬운 안내/빠른 설정 모드 × 오픈망/폐쇄망"
+전체 조합의 대화형 wizard 수동 테스트는 아직 안 했다. Task 2는 여전히 미완료(○)로
+유지하되, ToolSpecRequest 경로 자체가 실제로 동작한다는 것과 Sprint 9 정책이
+살아있다는 것은 이번에 최초로 실증됨.
 ```
 
 **Progress (Task 1 완료, 2026-07-14, 커밋 `f7f34b1`/`9ccda57`, Issue #44):**

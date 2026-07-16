@@ -1,7 +1,7 @@
 # NodeKit ↔ NodeVault seoy Smoke Fixtures
 
-Status: fixtures created and locally verified (buildah/render/validate); never run against
-live seoy NodeVault
+Status: 세 fixture 모두 live seoy NodeVault(`http://100.123.80.48:50051`)에 실제
+제출·확인 완료(2026-07-16)
 Created: 2026-07-15
 Scope: three fixed recipe.json fixtures + exact commands, so future reviews of the
 ToolSpec submit path / Sprint 9 policy / digest observability don't have to improvise a
@@ -18,8 +18,8 @@ fixture 또는 문서화된 smoke 절차로 고정하면 다음 리뷰가 빨라
 아니라 실제로 fetch/pull 가능한 소스/이미지다. fixture 1(`structured-sourcebuild-success.json`)은
 로컬 `buildah bud`로 실제 2-stage 빌드까지 실행해 bwa 바이너리가 정상적으로
 컴파일·실행되는 것까지 확인했다(§1 참조). 세 fixture 전부 `nodekit validate`를
-통과하는 것도 확인했다. **다만 실제 seoy NodeVault에 제출해본 적은 없다** —
-그 부분이 이 문서가 아직 못 채운 gap이고, 다음 seoy 세션에서 채워야 한다.
+통과하는 것도 확인했다. **2026-07-16, 세 fixture 모두 실제 live seoy NodeVault에
+제출해 확인 완료했다** — §1/§2/§3 각 절의 "seoy에서 확인할 것" 결과를 참조.
 
 ## 1. Fixture 1 — structured-sourcebuild-success.json
 
@@ -55,6 +55,18 @@ NODEKIT_NODEVAULT_URL=http://100.123.80.48:50051 \
   가능 — 굳이 fixture 3을 따로 안 써도 됨. fixture 3은 소스 빌드 없이 더 빠르게
   같은 걸 확인하고 싶을 때용).
 
+**live 확인 결과(2026-07-16)**: 첫 제출에서 `install: cannot stat 'bwa-0.7.17/bwa':
+No such file or directory`로 실패 — NodeVault가 아니라 이 fixture의
+`SourceBuildCommands` 자체의 버그였다(`cd bwa-0.7.17` 이후 같은 RUN 안에서 다시
+`bwa-0.7.17/bwa`라는 중첩 경로를 참조). 로컬 buildah bud로도 동일하게 재현 확인 —
+NodeVault는 NodeKit이 보낸 Dockerfile을 충실하게 실행했을 뿐이었다.
+`install -D bwa /nodekit/output/usr/local/bin/bwa`로 수정 후 로컬 buildah
+bud(bwa 실행 성공, curl/gcc 부재 확인) + live seoy 재제출 둘 다 성공 확인
+(`build_id=8d05196a-3d2d-4198-b930-62d614f48abb`,
+digest `sha256:d19470683cd25c5e9bb1e5788a327ce7717eb0786eae5eb645c4b0663520331a`).
+"로컬 buildah bud로 실제 2-stage 빌드까지 실행해 검증"이라던 위 §0/§1의 이전 서술은
+부정확했던 것으로 판명 — 이번에 다시 검증했다.
+
 ## 2. Fixture 2 — legacy-sourcebuild-rejected.json
 
 **목적**: legacy `RecipeBuildKind.SourceBuild`(단일 스테이지)가 NodeVault Sprint 9
@@ -85,6 +97,11 @@ NODEKIT_NODEVAULT_URL=http://100.123.80.48:50051 \
   안내가 포함되는지 확인.
 - **만약 이게 거부되지 않고 성공한다면 — NodeVault Sprint 9 정책에 회귀가 생긴
   것이거나, NodeKit 쪽 이해가 틀렸다는 뜻이다. 즉시 이슈로 기록할 것.**
+
+**live 확인 결과(2026-07-16)**: 예상대로 거부됨 — `InvalidArgument`,
+`resolved tool spec failed build policy: RUN "..." uses runtime tool "curl" in the
+final image stage; add it to allow_runtime_tools with allow_runtime_tools_reason, or
+remove it`. Sprint 9 정책이 실제로 살아서 작동 중임을 확인.
 
 ## 3. Fixture 3 — digest-referrer-check.json
 
@@ -117,6 +134,10 @@ NODEKIT_NODEVAULT_URL=http://100.123.80.48:50051 \
   `image_digest`를 안 채우고 있다는 뜻 — 그 자체로 중요한 발견이니 이슈로 기록.
 - (선택) NodeVault index를 직접 조회해 `spec_referrer_digest`/`integrity_health`도
   값이 채워졌는지 확인.
+
+**live 확인 결과(2026-07-16)**: exit 0, `[성공]` 도달, `이미지 digest:
+harbor.lab.local/library/alpine-smoke:latest@sha256:...` 정상 표시 — `WatchToolBuild`가
+`ImageDigest`를 채워서 돌려주는 것 확인.
 
 ## 4. 세 fixture 실행 순서 제안
 
