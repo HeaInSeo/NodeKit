@@ -59,18 +59,12 @@ namespace NodeKit.Validation
 
         private static bool HasDanglingLineContinuation(string dockerfile)
         {
-            foreach (var rawLine in dockerfile.Split('\n', StringSplitOptions.None).Reverse())
-            {
-                var trimmed = rawLine.Trim();
-                if (string.IsNullOrWhiteSpace(trimmed) || trimmed.StartsWith('#'))
-                {
-                    continue;
-                }
+            var lastMeaningfulLine = dockerfile.Split('\n', StringSplitOptions.None)
+                .Reverse()
+                .Select(rawLine => rawLine.Trim())
+                .FirstOrDefault(trimmed => !string.IsNullOrWhiteSpace(trimmed) && !trimmed.StartsWith('#'));
 
-                return trimmed.EndsWith('\\');
-            }
-
-            return false;
+            return lastMeaningfulLine?.EndsWith('\\') ?? false;
         }
 
         private static void ValidateFromInstruction(

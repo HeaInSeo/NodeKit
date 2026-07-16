@@ -76,17 +76,10 @@ namespace NodeKit.Validation
 
         private static bool IsCondaEnvironmentYaml(string spec)
         {
-            foreach (var rawLine in spec.Split('\n', StringSplitOptions.None))
-            {
-                var trimmed = rawLine.TrimStart();
-                if (trimmed.StartsWith("name:", StringComparison.Ordinal) ||
-                    trimmed.StartsWith("dependencies:", StringComparison.Ordinal))
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return spec.Split('\n', StringSplitOptions.None)
+                .Select(rawLine => rawLine.TrimStart())
+                .Any(trimmed => trimmed.StartsWith("name:", StringComparison.Ordinal) ||
+                    trimmed.StartsWith("dependencies:", StringComparison.Ordinal));
         }
 
         private static ValidationResult ValidateConda(string spec)
@@ -145,10 +138,8 @@ namespace NodeKit.Validation
         {
             var violations = new List<ValidationViolation>();
 
-            foreach (var rawLine in spec.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            foreach (var line in spec.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(rawLine => rawLine.Trim()))
             {
-                var line = rawLine.Trim();
-
                 if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#'))
                 {
                     continue;
@@ -217,12 +208,9 @@ namespace NodeKit.Validation
                 ? rawInstruction[3..].Trim()
                 : string.Empty;
 
-            foreach (var command in runBody.Split(_shellCommandSeparators, StringSplitOptions.RemoveEmptyEntries))
+            foreach (var tokens in runBody.Split(_shellCommandSeparators, StringSplitOptions.RemoveEmptyEntries)
+                .Select(command => command.Split(_dockerfileTokenSeparators, StringSplitOptions.RemoveEmptyEntries).ToList()))
             {
-                var tokens = command
-                    .Split(_dockerfileTokenSeparators, StringSplitOptions.RemoveEmptyEntries)
-                    .ToList();
-
                 var argStartIndex = GetPipInstallArgStartIndex(tokens);
                 if (argStartIndex < 0)
                 {
@@ -348,12 +336,9 @@ namespace NodeKit.Validation
                 ? rawInstruction[3..].Trim()
                 : string.Empty;
 
-            foreach (var command in runBody.Split(_shellCommandSeparators, StringSplitOptions.RemoveEmptyEntries))
+            foreach (var tokens in runBody.Split(_shellCommandSeparators, StringSplitOptions.RemoveEmptyEntries)
+                .Select(command => command.Split(_dockerfileTokenSeparators, StringSplitOptions.RemoveEmptyEntries).ToList()))
             {
-                var tokens = command
-                    .Split(_dockerfileTokenSeparators, StringSplitOptions.RemoveEmptyEntries)
-                    .ToList();
-
                 if (tokens.Count < 2)
                 {
                     continue;

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -121,9 +122,8 @@ namespace NodeKit.Policy
 
                     sawResultEntry = true;
 
-                    foreach (var msg in result.EnumerateArray())
+                    foreach (var message in result.EnumerateArray().Select(msg => msg.GetString() ?? string.Empty))
                     {
-                        var message = msg.GetString() ?? string.Empty;
                         var ruleId = ExtractRuleId(message);
                         violations.Add(new PolicyViolation(ruleId, message));
                     }

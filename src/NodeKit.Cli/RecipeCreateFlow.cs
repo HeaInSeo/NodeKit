@@ -1102,9 +1102,8 @@ namespace NodeKit.Cli
 
             if (inputLine.Length > 0 && !RecipeCreateEscapeCommands.IsBack(inputLine))
             {
-                foreach (var idx in ParseNumberList(inputLine, inputPresets.Count))
+                foreach (var preset in ParseNumberList(inputLine, inputPresets.Count).Select(idx => inputPresets[idx]))
                 {
-                    var preset = inputPresets[idx];
                     if (preset.Id != InputOutputPresetCatalog.CustomPresetId)
                     {
                         document.Inputs.Add(new ToolInput
@@ -1143,9 +1142,8 @@ namespace NodeKit.Cli
 
             if (outputLine.Length > 0 && !RecipeCreateEscapeCommands.IsBack(outputLine))
             {
-                foreach (var idx in ParseNumberList(outputLine, outputPresets.Count))
+                foreach (var preset in ParseNumberList(outputLine, outputPresets.Count).Select(idx => outputPresets[idx]))
                 {
-                    var preset = outputPresets[idx];
                     if (preset.Id != InputOutputPresetCatalog.CustomPresetId)
                     {
                         document.Outputs.Add(new ToolOutput
@@ -1164,9 +1162,8 @@ namespace NodeKit.Cli
         private static IReadOnlyList<int> ParseNumberList(string input, int maxCount)
         {
             var result = new List<int>();
-            foreach (var part in input.Split(','))
+            foreach (var trimmed in input.Split(',').Select(part => part.Trim()))
             {
-                var trimmed = part.Trim();
                 if (int.TryParse(trimmed, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var n)
                     && n >= 1 && n <= maxCount)
                 {
