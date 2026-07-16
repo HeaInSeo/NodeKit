@@ -50,7 +50,7 @@ namespace NodeKit.Policy
                     continue;
                 }
 
-                var fullLine = (pending.ToString() + line).Trim();
+                var fullLine = pending.Append(line).ToString().Trim();
                 pending.Clear();
 
                 if (string.IsNullOrWhiteSpace(fullLine))
