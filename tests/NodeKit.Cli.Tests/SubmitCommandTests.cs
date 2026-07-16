@@ -94,10 +94,19 @@ namespace NodeKit.Cli.Tests
             var stdout = new StringWriter();
             var stderr = new StringWriter();
 
-            var exitCode = SubmitCommand.Run(new[] { "submit", recipePath }, stdout, stderr);
+            var previousUrl = Environment.GetEnvironmentVariable("NODEKIT_NODEVAULT_URL");
+            Environment.SetEnvironmentVariable("NODEKIT_NODEVAULT_URL", null);
+            try
+            {
+                var exitCode = SubmitCommand.Run(new[] { "submit", recipePath }, stdout, stderr);
 
-            Assert.Equal(2, exitCode);
-            Assert.Contains("NODEKIT_NODEVAULT_URL", stderr.ToString());
+                Assert.Equal(2, exitCode);
+                Assert.Contains("NODEKIT_NODEVAULT_URL", stderr.ToString());
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable("NODEKIT_NODEVAULT_URL", previousUrl);
+            }
         }
 
         [Fact]

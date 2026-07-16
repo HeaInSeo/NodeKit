@@ -8,6 +8,8 @@ namespace NodeKit.Cli.Tests
     public class CliAppTests : IDisposable
     {
         private readonly string _workDir = Path.Combine(Path.GetTempPath(), "nodekit-cli-tests-" + Guid.NewGuid());
+        private readonly IDisposable _resolveClientOverride =
+            ResolveRecipeClientTestOverride.Use(NullResolveRecipeClient.Instance);
 
         public CliAppTests()
         {
@@ -17,6 +19,7 @@ namespace NodeKit.Cli.Tests
         public void Dispose()
         {
             Directory.Delete(_workDir, recursive: true);
+            _resolveClientOverride.Dispose();
         }
 
         private const string ValidRecipeJson = """

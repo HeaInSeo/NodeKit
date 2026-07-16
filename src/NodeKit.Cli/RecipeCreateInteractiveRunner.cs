@@ -41,6 +41,7 @@ namespace NodeKit.Cli
             using var grpcResolver = GrpcResolveRecipeClient.TryCreate();
 
             IResolveRecipeClient recipeResolver = resolveClient
+                ?? ResolveRecipeClientTestOverride.Current
                 ?? StubResolveRecipeClient.TryCreate()
                 ?? (IResolveRecipeClient?)grpcResolver
                 ?? NullResolveRecipeClient.Instance;

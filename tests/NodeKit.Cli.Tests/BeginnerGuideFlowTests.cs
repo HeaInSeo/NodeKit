@@ -31,6 +31,9 @@ namespace NodeKit.Cli.Tests
 
         private static readonly NoOpCancellationSource _noCancellation = new();
 
+        private readonly IDisposable _resolveClientOverride =
+            ResolveRecipeClientTestOverride.Use(NullResolveRecipeClient.Instance);
+
         public BeginnerGuideFlowTests()
         {
             Directory.CreateDirectory(_workDir);
@@ -39,6 +42,7 @@ namespace NodeKit.Cli.Tests
         public void Dispose()
         {
             Directory.Delete(_workDir, recursive: true);
+            _resolveClientOverride.Dispose();
         }
 
         // ── Safe-exit paths (아무것도 모름) ─────────────────────────────────────

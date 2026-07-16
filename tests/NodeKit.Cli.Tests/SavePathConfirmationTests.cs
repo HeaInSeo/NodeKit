@@ -19,6 +19,9 @@ namespace NodeKit.Cli.Tests
         private readonly string _workDir =
             Path.Combine(Path.GetTempPath(), "nodekit-savepath-tests-" + Guid.NewGuid());
 
+        private readonly IDisposable _resolveClientOverride =
+            ResolveRecipeClientTestOverride.Use(NullResolveRecipeClient.Instance);
+
         public SavePathConfirmationTests()
         {
             Directory.CreateDirectory(_workDir);
@@ -27,6 +30,7 @@ namespace NodeKit.Cli.Tests
         public void Dispose()
         {
             Directory.Delete(_workDir, recursive: true);
+            _resolveClientOverride.Dispose();
         }
 
         // ── CLI arg parsing ───────────────────────────────────────────────────────

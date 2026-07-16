@@ -20,6 +20,8 @@ namespace NodeKit.Cli.Tests
             "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
         private readonly string _workDir = Path.Combine(Path.GetTempPath(), "nodekit-recipe-create-tests-" + Guid.NewGuid());
+        private readonly IDisposable _resolveClientOverride =
+            ResolveRecipeClientTestOverride.Use(NullResolveRecipeClient.Instance);
 
         public RecipeCreateCommandTests()
         {
@@ -29,6 +31,7 @@ namespace NodeKit.Cli.Tests
         public void Dispose()
         {
             Directory.Delete(_workDir, recursive: true);
+            _resolveClientOverride.Dispose();
         }
 
         // --- 31.5 CLI option tests ---
