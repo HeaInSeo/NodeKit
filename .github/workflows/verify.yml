@@ -47,15 +47,25 @@ jobs:
       - name: Build
         run: dotnet build NodeKit.sln --no-restore --configuration Release /p:TreatWarningsAsErrors=true /p:EnforceCodeStyleInBuild=true
 
-      - name: Test with coverage
-        run: dotnet test --solution NodeKit.sln --no-build --configuration Release --results-directory TestResults --coverage --coverage-output coverage.cobertura.xml --coverage-output-format cobertura
+      # Each project writes to its own subdirectory — running them together
+      # via "dotnet test --solution ... --coverage-output coverage.cobertura.xml"
+      # made both projects write to the exact same path, so one silently
+      # overwrote the other (see scripts/ci-check-coverage.py's docstring).
+      - name: Test with coverage (NodeKit.Tests)
+        run: dotnet test --project tests/NodeKit.Tests --no-build --configuration Release --results-directory TestResults/NodeKit.Tests --coverage --coverage-output coverage.cobertura.xml --coverage-output-format cobertura
+
+      - name: Test with coverage (NodeKit.Cli.Tests)
+        run: dotnet test --project tests/NodeKit.Cli.Tests --no-build --configuration Release --results-directory TestResults/NodeKit.Cli.Tests --coverage --coverage-output coverage.cobertura.xml --coverage-output-format cobertura
 
       - name: Coverage threshold
-        run: ./scripts/ci-check-coverage.sh
+        run: ./scripts/ci-check-coverage.py
+
+      - name: Coverage gate script self-test
+        run: python3 scripts/test_ci_check_coverage.py -v
 
       - name: Upload coverage artifacts
         uses: actions/upload-artifact@v7
         with:
           name: coverage
-          path: TestResults/coverage.cobertura.xml
+          path: TestResults/*/coverage.cobertura.xml
           if-no-files-found: error
