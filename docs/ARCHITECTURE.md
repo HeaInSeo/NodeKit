@@ -22,12 +22,16 @@ NodeVault는 Kubernetes data-plane app이며, NodeKit은 문서화된 gRPC/REST 
 NodeKit은 Kubernetes API를 직접 호출하지 않는다.
 NodeVault 및 관련 플랫폼 서비스의 live 테스트는 원격 인프라를 기본으로 하며,
 접속 정보와 운영 문서는 `~/.config/infra-lab` 아래 문서를 확인한다.
-NodeKit 쪽 live 연동 테스트(`GrpcBuildClientIntegrationTests`)는 기본적으로 스킵되며
-`NODEVAULT_INTEGRATION=1`로 옵트인하고, 주소는 `NODEVAULT_INTEGRATION_ADDRESS`로 override한다.
+NodeKit 쪽 live 연동 테스트(`GrpcToolSpecClientIntegrationTests`,
+`GrpcResolveRecipeClientIntegrationTests`)는 기본적으로 스킵되며
+`NODEKIT_NODEVAULT_URL` 환경변수를 설정해야 옵트인된다(예:
+`NODEKIT_NODEVAULT_URL=http://100.123.80.48:50051`). 고정 recipe fixture와
+seoy 수동 절차는 `docs/NODEKIT_SEOY_SMOKE_FIXTURES.md` 참조.
 
-현재 구현 단계에서는 기존 `BuildRequest` / `BuildAndRegister` legacy gRPC 경로를 유지한다.
-`ToolSpecRequest`, `ResolveToolSpec`, `SubmitToolBuild` 생산 경로는 NodeVault Phase 1 완료 후
-`PLATFORM_SCHEDULE.md` Phase 6에서 migration이 허용될 때까지 추가하지 않는다.
+`ToolSpecRequest → ResolveToolSpec → SubmitToolBuild → WatchToolBuild`
+경로만 사용한다(NodeVault Phase 1 gate 2026-07-02 오픈,
+`PLATFORM_SCHEDULE.md` Phase 6 완료). 기존 `BuildRequest` / `BuildAndRegister`
+legacy gRPC 경로는 CLI와 Avalonia GUI 양쪽 모두에서 완전히 제거됐다.
 
 ---
 

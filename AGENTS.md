@@ -12,9 +12,9 @@ Read these first when resuming work:
 Active planning rule:
 
 - NodeVault is a Kubernetes data-plane app. NodeKit integrates with it through the documented gRPC/REST API surface, not by calling the Kubernetes API directly.
-- **NodeVault Phase 1 gate opened 2026-07-02.** The CLI (`src/NodeKit.Cli/`) has already migrated to the production `ToolSpecRequest` path (`ResolveToolSpec → SubmitToolBuild → WatchToolBuild`); the `--legacy` flag and the `BuildAndRegister` path were removed from the CLI. Do not reintroduce a `--legacy`-style path in the CLI.
-- `IBuildClient` / `GrpcBuildClient` (the legacy `BuildRequest` / `BuildAndRegister` gRPC path) remain only in the Avalonia GUI project (`NodeKit.csproj`) — migrating the GUI to `GrpcToolSpecClient` is Sprint 7, still in progress. Do not remove the legacy client code from the GUI project until that migration lands.
-- Current work should focus on: Sprint 7 (Avalonia GUI ToolSpec migration), `docs/NODEKIT_CLI_FIRST_SPRINT_PLAN.md` §13 (R18-R21, completed) follow-up work, R22 SourceBuild structured-intent implementation (Issues #37-39, design finalized in `docs/NODEKIT_SOURCEBUILD_STRUCTURED_INTENT_DESIGN.md`), L1 validation, BuildRequest mapping, gRPC client resilience, CI, lint, tests, and coverage.
+- **NodeVault Phase 1 gate opened 2026-07-02.** The CLI (`src/NodeKit.Cli/`) migrated to the production `ToolSpecRequest` path (`ResolveToolSpec → SubmitToolBuild → WatchToolBuild`); the `--legacy` flag and the `BuildAndRegister` path were removed from the CLI. Do not reintroduce a `--legacy`-style path in the CLI.
+- **Sprint 7 Task 1 complete (2026-07-14).** `IBuildClient`/`GrpcBuildClient` (the legacy `BuildRequest`/`BuildAndRegister` gRPC path) have been fully removed from the repo — the Avalonia GUI (`NodeKit.csproj`) now also uses `GrpcToolSpecClient` (shared with the CLI via `src/Grpc/`), with build-submission state owned by `UI/ViewModels/BuildSubmissionViewModel.cs`. There is no legacy client code left anywhere in this repo; do not reintroduce it.
+- Current work should focus on: Sprint 7 Task 2 (U5-2, seoy live manual test — see `docs/NODEKIT_SEOY_SMOKE_FIXTURES.md` for fixed repro recipes and the opt-in `GrpcToolSpecClientIntegrationTests`), L1 validation, BuildRequest mapping, gRPC client resilience, CI, lint, tests, and coverage. R22 (SourceBuild structured-intent, Issues #37-39) and three rounds of adversarial-review follow-up (Issues #41-45) are done — see `docs/NODEKIT_CLI_FIRST_SPRINT_PLAN.md` for the full history.
 - New application state should follow the DagEdit direction: ReactiveUI / System.Reactive first, with DynamicData when collection change streams are useful.
 - The existing UI is still largely code-behind/event-handler based. Do not expand that pattern for new validation, submission progress, or result state; introduce focused reactive ViewModel/state objects instead.
 - CI includes reactive architecture guard tests. If `MainWindow.axaml.cs` grows, gains more click subscriptions, or gains more `async void` handlers, move the work into reactive ViewModel/state code instead of raising the baseline.
@@ -29,7 +29,7 @@ Session-start NodeVault check:
 - Read the current NodeVault planning/API surface before NodeKit API work:
   `docs/PLATFORM_SCHEDULE.md`, `docs/PLATFORM_MAP.md`, and `protos/nodevault/v1/nodevault.proto`.
 - Treat NodeVault planning documents as the upstream platform source of truth. Reconcile NodeKit documents and implementation to that state.
-- If NodeVault has `ResolveToolSpec` but not a complete `SubmitToolBuild`/watch/cancel path, keep NodeKit on legacy `BuildRequest` / `BuildAndRegister`.
+- (Historical decision rule, now moot — kept for context.) The migration criterion used before Phase 1 opened was: only move NodeKit onto the new `ToolSpecRequest` path once NodeVault has a complete `SubmitToolBuild`/watch/cancel path, not just `ResolveToolSpec`. That gate opened 2026-07-02 and the legacy `BuildRequest`/`BuildAndRegister` path has since been fully removed from this repo (see above) — there is no legacy fallback to revert to.
 
 Remote integration rule:
 

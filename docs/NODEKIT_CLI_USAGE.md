@@ -763,11 +763,12 @@ nodekit recipe create /tmp/recipe.json \
 recipe를 검증하고 NodeVault에 빌드 제출한다.
 
 ```bash
-nodekit submit recipe.json [--url <nodevault-url>] [--legacy] [--strict-reproducible]
+nodekit submit recipe.json [--url <nodevault-url>] [--strict-reproducible]
 ```
 
-기본 경로는 NodeVault Phase 1 신규 경로(`ResolveToolSpec → SubmitToolBuild →
-WatchToolBuild`)다. `--legacy` 플래그를 붙이면 기존 `BuildAndRegister` 경로를 사용한다.
+`ResolveToolSpec → SubmitToolBuild → WatchToolBuild`(NodeVault Phase 1)가 유일한
+경로다. Phase 6(2026-07-02)에서 기존 `BuildAndRegister`/`--legacy` 경로를 CLI에서
+완전히 제거했다 — `IBuildClient`/`GrpcBuildClient` 자체가 저장소에 더 이상 없다.
 
 NodeVault URL은 `NODEKIT_NODEVAULT_URL` 환경변수 또는 `--url` 옵션으로 지정한다.
 
@@ -789,7 +790,6 @@ spec 해결 완료 (digest: 8f3a1c2d...)
 | 옵션 | 의미 |
 |---|---|
 | `--url <url>` | NodeVault gRPC 엔드포인트 URL (환경변수 `NODEKIT_NODEVAULT_URL`이 없을 때 필수) |
-| `--legacy` | `BuildAndRegister` 레거시 경로 사용 (Phase 6 전환 완료 전 호환용) |
 | `--strict-reproducible` | conda/micromamba 패키지가 `name=version`(버전만 고정)이면 제출 전에 차단한다. NodeVault 최종 게이트는 `name=version=build` 전체 고정만 받아들이는데, NodeKit L1은 authoring 편의를 위해 버전만 고정된 값도 기본적으로 허용한다 — 이 플래그로 그 불일치를 제출 전에 미리 잡을 수 있다. |
 
 ## 4. `nodekit validate <recipe.json> [--strict-reproducible]`
@@ -1590,5 +1590,5 @@ dotnet run --project src/NodeKit.Cli -- validate /home/user/samtools-1.17.json
   (3) 아무것도 없을 때 — Docker Hub / quay.io에서 자동 조회 (오픈망 기본).
   `PublicRegistryImageDigestResolver`는 15초 HTTP 타임아웃으로 Docker Hub anonymous
   Bearer 토큰 인증을 사용한다 — 조회 실패 시 재시도 또는 `0`(직접 입력)으로 전환된다.
-- **레거시 경로(`--legacy` 플래그)**: `BuildAndRegister` RPC를 통한 기존 경로. Phase 6
-  전환(legacy usage 0 확인) 완료 전까지 유지한다.
+- **레거시 경로 (`BuildAndRegister` RPC, `--legacy` 플래그)**: Phase 6(2026-07-02)에서
+  CLI에서 완전히 제거됐다. `IBuildClient`/`GrpcBuildClient`는 저장소 어디에도 남아있지 않다.

@@ -105,9 +105,10 @@ EOF
 현재 NodeKit 작업의 기준 문서는
 [`docs/NODEKIT_CLI_FIRST_SPRINT_PLAN.md`](docs/NODEKIT_CLI_FIRST_SPRINT_PLAN.md)입니다.
 
-NodeKit은 당분간 기존 `BuildRequest` / `BuildAndRegister` gRPC 경로를 유지합니다.
-`ToolSpecRequest`, `ResolveToolSpec`, `SubmitToolBuild` 생산 경로는 NodeVault Phase 1 완료 후
-`PLATFORM_SCHEDULE.md` Phase 6 순서에 따라 migration할 때만 추가합니다.
+NodeKit은 `ToolSpecRequest → ResolveToolSpec → SubmitToolBuild → WatchToolBuild`
+경로만 사용합니다(NodeVault Phase 1 gate 2026-07-02 오픈, `PLATFORM_SCHEDULE.md`
+Phase 6 완료). 기존 `BuildRequest` / `BuildAndRegister` legacy gRPC 경로는 CLI와
+Avalonia GUI 양쪽 모두에서 완전히 제거됐습니다.
 
 NodeVault는 Kubernetes data-plane app입니다. NodeKit은 gRPC/REST API로만 연동하며,
 Kubernetes API를 직접 호출하지 않습니다.
