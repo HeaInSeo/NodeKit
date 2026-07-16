@@ -125,7 +125,7 @@ namespace NodeKit.UI
                 ? new AppSettings().CatalogAddress
                 : catalogAddr;
 
-#pragma warning disable CA1031
+#pragma warning disable CA1031 // top-level catch — see OnSendBuildClicked's catch, below
             try
             {
                 SettingsService.Save(_settings);
@@ -151,7 +151,7 @@ namespace NodeKit.UI
         {
             var resetSettings = new AppSettings();
 
-#pragma warning disable CA1031
+#pragma warning disable CA1031 // top-level catch — see OnSendBuildClicked's catch, below
             try
             {
                 SettingsService.Save(resetSettings);
@@ -344,6 +344,8 @@ namespace NodeKit.UI
                 // 새 빌드가 이전 빌드를 대체했다 — ViewModel이 이미 서버 취소를
                 // best-effort로 시도했으므로 여기서는 조용히 넘어간다.
             }
+
+            // Top-level catch — Avalonia has no default recovery for an exception escaping an event handler (same reasoning below).
 #pragma warning disable CA1031
             catch (Exception ex)
             {
@@ -438,7 +440,8 @@ namespace NodeKit.UI
                     StatusBar.Text = $"툴 목록: {tools.Count}개";
                 });
             }
-#pragma warning disable CA1031
+
+#pragma warning disable CA1031 // top-level catch — see OnSendBuildClicked's catch, above
             catch (Exception ex)
             {
                 Dispatcher.UIThread.Post(() => StatusBar.Text = $"목록 조회 오류: {ex.Message}");
@@ -486,7 +489,8 @@ namespace NodeKit.UI
                     StatusBar.Text = $"데이터 목록: {dataList.Count}개";
                 });
             }
-#pragma warning disable CA1031
+
+#pragma warning disable CA1031 // top-level catch — see OnSendBuildClicked's catch, above
             catch (Exception ex)
             {
                 Dispatcher.UIThread.Post(() => StatusBar.Text = $"데이터 목록 조회 오류: {ex.Message}");
@@ -518,7 +522,8 @@ namespace NodeKit.UI
                     StatusBar.Text = $"정책 목록: {result.Policies.Count}개";
                 });
             }
-#pragma warning disable CA1031
+
+#pragma warning disable CA1031 // top-level catch — see OnSendBuildClicked's catch, above
             catch (Exception ex)
             {
                 Dispatcher.UIThread.Post(() => StatusBar.Text = $"정책 조회 오류: {ex.Message}");
@@ -551,7 +556,8 @@ namespace NodeKit.UI
                     StatusBar.Text = $"번들 갱신 완료: {bundle.Version}";
                 });
             }
-#pragma warning disable CA1031
+
+#pragma warning disable CA1031 // top-level catch (see OnSendBuildClicked's, above); also a fail-safe — _policyChecker only swaps after GetLatestBundleAsync() succeeds
             catch (Exception ex)
             {
                 Dispatcher.UIThread.Post(() => StatusBar.Text = $"번들 갱신 오류: {ex.Message}");

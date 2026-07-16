@@ -22,6 +22,24 @@ namespace NodeKit.Policy
 
                 return Regex.IsMatch(value, pattern, RegexOptions.IgnoreCase) ? 1 : 0;
             }
+
+            // This is a WASM host-function callback invoked from inside
+            // WasmPolicyChecker.Check()'s eval(ctx) call, which has no
+            // surrounding try/catch of its own — an exception that escaped
+            // here would propagate out through the wasmtime call boundary,
+            // through Check(), and into ValidationViewModel.Validate(),
+            // which is invoked directly from a synchronous UI event handler
+            // (OnValidateClicked) with no catch either. Left uncaught, a
+            // single malformed regex or a wasm memory-read edge case would
+            // crash the whole desktop app on every validation attempt, not
+            // just fail this one check — so catching here is required, not
+            // just tidy. NOTE (open question, not resolved by this catch):
+            // returning 0 lets evaluation continue with a possibly-wrong
+            // regex.match result instead of surfacing a "this check
+            // couldn't run" signal to the caller. Whether that is fail-open
+            // or fail-closed in practice depends on how DockGuard's actual
+            // DFM/DSF/DGF rules use regex.match — that's DockGuard-owned
+            // rego logic this repository doesn't have visibility into.
 #pragma warning disable CA1031
             catch
             {
@@ -43,6 +61,10 @@ namespace NodeKit.Policy
                 _ = new Regex(pattern);
                 return 1;
             }
+
+            // Same reasoning as BuiltinRegexMatch above — required to keep a
+            // WASM host-function exception from crashing the app, with the
+            // same unresolved question about downstream rego semantics.
 #pragma warning disable CA1031
             catch
             {
@@ -121,6 +143,13 @@ namespace NodeKit.Policy
 
                 return new PolicyResult(violations);
             }
+
+            // Called after eval(ctx) has already returned (not from inside a
+            // live wasm host-function callback), so unlike the builtins
+            // below there's no crash risk either way — this just converts
+            // any JSON-parsing failure into an explicit blocking violation
+            // (fail-closed) rather than treating unparseable output as "no
+            // violations found".
 #pragma warning disable CA1031
             catch (Exception ex)
             {
@@ -161,6 +190,11 @@ namespace NodeKit.Policy
 
                 return memory.ReadString(ptr + 8, len, Encoding.UTF8);
             }
+
+            // Called from inside the live wasm host-function callbacks
+            // (BuiltinRegexMatch etc.) — same crash-prevention requirement
+            // and same unresolved downstream-rego-semantics question as
+            // documented on BuiltinRegexMatch above.
 #pragma warning disable CA1031
             catch
             {
