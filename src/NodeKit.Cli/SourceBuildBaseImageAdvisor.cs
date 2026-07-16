@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using NodeKit.Authoring.Recipes;
 
 namespace NodeKit.Cli
@@ -57,17 +58,12 @@ namespace NodeKit.Cli
                 return null;
             }
 
-            if (!string.IsNullOrEmpty(baseImage))
+            if (!string.IsNullOrEmpty(baseImage)
+                && _fetchOnlyImagePatterns.Any(pattern => baseImage.Contains(pattern, StringComparison.OrdinalIgnoreCase)))
             {
-                foreach (var pattern in _fetchOnlyImagePatterns)
-                {
-                    if (baseImage.Contains(pattern, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return NodeVaultRejectionWarning + " " +
-                            $"덧붙여 BaseImage('{baseImage}')가 fetch 전용 이미지로 보입니다 — curl 등 fetch 도구만 " +
-                            "있고 실제 도구 실행에 필요한 다른 구성요소는 없을 수 있으니 확인하세요.";
-                    }
-                }
+                return NodeVaultRejectionWarning + " " +
+                    $"덧붙여 BaseImage('{baseImage}')가 fetch 전용 이미지로 보입니다 — curl 등 fetch 도구만 " +
+                    "있고 실제 도구 실행에 필요한 다른 구성요소는 없을 수 있으니 확인하세요.";
             }
 
             return NodeVaultRejectionWarning;

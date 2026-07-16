@@ -291,12 +291,10 @@ namespace NodeKit.Authoring.Recipes
                 _invalidatedFields.Remove(fieldName);
             }
 
-            foreach (var fieldName in preview.FieldsRequiringRevalidation)
+            foreach (var fieldName in preview.FieldsRequiringRevalidation.Where(
+                f => _filledFields.Contains(f) || _completedListFields.Contains(f)))
             {
-                if (_filledFields.Contains(fieldName) || _completedListFields.Contains(fieldName))
-                {
-                    _invalidatedFields.Add(fieldName);
-                }
+                _invalidatedFields.Add(fieldName);
             }
 
             _metadata = ResetMetadataFor(_selectedMethod!.Value, _metadata);
@@ -492,12 +490,9 @@ namespace NodeKit.Authoring.Recipes
                 _appliedListItemCounts[field.Name] = items.Count;
             }
 
-            foreach (var field in RecipeFieldCatalog.DefaultedFieldsFor(_selectedMethod.Value))
+            foreach (var field in RecipeFieldCatalog.DefaultedFieldsFor(_selectedMethod.Value).Where(f => !_filledFields.Contains(f.Name)))
             {
-                if (!_filledFields.Contains(field.Name))
-                {
-                    field.Apply(_document, field.DefaultValue!);
-                }
+                field.Apply(_document, field.DefaultValue!);
             }
 
             // ImageRef (BaseImage) and ImageDigest are separate Required fields during

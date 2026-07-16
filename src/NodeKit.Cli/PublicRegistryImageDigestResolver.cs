@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -162,12 +163,10 @@ namespace NodeKit.Cli
         {
             if (response.Headers.TryGetValues("Docker-Content-Digest", out var values))
             {
-                foreach (var value in values)
+                var digest = values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+                if (digest != null)
                 {
-                    if (!string.IsNullOrWhiteSpace(value))
-                    {
-                        return ImageDigestResolutionResult.Resolved(value);
-                    }
+                    return ImageDigestResolutionResult.Resolved(digest);
                 }
             }
 

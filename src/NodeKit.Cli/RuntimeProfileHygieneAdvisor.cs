@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using NodeKit.Authoring.Recipes;
 
 namespace NodeKit.Cli
@@ -39,16 +40,15 @@ namespace NodeKit.Cli
                 return null;
             }
 
-            foreach (var pattern in _notMinimalImagePatterns)
+            var matchedPattern = _notMinimalImagePatterns.FirstOrDefault(
+                pattern => runtimeProfileImage.Contains(pattern, StringComparison.OrdinalIgnoreCase));
+            if (matchedPattern != null)
             {
-                if (runtimeProfileImage.Contains(pattern, StringComparison.OrdinalIgnoreCase))
-                {
-                    return $"RuntimeProfileImage('{runtimeProfileImage}')가 이름 기준으로 빌드/fetch 도구를 포함한 " +
-                        "이미지로 보입니다(추정 — 실제 이미지 콘텐츠를 검사한 결과가 아닙니다). RuntimeProfile은 " +
-                        "최종 실행 이미지이므로 빌드 도구가 남아있지 않은 이미지를 사용하는 것이 안전합니다. " +
-                        "실제 검증은 NodeVault의 몫입니다(최종 스테이지 RUN 정적 검사는 있음 — Sprint 9, " +
-                        "2026-07-13; base image에 이미 포함된 도구 탐지는 아직 없음 — Sprint 10, 미구현).";
-                }
+                return $"RuntimeProfileImage('{runtimeProfileImage}')가 이름 기준으로 빌드/fetch 도구를 포함한 " +
+                    "이미지로 보입니다(추정 — 실제 이미지 콘텐츠를 검사한 결과가 아닙니다). RuntimeProfile은 " +
+                    "최종 실행 이미지이므로 빌드 도구가 남아있지 않은 이미지를 사용하는 것이 안전합니다. " +
+                    "실제 검증은 NodeVault의 몫입니다(최종 스테이지 RUN 정적 검사는 있음 — Sprint 9, " +
+                    "2026-07-13; base image에 이미 포함된 도구 탐지는 아직 없음 — Sprint 10, 미구현).";
             }
 
             return null;
