@@ -24,7 +24,7 @@ namespace NodeKit.Cli.Tests
             };
 
             var stdin = new StringReader(""); // no input needed
-            var stdout = new StringWriter();
+            using var stdout = new StringWriter();
 
             var selections = PackageCandidatePresenter.Present(packages, new PlainTextRecipeConsole(stdin, stdout), _neverCancel);
 
@@ -44,7 +44,7 @@ namespace NodeKit.Cli.Tests
             };
 
             var stdin = new StringReader("");
-            var stdout = new StringWriter();
+            using var stdout = new StringWriter();
 
             var selections = PackageCandidatePresenter.Present(packages, new PlainTextRecipeConsole(stdin, stdout), _neverCancel);
 
@@ -67,7 +67,7 @@ namespace NodeKit.Cli.Tests
             };
 
             var stdin = new StringReader("2\n");
-            var stdout = new StringWriter();
+            using var stdout = new StringWriter();
 
             var selections = PackageCandidatePresenter.Present(packages, new PlainTextRecipeConsole(stdin, stdout), _neverCancel);
 
@@ -88,7 +88,7 @@ namespace NodeKit.Cli.Tests
             };
 
             var stdin = new StringReader("\n");
-            var stdout = new StringWriter();
+            using var stdout = new StringWriter();
 
             var selections = PackageCandidatePresenter.Present(packages, new PlainTextRecipeConsole(stdin, stdout), _neverCancel);
 
@@ -109,7 +109,7 @@ namespace NodeKit.Cli.Tests
             };
 
             var stdin = new StringReader("/cancel\n");
-            var stdout = new StringWriter();
+            using var stdout = new StringWriter();
 
             Assert.Throws<RecipeCreateCancelledException>(() =>
                 PackageCandidatePresenter.Present(packages, new PlainTextRecipeConsole(stdin, stdout), _neverCancel));
@@ -128,7 +128,7 @@ namespace NodeKit.Cli.Tests
             };
 
             var stdin = new StringReader("9\n1\n"); // 9 is out of range; then valid
-            var stdout = new StringWriter();
+            using var stdout = new StringWriter();
 
             var selections = PackageCandidatePresenter.Present(packages, new PlainTextRecipeConsole(stdin, stdout), _neverCancel);
 

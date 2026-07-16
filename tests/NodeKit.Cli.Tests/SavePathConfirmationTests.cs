@@ -46,8 +46,8 @@ namespace NodeKit.Cli.Tests
                 "/cancel",  // immediately cancel at clue picker
                 "1",        // confirm cancel
             };
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(
                 new[] { "recipe", "create" },
                 new StringReader(string.Join("\n", transcript)),
@@ -62,8 +62,8 @@ namespace NodeKit.Cli.Tests
         public void CliApp_RecipeCreate_FlagWithoutPath_IsAccepted()
         {
             // "nodekit recipe create --method package" (path comes from flags only)
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(
                 new[] { "recipe", "create", "--non-interactive", "--method", "package" },
                 new StringReader(string.Empty),
@@ -98,8 +98,8 @@ namespace NodeKit.Cli.Tests
                 "",     // Enter → use default path (bwa-mem-0.7.17.json in current dir)
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 null,   // no path hint
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
@@ -136,8 +136,8 @@ namespace NodeKit.Cli.Tests
                 customPath, // user enters full custom path
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 null,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
@@ -168,8 +168,8 @@ namespace NodeKit.Cli.Tests
                 "",
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 _workDir,   // directory hint
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
@@ -202,8 +202,8 @@ namespace NodeKit.Cli.Tests
                 "",     // Enter = save
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 outPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
@@ -250,8 +250,8 @@ namespace NodeKit.Cli.Tests
                 outPath,  // Step 9: save to concrete path
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 null,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),

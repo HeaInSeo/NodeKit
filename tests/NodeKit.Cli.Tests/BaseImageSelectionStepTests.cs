@@ -112,8 +112,8 @@ namespace NodeKit.Cli.Tests
                 // Save confirm: null → "" → saves
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 outPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
@@ -155,8 +155,8 @@ namespace NodeKit.Cli.Tests
                 "bwa=0.7.17=h5bf99c6_8", "",
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 outPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
@@ -193,8 +193,8 @@ namespace NodeKit.Cli.Tests
                 "bwa=0.7.17=h5bf99c6_8", "",
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 outPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
@@ -234,8 +234,8 @@ namespace NodeKit.Cli.Tests
                 "samtools", "1.17", "samtools view",
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 outPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
@@ -273,8 +273,8 @@ namespace NodeKit.Cli.Tests
                 "bwa=0.7.17=h5bf99c6_8", "",
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 outPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
@@ -314,8 +314,8 @@ namespace NodeKit.Cli.Tests
                 "bwa=0.7.17=h5bf99c6_8", "",
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 outPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
@@ -361,8 +361,8 @@ namespace NodeKit.Cli.Tests
                 "",         // Command (optional, skip)
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 outPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
@@ -400,8 +400,8 @@ namespace NodeKit.Cli.Tests
                 "bwa=0.7.17=h5bf99c6_8", "",
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 outPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
@@ -441,8 +441,8 @@ namespace NodeKit.Cli.Tests
                 // Port + save: null → "" → saved
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 outPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),

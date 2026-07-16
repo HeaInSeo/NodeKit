@@ -159,7 +159,7 @@ namespace NodeKit.Cli.Tests
         public void Container_ImageDigestMissing_FailsAsRequired()
         {
             var outPath = Path.Combine(_workDir, "recipe.json");
-            var stderr = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RunCreate(
                 new[]
                 {
@@ -181,7 +181,7 @@ namespace NodeKit.Cli.Tests
         public void Source_BuildDependenciesMissing_WarnsAndContinues()
         {
             var outPath = Path.Combine(_workDir, "recipe.json");
-            var stderr = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RunCreate(SourceArgs(includeBuildDependencies: false), outPath, stderr: stderr);
 
             Assert.Equal(0, exitCode);
@@ -196,7 +196,7 @@ namespace NodeKit.Cli.Tests
             // RecipeRenderer never actually installs it — this only makes
             // that limitation visible, it doesn't add install logic.
             var outPath = Path.Combine(_workDir, "recipe.json");
-            var stderr = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RunCreate(SourceArgs(includeBuildDependencies: true), outPath, stderr: stderr);
 
             Assert.Equal(0, exitCode);
@@ -217,8 +217,8 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(0, exitCode);
             Assert.True(File.Exists(outPath));
 
-            var validateStdout = new StringWriter();
-            var validateStderr = new StringWriter();
+            using var validateStdout = new StringWriter();
+            using var validateStderr = new StringWriter();
             var validateExitCode = CliApp.Run(new[] { "validate", outPath }, validateStdout, validateStderr);
 
             Assert.Equal(0, validateExitCode);
@@ -232,7 +232,7 @@ namespace NodeKit.Cli.Tests
             // non-blocking — a risky-looking RuntimeProfileImage gets a
             // warning on stderr, not a rejection.
             var outPath = Path.Combine(_workDir, "recipe.json");
-            var stderr = new StringWriter();
+            using var stderr = new StringWriter();
             var args = RemoveField(SourceStructuredArgs(), "RuntimeProfile")
                 .Concat(new[]
                 {
@@ -277,7 +277,7 @@ namespace NodeKit.Cli.Tests
         public void Source_SourceChecksumMissing_FailsAsRequired()
         {
             var outPath = Path.Combine(_workDir, "recipe.json");
-            var stderr = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RunCreate(RemoveField(SourceArgs(includeBuildDependencies: true), "SourceChecksum"), outPath, stderr: stderr);
 
             Assert.Equal(1, exitCode);
@@ -299,7 +299,7 @@ namespace NodeKit.Cli.Tests
         public void Mirror_MirrorKindMissing_ContinuesWithoutWarning()
         {
             var outPath = Path.Combine(_workDir, "recipe.json");
-            var stderr = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RunCreate(MirrorArgs(), outPath, stderr: stderr);
 
             Assert.Equal(0, exitCode);
@@ -312,7 +312,7 @@ namespace NodeKit.Cli.Tests
         public void Package_MicromambaBaseImage_EngineFlagOmitted_WarnsButStillSaves()
         {
             var outPath = Path.Combine(_workDir, "recipe.json");
-            var stderr = new StringWriter();
+            using var stderr = new StringWriter();
             var args = new[]
             {
                 "--non-interactive", "--method", "package",
@@ -339,7 +339,7 @@ namespace NodeKit.Cli.Tests
         public void Source_CurlBaseImage_WarnsButStillSaves()
         {
             var outPath = Path.Combine(_workDir, "recipe.json");
-            var stderr = new StringWriter();
+            using var stderr = new StringWriter();
             var args = new[]
             {
                 "--non-interactive", "--method", "source",
@@ -363,7 +363,7 @@ namespace NodeKit.Cli.Tests
         public void Mirror_MicromambaBaseImage_WarnsButStillSaves()
         {
             var outPath = Path.Combine(_workDir, "recipe.json");
-            var stderr = new StringWriter();
+            using var stderr = new StringWriter();
             var args = new[]
             {
                 "--non-interactive", "--method", "mirror",
@@ -480,7 +480,7 @@ namespace NodeKit.Cli.Tests
             var fullArgs = new System.Collections.Generic.List<string> { "recipe", "create", outPath };
             fullArgs.AddRange(options);
 
-            var stdout = new StringWriter();
+            using var stdout = new StringWriter();
             stderr ??= new StringWriter();
             return CliApp.Run(fullArgs.ToArray(), stdout, stderr);
         }

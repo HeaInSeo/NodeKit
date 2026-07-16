@@ -72,8 +72,8 @@ namespace NodeKit.Cli.Tests
         public void Submit_RecipeMissingBuildKind_ReturnsTwoInsteadOfThrowing()
         {
             var recipePath = WriteFile("recipe.json", MissingBuildKindRecipeJson);
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
 
             var exitCode = SubmitCommand.Run(
                 new[] { "submit", recipePath },
@@ -91,8 +91,8 @@ namespace NodeKit.Cli.Tests
         public void Submit_MissingUrl_ReturnsTwo()
         {
             var recipePath = WriteFile("recipe.json", ValidRecipeJson);
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
 
             var previousUrl = Environment.GetEnvironmentVariable("NODEKIT_NODEVAULT_URL");
             Environment.SetEnvironmentVariable("NODEKIT_NODEVAULT_URL", null);
@@ -112,8 +112,8 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void Submit_MissingArgs_ReturnsTwo()
         {
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
 
             var exitCode = SubmitCommand.Run(new[] { "submit" }, stdout, stderr);
 
@@ -125,8 +125,8 @@ namespace NodeKit.Cli.Tests
         public void Submit_MissingRecipeFile_ReturnsTwo()
         {
             var missingPath = Path.Combine(_workDir, "nonexistent.json");
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
 
             var exitCode = SubmitCommand.Run(
                 new[] { "submit", missingPath },
@@ -142,8 +142,8 @@ namespace NodeKit.Cli.Tests
         public void Submit_InvalidJson_ReturnsTwo()
         {
             var recipePath = WriteFile("bad.json", "{ not valid json }");
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
 
             var exitCode = SubmitCommand.Run(
                 new[] { "submit", recipePath },
@@ -159,8 +159,8 @@ namespace NodeKit.Cli.Tests
         public void Submit_L1ValidationFailure_ReturnsOne()
         {
             var recipePath = WriteFile("recipe.json", InvalidRecipeJson);
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
 
             var exitCode = SubmitCommand.Run(
                 new[] { "submit", recipePath },
@@ -191,8 +191,8 @@ namespace NodeKit.Cli.Tests
         public void Submit_VersionOnlyPin_WithStrictFlag_ReturnsOne()
         {
             var recipePath = WriteFile("recipe.json", VersionOnlyPinRecipeJson);
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
 
             var exitCode = SubmitCommand.Run(
                 new[] { "submit", recipePath, "--strict-reproducible" },
@@ -210,8 +210,8 @@ namespace NodeKit.Cli.Tests
         public void Submit_BuildSucceeded_ReturnsZero()
         {
             var recipePath = WriteFile("recipe.json", ValidRecipeJson);
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var events = new[]
             {
                 new BuildEvent { Kind = BuildEventKind.Log, Message = "spec 해결 완료" },
@@ -248,8 +248,8 @@ namespace NodeKit.Cli.Tests
         public void Submit_BuildSucceeded_WithoutDigestAcquired_PrintsFallbackNotice()
         {
             var recipePath = WriteFile("recipe.json", ValidRecipeJson);
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var events = new[]
             {
                 new BuildEvent { Kind = BuildEventKind.JobCreated, Message = "빌드 제출됨", BuildId = "build-123" },
@@ -271,8 +271,8 @@ namespace NodeKit.Cli.Tests
         public void Submit_BuildSucceeded_WithDigestAcquired_DoesNotPrintFallbackNotice()
         {
             var recipePath = WriteFile("recipe.json", ValidRecipeJson);
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var events = new[]
             {
                 new BuildEvent { Kind = BuildEventKind.JobCreated, Message = "빌드 제출됨", BuildId = "build-123" },
@@ -297,8 +297,8 @@ namespace NodeKit.Cli.Tests
             // (buildStateEvent in NodeVault's submit_tool_build.go), digest
             // travels via ImageDigest/ImageRef, never via DigestAcquired/Digest.
             var recipePath = WriteFile("recipe.json", ValidRecipeJson);
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var events = new[]
             {
                 new BuildEvent { Kind = BuildEventKind.JobCreated, Message = "빌드 제출됨", BuildId = "build-123" },
@@ -332,8 +332,8 @@ namespace NodeKit.Cli.Tests
             // Interrupted status, the outcome was never actually observed —
             // this must not be reported as success (exit 0).
             var recipePath = WriteFile("recipe.json", ValidRecipeJson);
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var events = new[]
             {
                 new BuildEvent { Kind = BuildEventKind.Log, Message = "spec 해결 완료" },
@@ -354,8 +354,8 @@ namespace NodeKit.Cli.Tests
         public void Submit_BuildFailed_ReturnsOne()
         {
             var recipePath = WriteFile("recipe.json", ValidRecipeJson);
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var events = new[]
             {
                 new BuildEvent { Kind = BuildEventKind.Log, Message = "spec 해결 완료" },
@@ -376,8 +376,8 @@ namespace NodeKit.Cli.Tests
         public void Submit_OperationCanceled_CallsCancelBuildAndReturns130()
         {
             var recipePath = WriteFile("recipe.json", ValidRecipeJson);
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var client = new CancellingToolSpecClient("build-cancel-1", new OperationCanceledException());
 
             var exitCode = SubmitCommand.Run(
@@ -395,8 +395,8 @@ namespace NodeKit.Cli.Tests
         public void Submit_RpcCancelled_CallsCancelBuildAndReturns130()
         {
             var recipePath = WriteFile("recipe.json", ValidRecipeJson);
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var client = new CancellingToolSpecClient(
                 "build-cancel-2",
                 new RpcException(new Status(StatusCode.Cancelled, "stream cancelled")));
@@ -416,8 +416,8 @@ namespace NodeKit.Cli.Tests
         public void Submit_RawSpecContainsProtoFieldNames()
         {
             var recipePath = WriteFile("recipe.json", ValidRecipeJson);
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             string? capturedRawSpec = null;
 
             var exitCode = SubmitCommand.Run(
@@ -451,8 +451,8 @@ namespace NodeKit.Cli.Tests
             // 생략하면 BUILD_KIND_UNSPECIFIED(0)가 되는데, 지금은 NodeVault가
             // 우연히 이를 TOOLSPEC과 동일하게 처리해 통과할 뿐이라 명시하는 게 안전하다.
             var recipePath = WriteFile("recipe.json", ValidRecipeJson);
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             string? capturedRawSpec = null;
 
             var exitCode = SubmitCommand.Run(

@@ -486,7 +486,7 @@ namespace NodeKit.Cli.Tests
         public void ContainerImageFlow_WhenResolverReturnsDigest_AsksToUseDigest()
         {
             var session = new RecipeAuthoringSession();
-            var stdout = new StringWriter();
+            using var stdout = new StringWriter();
             var stdin = new StringReader(string.Join("\n", new[]
             {
                 "3",               // container image
@@ -510,7 +510,7 @@ namespace NodeKit.Cli.Tests
         public void ContainerImageFlow_WhenResolverUnsupported_FallsBackToManualDigestInput()
         {
             var session = new RecipeAuthoringSession();
-            var stdout = new StringWriter();
+            using var stdout = new StringWriter();
             var stdin = new StringReader(string.Join("\n", new[]
             {
                 "3",               // container image
@@ -534,7 +534,7 @@ namespace NodeKit.Cli.Tests
         public void ContainerImageFlow_WhenResolverFails_PrintsHumanReadableReason()
         {
             var session = new RecipeAuthoringSession();
-            var stdout = new StringWriter();
+            using var stdout = new StringWriter();
             var stdin = new StringReader(string.Join("\n", new[]
             {
                 "3",               // container image
@@ -557,7 +557,7 @@ namespace NodeKit.Cli.Tests
         public void ContainerImageFlow_WhenUserRejectsResolvedDigest_AsksManualDigest()
         {
             var session = new RecipeAuthoringSession();
-            var stdout = new StringWriter();
+            using var stdout = new StringWriter();
             var stdin = new StringReader(string.Join("\n", new[]
             {
                 "3",               // container image
@@ -813,8 +813,8 @@ namespace NodeKit.Cli.Tests
 
         private static int RunCli(string outPath, string[] transcript, out string stdout, out string stderr)
         {
-            var stdoutWriter = new StringWriter();
-            var stderrWriter = new StringWriter();
+            using var stdoutWriter = new StringWriter();
+            using var stderrWriter = new StringWriter();
             var exitCode = CliApp.Run(
                 new[] { "recipe", "create", outPath },
                 new StringReader(string.Join("\n", transcript)),

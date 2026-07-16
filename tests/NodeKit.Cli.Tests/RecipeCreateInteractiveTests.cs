@@ -59,8 +59,8 @@ namespace NodeKit.Cli.Tests
                 "", // complete Packages
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -106,8 +106,8 @@ namespace NodeKit.Cli.Tests
                 "", // RuntimeDependencies — recommended, leave empty
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -149,8 +149,8 @@ namespace NodeKit.Cli.Tests
                 "", // complete Packages
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -194,8 +194,8 @@ namespace NodeKit.Cli.Tests
                 "bam", "1", "",
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -253,8 +253,8 @@ namespace NodeKit.Cli.Tests
                 // stdin ends here — no blank line to terminate DockerfileContent
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(130, exitCode);
@@ -318,8 +318,8 @@ namespace NodeKit.Cli.Tests
                 "n", // decline dockerfile warning
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(1, exitCode);
@@ -348,8 +348,8 @@ namespace NodeKit.Cli.Tests
                 "", // MirrorKind optional — skip
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -379,8 +379,8 @@ namespace NodeKit.Cli.Tests
                 "bwa=0.7.17=h5bf99c6_8", "",
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -411,8 +411,8 @@ namespace NodeKit.Cli.Tests
                 "bwa=0.7.17=h5bf99c6_8", "",
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -444,8 +444,8 @@ namespace NodeKit.Cli.Tests
                 // 여기서 transcript가 끝남 — 수동 방식 선택 프롬프트에서 stdin EOF
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(130, exitCode);
@@ -467,8 +467,8 @@ namespace NodeKit.Cli.Tests
                 // 여기서 transcript가 끝남 — 채널 입력 프롬프트에서 stdin EOF
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(130, exitCode);
@@ -494,8 +494,8 @@ namespace NodeKit.Cli.Tests
                 // 여기서 transcript가 끝남 — Packages 입력 프롬프트에서 stdin EOF
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(130, exitCode);
@@ -518,8 +518,8 @@ namespace NodeKit.Cli.Tests
                 // 여기서 transcript가 끝남 — ToolName(필수 스칼라 필드) 입력에서 stdin EOF
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(130, exitCode);
@@ -548,8 +548,8 @@ namespace NodeKit.Cli.Tests
                 "", // BuildDependencies — leave empty (Recommended, always complete), skipped
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -581,8 +581,8 @@ namespace NodeKit.Cli.Tests
                 "", // MirrorKind optional — skip
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -610,8 +610,8 @@ namespace NodeKit.Cli.Tests
                 DigestOnly, // re-enter ImageDigest, corrected
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -640,8 +640,8 @@ namespace NodeKit.Cli.Tests
                 "", // Command optional list — skip
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -674,8 +674,8 @@ namespace NodeKit.Cli.Tests
                 "", // Command optional list — skip
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -698,8 +698,8 @@ namespace NodeKit.Cli.Tests
                 "/cancel",
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(130, exitCode);
@@ -719,8 +719,8 @@ namespace NodeKit.Cli.Tests
                 "/cancel",
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(130, exitCode);
@@ -740,8 +740,8 @@ namespace NodeKit.Cli.Tests
                 "3", // CI usage, then exit 0
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -763,8 +763,8 @@ namespace NodeKit.Cli.Tests
                 "3", // CI usage, then exit 0
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -794,8 +794,8 @@ namespace NodeKit.Cli.Tests
                 "", // Command optional list — skip
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -823,8 +823,8 @@ namespace NodeKit.Cli.Tests
                 "", // Command optional list — skip
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -858,8 +858,8 @@ namespace NodeKit.Cli.Tests
                 "", // Command optional list — skip
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -881,8 +881,8 @@ namespace NodeKit.Cli.Tests
                 "1", // confirm cancellation
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(130, exitCode);
@@ -905,8 +905,8 @@ namespace NodeKit.Cli.Tests
                 "1", // confirm cancellation
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(130, exitCode);
@@ -927,8 +927,8 @@ namespace NodeKit.Cli.Tests
                 "1", // confirm cancellation
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(130, exitCode);
@@ -946,8 +946,8 @@ namespace NodeKit.Cli.Tests
                 "", // accept recommended method
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var cancellation = new SequencedCancellationSource(checksBeforeCancellation: 0);
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 outPath,
@@ -979,7 +979,7 @@ namespace NodeKit.Cli.Tests
                 "1", // confirm cancellation
             };
 
-            var cancelStdout = new StringWriter();
+            using var cancelStdout = new StringWriter();
             var cancelExitCode = CliApp.Run(
                 new[] { "recipe", "create", cancelOutPath },
                 new StringReader(string.Join("\n", cancelTranscript)),
@@ -994,7 +994,7 @@ namespace NodeKit.Cli.Tests
                 "", // accept recommended method
             };
 
-            var ctrlCStdout = new StringWriter();
+            using var ctrlCStdout = new StringWriter();
             var ctrlCExitCode = RecipeCreateInteractiveRunner.Run(
                 ctrlCOutPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
@@ -1021,8 +1021,8 @@ namespace NodeKit.Cli.Tests
                 "3", // CI 모드 사용법 보기
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(
                 new[] { "recipe", "create", outPath },
                 new StringReader(string.Join("\n", transcript)),
@@ -1058,8 +1058,8 @@ namespace NodeKit.Cli.Tests
                 // PackageEngine: Defaulted, skipped
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(
                 new[] { "recipe", "create", outPath },
                 new StringReader(string.Join("\n", transcript)),
@@ -1094,8 +1094,8 @@ namespace NodeKit.Cli.Tests
                 "", // Command optional list — skip
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(
                 new[] { "recipe", "create", outPath },
                 new StringReader(string.Join("\n", transcript)),
@@ -1138,8 +1138,8 @@ namespace NodeKit.Cli.Tests
                 "",                   // complete Packages
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -1173,8 +1173,8 @@ namespace NodeKit.Cli.Tests
                 DigestOnly,     // re-enter ImageDigest, corrected
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -1204,8 +1204,8 @@ namespace NodeKit.Cli.Tests
                 "",             // empty selection at recovery menu → return false
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(1, exitCode);
@@ -1233,8 +1233,8 @@ namespace NodeKit.Cli.Tests
                 "condaforge/miniforge3:24.3.0-0", DigestOnly, // fix the digest
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -1261,8 +1261,8 @@ namespace NodeKit.Cli.Tests
                 "/cancel", // at recovery menu → ThrowIfCancel → exit 130
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(130, exitCode);
@@ -1290,8 +1290,8 @@ namespace NodeKit.Cli.Tests
                 "bwa=0.7.17=h5bf99c6_8", "", // Packages
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -1321,8 +1321,8 @@ namespace NodeKit.Cli.Tests
                 "bwa=0.7.17=h5bf99c6_8", "",
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -1353,8 +1353,8 @@ namespace NodeKit.Cli.Tests
                 "bwa=0.7.17=h5bf99c6_8", "",
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -1383,8 +1383,8 @@ namespace NodeKit.Cli.Tests
                 "bwa=0.7.17=h5bf99c6_8", "",  // correct entry + complete
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -1409,8 +1409,8 @@ namespace NodeKit.Cli.Tests
                 "/cancel", // at dockerfile warning prompt → ThrowIfCancel → exit 130
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(130, exitCode);
@@ -1442,8 +1442,8 @@ namespace NodeKit.Cli.Tests
                 "bwa=0.7.17=h5bf99c6_8", "",
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, new StringReader(string.Join("\n", transcript)), stdout, stderr);
 
             Assert.Equal(0, exitCode);
@@ -1480,8 +1480,8 @@ namespace NodeKit.Cli.Tests
                 "1",               // PackageCandidatePresenter: pick first candidate
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 outPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
@@ -1517,8 +1517,8 @@ namespace NodeKit.Cli.Tests
                 "bwa=0.7.17", "",
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 outPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
@@ -1553,8 +1553,8 @@ namespace NodeKit.Cli.Tests
                 "bwa=0.7.17=h5bf99c6_8", "",
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 outPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
@@ -1592,8 +1592,8 @@ namespace NodeKit.Cli.Tests
                 "mirrortool=1.0", "",   // Packages, blank로 목록 종료
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 outPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
@@ -1634,8 +1634,8 @@ namespace NodeKit.Cli.Tests
                 "/cancel",         // during PackageCandidatePresenter → exit 130
             };
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = RecipeCreateInteractiveRunner.Run(
                 outPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
