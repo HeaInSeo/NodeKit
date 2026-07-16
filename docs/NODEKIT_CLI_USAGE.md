@@ -450,7 +450,8 @@ digest 조회에 성공하면 `BaseImage` 필드가 자동으로 채워지고 �
 
 | 환경 | 동작 |
 |---|---|
-| `NODEKIT_HARBOR_URL` 설정 | Harbor에서 digest 조회 (폐쇄망) |
+| `NODEKIT_HARBOR_URL` + `NODEKIT_HARBOR_IMAGE_MAP` 둘 다 설정 | Harbor에서 digest 조회 (폐쇄망) — 후보 이미지 이름을 `NODEKIT_HARBOR_IMAGE_MAP`으로 실제 Harbor 경로로 변환한 뒤 조회 |
+| `NODEKIT_HARBOR_URL`만 설정 (`NODEKIT_HARBOR_IMAGE_MAP` 없음) | 자동 조회 불가 — 매핑 설정이 필요하다는 안내 후 `[0] 직접 입력` 권장, HTTP 조회 자체를 시도하지 않음 |
 | `NODEKIT_BASE_IMAGE_STUB=1` | 테스트/UX 확인용 고정 digest 반환 |
 | 아무것도 없음 (오픈망 기본) | Docker Hub / quay.io에서 자동 조회 |
 
@@ -1214,7 +1215,35 @@ condaforge/miniforge3:24.3.0-0 의 digest를 조회합니다...
 설정 완료: condaforge/miniforge3:24.3.0-0@sha256:abcdef...
 ```
 
-번호를 선택하면 Docker Hub(오픈망) 또는 Harbor(폐쇄망, `NODEKIT_HARBOR_URL` 설정 시)에서 digest를 자동으로 가져온다. `0`을 입력하면 다음 단계 필드 입력에서 직접 입력한다.
+번호를 선택하면 Docker Hub(오픈망)에서 digest를 자동으로 가져온다.
+
+**폐쇄망(Harbor)에서는 `NODEKIT_HARBOR_URL`만으로는 부족하다.** 위 후보들
+(`condaforge/miniforge3`, `mambaorg/micromamba`)은 registry 호스트가 없는
+공개 이미지 이름이고, Harbor는 배포마다 프로젝트 구조가 달라 NodeKit이
+임의로 경로를 추측하지 않는다 — `NODEKIT_HARBOR_IMAGE_MAP` 환경변수로
+"공개 origin=Harbor 전체 pull 경로" 매핑을 명시해야 자동 조회가 동작한다:
+
+```bash
+export NODEKIT_HARBOR_URL=https://harbor.lab.local
+export NODEKIT_HARBOR_IMAGE_MAP=docker.io=harbor.lab.local/dockerhub-proxy
+```
+
+이렇게 설정하면 `[1] condaforge/miniforge3:24.3.0-0` 선택 시 실제로는
+`harbor.lab.local/dockerhub-proxy/condaforge/miniforge3:24.3.0-0`의 digest를
+조회하고, 저장되는 `BaseImage` 값도 이 Harbor 경로 기준이 된다(공개
+주소가 아니라 실제로 폐쇄망에서 pull 가능한 주소가 저장된다).
+
+`NODEKIT_HARBOR_IMAGE_MAP`을 설정하지 않으면 화면 자체가 "Digest는 자동으로
+조회합니다"라고 안내하지 않고, 대신 `NODEKIT_HARBOR_IMAGE_MAP` 설정이
+필요하다는 안내와 함께 `[0] 직접 입력`을 권한다 — 이 경우 HTTP 조회 자체가
+시도되지 않는다.
+
+`0`을 입력하면 다음 단계 필드 입력에서 직접 입력한다. 이때 이미 Harbor
+경로가 포함된 주소(예: `harbor.lab.local/<project>/<repo>:<tag>`, digest 없이)를
+입력하면 — `NODEKIT_HARBOR_IMAGE_MAP` 설정 여부와 무관하게 — 그 주소 그대로
+digest 자동 조회를 시도한다(이미 구체적인 Harbor 경로이므로 매핑이 필요
+없다). digest까지 포함된 값을 처음부터 직접 입력하는 것은 최후의 수동
+fallback으로만 남아 있다.
 
 **4. 필드 입력**
 
@@ -1590,5 +1619,11 @@ dotnet run --project src/NodeKit.Cli -- validate /home/user/samtools-1.17.json
   (3) 아무것도 없을 때 — Docker Hub / quay.io에서 자동 조회 (오픈망 기본).
   `PublicRegistryImageDigestResolver`는 15초 HTTP 타임아웃으로 Docker Hub anonymous
   Bearer 토큰 인증을 사용한다 — 조회 실패 시 재시도 또는 `0`(직접 입력)으로 전환된다.
+  (2)는 base image 선택 화면(카탈로그 후보 번호 선택)에서는 `NODEKIT_HARBOR_URL`만으로
+  부족하고 `NODEKIT_HARBOR_IMAGE_MAP`(origin=Harbor 전체 pull 경로 매핑)도 필요하다 —
+  카탈로그 후보가 registry 호스트 없는 공개 이미지 이름이라 Harbor 프로젝트 경로를
+  추측할 수 없기 때문(Issue #49). 사용자가 이미 Harbor 경로가 포함된 주소를 직접
+  입력하는 경우(BeginnerGuideFlow 컨테이너 clue, `[0] 직접 입력`)는 매핑 없이도
+  그대로 동작한다. §2-3 "자동 조회 동작 조건" 표 참조.
 - **레거시 경로 (`BuildAndRegister` RPC, `--legacy` 플래그)**: Phase 6(2026-07-02)에서
   CLI에서 완전히 제거됐다. `IBuildClient`/`GrpcBuildClient`는 저장소 어디에도 남아있지 않다.

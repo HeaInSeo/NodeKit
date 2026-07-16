@@ -1,5 +1,4 @@
 using System;
-using System.Threading;
 using NodeKit.Authoring.Recipes;
 
 namespace NodeKit.Cli
@@ -593,7 +592,8 @@ namespace NodeKit.Cli
 
                 if (result.Status == ImageReferenceNormalizeStatus.MissingDigest)
                 {
-                    var resolvedDigest = TryResolveImageDigest(pendingRef, digestResolver, console, cancellation);
+                    var (resolvedDigest, resolvedReference) = ImageDigestAutoResolveHelper.TryResolveImageDigest(
+                        pendingRef, digestResolver, console, cancellation);
                     if (resolvedDigest != null)
                     {
                         RecipeCreateScreen.ClearForNewStep(console);
@@ -605,7 +605,7 @@ namespace NodeKit.Cli
                         var confirm = ReadTrimmedLine(console).ToLowerInvariant();
                         if (confirm.Length == 0 || confirm == "y")
                         {
-                            var resolved = ImageReferenceNormalizer.Normalize(pendingRef, resolvedDigest);
+                            var resolved = ImageReferenceNormalizer.Normalize(resolvedReference ?? pendingRef, resolvedDigest);
                             if (resolved.Status == ImageReferenceNormalizeStatus.Normalized)
                             {
                                 session.SelectMethod(RecipeMethodId.Container);
@@ -1071,45 +1071,6 @@ namespace NodeKit.Cli
             console.WriteLine("  sha256:3f2a1b9c...");
             console.WriteLine();
         }
-
-        private static string? TryResolveImageDigest(
-            string imageUri,
-            IImageDigestResolver digestResolver,
-            IRecipeConsole console,
-            IRecipeCreateCancellationSource cancellation)
-        {
-            if (cancellation.IsCancellationRequested)
-            {
-                throw new RecipeCreateCancelledException();
-            }
-
-            var result = digestResolver.ResolveAsync(imageUri, CancellationToken.None).GetAwaiter().GetResult();
-            if (result.Status == ImageDigestResolutionStatus.Resolved && !string.IsNullOrWhiteSpace(result.Digest))
-            {
-                return result.Digest;
-            }
-
-            console.WriteLine();
-            console.WriteLine(DescribeDigestResolutionFailure(result));
-            if (!string.IsNullOrWhiteSpace(result.Message))
-            {
-                console.WriteLine(result.Message);
-            }
-
-            console.WriteLine("이미지 registry에서 digest를 복사해 입력하세요.");
-            return null;
-        }
-
-        private static string DescribeDigestResolutionFailure(ImageDigestResolutionResult result) => result.Status switch
-        {
-            ImageDigestResolutionStatus.NotFound => "이미지를 찾을 수 없습니다. 이미지 이름과 tag를 확인하세요.",
-            ImageDigestResolutionStatus.AuthenticationRequired => "registry 인증이 필요합니다. 현재 CLI는 인증 조회를 지원하지 않습니다.",
-            ImageDigestResolutionStatus.NetworkUnavailable => "네트워크 연결을 확인할 수 없습니다. 수동으로 digest를 입력하세요.",
-            ImageDigestResolutionStatus.InvalidReference => "이미지 주소 형식이 올바르지 않습니다.",
-            ImageDigestResolutionStatus.Unsupported => "현재 환경에서는 자동 조회를 사용할 수 없습니다.",
-            ImageDigestResolutionStatus.Resolved => "이미지 digest를 확인했습니다.",
-            _ => throw new ArgumentOutOfRangeException(nameof(result), result.Status, "Unsupported digest resolution status."),
-        };
 
         private static string ReadTrimmedLine(IRecipeConsole console)
         {

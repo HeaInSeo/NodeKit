@@ -16,7 +16,12 @@ namespace NodeKit.Cli
     internal sealed record ImageDigestResolutionResult(
         ImageDigestResolutionStatus Status,
         string? Digest,
-        string? Message)
+        string? Message,
+        // Set when the resolver resolved a *different* reference than the one it
+        // was asked about (e.g. MappedHarborImageDigestResolver rewriting a
+        // host-less public reference onto a concrete Harbor pull path). Null
+        // means "use the reference the caller originally passed in".
+        string? ResolvedReference = null)
     {
         public static ImageDigestResolutionResult Resolved(string digest) =>
             new(ImageDigestResolutionStatus.Resolved, digest, null);

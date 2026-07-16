@@ -54,7 +54,7 @@ namespace NodeKit.Cli
 
             // 단계 5: 나머지 필드 입력
             RecipeCreateScreen.ClearForNewStep(console);
-            RunFieldLoop(session, console, cancellation);
+            RunFieldLoop(session, console, cancellation, imageDigestResolver);
 
             // 단계 6: 빌드 + 검증 + recovery
             var method = session.Snapshot().SelectedMethod!.Value;
@@ -65,7 +65,7 @@ namespace NodeKit.Cli
             while (!result.IsValid)
             {
                 RecipeCreateScreen.ClearForNewStep(console);
-                if (!RunRecoveryLoop(session, result.Violations, console, cancellation))
+                if (!RunRecoveryLoop(session, result.Violations, console, cancellation, imageDigestResolver))
                 {
                     stderr.WriteLine("최종 검증을 통과하지 못해 저장하지 않습니다.");
                     CliApp.PrintViolations(result.Violations, stderr);
@@ -325,9 +325,25 @@ namespace NodeKit.Cli
                 return;
             }
 
+            // Harbor가 설정됐는데 NODEKIT_HARBOR_IMAGE_MAP이 없으면 카탈로그 후보들은
+            // (호스트 없는 공개 이미지 이름이라) 절대 자동 조회에 성공할 수 없다 —
+            // 그 상태를 마치 될 것처럼 안내하지 않는다 (Issue #49).
+            var harborWithoutMapping = digestResolver is MappedHarborImageDigestResolver { HasAnyMapping: false };
+
             RecipeCreateScreen.ClearForNewStep(console);
             console.WriteLine("── Base image 선택 ─────────────────────────────────────────");
-            console.WriteLine("사용할 기반 이미지를 선택하세요. Digest는 자동으로 조회합니다.");
+            if (harborWithoutMapping)
+            {
+                console.WriteLine("사용할 기반 이미지를 선택하세요.");
+                console.WriteLine("⚠ Harbor가 설정되어 있지만 NODEKIT_HARBOR_IMAGE_MAP이 없어 아래 후보의 digest를 자동 조회할 수 없습니다.");
+                console.WriteLine("  NODEKIT_HARBOR_IMAGE_MAP=docker.io=harbor.lab.local/<project> 형식으로 설정하거나,");
+                console.WriteLine("  [0] 직접 입력으로 Harbor 이미지 주소(예: harbor.lab.local/<project>/<repo>:<tag>)를 입력하세요.");
+            }
+            else
+            {
+                console.WriteLine("사용할 기반 이미지를 선택하세요. Digest는 자동으로 조회합니다.");
+            }
+
             console.WriteLine();
 
             for (var i = 0; i < candidates.Count; i++)
@@ -376,7 +392,7 @@ namespace NodeKit.Cli
                 if (result.Status == ImageDigestResolutionStatus.Resolved
                     && !string.IsNullOrEmpty(result.Digest))
                 {
-                    var combined = $"{selected.Reference}@{result.Digest}";
+                    var combined = $"{result.ResolvedReference ?? selected.Reference}@{result.Digest}";
                     var violations = session.SetField("BaseImage", combined);
                     if (violations.Count == 0)
                     {
@@ -415,14 +431,23 @@ namespace NodeKit.Cli
                     return;
                 }
 
-                console.WriteLine($"digest 조회 실패: {result.Message ?? result.Status.ToString()}");
+                console.WriteLine($"digest 조회 실패: {ImageDigestAutoResolveHelper.DescribeDigestResolutionFailure(result)}");
+                if (!string.IsNullOrWhiteSpace(result.Message))
+                {
+                    console.WriteLine(result.Message);
+                }
+
                 console.WriteLine("다시 시도하려면 번호를, 직접 입력하려면 0을 입력하세요.");
             }
         }
 
         // ── RunFieldLoop 및 PromptField 계열 ─────────────────────────────────────
 
-        private static void RunFieldLoop(RecipeAuthoringSession session, IRecipeConsole console, IRecipeCreateCancellationSource cancellation)
+        private static void RunFieldLoop(
+            RecipeAuthoringSession session,
+            IRecipeConsole console,
+            IRecipeCreateCancellationSource cancellation,
+            IImageDigestResolver? imageDigestResolver = null)
         {
             var total = RecipeFieldCatalog.FieldsFor(session.Snapshot().SelectedMethod!.Value).Count;
             var history = new List<RecipeFieldDescriptor>();
@@ -437,7 +462,7 @@ namespace NodeKit.Cli
 
                 try
                 {
-                    PromptField(session, field, console, cancellation);
+                    PromptField(session, field, console, cancellation, imageDigestResolver);
                     history.Add(field);
                 }
                 catch (RecipeCreateBackRequestedException)
@@ -460,7 +485,12 @@ namespace NodeKit.Cli
             }
         }
 
-        private static void PromptField(RecipeAuthoringSession session, RecipeFieldDescriptor field, IRecipeConsole console, IRecipeCreateCancellationSource cancellation)
+        private static void PromptField(
+            RecipeAuthoringSession session,
+            RecipeFieldDescriptor field,
+            IRecipeConsole console,
+            IRecipeCreateCancellationSource cancellation,
+            IImageDigestResolver? imageDigestResolver = null)
         {
             switch (field.Type)
             {
@@ -468,7 +498,7 @@ namespace NodeKit.Cli
                     PromptMultilineScalarField(session, field, console, cancellation);
                     break;
                 case RecipeFieldType.Scalar:
-                    PromptScalarField(session, field, console, cancellation);
+                    PromptScalarField(session, field, console, cancellation, imageDigestResolver);
                     break;
                 case RecipeFieldType.Choice:
                     PromptChoiceField(session, field, console, cancellation);
@@ -481,7 +511,12 @@ namespace NodeKit.Cli
             }
         }
 
-        private static void PromptScalarField(RecipeAuthoringSession session, RecipeFieldDescriptor field, IRecipeConsole console, IRecipeCreateCancellationSource cancellation)
+        private static void PromptScalarField(
+            RecipeAuthoringSession session,
+            RecipeFieldDescriptor field,
+            IRecipeConsole console,
+            IRecipeCreateCancellationSource cancellation,
+            IImageDigestResolver? imageDigestResolver = null)
         {
             while (true)
             {
@@ -539,6 +574,36 @@ namespace NodeKit.Cli
                 {
                     session.SkipOptionalField(field.Name);
                     return;
+                }
+
+                // [0] 직접 입력으로 BaseImage 필드까지 온 경우, digest 없는 값을 그냥
+                // 받아 적기 전에 BeginnerGuideFlow의 컨테이너 clue와 동일한 자동 조회를
+                // 시도한다 — 지금까지는 이 경로만 "@sha256:..."을 사용자가 직접 계산해
+                // 붙여야 했다 (Issue #49 요구사항 6).
+                if (string.Equals(field.Name, "BaseImage", StringComparison.Ordinal)
+                    && imageDigestResolver is not null
+                    && line.Trim().Length > 0
+                    && !line.Contains("@sha256:", StringComparison.Ordinal))
+                {
+                    var (resolvedDigest, resolvedReference) = ImageDigestAutoResolveHelper.TryResolveImageDigest(
+                        line.Trim(), imageDigestResolver, console, cancellation);
+                    if (resolvedDigest != null)
+                    {
+                        console.WriteLine();
+                        console.WriteLine($"  {resolvedDigest}");
+                        console.WriteLine();
+                        console.WriteLine("이 digest를 사용할까요? [Y/n]");
+                        var confirm = (console.ReadLine() ?? string.Empty).Trim().ToLowerInvariant();
+                        if (confirm.Length == 0 || confirm == "y")
+                        {
+                            line = $"{resolvedReference ?? line.Trim()}@{resolvedDigest}";
+                        }
+                        else
+                        {
+                            console.WriteLine("직접 digest를 입력합니다.");
+                            continue;
+                        }
+                    }
                 }
 
                 var violations = session.SetField(field.Name, line);
@@ -926,7 +991,12 @@ namespace NodeKit.Cli
             return true;
         }
 
-        private static bool RunRecoveryLoop(RecipeAuthoringSession session, IReadOnlyList<ValidationViolation> violations, IRecipeConsole console, IRecipeCreateCancellationSource cancellation)
+        private static bool RunRecoveryLoop(
+            RecipeAuthoringSession session,
+            IReadOnlyList<ValidationViolation> violations,
+            IRecipeConsole console,
+            IRecipeCreateCancellationSource cancellation,
+            IImageDigestResolver? imageDigestResolver = null)
         {
             var plan = session.BuildRecoveryPlan(violations);
 
@@ -952,7 +1022,7 @@ namespace NodeKit.Cli
                 || index < 1 || index > plan.Actions.Count)
             {
                 console.WriteLine("알 수 없는 선택입니다.");
-                return RunRecoveryLoop(session, violations, console, cancellation);
+                return RunRecoveryLoop(session, violations, console, cancellation, imageDigestResolver);
             }
 
             var chosen = plan.Actions[index - 1];
@@ -960,7 +1030,7 @@ namespace NodeKit.Cli
             {
                 foreach (var fieldName in chosen.RelatedFields)
                 {
-                    ReEditField(session, fieldName, console, cancellation);
+                    ReEditField(session, fieldName, console, cancellation, imageDigestResolver);
                 }
             }
             catch (RecipeCreateBackRequestedException)
@@ -971,7 +1041,12 @@ namespace NodeKit.Cli
             return true;
         }
 
-        private static void ReEditField(RecipeAuthoringSession session, string fieldName, IRecipeConsole console, IRecipeCreateCancellationSource cancellation)
+        private static void ReEditField(
+            RecipeAuthoringSession session,
+            string fieldName,
+            IRecipeConsole console,
+            IRecipeCreateCancellationSource cancellation,
+            IImageDigestResolver? imageDigestResolver = null)
         {
             var field = RecipeFieldCatalog.FieldsFor(session.Snapshot().SelectedMethod!.Value).FirstOrDefault(f => f.Name == fieldName);
             if (field is null)
@@ -980,7 +1055,7 @@ namespace NodeKit.Cli
             }
 
             session.ConfirmInvalidatedField(fieldName);
-            PromptField(session, field, console, cancellation);
+            PromptField(session, field, console, cancellation, imageDigestResolver);
         }
 
         private static void PrintViolations(IReadOnlyList<ValidationViolation> violations, IRecipeConsole console)

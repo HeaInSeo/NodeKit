@@ -27,7 +27,7 @@ Phase 6(ToolSpec 경로 전환)은 2026-07-02 완료됨 — 이 문서의 UX 항
 ═══════════════════════════════════════════════════════
  NodeKit CLI UX 개선 — 스프린트 진행률
 ═══════════════════════════════════════════════════════
- 전체 진행률   : ██████████  22/23 (96%)
+ 전체 진행률   : █████████░  21.5/23 (93%)
  현재 스프린트 : U5 — 문서 + 최종 검증
  U5 진행률     : ██████████  2/3  (67%)
 ═══════════════════════════════════════════════════════
@@ -39,7 +39,7 @@ Phase 6(ToolSpec 경로 전환)은 2026-07-02 완료됨 — 이 문서의 UX 항
    ✓ U1-5  빌드 0 경고 / 전체 테스트 통과 (464 tests)
 ───────────────────────────────────────────────────────
  U2 통합 흐름 재설계       [6/6]  ██████████
- U3 Base image 자동 조회   [5/5]  ██████████
+ U3 Base image 자동 조회   [4.5/5] █████████░ (U3-5: 폐쇄망 코드/테스트 완료, live 미검증)
  U4 저장 경로 마지막 확정  [4/4]  ██████████ (U4-2 draft save 제외, 범위 밖)
  U5 문서 + 최종 검증       [2/3]  ███████░░░
    ✓ U5-1  NODEKIT_CLI_USAGE.md 업데이트 (2026-07-02)
@@ -181,6 +181,20 @@ Phase 6(ToolSpec 경로 전환)은 2026-07-02 완료됨 — 이 문서의 UX 항
 
 **완료 기준**: 오픈망과 폐쇄망 모두에서 사용자가 번호 선택만으로 base image + digest가 확정된다.
 
+**정정 (2026-07-16, NodeKit Issue #49)**: 이 완료 기준은 실제로는 충족된 적이 없었다 —
+`✓`로 표시돼 있었지만, 폐쇄망(Harbor) 경로는 `BaseImageCatalog`의 호스트 없는
+공개 이미지 이름과 `HarborImageDigestResolver`의 "완전한 Harbor 주소만 파싱"
+요구사항이 애초에 서로 안 맞아 `NODEKIT_HARBOR_URL`을 설정해도 카탈로그 후보
+선택 시 항상 실패했다(Sprint 7 Task 2 seoy live 테스트 중 발견).
+
+`HarborImageReferenceMapper`/`MappedHarborImageDigestResolver`(신규,
+`NODEKIT_HARBOR_IMAGE_MAP` 환경변수로 명시적 매핑 제공)로 수정하고 7개 필수
+회귀 테스트(`HarborImageReferenceMapperTests`, `MappedHarborImageDigestResolverTests`,
+`HarborBaseImageSelectionTests`)로 커버함 — 코드 수정과 테스트 검증은 완료.
+**다만 실제 live seoy Harbor 상대 재검증은 아직 못 했다** — infra-lab#35(TLS
+handshake 실패)가 막고 있어서, 그 이슈가 풀린 뒤 다시 진행해야 한다. 그 전까지
+이 항목은 "코드/테스트 완료, live 미검증"으로 취급한다.
+
 ---
 
 ## U4. 저장 경로 마지막 확정
@@ -294,6 +308,39 @@ ResolveRecipe 정책 분기, 저장, 실제 submit, 취소)을 TC-1~TC-13 전체
 base image catalog/Harbor host-matching 설계를 먼저 결정·구현하고, (2) TLS
 CA cert 불일치 원인을 확인해야 한다.
 
+**후속 Progress (Issue #49 코드/테스트 완료, 2026-07-16):** 사용자가 리뷰 후
+구체적인 구현 방향을 지시함 — `HarborImageDigestResolver`는 그대로 두고,
+별도의 environment-aware mapping 계층(`NODEKIT_HARBOR_IMAGE_MAP` 환경변수,
+"공개 origin=Harbor 전체 pull 경로" 형식, 절대 추측하지 않음)을 새로 추가하는
+방향으로 확정. 구현 완료:
+
+- `HarborImageReferenceMapper`(신규) — 순수 매핑 로직, host-less 참조는
+  Docker 관례대로 `docker.io` origin으로 취급.
+- `MappedHarborImageDigestResolver`(신규) — `HarborImageDigestResolver`를
+  감싸는 wrapper. 이미 host가 붙은 참조(직접 입력/컨테이너 clue)는 그대로
+  통과시키고, host 없는 카탈로그 후보만 매핑을 거침. 매핑이 없으면 HTTP 요청
+  없이 즉시 실행 가능한 안내와 함께 실패(fail-fast).
+- `ImageDigestAutoResolveHelper`(신규) — `BeginnerGuideFlow`에 있던
+  `TryResolveImageDigest`/`DescribeDigestResolutionFailure`를 추출해 공유 —
+  두 모드가 동일한 동작/문구를 쓰도록 통합.
+- `RecipeCreateFlow`의 `[0] 직접 입력` → BaseImage 필드 입력에도 동일한
+  자동 조회를 연결(이전에는 `@sha256:...`까지 직접 타이핑해야 했음).
+- Base image 선택 화면: Harbor가 설정됐지만 매핑이 없으면 "Digest는 자동으로
+  조회합니다" 문구를 보여주지 않고 대신 매핑 설정 안내를 보여줌.
+
+지시받은 7개 필수 회귀 테스트 전부 반영(`HarborImageReferenceMapperTests`
+8개, `MappedHarborImageDigestResolverTests` 6개, `HarborBaseImageSelectionTests`
+5개 — 매핑된 후보의 실제 요청 경로, 저장되는 BaseImage가 공개 주소가 아닌
+concrete Harbor 주소인지, mapping 없을 때 HTTP 미발생, 두 모드 동일 결과,
+PackageEngine 유지, `[0] 직접 입력` 자동 조회, host mismatch 시 기존처럼
+Unsupported). 637/637 통과(2 스킵), 0 warnings, dotnet format 클린.
+
+`docs/NODEKIT_CLI_USAGE.md`도 실제 매핑 요구사항에 맞게 갱신함.
+
+**여전히 남은 것**: 실제 live seoy Harbor 상대 재검증(§U3-5 참조) — TLS
+문제(infra-lab#35)가 풀려야 가능하다. 그 전까지 이 코드 경로는 fake HTTP
+계층으로만 검증된 상태다.
+
 ### U5-3. 커밋 + GitHub push
 
 **완료 기준**: 사용자 수동 테스트 통과 + 문서 업데이트 + push 완료.
@@ -319,7 +366,7 @@ CA cert 불일치 원인을 확인해야 한다.
 | U3-2 | U3 | PublicRegistryImageDigestResolver (오픈망) | ✓ |
 | U3-3 | U3 | HarborImageDigestResolver 통합 (폐쇄망) | ✓ |
 | U3-4 | U3 | StubImageDigestResolver + 테스트 | ✓ |
-| U3-5 | U3 | 빌드 + 테스트 검증 | ✓ |
+| U3-5 | U3 | 빌드 + 테스트 검증 | ◐ (폐쇄망 코드/테스트 완료, live 미검증 — Issue #49, infra-lab#35) |
 | U4-1 | U4 | outPathHint 시그니처 변경 | ✓ |
 | U4-2 | U4 | 임시 파일 draft 저장 | — (범위 조정: 제거) |
 | U4-3 | U4 | 저장 경로 확정 UI (PromptSavePath) | ✓ |

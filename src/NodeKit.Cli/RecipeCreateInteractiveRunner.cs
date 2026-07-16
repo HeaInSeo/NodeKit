@@ -40,6 +40,16 @@ namespace NodeKit.Cli
             using var harborResolver = HarborImageDigestResolver.TryCreate();
             using var grpcResolver = GrpcResolveRecipeClient.TryCreate();
 
+            // MappedHarborImageDigestResolver applies NODEKIT_HARBOR_IMAGE_MAP so
+            // BaseImageCatalog's host-less public candidates can be resolved
+            // against Harbor — HarborImageDigestResolver itself never guesses a
+            // project path (Issue #49). References that already carry an explicit
+            // host (typed via [0] 직접 입력 or a beginner-flow container ref) pass
+            // through to HarborImageDigestResolver unchanged.
+            IImageDigestResolver? mappedHarborResolver = harborResolver is not null
+                ? new MappedHarborImageDigestResolver(harborResolver)
+                : null;
+
             IResolveRecipeClient recipeResolver = resolveClient
                 ?? ResolveRecipeClientTestOverride.Current
                 ?? StubResolveRecipeClient.TryCreate()
@@ -49,7 +59,7 @@ namespace NodeKit.Cli
             // Step 4 resolver chain: injected (tests) > stub env var > Harbor (closed-net) > public registry (open-net).
             IImageDigestResolver? step4Candidate = imageDigestResolver
                 ?? StubImageDigestResolver.TryCreate()
-                ?? (IImageDigestResolver?)harborResolver;
+                ?? mappedHarborResolver;
 
             // Open-network fallback: created only when neither stub nor Harbor is available.
             using var publicResolver = step4Candidate is null
@@ -61,7 +71,7 @@ namespace NodeKit.Cli
             // BeginnerGuideFlow: Harbor > null (image lookup when user types a container ref).
             // PublicRegistryImageDigestResolver not wired here to avoid live HTTP in tests.
             IImageDigestResolver resolverForBeginner =
-                (IImageDigestResolver?)harborResolver ?? NullImageDigestResolver.Instance;
+                mappedHarborResolver ?? NullImageDigestResolver.Instance;
 
             try
             {
