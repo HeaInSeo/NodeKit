@@ -138,8 +138,14 @@ namespace NodeKit.UI.ViewModels
             {
                 await client.CancelBuildAsync(buildId).ConfigureAwait(false);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                // Swallowed per the comment above — no user-facing surface exists
+                // here to report to (mid-SubmitAsync a new build's own events
+                // supersede this; from Dispose there's no UI left). Still bound to
+                // a name rather than left as a truly empty block, so `ex` is
+                // inspectable from a debugger if this path is hit while diagnosing a hang.
+                _ = ex;
             }
 #pragma warning restore CA1031
         }

@@ -1102,19 +1102,18 @@ namespace NodeKit.Cli
 
             if (inputLine.Length > 0 && !RecipeCreateEscapeCommands.IsBack(inputLine))
             {
-                foreach (var preset in ParseNumberList(inputLine, inputPresets.Count).Select(idx => inputPresets[idx]))
+                foreach (var preset in ParseNumberList(inputLine, inputPresets.Count)
+                    .Select(idx => inputPresets[idx])
+                    .Where(preset => preset.Id != InputOutputPresetCatalog.CustomPresetId))
                 {
-                    if (preset.Id != InputOutputPresetCatalog.CustomPresetId)
+                    document.Inputs.Add(new ToolInput
                     {
-                        document.Inputs.Add(new ToolInput
-                        {
-                            Name = preset.Role,
-                            Role = preset.Role,
-                            Format = preset.Format,
-                            Shape = preset.Shape,
-                            Required = true,
-                        });
-                    }
+                        Name = preset.Role,
+                        Role = preset.Role,
+                        Format = preset.Format,
+                        Shape = preset.Shape,
+                        Required = true,
+                    });
                 }
             }
 
@@ -1142,36 +1141,33 @@ namespace NodeKit.Cli
 
             if (outputLine.Length > 0 && !RecipeCreateEscapeCommands.IsBack(outputLine))
             {
-                foreach (var preset in ParseNumberList(outputLine, outputPresets.Count).Select(idx => outputPresets[idx]))
+                foreach (var preset in ParseNumberList(outputLine, outputPresets.Count)
+                    .Select(idx => outputPresets[idx])
+                    .Where(preset => preset.Id != InputOutputPresetCatalog.CustomPresetId))
                 {
-                    if (preset.Id != InputOutputPresetCatalog.CustomPresetId)
+                    document.Outputs.Add(new ToolOutput
                     {
-                        document.Outputs.Add(new ToolOutput
-                        {
-                            Name = preset.Role,
-                            Role = preset.Role,
-                            Format = preset.Format,
-                            Shape = "single",
-                            Class = preset.Class,
-                        });
-                    }
+                        Name = preset.Role,
+                        Role = preset.Role,
+                        Format = preset.Format,
+                        Shape = "single",
+                        Class = preset.Class,
+                    });
                 }
             }
         }
 
         private static IReadOnlyList<int> ParseNumberList(string input, int maxCount)
         {
-            var result = new List<int>();
-            foreach (var trimmed in input.Split(',').Select(part => part.Trim()))
-            {
-                if (int.TryParse(trimmed, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var n)
-                    && n >= 1 && n <= maxCount)
-                {
-                    result.Add(n - 1);
-                }
-            }
-
-            return result;
+            return input.Split(',')
+                .Select(part => part.Trim())
+                .Select(trimmed => int.TryParse(
+                    trimmed, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var n)
+                    ? n
+                    : (int?)null)
+                .Where(n => n.HasValue && n.Value >= 1 && n.Value <= maxCount)
+                .Select(n => n!.Value - 1)
+                .ToList();
         }
 
         // Returns the resolved save path, or null if the user chose to restart the wizard.
