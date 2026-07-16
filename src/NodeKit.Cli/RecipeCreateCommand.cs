@@ -133,12 +133,10 @@ namespace NodeKit.Cli
             }
 
             var setFieldNames = parsed.Fields.Select(f => f.Name).ToHashSet(StringComparer.Ordinal);
-            foreach (var field in catalogFields.Where(f => f.Requirement == RecipeFieldRequirement.Optional && !IsListType(f)))
+            foreach (var field in catalogFields.Where(
+                f => f.Requirement == RecipeFieldRequirement.Optional && !IsListType(f) && !setFieldNames.Contains(f.Name)))
             {
-                if (!setFieldNames.Contains(field.Name))
-                {
-                    session.SkipOptionalField(field.Name);
-                }
+                session.SkipOptionalField(field.Name);
             }
 
             foreach (var warningField in session.Snapshot().RecommendedWarnings)

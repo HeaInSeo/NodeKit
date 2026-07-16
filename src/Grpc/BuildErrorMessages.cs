@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Grpc.Core;
 
 namespace NodeKit.Grpc
@@ -41,14 +42,12 @@ namespace NodeKit.Grpc
         private static string DescribeUnimplemented(RpcException rpc)
         {
             var detail = rpc.Status.Detail ?? string.Empty;
-            foreach (var name in _toolSpecMethodNames)
+            var missingMethod = _toolSpecMethodNames.FirstOrDefault(name => detail.Contains(name, StringComparison.Ordinal));
+            if (missingMethod != null)
             {
-                if (detail.Contains(name, StringComparison.Ordinal))
-                {
-                    return "연결된 NodeVault가 구버전이라 ToolSpec API를 지원하지 않는 것 같습니다 " +
-                        $"(누락된 메서드: {name}). NodeVault를 최신 버전으로 업그레이드하거나 " +
-                        "다른 주소를 사용하세요.";
-                }
+                return "연결된 NodeVault가 구버전이라 ToolSpec API를 지원하지 않는 것 같습니다 " +
+                    $"(누락된 메서드: {missingMethod}). NodeVault를 최신 버전으로 업그레이드하거나 " +
+                    "다른 주소를 사용하세요.";
             }
 
             return $"연결된 NodeVault가 이 요청을 지원하지 않습니다: {detail}";

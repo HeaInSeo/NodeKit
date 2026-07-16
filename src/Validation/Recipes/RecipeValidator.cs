@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
 using NodeKit.Authoring.Recipes;
 using NodeKit.Policy;
@@ -191,15 +192,12 @@ namespace NodeKit.Validation.Recipes
         // — 기본값은 여전히 version-only를 허용(NodeVault가 최종 판단자).
         private static void ValidateStrictPackagePinning(RecipeDocument recipe, List<ValidationViolation> violations)
         {
-            foreach (var package in recipe.Packages)
+            foreach (var package in recipe.Packages.Where(p => PackagePinClassifier.Classify(p) == PackagePinStatus.VersionOnly))
             {
-                if (PackagePinClassifier.Classify(package) == PackagePinStatus.VersionOnly)
-                {
-                    violations.Add(new ValidationViolation(
-                        "L1-RCP-016",
-                        $"--strict-reproducible 모드에서는 버전만 고정된 패키지가 허용되지 않습니다. name=version=build 형식으로 지정하세요: '{package}'",
-                        nameof(recipe.Packages)));
-                }
+                violations.Add(new ValidationViolation(
+                    "L1-RCP-016",
+                    $"--strict-reproducible 모드에서는 버전만 고정된 패키지가 허용되지 않습니다. name=version=build 형식으로 지정하세요: '{package}'",
+                    nameof(recipe.Packages)));
             }
         }
 
@@ -286,15 +284,13 @@ namespace NodeKit.Validation.Recipes
                     nameof(recipe.SourceBuildCommands)));
             }
 
-            foreach (var command in recipe.SourceBuildCommands)
+            foreach (var command in recipe.SourceBuildCommands.Where(
+                c => c.Contains('\n', StringComparison.Ordinal) || c.Contains('\r', StringComparison.Ordinal)))
             {
-                if (command.Contains('\n', StringComparison.Ordinal) || command.Contains('\r', StringComparison.Ordinal))
-                {
-                    violations.Add(new ValidationViolation(
-                        "L1-RCP-015",
-                        $"build command에 개행 문자가 포함되어 있으면 새로운 Dockerfile 명령으로 해석될 수 있어 차단됩니다: '{command}'",
-                        nameof(recipe.SourceBuildCommands)));
-                }
+                violations.Add(new ValidationViolation(
+                    "L1-RCP-015",
+                    $"build command에 개행 문자가 포함되어 있으면 새로운 Dockerfile 명령으로 해석될 수 있어 차단됩니다: '{command}'",
+                    nameof(recipe.SourceBuildCommands)));
             }
         }
 

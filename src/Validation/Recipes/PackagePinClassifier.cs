@@ -1,3 +1,5 @@
+using System.Linq;
+
 namespace NodeKit.Validation.Recipes
 {
     internal enum PackagePinStatus
@@ -27,14 +29,7 @@ namespace NodeKit.Validation.Recipes
                 return PackagePinStatus.Malformed;
             }
 
-            var equalsCount = 0;
-            foreach (var c in package)
-            {
-                if (c == '=')
-                {
-                    equalsCount++;
-                }
-            }
+            var equalsCount = package.Count(c => c == '=');
 
             return equalsCount switch
             {
