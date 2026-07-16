@@ -771,6 +771,31 @@ nodekit submit recipe.json [--url <nodevault-url>] [--strict-reproducible]
 경로다. Phase 6(2026-07-02)에서 기존 `BuildAndRegister`/`--legacy` 경로를 CLI에서
 완전히 제거했다 — `IBuildClient`/`GrpcBuildClient` 자체가 저장소에 더 이상 없다.
 
+`submit`은 사용자가 손으로 만든 `recipe.json`을 그대로 NodeVault에 보내지
+않는다. 내부적으로 두 단계를 거쳐 NodeVault가 이해하는 형태로 바꾼 다음
+전송한다 — 이 변환은 전부 CLI 안에서 자동으로 일어나므로 사용자가 직접
+신경 쓸 일은 없지만, "recipe.json에는 없는 필드인데 오류 메시지엔
+왜 나오지?" 같은 걸 이해하려면 아래 흐름을 알아두면 도움이 된다.
+
+1. **`RecipeRenderer.Render(recipe)`** — §4에서 설명한 것과 동일한 단계다.
+   `recipe.json`(`RecipeDocument`, build kind별로 나뉜 필드: `BaseImage`,
+   `Channels`, `Packages`, `SourceUri` 등)을 하나로 통일된 중간 모델인
+   `ToolDefinition`(`ImageUri`, `DockerfileContent`, `Script` 등)으로
+   합쳐준다. 이 단계 덕분에 build kind가 뭐든 이후 검증/변환 로직은
+   `ToolDefinition` 하나만 알면 된다.
+2. **`ToolSpecRawSpecFactory.Build(definition)`**
+   (`src/Grpc/ToolSpecRawSpecFactory.cs`) — `ToolDefinition`을 NodeVault의
+   gRPC 프로토콜(`BuildRequest` proto)이 기대하는 JSON 문자열(`raw_spec`)로
+   한 번 더 변환한다. 필드 이름 표기법이 여기서 `PascalCase`(C# 관례)에서
+   `snake_case`(`tool_name`, `image_uri`, `dockerfile_content` 등, NodeVault
+   proto 관례)로 바뀐다. 이 `raw_spec` 문자열이 실제로 `ResolveToolSpec`
+   RPC를 통해 NodeVault로 전송되는 값이다 — 즉 "ToolSpec"이라고 부를 때
+   가리키는 게 바로 이것이다.
+
+정리하면: `recipe.json`(사람이 쓰는 초안) → `ToolDefinition`(NodeKit
+내부 통일 모델) → `raw_spec`(NodeVault로 실제로 나가는 ToolSpec) 순서로
+변환되며, 이 전 과정은 `nodekit submit` 한 번 실행으로 자동 처리된다.
+
 NodeVault URL은 `NODEKIT_NODEVAULT_URL` 환경변수 또는 `--url` 옵션으로 지정한다.
 
 ```bash
