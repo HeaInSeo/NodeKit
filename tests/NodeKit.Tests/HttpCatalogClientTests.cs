@@ -27,6 +27,9 @@ namespace NodeKit.Tests
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            // HttpMessageHandler.SendAsync's contract hands ownership of the returned
+            // response to the caller (HttpClient), which disposes it after reading —
+            // disposing it here before returning would break the very object being handed back.
             var response = new HttpResponseMessage(_statusCode)
             {
                 Content = new StringContent(_responseBody, Encoding.UTF8, "application/json"),

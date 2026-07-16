@@ -212,6 +212,8 @@ namespace NodeKit.Cli.Tests
         public void Dockerfile_NonInteractive_WithUserInstruction_SavesValidRecipe()
         {
             var outPath = Path.Join(_workDir, "recipe.json");
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exitCode = CliApp.Run(
                 new[]
                 {
@@ -224,8 +226,8 @@ namespace NodeKit.Cli.Tests
                     "--field", $"DockerfileContent=FROM {ImageRefWithDigest}\nUSER 1000\n",
                     "--field", "DockerfilePath=./Dockerfile",
                 },
-                new StringWriter(),
-                new StringWriter());
+                stdout,
+                stderr);
 
             Assert.Equal(0, exitCode);
             Assert.True(File.Exists(outPath));
@@ -276,13 +278,17 @@ namespace NodeKit.Cli.Tests
                 "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
                 "bwa=0.7.17=h5bf99c6_8", "",
             };
+            using var interactiveStdout = new StringWriter();
+            using var interactiveStderr = new StringWriter();
             var interactiveExitCode = CliApp.Run(
                 new[] { "recipe", "create", interactiveOutPath },
                 new StringReader(string.Join("\n", transcript)),
-                new StringWriter(),
-                new StringWriter());
+                interactiveStdout,
+                interactiveStderr);
 
             var nonInteractiveOutPath = Path.Join(_workDir, "non-interactive.json");
+            using var nonInteractiveStdout = new StringWriter();
+            using var nonInteractiveStderr = new StringWriter();
             var nonInteractiveExitCode = CliApp.Run(
                 new[]
                 {
@@ -295,8 +301,8 @@ namespace NodeKit.Cli.Tests
                     "--field", "Packages=bwa=0.7.17=h5bf99c6_8",
                     "--field", "Channels=bioconda",
                 },
-                new StringWriter(),
-                new StringWriter());
+                nonInteractiveStdout,
+                nonInteractiveStderr);
 
             Assert.Equal(0, interactiveExitCode);
             Assert.Equal(0, nonInteractiveExitCode);
@@ -980,11 +986,12 @@ namespace NodeKit.Cli.Tests
             };
 
             using var cancelStdout = new StringWriter();
+            using var cancelStderr = new StringWriter();
             var cancelExitCode = CliApp.Run(
                 new[] { "recipe", "create", cancelOutPath },
                 new StringReader(string.Join("\n", cancelTranscript)),
                 cancelStdout,
-                new StringWriter());
+                cancelStderr);
 
             var ctrlCOutPath = Path.Join(_workDir, "ctrlc.json");
             var ctrlCTranscript = new[]
@@ -995,11 +1002,12 @@ namespace NodeKit.Cli.Tests
             };
 
             using var ctrlCStdout = new StringWriter();
+            using var ctrlCStderr = new StringWriter();
             var ctrlCExitCode = RecipeCreateInteractiveRunner.Run(
                 ctrlCOutPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
                 new PlainTextRecipeConsole(new StringReader(string.Join("\n", ctrlCTranscript)), ctrlCStdout),
-                new StringWriter(),
+                ctrlCStderr,
                 new SequencedCancellationSource(checksBeforeCancellation: 0),
                 resolveClient: NullResolveRecipeClient.Instance);
 
