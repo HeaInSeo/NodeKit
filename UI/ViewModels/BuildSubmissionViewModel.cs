@@ -124,7 +124,16 @@ namespace NodeKit.UI.ViewModels
                 return;
             }
 
-#pragma warning disable CA1031 // best-effort — 실패해도 계속 진행해야 한다
+            // Any exception here (RpcException from the server being gone/
+            // unreachable, network failure, etc.) — the caller can't do
+            // anything different based on which one it was, so catching
+            // Exception specifically (not a narrower type) is intentional.
+            // Safe to ignore: this is explicitly a best-effort notification,
+            // not a correctness requirement — the server-side build simply
+            // keeps running to completion instead of being cancelled early,
+            // which is an accepted (if wasteful) outcome, not a bug. Disposal
+            // and starting a new build both proceed unconditionally either way.
+#pragma warning disable CA1031
             try
             {
                 await client.CancelBuildAsync(buildId).ConfigureAwait(false);
