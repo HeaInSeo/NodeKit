@@ -25,6 +25,10 @@ namespace NodeKit.Cli
                 }
                 catch (IOException)
                 {
+                    // Console.Clear() throws when the console handle is unusual
+                    // (e.g. a non-interactive terminal) even though
+                    // IsOutputRedirected reported false — fall through to the
+                    // text separator below instead of crashing the wizard.
                 }
             }
 

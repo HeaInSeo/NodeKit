@@ -33,6 +33,13 @@ jobs:
         with:
           languages: csharp
           queries: security-and-quality
+          # obj/ and bin/ are build output (generated protobuf/gRPC code,
+          # xUnit's auto-generated test entry points) — not checked in, not
+          # something anyone can fix, regenerated on every build. Scanning
+          # them was producing ~37 unactionable alerts (2026-07-16 audit).
+          paths-ignore:
+            - "**/obj/**"
+            - "**/bin/**"
 
       - name: Restore
         run: dotnet restore NodeKit.sln --locked-mode

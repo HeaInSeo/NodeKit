@@ -21,8 +21,10 @@ namespace NodeKit.Cli
         public void BeginStep()
         {
             _pendingHints = null;
+#pragma warning disable CA1031 // Console.Clear() can throw for many unrelated reasons (redirected/non-interactive output) — never worth failing the wizard over.
             try { Console.Clear(); }
             catch (Exception) { }
+#pragma warning restore CA1031
             _ansi.Write(new Rule().RuleStyle("grey dim"));
             _ansi.WriteLine();
         }

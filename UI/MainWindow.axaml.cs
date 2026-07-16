@@ -183,8 +183,8 @@ namespace NodeKit.UI
             };
 
             var nameBox = MakePortTextBox("이름 (예: reads)", 0, row);
-            var roleBox = MakePortTextBox("역할 (예: sample-fastq)", 2, row);
-            var formatBox = MakePortTextBox("형식 (예: fastq)", 4, row);
+            MakePortTextBox("역할 (예: sample-fastq)", 2, row);
+            MakePortTextBox("형식 (예: fastq)", 4, row);
 
             var shapeBox = new ComboBox
             {
@@ -213,8 +213,8 @@ namespace NodeKit.UI
             };
 
             var nameBox = MakePortTextBox("이름 (예: aligned_bam)", 0, row);
-            var roleBox = MakePortTextBox("역할 (예: aligned-bam)", 2, row);
-            var formatBox = MakePortTextBox("형식 (예: bam)", 4, row);
+            MakePortTextBox("역할 (예: aligned-bam)", 2, row);
+            MakePortTextBox("형식 (예: bam)", 4, row);
 
             var shapeBox = new ComboBox
             {
