@@ -17,7 +17,7 @@ namespace NodeKit.UI
         {
             try
             {
-                var wasmPath = Path.Combine(
+                var wasmPath = Path.Join(
                     AppDomain.CurrentDomain.BaseDirectory,
                     "assets",
                     "policy",

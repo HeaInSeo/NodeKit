@@ -12,7 +12,7 @@ namespace NodeKit.Tests
     public sealed class WasmPolicyCheckerTests
     {
         // 빌드 출력 디렉토리에 복사된 .wasm 경로
-        private static readonly string _wasmPath = Path.Combine(
+        private static readonly string _wasmPath = Path.Join(
             Path.GetDirectoryName(typeof(WasmPolicyCheckerTests).Assembly.Location)!,
             "assets",
             "policy",

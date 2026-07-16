@@ -14,7 +14,7 @@ namespace NodeKit.Cli.Tests
 {
     public class SubmitCommandTests : IDisposable
     {
-        private readonly string _workDir = Path.Combine(Path.GetTempPath(), "nodekit-submit-tests-" + Guid.NewGuid());
+        private readonly string _workDir = Path.Join(Path.GetTempPath(), "nodekit-submit-tests-" + Guid.NewGuid());
 
         public SubmitCommandTests()
         {
@@ -124,7 +124,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void Submit_MissingRecipeFile_ReturnsTwo()
         {
-            var missingPath = Path.Combine(_workDir, "nonexistent.json");
+            var missingPath = Path.Join(_workDir, "nonexistent.json");
             using var stdout = new StringWriter();
             using var stderr = new StringWriter();
 
@@ -475,7 +475,7 @@ namespace NodeKit.Cli.Tests
 
         private string WriteFile(string name, string content)
         {
-            var path = Path.Combine(_workDir, name);
+            var path = Path.Join(_workDir, name);
             File.WriteAllText(path, content);
             return path;
         }

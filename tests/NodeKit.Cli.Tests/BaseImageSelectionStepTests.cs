@@ -16,7 +16,7 @@ namespace NodeKit.Cli.Tests
             new FixedCancellationSource(false);
 
         private readonly string _workDir =
-            Path.Combine(Path.GetTempPath(), "nodekit-base-image-tests-" + Guid.NewGuid());
+            Path.Join(Path.GetTempPath(), "nodekit-base-image-tests-" + Guid.NewGuid());
 
         public BaseImageSelectionStepTests()
         {
@@ -86,7 +86,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void Step4_PackageMethod_WithStubResolver_SetsImageRefAutoAndSkipsManualEntry()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
 
             // Package method QuickSetup: user picks candidate [1] in step 4.
             // ImageRef is auto-set → RunFieldLoop does NOT prompt ImageRef.
@@ -142,7 +142,7 @@ namespace NodeKit.Cli.Tests
             // candidate must auto-set PackageEngine too — otherwise
             // PackageEngine stays defaulted to "conda" and the renderer emits
             // "conda install" against an image that has no conda binary.
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
 
             var transcript = new[]
             {
@@ -180,7 +180,7 @@ namespace NodeKit.Cli.Tests
         {
             // Sanity counterpart: picking the conda-forge candidate must NOT
             // be affected by the micromamba auto-detection.
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
 
             var transcript = new[]
             {
@@ -221,7 +221,7 @@ namespace NodeKit.Cli.Tests
             // be reverted to conda — otherwise the renderer emits "micromamba
             // install" against an image with no micromamba binary. Confirmed
             // via a real buildah build pre-fix: "micromamba: not found".
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
 
             var transcript = new[]
             {
@@ -257,7 +257,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void Step4_DirectInput_SkipsAutoResolve_ImageRefPromptedInFieldLoop()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             const string manualRef =
                 "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
@@ -296,7 +296,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void Step4_PublicResolver_DirectInput_ImageRefPromptedInFieldLoop()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             const string manualRef =
                 "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
@@ -335,7 +335,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void Step4_ContainerMethod_StepSkippedBecauseNoCandidates_ImageRefPromptedManually()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             // Container method: ImageRef (tag only) and ImageDigest are separate fields.
             const string imageRef = "condaforge/miniforge3:24.3.0-0";
             const string digest =
@@ -379,7 +379,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void Step4_FailedResolution_WarnsUser_AndPromptRetryOrDirect()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
             const string manualRef =
                 "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
@@ -421,7 +421,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void Step4_BeginnerGuide_InstallCommand_WithStubResolver_SetsImageRefAuto()
         {
-            var outPath = Path.Combine(_workDir, "recipe.json");
+            var outPath = Path.Join(_workDir, "recipe.json");
 
             var transcript = new[]
             {
