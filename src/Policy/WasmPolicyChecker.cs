@@ -202,6 +202,11 @@ namespace NodeKit.Policy
 
                 return map;
             }
+
+            // Any exception here is one more way bootstrap can fail (see the
+            // method doc comment) — Check() already treats a null return as
+            // "cannot trust evaluation, block" rather than proceeding, so
+            // this doesn't need its own separate handling per exception type.
 #pragma warning disable CA1031
             catch
             {

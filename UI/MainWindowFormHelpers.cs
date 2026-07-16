@@ -31,6 +31,14 @@ namespace NodeKit.UI
                 var bytes = File.ReadAllBytes(wasmPath);
                 return new WasmPolicyChecker(new PolicyBundle(bytes, $"local:{Path.GetFileName(wasmPath)}"));
             }
+
+            // File I/O and wasmtime bundle-loading can fail in many ways
+            // (missing file, permissions, corrupt/incompatible wasm) that
+            // all warrant the same handling. Returning null here is NOT a
+            // silent fail-open: ValidationViewModel.AddPolicyViolations
+            // explicitly blocks with a "POLICY-UNAVAIL" violation when the
+            // policy checker is null, so callers never validate anything
+            // without either a real policy check or an explicit failure.
 #pragma warning disable CA1031
             catch
             {
@@ -129,12 +137,12 @@ namespace NodeKit.UI
                 var parsed = JsonSerializer.Deserialize<List<string>>(raw.Trim());
                 return parsed ?? new List<string>();
             }
-#pragma warning disable CA1031
-            catch
+            catch (JsonException)
             {
+                // Malformed user-typed JSON in the Command field — fall back
+                // to an empty list rather than blocking the whole form.
                 return new List<string>();
             }
-#pragma warning restore CA1031
         }
     }
 }

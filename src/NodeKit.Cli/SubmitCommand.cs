@@ -206,6 +206,12 @@ namespace NodeKit.Cli
                 stderr.WriteLine("빌드 요청이 취소되었습니다.");
                 return 130;
             }
+            // Final fallback after the specific OperationCanceledException/
+            // RpcException(Cancelled) cases above — any other failure
+            // (network error, unexpected RpcException status, etc.) gets
+            // the same treatment: describe it and exit 1, since the CLI
+            // command needs to terminate cleanly either way rather than
+            // crash with a raw stack trace.
             catch (Exception ex)
             {
                 stderr.WriteLine(BuildErrorMessages.Describe(ex));
@@ -228,6 +234,11 @@ namespace NodeKit.Cli
                 return;
             }
 
+            // Best-effort notification (same pattern as the GUI's
+            // BuildSubmissionViewModel.CancelServerBuildBestEffort) — any
+            // failure here just means the server-side build keeps running
+            // instead of stopping early, which is reported as a warning,
+            // not treated as a command failure.
             try
             {
                 await client.CancelBuildAsync(buildId, CancellationToken.None);
