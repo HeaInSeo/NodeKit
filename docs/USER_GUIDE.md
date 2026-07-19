@@ -75,10 +75,24 @@ dotnet build NodeKit.sln
 dotnet run --project src/NodeKit.Cli -- recipe create /tmp/nodekit-recipe.json
 ```
 
-생성된 recipe 검증과 legacy BuildRequest 렌더링:
+생성된 recipe 검증:
 
 ```bash
 dotnet run --project src/NodeKit.Cli -- validate /tmp/nodekit-recipe.json
+```
+
+실제 NodeVault에 제출(빌드 요청)하려면:
+
+```bash
+NODEKIT_NODEVAULT_URL=http://<nodevault-host>:50051 \
+  dotnet run --project src/NodeKit.Cli -- submit /tmp/nodekit-recipe.json
+```
+
+`render`(legacy `BuildRequest` 형식으로 로컬에 미리보기 파일을 쓰는 명령)는
+`submit`과 무관한 별개 유틸리티다 — 자세한 차이는
+[`NODEKIT_CLI_USAGE.md`](NODEKIT_CLI_USAGE.md) §5 참고.
+
+```bash
 dotnet run --project src/NodeKit.Cli -- render /tmp/nodekit-recipe.json --out /tmp/build-request.json
 ```
 

@@ -49,8 +49,8 @@ namespace NodeKit.Authoring.Recipes
                 DefaultValue: null,
                 Label: Text("기본 실행 명령", "Default run command"),
                 Help: Text(
-                    "도구 실행 시 사용할 기본 명령 또는 이미지 안의 스크립트 경로입니다. 현재 legacy BuildRequest 호환을 위해 필요합니다.",
-                    "The default command or in-image script path used to run the tool. Required for legacy BuildRequest compatibility."),
+                    "도구 실행 시 사용할 기본 명령 또는 이미지 안의 스크립트 경로입니다. ToolSpec raw_spec의 script 필드로 전송되며, submit 경로에 필수입니다.",
+                    "The default command or in-image script path used to run the tool. Sent as the ToolSpec raw_spec's script field; required for the submit path."),
                 Examples: new[] { "bwa mem", "/app/run.sh" },
                 Choices: Array.Empty<RecipeChoice>(),
                 Apply: (recipe, value) => recipe.Script = (string)value),
