@@ -11,7 +11,8 @@ Current planning source of truth:
   클라이언트 경로가 NodeKit에서 구현 허용됨.
 - `nodekit submit` 경로: `ResolveToolSpec → SubmitToolBuild → WatchToolBuild`.
 - **Phase 6 완료 (2026-07-02)**: `--legacy` 플래그 및 `BuildAndRegister` 경로 NodeKit CLI에서 제거.
-  `IBuildClient` / `GrpcBuildClient` 는 NodeKit.csproj(Avalonia) 에만 남음.
+  Avalonia GUI(`NodeKit.csproj`)도 이후 `BuildSubmissionViewModel`/`GrpcToolSpecClient`로 전환 완료 —
+  `IBuildClient`/`GrpcBuildClient`는 저장소 어디에도 남아있지 않음.
   NodeVault 측 `BuildAndRegister` RPC deprecated 표시는 NodeVault 담당.
 
 Older sprint documents under `docs/obsolete/` are historical reference only and

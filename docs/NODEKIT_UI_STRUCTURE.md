@@ -102,8 +102,8 @@ ValidateButton click
     → violations.Count > 0: ValidationResultPanel 표시
     → violations.Count == 0: ValidationPassPanel 표시, SendBuildButton 활성화
     → SendBuildButton click
-    → BuildRequestFactory.FromToolDefinition(toolDef)
-    → GrpcBuildClient.BuildAndRegisterAsync(req)
+    → BuildSubmissionViewModel.SubmitAsync(toolDef, address)
+    → GrpcToolSpecClient: ResolveToolSpec → SubmitToolBuild → WatchToolBuild
     → 스트림 수신 → BuildLogBox append
     → 완료 → BuildSuccessPanel 표시
 ```
@@ -211,7 +211,7 @@ ReloadBundleButton 클릭
 | 의존 대상 | 방향 | 용도 |
 |-----------|------|------|
 | `WasmPolicyChecker` | NodeKit → DockGuard .wasm | L1 정책 실행 |
-| `GrpcBuildClient` | NodeKit → NodeVault BuildService gRPC | BuildRequest 전송 + 빌드 이벤트 수신 |
+| `GrpcToolSpecClient` | NodeKit → NodeVault BuildService gRPC | ResolveToolSpec → SubmitToolBuild → WatchToolBuild, 빌드 이벤트 수신 |
 | `GrpcPolicyBundleProvider` | NodeKit → NodeVault PolicyService gRPC | 정책 번들 동적 로드 및 목록 조회 |
 | `HttpCatalogClient` | NodeKit → Catalog REST | Tool/Data 목록 조회 (read-only) |
 | `GrpcToolRegistryClient` | — | **레거시 — MainWindow에서 미사용**. `HttpCatalogClient`로 대체됨 |
@@ -233,7 +233,8 @@ ReloadBundleButton 클릭
 | `RegisteredData` | `src/Grpc/HttpCatalogClient.cs` | Catalog 조회 결과 |
 | `IToolRegistryClient` | `src/Grpc/GrpcToolRegistryClient.cs` | Catalog 클라이언트 인터페이스 (별도 파일 없음) |
 | `HttpCatalogClient` | `src/Grpc/HttpCatalogClient.cs` | Catalog REST 클라이언트 (`IToolRegistryClient` 구현) |
-| `GrpcBuildClient` | `src/Grpc/GrpcBuildClient.cs` | BuildService gRPC 클라이언트 |
-| `IBuildClient` | `src/Grpc/IBuildClient.cs` | Build 클라이언트 인터페이스 |
+| `GrpcToolSpecClient` | `src/Grpc/GrpcToolSpecClient.cs` | BuildService gRPC 클라이언트 (ResolveToolSpec/SubmitToolBuild/WatchToolBuild) |
+| `IToolSpecBuildClient` | `src/Grpc/IToolSpecBuildClient.cs` | Build 클라이언트 인터페이스 |
+| `BuildSubmissionViewModel` | `UI/ViewModels/BuildSubmissionViewModel.cs` | `GrpcToolSpecClient` 수명 관리 + 진행 중인 빌드 추적 |
 | `WasmPolicyChecker` | `src/Policy/WasmPolicyChecker.cs` | L1 정책 실행기 |
 | `MainWindow` | `UI/MainWindow.axaml(.cs)` | 메인 윈도우 code-behind |
