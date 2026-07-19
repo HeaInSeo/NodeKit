@@ -16,6 +16,10 @@ namespace NodeKit.Cli.Tests.Fakes
         public Func<ToolSpecRequest, ResolvedToolSpecResponse> OnResolveToolSpec { get; set; } =
             _ => new ResolvedToolSpecResponse { ToolSpecDigest = "fake-digest" };
 
+        /// <summary>true면 ResolveToolSpec이 응답하지 않고 클라이언트가 취소할 때까지
+        /// 대기한다 (연결 타임아웃/취소 전파 시나리오 재현용).</summary>
+        public bool HangOnResolveToolSpec { get; set; }
+
         public Func<SubmitToolBuildRequest, SubmitToolBuildResponse> OnSubmitToolBuild { get; set; } =
             _ => new SubmitToolBuildResponse { BuildId = "fake-build-id", Status = "Requested" };
 
@@ -30,9 +34,16 @@ namespace NodeKit.Cli.Tests.Fakes
 
         public List<string> CancelledBuildIds { get; } = new();
 
-        public override Task<ResolvedToolSpecResponse> ResolveToolSpec(
-            ToolSpecRequest request, ServerCallContext context) =>
-            Task.FromResult(OnResolveToolSpec(request));
+        public override async Task<ResolvedToolSpecResponse> ResolveToolSpec(
+            ToolSpecRequest request, ServerCallContext context)
+        {
+            if (HangOnResolveToolSpec)
+            {
+                await Task.Delay(System.Threading.Timeout.Infinite, context.CancellationToken);
+            }
+
+            return OnResolveToolSpec(request);
+        }
 
         public override Task<SubmitToolBuildResponse> SubmitToolBuild(
             SubmitToolBuildRequest request, ServerCallContext context) =>

@@ -217,10 +217,12 @@ namespace NodeKit.Cli
                         // reconcile/등록 단계에 문제가 있다는 뜻이라 조용히
                         // 넘어가지 않고 눈에 띄는 경고를 남긴다 — 빈 문자열은
                         // "정보 없음"(구버전 NodeVault 등)이지 "문제 있음"이
-                        // 아니므로 경고 대상이 아니다.
+                        // 아니므로 경고 대상이 아니다. stderr에 쓴다 — stdout은
+                        // digest 같은 실제 결과값 전용으로 남겨서, 파이프/자동화가
+                        // stdout만 파싱해도 진단성 경고에 오염되지 않게 한다.
                         if (!string.IsNullOrEmpty(lastIntegrityHealth) && lastIntegrityHealth != "Healthy")
                         {
-                            stdout.WriteLine($"경고: 무결성 상태가 {lastIntegrityHealth}입니다 — 빌드는 성공했지만 후속 검증/등록에 문제가 있을 수 있습니다. NodeVault 인덱스에서 확인하세요.");
+                            stderr.WriteLine($"경고: 무결성 상태가 {lastIntegrityHealth}입니다 — 빌드는 성공했지만 후속 검증/등록에 문제가 있을 수 있습니다. NodeVault 인덱스에서 확인하세요.");
                         }
 
                         return 0;
@@ -241,7 +243,22 @@ namespace NodeKit.Cli
                     : $"빌드 결과를 확인하지 못한 채 서버 스트림이 종료되었습니다 (build ID: {buildId}). NodeVault에서 빌드 상태를 직접 확인하세요.");
                 return 1;
             }
-            catch (OperationCanceledException)
+            // 취소로 취급하는 조건은 두 신호 중 하나만 있어도 충분하다:
+            // (1) linkedCts(내가 넘긴 토큰)가 취소된 상태 — 내가 Ctrl-C나
+            //     --connect-timeout으로 직접 취소를 요청했다는 뜻. 정확히 어떤
+            //     예외 타입/RpcException 상태 코드로 나타나는지에 기대지 않는다
+            //     — 서버(가짜 테스트 서버, 어쩌면 실제 NodeVault도 상황에
+            //     따라)가 취소를 항상 RpcException(Cancelled)로 깔끔하게
+            //     돌려주지 않고 StatusCode.Unknown("Exception was thrown by
+            //     handler") 같은 형태로 보낼 수 있다는 게 회귀 테스트로 드러남.
+            // (2) 예외 자체가 OperationCanceledException/RpcException(Cancelled)
+            //     모양인 경우 — 내가 취소를 요청하지 않았어도(내 토큰은
+            //     멀쩡해도) gRPC/서버 계층이 스스로 "취소됨"으로 보고한
+            //     상황이라, 이것도 "빌드 요청이 취소되었습니다"로 보고하는
+            //     쪽이 일반 실패(exit 1)로 뭉개는 것보다 정확하다.
+#pragma warning disable CA1031 // any exception is treated as cancellation when either signal above holds, not a real failure
+            catch (Exception ex) when (linkedCts.IsCancellationRequested || IsCancellationShaped(ex))
+#pragma warning restore CA1031
             {
                 if (connectTimeoutCts.IsCancellationRequested && !cts.IsCancellationRequested)
                 {
@@ -252,21 +269,10 @@ namespace NodeKit.Cli
                 stderr.WriteLine("빌드 요청이 취소되었습니다.");
                 return 130;
             }
-            catch (RpcException rpc) when (rpc.StatusCode == StatusCode.Cancelled)
-            {
-                if (connectTimeoutCts.IsCancellationRequested && !cts.IsCancellationRequested)
-                {
-                    return ReportConnectTimeout(stderr, connectTimeout!.Value);
-                }
-
-                await CancelServerBuildBestEffort(client, buildId, stderr);
-                stderr.WriteLine("빌드 요청이 취소되었습니다.");
-                return 130;
-            }
-            // Final fallback after the specific OperationCanceledException/
-            // RpcException(Cancelled) cases above — any other failure
-            // (network error, unexpected RpcException status, etc.) gets
-            // the same treatment: describe it and exit 1, since the CLI
+            // Final fallback after the cancellation-filtered catch above — any
+            // other failure (network error, unexpected RpcException status,
+            // etc.) that did NOT happen because we cancelled our own token
+            // gets the same treatment: describe it and exit 1, since the CLI
             // command needs to terminate cleanly either way rather than
             // crash with a raw stack trace.
             catch (Exception ex)
@@ -292,6 +298,12 @@ namespace NodeKit.Cli
                 "주소와 네트워크 상태를 확인하세요.");
             return 124;
         }
+
+        // linkedCts가 취소되지 않은 상태에서도(=내가 취소를 요청하지 않았어도)
+        // gRPC 계층이 스스로 취소를 이렇게 보고할 수 있다 — 그 경우도
+        // "빌드 요청이 취소되었습니다"로 다루는 게 일반 실패보다 정확하다.
+        private static bool IsCancellationShaped(Exception ex) =>
+            ex is OperationCanceledException || (ex is RpcException rpc && rpc.StatusCode == StatusCode.Cancelled);
 
         // 클라이언트 취소는 로컬 스트림만 끊을 뿐 서버 빌드를 멈추지 않는다 —
         // CancelToolBuild를 명시적으로 호출해야 서버가 실제로 빌드를 중단한다.
@@ -376,7 +388,10 @@ namespace NodeKit.Cli
                         return false;
                     }
 
-                    if (i + 1 >= args.Length)
+                    // 다음 토큰이 없거나 그 자체가 또 다른 옵션처럼 보이면(-- 로 시작)
+                    // "값 누락"으로 취급한다 — 그렇지 않으면 `--url --strict-reproducible`
+                    // 같은 실수가 "--strict-reproducible"을 URL 값으로 그대로 삼켜버린다.
+                    if (i + 1 >= args.Length || args[i + 1].StartsWith("--", StringComparison.Ordinal))
                     {
                         stderr.WriteLine("--url 옵션에는 값이 필요합니다.");
                         return false;

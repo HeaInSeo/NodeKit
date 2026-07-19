@@ -67,8 +67,20 @@ namespace NodeKit.Grpc
                     },
                     cancellationToken: cancellationToken);
             }
-#pragma warning disable CA1031 // any failure (RPC error, cancellation race, etc.) must surface as a Failed event, not crash the caller
-            catch (Exception ex)
+
+            // 내가 넘겨받은 cancellationToken이 취소된 상태에서 발생한 예외는
+            // 여기서 잡지 않는다 — 그대로 전파시켜서 SubmitCommand의
+            // --connect-timeout/Ctrl-C 처리(그리고 GUI의 빌드 대체-취소 처리)가
+            // 실제로 관측할 수 있게 한다. 예전엔 이것도 다른 RPC 실패와 똑같이
+            // Failed 이벤트로 바뀌어서, 취소는 항상 구분 불가능한 "빌드
+            // 실패"(exit 1)로만 보고됐다 — 회귀로 발견됨(외부 리뷰). 예외
+            // 타입/RpcException 상태 코드로 "이게 취소였다"를 판단하지 않는다 —
+            // 실제로 서버(가짜 테스트 서버 포함)가 취소를 항상
+            // RpcException(Cancelled)로 깔끔하게 돌려주지 않고
+            // StatusCode.Unknown 같은 형태로 보낼 수 있어(회귀 테스트로 확인),
+            // "내 토큰이 취소됐는가"만이 유일하게 신뢰할 수 있는 신호다.
+#pragma warning disable CA1031 // any non-cancellation failure (RPC error, etc.) must surface as a Failed event, not crash the caller
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
 #pragma warning restore CA1031
             {
                 resolveEx = ex;
@@ -103,8 +115,11 @@ namespace NodeKit.Grpc
                     },
                     cancellationToken: cancellationToken);
             }
-#pragma warning disable CA1031 // any failure (RPC error, cancellation race, etc.) must surface as a Failed event, not crash the caller
-            catch (Exception ex)
+
+            // Step 1과 동일한 이유로, 내 토큰이 취소된 상태의 예외는 여기서도
+            // 잡지 않고 전파시킨다.
+#pragma warning disable CA1031 // any non-cancellation failure (RPC error, etc.) must surface as a Failed event, not crash the caller
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
 #pragma warning restore CA1031
             {
                 submitEx = ex;
