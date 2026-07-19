@@ -373,6 +373,65 @@ namespace NodeKit.Cli.Tests
         }
 
         [Fact]
+        public void Submit_BuildSucceeded_WithDegradedIntegrityHealth_PrintsWarningButStillReturnsZero()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var events = new[]
+            {
+                new BuildEvent { Kind = BuildEventKind.JobCreated, Message = "빌드 제출됨", BuildId = "build-123" },
+                new BuildEvent
+                {
+                    Kind = BuildEventKind.Log,
+                    ImageDigest = "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                    IntegrityHealth = "Partial",
+                },
+                new BuildEvent { Kind = BuildEventKind.Succeeded, Message = "완료" },
+            };
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(events));
+
+            // 빌드 자체는 성공했으므로 exit code는 0 유지 — 기존 스크립트의
+            // 성공 판정을 깨지 않기 위한 의도적 선택. 다만 무결성 상태
+            // degraded는 눈에 띄게 경고해야 한다.
+            Assert.Equal(0, exitCode);
+            Assert.Contains("경고: 무결성 상태가 Partial입니다", stdout.ToString());
+        }
+
+        [Fact]
+        public void Submit_BuildSucceeded_WithHealthyIntegrityHealth_DoesNotPrintWarning()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var events = new[]
+            {
+                new BuildEvent { Kind = BuildEventKind.JobCreated, Message = "빌드 제출됨", BuildId = "build-123" },
+                new BuildEvent
+                {
+                    Kind = BuildEventKind.Log,
+                    ImageDigest = "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                    IntegrityHealth = "Healthy",
+                },
+                new BuildEvent { Kind = BuildEventKind.Succeeded, Message = "완료" },
+            };
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(events));
+
+            Assert.Equal(0, exitCode);
+            Assert.DoesNotContain("경고: 무결성 상태", stdout.ToString());
+        }
+
+        [Fact]
         public void Submit_StreamEndsWithoutTerminalEvent_DoesNotReturnZero()
         {
             // Hidden-failure-mode check (CLAUDE.md §11 "gRPC 실패가 조용히
