@@ -1,7 +1,8 @@
 # NodeKit 아키텍처 개요
 
-버전: 1.2
-작성일: 2026-04-18 / 갱신: 2026-06-18
+버전: 1.3
+작성일: 2026-04-18 / 갱신: 2026-07-19 (컴포넌트 레이어/데이터 흐름/완료 항목 표에 남아있던
+GrpcBuildClient/BuildRequest 서술을 GrpcToolSpecClient/raw_spec 경로로 정정)
 상태: 현재 구현 + active planning 기준
 
 관련 문서:
@@ -66,12 +67,17 @@ legacy gRPC 경로는 CLI와 Avalonia GUI 양쪽 모두에서 완전히 제거�
 │  └── IPolicyBundleProvider     스왑 가능 인터페이스      │
 ├──────────────────────────────────────────────────────────┤
 │  gRPC/HTTP Client Layer (src/Grpc/)                      │
-│  ├── GrpcBuildClient           BuildService gRPC (빌드 스트림) │
+│  ├── GrpcToolSpecClient        BuildService gRPC          │
+│  │   (ResolveToolSpec → SubmitToolBuild → WatchToolBuild) │
+│  ├── ToolSpecRawSpecFactory    ToolDefinition → raw_spec  │
 │  ├── HttpCatalogClient         Catalog REST (Tool/Data 목록) │
 │  ├── GrpcPolicyBundleProvider  PolicyService gRPC (정책 관리) │
 │  └── GrpcToolRegistryClient    [레거시 — 미사용]         │
 └──────────────────────────────────────────────────────────┘
 ```
+
+`UI/ViewModels/BuildSubmissionViewModel.cs`가 `GrpcToolSpecClient`의 수명과
+in-flight build ID 추적을 전담한다 (CLI의 `SubmitCommand`와 동일한 패턴).
 
 ---
 
@@ -114,16 +120,17 @@ ToolDefinition (초안 모델)
   │   └── 없음 + 폐쇄망 → InvalidArgument (관리자 Harbor 사전 등록 필요)
   │   ※ source build / Dockerfile fallback은 이미 고정 — 사전 조회 불필요
   │
-  ├── BuildRequestFactory.FromToolDefinition()
-  │   (artifact 고정된 상태로 BuildRequest 생성)
+  ├── ToolSpecRawSpecFactory.Build(toolDefinition)
+  │   (artifact 고정된 상태로 raw_spec 생성 — PascalCase → snake_case)
   │
   ▼
-BuildRequest (proto)
-  │ gRPC stream
+raw_spec (JSON 문자열)
+  │ gRPC (GrpcToolSpecClient, BuildSubmissionViewModel이 수명 관리)
   ▼
 [NodeVault BuildService]
+  ResolveToolSpec → SubmitToolBuild → WatchToolBuild
   → L2(image build) → L3(dry-run) → L4(smoke) → index 등록
-  → BuildEvent stream →
+  → BuildEvent stream (WatchToolBuild) →
   ▼
 [NodeKit] 빌드 로그 표시 → 완료 알림
 ```
@@ -167,7 +174,7 @@ NavToolListButton / NavDataListButton 클릭
 | L1 정적 검증 | 완료 | `RequiredFieldsValidator`, `ImageUriValidator`, `PackageVersionValidator` |
 | DockGuard .wasm 정책 검사 | 완료 | `WasmPolicyChecker`, `LocalFilePolicyBundleProvider` |
 | gRPC 정책 번들 동적 로드 | 완료 | `GrpcPolicyBundleProvider` |
-| BuildRequest gRPC 전송 + 스트림 수신 | 완료 | `GrpcBuildClient`, `BuildRequestFactory` |
+| ToolSpec gRPC 전송(ResolveToolSpec/SubmitToolBuild) + WatchToolBuild 스트림 수신 | 완료 | `GrpcToolSpecClient`, `ToolSpecRawSpecFactory`, `BuildSubmissionViewModel` |
 | AdminToolList (Catalog REST) | 완료 | `HttpCatalogClient` |
 | AdminDataList (Catalog REST) | 완료 | `HttpCatalogClient.ListDataAsync()` |
 | Data 초안 모델 | 완료 (도메인 객체만) | `DataDefinition`, `DataRegisterRequest` |
