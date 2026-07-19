@@ -171,6 +171,57 @@ namespace NodeKit.Cli.Tests
         }
 
         [Fact]
+        public void Submit_ConnectTimeoutOptionMissingValue_ReturnsTwoWithExplicitError()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--connect-timeout" },
+                stdout,
+                stderr);
+
+            Assert.Equal(2, exitCode);
+            Assert.Contains("--connect-timeout 옵션에는 초 단위 양의 정수 값이 필요합니다", stderr.ToString());
+        }
+
+        [Theory]
+        [InlineData("abc")]
+        [InlineData("0")]
+        [InlineData("-5")]
+        public void Submit_ConnectTimeoutOptionInvalidValue_ReturnsTwoWithExplicitError(string value)
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--connect-timeout", value },
+                stdout,
+                stderr);
+
+            Assert.Equal(2, exitCode);
+            Assert.Contains("--connect-timeout 값이 올바르지 않습니다", stderr.ToString());
+        }
+
+        [Fact]
+        public void Submit_ConnectTimeoutOptionDuplicated_ReturnsTwoWithExplicitError()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--connect-timeout", "5", "--connect-timeout", "10" },
+                stdout,
+                stderr);
+
+            Assert.Equal(2, exitCode);
+            Assert.Contains("--connect-timeout 옵션이 여러 번 지정되었습니다", stderr.ToString());
+        }
+
+        [Fact]
         public void Submit_MissingRecipeFile_ReturnsTwo()
         {
             var missingPath = Path.Join(_workDir, "nonexistent.json");
@@ -429,6 +480,46 @@ namespace NodeKit.Cli.Tests
 
             Assert.Equal(0, exitCode);
             Assert.DoesNotContain("경고: 무결성 상태", stdout.ToString());
+        }
+
+        [Fact]
+        public void Submit_ConnectTimeoutFires_BeforeAnyEvent_ReturnsDistinctTimeoutExitCode()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var client = new HangingBeforeAnyEventToolSpecClient();
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--connect-timeout", "1" },
+                stdout,
+                stderr,
+                toolSpecClient: client);
+
+            // 130(사용자 Ctrl-C)과 구분되는 별도 exit code — 타임아웃은
+            // 사용자가 취소한 게 아니라 서버/네트워크가 응답하지 않은 것.
+            Assert.Equal(124, exitCode);
+            Assert.Contains("타임아웃되었습니다 (--connect-timeout)", stderr.ToString());
+        }
+
+        [Fact]
+        public void Submit_ConnectTimeout_DoesNotApplyAfterBuildIdReceived()
+        {
+            // connect-timeout(1초)보다 오래 걸리는 WatchToolBuild 단계가 있어도
+            // 실제 빌드는 정상적으로 오래 걸릴 수 있으므로, buildId를 받은
+            // 뒤에는 이 타이머가 더 이상 적용되지 않아야 한다.
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var client = new SlowWatchToolSpecClient();
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--connect-timeout", "1" },
+                stdout,
+                stderr,
+                toolSpecClient: client);
+
+            Assert.Equal(0, exitCode);
         }
 
         [Fact]
@@ -746,6 +837,47 @@ namespace NodeKit.Cli.Tests
 
             public Task CancelBuildAsync(string buildId, CancellationToken cancellationToken = default) =>
                 Task.Delay(Timeout.Infinite, cancellationToken);
+        }
+
+        // Simulates ResolveToolSpec/SubmitToolBuild hanging before any event is ever
+        // yielded (no buildId reaches SubmitCommand) -- proves --connect-timeout can
+        // still get the CLI out even though there is nothing to observe yet.
+        private sealed class HangingBeforeAnyEventToolSpecClient : IToolSpecBuildClient
+        {
+#pragma warning disable CS1998
+            public async IAsyncEnumerable<BuildEvent> ResolveAndBuildAsync(
+                string toolName,
+                string version,
+                string rawSpec,
+                [EnumeratorCancellation] CancellationToken cancellationToken = default)
+            {
+                await Task.Delay(Timeout.Infinite, cancellationToken);
+                yield break;
+            }
+#pragma warning restore CS1998
+
+            public Task CancelBuildAsync(string buildId, CancellationToken cancellationToken = default) =>
+                Task.CompletedTask;
+        }
+
+        // Yields JobCreated immediately, then simulates a long-running real build by
+        // delaying well past a short --connect-timeout before the terminal Succeeded
+        // event -- proves the connect-timeout is disarmed once a buildId exists.
+        private sealed class SlowWatchToolSpecClient : IToolSpecBuildClient
+        {
+            public async IAsyncEnumerable<BuildEvent> ResolveAndBuildAsync(
+                string toolName,
+                string version,
+                string rawSpec,
+                [EnumeratorCancellation] CancellationToken cancellationToken = default)
+            {
+                yield return new BuildEvent { Kind = BuildEventKind.JobCreated, BuildId = "build-slow-watch" };
+                await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+                yield return new BuildEvent { Kind = BuildEventKind.Succeeded, Message = "완료" };
+            }
+
+            public Task CancelBuildAsync(string buildId, CancellationToken cancellationToken = default) =>
+                Task.CompletedTask;
         }
     }
 }

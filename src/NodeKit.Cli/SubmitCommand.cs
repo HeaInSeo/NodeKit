@@ -13,10 +13,13 @@ using NodeKit.Validation.Recipes;
 namespace NodeKit.Cli
 {
     /// <summary>
-    /// nodekit submit &lt;recipe.json&gt; [--url &lt;nodevault-url&gt;]
+    /// nodekit submit &lt;recipe.json&gt; [--url &lt;nodevault-url&gt;] [--connect-timeout &lt;seconds&gt;]
     ///
     /// 경로: ResolveToolSpec → SubmitToolBuild → WatchToolBuild.
     /// NodeVault 주소: --url 옵션 또는 NODEKIT_NODEVAULT_URL 환경변수.
+    /// --connect-timeout은 build ID를 받기 전(ResolveToolSpec/SubmitToolBuild)
+    /// 단계에만 적용된다 — WatchToolBuild로 실제 빌드를 관찰하는 동안은
+    /// 정상적으로 오래 걸릴 수 있어 적용되지 않는다(Ctrl-C만 유효).
     /// </summary>
     internal static class SubmitCommand
     {
@@ -34,12 +37,12 @@ namespace NodeKit.Cli
         {
             if (args.Length < 2)
             {
-                stderr.WriteLine("사용법: nodekit submit <recipe.json> [--url <nodevault-url>] [--strict-reproducible]");
+                stderr.WriteLine("사용법: nodekit submit <recipe.json> [--url <nodevault-url>] [--connect-timeout <seconds>] [--strict-reproducible]");
                 return 2;
             }
 
             var recipePath = args[1];
-            if (!TryParseOptions(args, stderr, out var urlOption))
+            if (!TryParseOptions(args, stderr, out var urlOption, out var connectTimeout))
             {
                 return 2;
             }
@@ -102,12 +105,12 @@ namespace NodeKit.Cli
 
             if (toolSpecClient is not null)
             {
-                return SubmitAsync(definition.Name, definition.Version, rawSpec, toolSpecClient, stdout, stderr)
+                return SubmitAsync(definition.Name, definition.Version, rawSpec, toolSpecClient, stdout, stderr, connectTimeout)
                     .GetAwaiter().GetResult();
             }
 
             using var grpc = new GrpcToolSpecClient(url!);
-            return SubmitAsync(definition.Name, definition.Version, rawSpec, grpc, stdout, stderr)
+            return SubmitAsync(definition.Name, definition.Version, rawSpec, grpc, stdout, stderr, connectTimeout)
                 .GetAwaiter().GetResult();
         }
 
@@ -117,9 +120,24 @@ namespace NodeKit.Cli
             string rawSpec,
             IToolSpecBuildClient client,
             TextWriter stdout,
-            TextWriter stderr)
+            TextWriter stderr,
+            TimeSpan? connectTimeout = null)
         {
             using var cts = new CancellationTokenSource();
+
+            // 별도 CTS로 분리한 이유: ResolveToolSpec/SubmitToolBuild 단계(빌드
+            // ID가 아직 없는 상태)가 네트워크/서버 문제로 멈추면 Ctrl-C 외에는
+            // 빠져나갈 방법이 없었다 — WatchToolBuild(실제 빌드 관찰) 단계는
+            // 정상적으로 오래 걸릴 수 있어 같은 타임아웃을 적용하면 안 되므로,
+            // buildId를 처음 받는 순간 아래에서 이 타이머를 명시적으로 해제한다
+            // (CancelAfter(Timeout.InfiniteTimeSpan)로 예약된 취소를 취소).
+            using var connectTimeoutCts = new CancellationTokenSource();
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token, connectTimeoutCts.Token);
+            if (connectTimeout is { } timeout)
+            {
+                connectTimeoutCts.CancelAfter(timeout);
+            }
+
             string? buildId = null;
             var digestReceived = false;
             string? lastImageDigest = null;
@@ -134,12 +152,18 @@ namespace NodeKit.Cli
 
             try
             {
-                await foreach (var ev in client.ResolveAndBuildAsync(toolName, version, rawSpec, cts.Token))
+                await foreach (var ev in client.ResolveAndBuildAsync(toolName, version, rawSpec, linkedCts.Token))
                 {
                     PrintEvent(ev, stdout);
                     if (!string.IsNullOrEmpty(ev.BuildId))
                     {
                         buildId = ev.BuildId;
+
+                        // 빌드 ID를 받았다는 건 ResolveToolSpec/SubmitToolBuild가
+                        // 이미 끝났다는 뜻 — connect-timeout이 아직 발동 전이면
+                        // 여기서 해제해서 이후 WatchToolBuild 관찰 단계에는 영향을
+                        // 주지 않게 한다. 이미 발동됐다면 이 호출은 안전한 no-op.
+                        connectTimeoutCts.CancelAfter(Timeout.InfiniteTimeSpan);
                     }
 
                     if (ev.Kind == BuildEventKind.DigestAcquired && !string.IsNullOrEmpty(ev.Digest))
@@ -219,12 +243,22 @@ namespace NodeKit.Cli
             }
             catch (OperationCanceledException)
             {
+                if (connectTimeoutCts.IsCancellationRequested && !cts.IsCancellationRequested)
+                {
+                    return ReportConnectTimeout(stderr, connectTimeout!.Value);
+                }
+
                 await CancelServerBuildBestEffort(client, buildId, stderr);
                 stderr.WriteLine("빌드 요청이 취소되었습니다.");
                 return 130;
             }
             catch (RpcException rpc) when (rpc.StatusCode == StatusCode.Cancelled)
             {
+                if (connectTimeoutCts.IsCancellationRequested && !cts.IsCancellationRequested)
+                {
+                    return ReportConnectTimeout(stderr, connectTimeout!.Value);
+                }
+
                 await CancelServerBuildBestEffort(client, buildId, stderr);
                 stderr.WriteLine("빌드 요청이 취소되었습니다.");
                 return 130;
@@ -244,6 +278,19 @@ namespace NodeKit.Cli
             {
                 Console.CancelKeyPress -= onCancelKeyPress;
             }
+        }
+
+        // 타임아웃이 발동하는 시점은 항상 buildId를 받기 전(ResolveToolSpec/
+        // SubmitToolBuild 단계)이므로 — 그 이후엔 disarm된다 — 서버에 실제로
+        // 시작된 빌드가 없다. CancelServerBuildBestEffort를 부를 대상 자체가
+        // 없다는 뜻이라 사용자 Ctrl-C 취소(exit 130)와 다른, 구분되는 exit
+        // code(124, `timeout(1)` 셸 명령의 관례와 동일)를 쓴다.
+        private static int ReportConnectTimeout(TextWriter stderr, TimeSpan timeout)
+        {
+            stderr.WriteLine(
+                $"NodeVault 연결이 {(int)timeout.TotalSeconds}초 동안 응답이 없어 타임아웃되었습니다 (--connect-timeout). " +
+                "주소와 네트워크 상태를 확인하세요.");
+            return 124;
         }
 
         // 클라이언트 취소는 로컬 스트림만 끊을 뿐 서버 빌드를 멈추지 않는다 —
@@ -307,13 +354,16 @@ namespace NodeKit.Cli
         }
 
         // args[0]은 "submit", args[1]은 recipe 경로 — 옵션은 인덱스 2부터 시작한다.
-        // 알려지지 않은 옵션, --url 값 누락, --url 중복 지정을 명시적 에러로
-        // 만든다 — 이전에는 --url 값이 없으면 조용히 null이 되어 "주소 필요"라는
-        // 일반 에러로 뭉개졌고, 오타난 플래그는 그냥 무시됐다.
-        private static bool TryParseOptions(string[] args, TextWriter stderr, out string? url)
+        // 알려지지 않은 옵션, --url/--connect-timeout 값 누락, --url 중복 지정을
+        // 명시적 에러로 만든다 — 이전에는 --url 값이 없으면 조용히 null이 되어
+        // "주소 필요"라는 일반 에러로 뭉개졌고, 오타난 플래그는 그냥 무시됐다.
+        private static bool TryParseOptions(
+            string[] args, TextWriter stderr, out string? url, out TimeSpan? connectTimeout)
         {
             url = null;
+            connectTimeout = null;
             var urlSeen = false;
+            var connectTimeoutSeen = false;
 
             for (var i = 2; i < args.Length; i++)
             {
@@ -338,12 +388,38 @@ namespace NodeKit.Cli
                     continue;
                 }
 
+                if (arg == "--connect-timeout")
+                {
+                    if (connectTimeoutSeen)
+                    {
+                        stderr.WriteLine("--connect-timeout 옵션이 여러 번 지정되었습니다.");
+                        return false;
+                    }
+
+                    if (i + 1 >= args.Length)
+                    {
+                        stderr.WriteLine("--connect-timeout 옵션에는 초 단위 양의 정수 값이 필요합니다.");
+                        return false;
+                    }
+
+                    if (!int.TryParse(args[i + 1], out var seconds) || seconds <= 0)
+                    {
+                        stderr.WriteLine($"--connect-timeout 값이 올바르지 않습니다: '{args[i + 1]}' (초 단위 양의 정수여야 합니다).");
+                        return false;
+                    }
+
+                    connectTimeout = TimeSpan.FromSeconds(seconds);
+                    connectTimeoutSeen = true;
+                    i++;
+                    continue;
+                }
+
                 if (arg == "--strict-reproducible")
                 {
                     continue;
                 }
 
-                stderr.WriteLine($"알 수 없는 옵션입니다: {arg} (지원: --url <url>, --strict-reproducible)");
+                stderr.WriteLine($"알 수 없는 옵션입니다: {arg} (지원: --url <url>, --connect-timeout <seconds>, --strict-reproducible)");
                 return false;
             }
 

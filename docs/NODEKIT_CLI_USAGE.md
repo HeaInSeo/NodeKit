@@ -764,7 +764,7 @@ nodekit recipe create /tmp/recipe.json \
 recipe를 검증하고 NodeVault에 빌드 제출한다.
 
 ```bash
-nodekit submit recipe.json [--url <nodevault-url>] [--strict-reproducible]
+nodekit submit recipe.json [--url <nodevault-url>] [--connect-timeout <seconds>] [--strict-reproducible]
 ```
 
 `ResolveToolSpec → SubmitToolBuild → WatchToolBuild`(NodeVault Phase 1)가 유일한
@@ -816,6 +816,7 @@ spec 해결 완료 (digest: 8f3a1c2d...)
 | 옵션 | 의미 |
 |---|---|
 | `--url <url>` | NodeVault gRPC 엔드포인트 URL (환경변수 `NODEKIT_NODEVAULT_URL`이 없을 때 필수) |
+| `--connect-timeout <seconds>` | `ResolveToolSpec`/`SubmitToolBuild` 단계(아직 build ID가 없는 상태)가 이 시간(초) 안에 끝나지 않으면 타임아웃으로 종료한다(종료 코드 124). 기본값 없음 — 지정하지 않으면 이전과 동일하게 Ctrl-C 외에는 빠져나갈 방법이 없다. **build ID를 받은 뒤(`WatchToolBuild`로 실제 빌드를 관찰하는 동안)에는 적용되지 않는다** — 실제 빌드는 오래 걸리는 게 정상이라 같은 타임아웃을 적용하면 안 되기 때문. 그 단계에서 빠져나가려면 여전히 Ctrl-C를 쓴다. |
 | `--strict-reproducible` | conda/micromamba 패키지가 `name=version`(버전만 고정)이면 제출 전에 차단한다. NodeVault 최종 게이트는 `name=version=build` 전체 고정만 받아들이는데, NodeKit L1은 authoring 편의를 위해 버전만 고정된 값도 기본적으로 허용한다 — 이 플래그로 그 불일치를 제출 전에 미리 잡을 수 있다. |
 
 ## 4. `nodekit validate <recipe.json> [--strict-reproducible]`
@@ -909,6 +910,8 @@ ls: cannot access 'build-request.json': No such file or directory
 | 0 | 성공 (검증 통과, 또는 검증 통과 후 render/recipe create 완료) |
 | 1 | recipe-level 또는 L1 검증 위반 1개 이상, 또는 recipe create 최종 검증 실패 |
 | 2 | 사용법 오류, 인자 누락, 알 수 없는 옵션/필드, 파일을 읽을 수 없음, recipe JSON 파싱 실패 |
+| 124 | `nodekit submit`: `--connect-timeout`이 만료됨 (build ID를 받기 전 단계에서만 적용) |
+| 130 | `nodekit submit`: Ctrl-C로 취소됨 |
 
 ### 그 외
 
