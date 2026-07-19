@@ -39,7 +39,12 @@ namespace NodeKit.Cli
             }
 
             var recipePath = args[1];
-            var url = ParseUrlOption(args) ?? Environment.GetEnvironmentVariable("NODEKIT_NODEVAULT_URL");
+            if (!TryParseOptions(args, stderr, out var urlOption))
+            {
+                return 2;
+            }
+
+            var url = urlOption ?? Environment.GetEnvironmentVariable("NODEKIT_NODEVAULT_URL");
 
             if (toolSpecClient is null && string.IsNullOrWhiteSpace(url))
             {
@@ -283,10 +288,48 @@ namespace NodeKit.Cli
             }
         }
 
-        private static string? ParseUrlOption(string[] args)
+        // args[0]은 "submit", args[1]은 recipe 경로 — 옵션은 인덱스 2부터 시작한다.
+        // 알려지지 않은 옵션, --url 값 누락, --url 중복 지정을 명시적 에러로
+        // 만든다 — 이전에는 --url 값이 없으면 조용히 null이 되어 "주소 필요"라는
+        // 일반 에러로 뭉개졌고, 오타난 플래그는 그냥 무시됐다.
+        private static bool TryParseOptions(string[] args, TextWriter stderr, out string? url)
         {
-            var idx = Array.IndexOf(args, "--url");
-            return idx >= 0 && idx + 1 < args.Length ? args[idx + 1] : null;
+            url = null;
+            var urlSeen = false;
+
+            for (var i = 2; i < args.Length; i++)
+            {
+                var arg = args[i];
+                if (arg == "--url")
+                {
+                    if (urlSeen)
+                    {
+                        stderr.WriteLine("--url 옵션이 여러 번 지정되었습니다.");
+                        return false;
+                    }
+
+                    if (i + 1 >= args.Length)
+                    {
+                        stderr.WriteLine("--url 옵션에는 값이 필요합니다.");
+                        return false;
+                    }
+
+                    url = args[i + 1];
+                    urlSeen = true;
+                    i++;
+                    continue;
+                }
+
+                if (arg == "--strict-reproducible")
+                {
+                    continue;
+                }
+
+                stderr.WriteLine($"알 수 없는 옵션입니다: {arg} (지원: --url <url>, --strict-reproducible)");
+                return false;
+            }
+
+            return true;
         }
     }
 }

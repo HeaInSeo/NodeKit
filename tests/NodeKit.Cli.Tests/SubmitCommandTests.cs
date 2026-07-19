@@ -123,6 +123,54 @@ namespace NodeKit.Cli.Tests
         }
 
         [Fact]
+        public void Submit_UrlOptionMissingValue_ReturnsTwoWithExplicitError()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--url" },
+                stdout,
+                stderr);
+
+            Assert.Equal(2, exitCode);
+            Assert.Contains("--url 옵션에는 값이 필요합니다", stderr.ToString());
+        }
+
+        [Fact]
+        public void Submit_UrlOptionDuplicated_ReturnsTwoWithExplicitError()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--url", "http://a", "--url", "http://b" },
+                stdout,
+                stderr);
+
+            Assert.Equal(2, exitCode);
+            Assert.Contains("--url 옵션이 여러 번 지정되었습니다", stderr.ToString());
+        }
+
+        [Fact]
+        public void Submit_UnknownOption_ReturnsTwoWithExplicitError()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--url", "http://a", "--typo-flag" },
+                stdout,
+                stderr);
+
+            Assert.Equal(2, exitCode);
+            Assert.Contains("알 수 없는 옵션입니다: --typo-flag", stderr.ToString());
+        }
+
+        [Fact]
         public void Submit_MissingRecipeFile_ReturnsTwo()
         {
             var missingPath = Path.Join(_workDir, "nonexistent.json");
