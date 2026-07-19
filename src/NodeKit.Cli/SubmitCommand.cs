@@ -238,10 +238,17 @@ namespace NodeKit.Cli
             // BuildSubmissionViewModel.CancelServerBuildBestEffort) — any
             // failure here just means the server-side build keeps running
             // instead of stopping early, which is reported as a warning,
-            // not treated as a command failure.
+            // not treated as a command failure. The caller's own cts is
+            // already cancelled at this point (Ctrl-C or a cancelled RPC
+            // already fired), so it can't be reused here — but
+            // CancellationToken.None would let this hang forever if the
+            // server or network is unresponsive, defeating the "user pressed
+            // Ctrl-C to get control back" intent. Bound it with its own
+            // short timeout instead.
+            using var cancelCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             try
             {
-                await client.CancelBuildAsync(buildId, CancellationToken.None);
+                await client.CancelBuildAsync(buildId, cancelCts.Token);
             }
             catch (Exception ex)
             {
