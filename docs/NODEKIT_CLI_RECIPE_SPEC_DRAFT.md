@@ -1,6 +1,21 @@
 # NodeKit CLI / Recipe Spec — DRAFT (2026-06-22)
 
-> **Status: partially implemented, design still under review.** The recipe
+> **Superseded (2026-07-19).** This entire draft predates NodeVault Phase 1
+> (gate opened 2026-07-02) and describes `BuildAndRegister` as "current" and
+> `ToolSpecRequest`/`ResolveToolSpec`/`SubmitToolBuild` as a "future" path —
+> that is no longer true. `nodekit submit` exists and is the only build
+> submission path (CLI and Avalonia GUI both), `BuildAndRegister`/
+> `IBuildClient`/`GrpcBuildClient` are fully removed from this repo, and the
+> vendored proto has carried `ToolSpecRequest`/`ResolveToolSpec`/
+> `SubmitToolBuild` since Phase 1 opened. The `RecipeDocument` model,
+> `RecipeValidator`, and `RecipeRenderer` design described below (sections
+> 1-7) is still accurate — only the "current legacy path vs. future path"
+> framing in section 0 and the 한국어 요약 (section 8) is wrong. For current
+> state, see `CLAUDE.md` §0 and `docs/NODEKIT_CLI_USAGE.md`. Kept below,
+> unmodified, as historical design-decision record.
+
+> **Original status note (2026-06-22, now stale — see above):**
+> partially implemented, design still under review. The recipe
 > model, recipe-level validator, and renderer described below exist in code
 > (`src/Authoring/Recipes/`, `src/Validation/Recipes/`,
 > `tests/NodeKit.Tests/Recipes/`) and are covered by tests. The CLI executable
@@ -10,7 +25,17 @@
 
 ## 0. Current path vs. future path
 
-This draft only targets the **current legacy path**:
+**Superseded (2026-07-19)**: the "future" path below is now the only path.
+`ToolSpecRequest`/`ResolveToolSpec`/`SubmitToolBuild` have been in the
+vendored proto since NodeVault Phase 1 opened (2026-07-02), `nodekit submit`
+implements the full chain, and `RecipeRenderer` output additionally feeds
+`ToolSpecRawSpecFactory.Build()` to produce `raw_spec` (see
+`docs/NODEKIT_CLI_USAGE.md` §3). `BuildAndRegister` is fully removed from
+this repo (both CLI and Avalonia GUI). Kept below, unmodified, as the
+original design record of what this draft was scoped to when written.
+
+This draft only targets the **current legacy path** (at time of writing,
+2026-06-22):
 
 ```text
 RecipeDocument -> ToolDefinition -> BuildRequest -> BuildAndRegister (gRPC)
@@ -325,6 +350,13 @@ layer; nothing here assumes that will happen or what it would look like.
    (PLATFORM_MASTER_DESIGN.md §4.9 참조).
 
 ## 8. 한국어 요약
+
+**Superseded (2026-07-19)**: 아래 두 단락(당시 상태 요약, "현재 경로 vs 미래
+경로")은 2026-06-22 시점 기록이며 지금은 맞지 않다. `nodekit submit`은
+이미 존재하고(§0 상단 배너, `docs/NODEKIT_CLI_USAGE.md` §3 참조) CLI/GUI
+모두 ToolSpec 경로(`ResolveToolSpec → SubmitToolBuild → WatchToolBuild`)만
+사용한다. `BuildAndRegister`/`IBuildClient`/`GrpcBuildClient`는 저장소
+어디에도 남아있지 않다. 아래는 원문 그대로 보존.
 
 이 문서는 **구현됨** 상태다. 아래에서 설명하는 recipe 모델, recipe-level
 validator, renderer는 실제 코드로 존재하며 (`src/Authoring/Recipes/`,
