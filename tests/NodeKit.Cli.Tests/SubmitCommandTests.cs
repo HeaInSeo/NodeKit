@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
@@ -389,6 +390,11 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(130, exitCode);
             Assert.Contains("취소되었습니다", stderr.ToString());
             Assert.Equal(new[] { "build-cancel-1" }, client.CancelledBuildIds);
+
+            // Regression: CancelBuildAsync must not be called with CancellationToken.None
+            // (which would let a best-effort cancel notification hang forever if the
+            // server/network is unresponsive) — it must carry its own bounded timeout.
+            Assert.True(client.CancelledTokens[0].CanBeCanceled);
         }
 
         [Fact]
@@ -410,6 +416,30 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(130, exitCode);
             Assert.Contains("취소되었습니다", stderr.ToString());
             Assert.Equal(new[] { "build-cancel-2" }, client.CancelledBuildIds);
+            Assert.True(client.CancelledTokens[0].CanBeCanceled);
+        }
+
+        [Fact]
+        public void Submit_ServerCancelRpcHangs_StillReturnsWithinOwnTimeout()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var client = new HangingCancelToolSpecClient("build-hang-1", new OperationCanceledException());
+
+            var stopwatch = Stopwatch.StartNew();
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath },
+                stdout,
+                stderr,
+                toolSpecClient: client);
+            stopwatch.Stop();
+
+            Assert.Equal(130, exitCode);
+            Assert.True(
+                stopwatch.Elapsed < TimeSpan.FromSeconds(10),
+                $"CancelServerBuildBestEffort should be bounded by its own timeout even when the " +
+                $"server never responds, took {stopwatch.Elapsed}");
         }
 
         [Fact]
@@ -558,6 +588,8 @@ namespace NodeKit.Cli.Tests
 
             public List<string> CancelledBuildIds { get; } = new();
 
+            public List<CancellationToken> CancelledTokens { get; } = new();
+
 #pragma warning disable CS1998
             public async IAsyncEnumerable<BuildEvent> ResolveAndBuildAsync(
                 string toolName,
@@ -573,8 +605,40 @@ namespace NodeKit.Cli.Tests
             public Task CancelBuildAsync(string buildId, CancellationToken cancellationToken = default)
             {
                 CancelledBuildIds.Add(buildId);
+                CancelledTokens.Add(cancellationToken);
                 return Task.CompletedTask;
             }
+        }
+
+        // Simulates a server/network that never responds to the cancel RPC — CancelBuildAsync
+        // only ever completes (with a cancellation exception) when the token it was given
+        // fires. If SubmitCommand ever regresses to passing CancellationToken.None again,
+        // this task never completes and the owning test hangs instead of finishing quickly.
+        private sealed class HangingCancelToolSpecClient : IToolSpecBuildClient
+        {
+            private readonly string _buildId;
+            private readonly Exception _cancellationException;
+
+            public HangingCancelToolSpecClient(string buildId, Exception cancellationException)
+            {
+                _buildId = buildId;
+                _cancellationException = cancellationException;
+            }
+
+#pragma warning disable CS1998
+            public async IAsyncEnumerable<BuildEvent> ResolveAndBuildAsync(
+                string toolName,
+                string version,
+                string rawSpec,
+                [EnumeratorCancellation] CancellationToken cancellationToken = default)
+            {
+                yield return new BuildEvent { Kind = BuildEventKind.JobCreated, BuildId = _buildId };
+                throw _cancellationException;
+            }
+#pragma warning restore CS1998
+
+            public Task CancelBuildAsync(string buildId, CancellationToken cancellationToken = default) =>
+                Task.Delay(Timeout.Infinite, cancellationToken);
         }
     }
 }
