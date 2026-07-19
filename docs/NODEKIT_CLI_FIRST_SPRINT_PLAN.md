@@ -2,7 +2,7 @@
 
 Status: Sprint 6 완료 / Sprint 7 진행 중(Task 1 완료, Task 2 — seoy fixture 3개 live 확인 완료, 전체 wizard 수동 테스트는 대기) / R18-R21(§13) 완료 / R22-B/C/D(§13) 완료 / 적대적 리뷰 Major-1(#41)/wizard 통합(#42)/3차 리뷰 follow-up(#45)/4차 리뷰 follow-up(proto+docs) 완료  
 Created: 2026-06-17  
-Updated: 2026-07-16  
+Updated: 2026-07-19 (§0/§1/§5/§8 stale BuildAndRegister/IBuildClient references corrected — Sprint 7 Task 1 was already complete but several sections still described the pre-Phase-6 world)  
 Scope: NodeKit work — Sprint 0-6 완료, Sprint 7(Post-Migration Hardening) 진행 중,
 §13 Live Recipe Reproducibility Improvement(R18-R21) 완료, R22-B/C/D(SourceBuild
 구조화 intent authoring 모델 + 2-stage 렌더링 + RuntimeProfile hygiene advisor) 완료,
@@ -16,7 +16,9 @@ Read this document first when resuming NodeKit work.
 **Phase 6 완료 (2026-07-02)**: NodeVault Phase 1 gate가 열렸고 NodeKit CLI는 이미
 ToolSpec 경로(`ResolveToolSpec → SubmitToolBuild → WatchToolBuild`)로 전환 완료.
 `--legacy` 플래그와 `BuildAndRegister` 경로는 CLI에서 제거됨.
-`IBuildClient` / `GrpcBuildClient`는 Avalonia(NodeKit.csproj)에만 남아 있음 — Sprint 7 대상.
+**Sprint 7 Task 1 완료 (2026-07-14)**: Avalonia GUI(NodeKit.csproj)도
+`BuildSubmissionViewModel`/`GrpcToolSpecClient`로 전환 완료 —
+`IBuildClient` / `GrpcBuildClient`는 저장소 어디에도 남아있지 않음.
 
 **§13 완료 (2026-07-09)**: seoy-libvirt-cilium 실 K8s 클러스터 라이브
 테스트(2026-07-08)에서 나온 NodeKit 쪽 개선 항목 R18-R21 전부 구현·테스트·
@@ -77,35 +79,58 @@ risky(curl 전용/buildpack-deps 등)하면 non-blocking 경고. 상세는 §13
 R22-D Progress 블록 참조. **R22(SourceBuild 구조화 intent) 이니셔티브
 전체(R22-B/C/D) 완료.**
 
-현재 NodeKit 초점:
+현재 NodeKit 초점 (2026-07-16 갱신):
 
 ```text
-R22-B/C/D 완료, 적대적 리뷰 Major-1(#41)/wizard 통합(#42) 완료 →
-  다음 후보: Sprint 7 Task 1(Avalonia GUI ToolSpec 마이그레이션) 또는
-  U5-2(seoy 수동 테스트) — 사용자 확인 필요
-Sprint 7: Avalonia GUI ToolSpec 마이그레이션
-+ U5-2: seoy 원격 장비 nodekit submit 수동 테스트 (seoy 준비 후)
+Sprint 7 Task 1(Avalonia GUI ToolSpec 마이그레이션) 완료(2026-07-14, 아래
+Progress 블록 참조). R22-B/C/D, 적대적 리뷰 Major-1(#41)/wizard 통합(#42) 완료.
+남은 것: Sprint 7 Task 2(seoy 원격 장비 nodekit submit 수동 테스트)
   — 2026-07-05: seoy 없이 heain 로컬 사전 검증 완료(TC-1~TC-13 전체), 버그 6건
     발견·수정·close (docs/NODEKIT_LOCAL_GRPC_TEST_SCENARIO.md §7 참조).
-    seoy 본 테스트는 아직 미완료.
+    seoy fixture 3개 live 확인 완료(§0 상단 Status 참조), 전체 wizard
+    수동 테스트는 여전히 미완료(○).
 + CI 그린 유지
 ```
 
 ## 1. Current Boundary
 
-NodeKit currently owns:
+**Superseded (2026-07-16)**: this section originally described the
+pre-Phase-6 world (BuildAndRegister current, ToolSpec future) and was
+never updated after Phase 6 opened — kept below as historical record of
+what Sprint 0 targeted, but do not treat it as current. Current
+boundary (CLI and GUI both, since Sprint 7 Task 1):
 
 ```text
+- user-facing authoring in the existing C# / Avalonia app and nodekit CLI
+- local L1 validation before submission
+- RecipeDocument -> ToolDefinition -> raw_spec conversion
+  (RecipeRenderer, ToolSpecRawSpecFactory)
+- ResolveToolSpec / SubmitToolBuild / WatchToolBuild client behavior
+  (GrpcToolSpecClient, shared by CLI and GUI)
+- local policy/check feedback quality
+```
+
+NodeKit still does not own (NodeVault-side, unchanged):
+
+```text
+- canonical digest calculation
+- ResolvedToolSpec generation
+- image build
+- certification / promotion
+- NodeVault Index mutation
+```
+
+Original pre-Phase-6 text, unmodified, for historical reference:
+
+```text
+NodeKit currently owns:
 - user-facing authoring in the existing C# / Avalonia app
 - local L1 validation before submission
 - BuildRequest creation
 - BuildAndRegister gRPC client behavior
 - local policy/check feedback quality
-```
 
 NodeKit does not yet own:
-
-```text
 - ToolSpecRequest production submission
 - ResolveToolSpec production integration
 - SubmitToolBuild integration
@@ -562,7 +587,12 @@ K8s 기반 NodeSentinel 검증(L3/L4/L5), 실제 Harbor 인증/웹훅/GC, seoy �
 
 ## 5. Immediate First Slice
 
-Start here:
+**Superseded (2026-07-16)**: this was Sprint 0's starting checklist
+(written 2026-06-17, pre-Phase-6) — all 6 items are long done (CI
+workflow exists, ToolSpecRequest production code has existed since
+Phase 6, L1 validation and coverage collection are both mature). Not a
+current "start here" list; see `## 0. Resume Note For Agents` above for
+current focus instead. Kept for historical reference:
 
 ```text
 1. Do not add new ToolSpecRequest production code.
@@ -651,12 +681,17 @@ Phase 1 이전 non-goal이었으나 현재 완료된 항목 (참고용):
 
 ## 8. Handoff Note
 
-The correct instruction for a NodeKit agent is:
+The correct instruction for a NodeKit agent is (updated 2026-07-16 —
+Sprint 7 Task 1 completed 2026-07-14; see `## 0. Resume Note For Agents`
+for current focus):
 
 ```text
-NodeKit CLI는 Phase 6 완료 (2026-07-02)로 ToolSpec 경로로 전환됨.
-BuildAndRegister / legacy 경로는 CLI에서 제거됨.
-다음 단계: Avalonia GUI(NodeKit.csproj)의 IBuildClient → GrpcToolSpecClient 전환 (Sprint 7).
+NodeKit CLI와 Avalonia GUI 둘 다 Phase 6 완료 (2026-07-02) 이후
+ToolSpec 경로(ResolveToolSpec → SubmitToolBuild → WatchToolBuild,
+GrpcToolSpecClient 공유)로 전환됨.
+BuildAndRegister / legacy 경로, IBuildClient / GrpcBuildClient는
+저장소 어디에도 남아있지 않음 (CLI: Phase 6, GUI: Sprint 7 Task 1,
+2026-07-14 완료).
 재현성 규칙(latest 태그 금지, digest 필수, 패키지 버전 고정)은 여전히 불변.
 NodeVault 경계(이미지 빌드, K8s API, 인덱스 뮤테이션)도 여전히 불변.
 ```
