@@ -124,6 +124,7 @@ namespace NodeKit.Cli
             var digestReceived = false;
             string? lastImageDigest = null;
             string? lastImageRef = null;
+            string? lastIntegrityHealth = null;
             ConsoleCancelEventHandler onCancelKeyPress = (_, e) =>
             {
                 e.Cancel = true;
@@ -159,6 +160,11 @@ namespace NodeKit.Cli
                         lastImageRef = ev.ImageRef;
                     }
 
+                    if (!string.IsNullOrEmpty(ev.IntegrityHealth))
+                    {
+                        lastIntegrityHealth = ev.IntegrityHealth;
+                    }
+
                     if (ev.Kind == BuildEventKind.Succeeded)
                     {
                         if (!string.IsNullOrEmpty(lastImageDigest))
@@ -179,6 +185,18 @@ namespace NodeKit.Cli
                             stdout.WriteLine(string.IsNullOrEmpty(buildId)
                                 ? "이미지 digest가 서버에서 제공되지 않았습니다 — NodeVault 인덱스에서 직접 확인하세요."
                                 : $"이미지 digest가 서버에서 제공되지 않았습니다 — NodeVault 인덱스에서 직접 확인하세요 (build ID: {buildId}).");
+                        }
+
+                        // 빌드 자체(Succeeded)는 exit code 0을 유지한다 — 기존
+                        // 스크립트/CI의 성공 판정을 깨지 않기 위해서다. 다만
+                        // integrity_health가 Healthy가 아니면(예: Partial) 후속
+                        // reconcile/등록 단계에 문제가 있다는 뜻이라 조용히
+                        // 넘어가지 않고 눈에 띄는 경고를 남긴다 — 빈 문자열은
+                        // "정보 없음"(구버전 NodeVault 등)이지 "문제 있음"이
+                        // 아니므로 경고 대상이 아니다.
+                        if (!string.IsNullOrEmpty(lastIntegrityHealth) && lastIntegrityHealth != "Healthy")
+                        {
+                            stdout.WriteLine($"경고: 무결성 상태가 {lastIntegrityHealth}입니다 — 빌드는 성공했지만 후속 검증/등록에 문제가 있을 수 있습니다. NodeVault 인덱스에서 확인하세요.");
                         }
 
                         return 0;
