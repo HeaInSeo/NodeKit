@@ -6,10 +6,10 @@ using NodeKit.Authoring;
 namespace NodeKit.Authoring.Recipes
 {
     /// <summary>
-    /// Renders a RecipeDocument into a ToolDefinition for the current legacy
-    /// BuildRequest path. Every build kind produces a non-empty DockerfileContent
-    /// because BuildRequest.dockerfile_content is a required field regardless
-    /// of how the image's contents were chosen (RequiredFieldsValidator L1-REQ-002).
+    /// Renders a RecipeDocument into a ToolDefinition for the current ToolSpec
+    /// raw_spec path. Every build kind produces a non-empty DockerfileContent
+    /// because NodeVault's buildRequestFromResolved requires dockerfile_content
+    /// regardless of how the image's contents were chosen.
     /// </summary>
     internal static class RecipeRenderer
     {

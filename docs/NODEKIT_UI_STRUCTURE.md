@@ -41,7 +41,7 @@
 
 ### 3.1 Tool 정의 패널 (`AuthoringPanel`)
 
-Tool authoring 워크플로의 시작점. `ToolDefinition` 초안을 작성하고 L1 검증 후 gRPC로 BuildRequest를 전송한다.
+Tool authoring 워크플로의 시작점. `ToolDefinition` 초안을 작성하고 L1 검증 후 gRPC로 ToolSpec `raw_spec`를 전송한다.
 
 #### 입력 필드
 
@@ -83,7 +83,7 @@ Tool authoring 워크플로의 시작점. `ToolDefinition` 초안을 작성하�
 | 버튼 (`Name`) | 동작 |
 |--------------|------|
 | `ValidateButton` | `WasmPolicyChecker`로 L1 검증 실행 |
-| `SendBuildButton` | L1 통과 후 활성화. `BuildRequest` gRPC 전송 |
+| `SendBuildButton` | L1 통과 후 활성화. ToolSpec gRPC 전송 |
 
 #### 피드백 패널
 
@@ -200,7 +200,7 @@ ReloadBundleButton 클릭
 |------|-----------|
 | 기본 | `준비` |
 | 검증 중 | `L1 검증 중...` |
-| 빌드 전송 | `BuildRequest 전송 중...` |
+| 빌드 전송 | `ToolSpec 빌드 전송 중...` |
 | 로드 중 | `툴 목록 로드 중...` |
 | 오류 | `오류: {message}` |
 
@@ -227,7 +227,7 @@ ReloadBundleButton 클릭
 |------|------|------|
 | `ToolDefinition` | `src/Authoring/ToolDefinition.cs` | Tool 작성 초안 모델 |
 | `DataDefinition` | `src/Authoring/DataDefinition.cs` | Data 작성 초안 모델 |
-| `BuildRequest` | `src/Grpc/BuildRequest.cs` | gRPC 전송 모델 |
+| `BuildRequest` | `src/Grpc/BuildRequest.cs` | legacy DTO/safety-net 테스트 모델. 현재 submit 경로는 `ToolSpecRawSpecFactory` 사용 |
 | `DataRegisterRequest` | `src/Grpc/DataRegisterRequest.cs` | Data gRPC 전송 모델 |
 | `RegisteredTool` | `src/Grpc/GrpcToolRegistryClient.cs` | Catalog 조회 결과 |
 | `RegisteredData` | `src/Grpc/HttpCatalogClient.cs` | Catalog 조회 결과 |

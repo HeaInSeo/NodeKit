@@ -32,34 +32,34 @@ namespace NodeKit.Cli
                 [RecipeMethodId.Container] = new[]
                 {
                     "기존 컨테이너 이미지를 그대로 사용하는 recipe를 생성합니다.",
-                    "나중에 legacy BuildRequest로 render할 수 있습니다.",
+                    "나중에 로컬 JSON preview로 render하거나 ToolSpec 경로로 submit할 수 있습니다.",
                 },
                 [RecipeMethodId.Package] = new[]
                 {
                     "conda/micromamba 기반 이미지 recipe를 생성합니다.",
                     "패키지와 채널 정보를 recipe에 기록합니다.",
-                    "나중에 legacy BuildRequest로 render할 수 있습니다.",
+                    "나중에 로컬 JSON preview로 render하거나 ToolSpec 경로로 submit할 수 있습니다.",
                 },
                 [RecipeMethodId.Mirror] = new[]
                 {
                     "내부 package mirror를 사용하는 recipe를 생성합니다.",
-                    "나중에 legacy BuildRequest로 render할 수 있습니다.",
+                    "나중에 로컬 JSON preview로 render하거나 ToolSpec 경로로 submit할 수 있습니다.",
                 },
                 [RecipeMethodId.Source] = new[]
                 {
                     "source archive를 받아 빌드하는 recipe를 생성합니다.",
-                    "나중에 legacy BuildRequest로 render할 수 있습니다.",
+                    "나중에 로컬 JSON preview로 render하거나 ToolSpec 경로로 submit할 수 있습니다.",
                 },
                 [RecipeMethodId.Dockerfile] = new[]
                 {
                     "Dockerfile을 직접 사용하는 recipe를 생성합니다.",
-                    "나중에 legacy BuildRequest로 render할 수 있습니다.",
+                    "나중에 로컬 JSON preview로 render하거나 ToolSpec 경로로 submit할 수 있습니다.",
                 },
                 [RecipeMethodId.SourceStructured] = new[]
                 {
                     "source archive를 빌드 환경(builder)과 런타임 환경(final)으로 분리된 " +
                         "2-stage recipe로 생성합니다 — 빌드 도구가 최종 이미지에 남지 않습니다.",
-                    "나중에 legacy BuildRequest로 render할 수 있습니다.",
+                    "나중에 로컬 JSON preview로 render하거나 ToolSpec 경로로 submit할 수 있습니다.",
                 },
             };
 

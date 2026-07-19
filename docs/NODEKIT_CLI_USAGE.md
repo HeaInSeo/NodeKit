@@ -850,6 +850,14 @@ $ echo $?
 
 ## 5. `nodekit render <recipe.json> --out <build-request.json> [--strict-reproducible]`
 
+**주의**: 이 명령의 출력 파일은 `nodekit submit`의 입력이 **아니다** —
+둘은 서로 무관한 별개 경로다. `submit`은 오직 `recipe.json`만 입력으로
+받아 내부에서 자체적으로 `raw_spec`을 만들어 NodeVault ToolSpec 경로로
+전송한다(§3 참고). `render`는 순수 로컬 미리보기/export 유틸리티로,
+recipe를 legacy `BuildRequest` POCO 형태(PascalCase, 필드명은 §7 스키마와
+다름)로 변환해 파일에 쓸 뿐이며 네트워크 호출이 전혀 없다 — 디버깅이나
+기존 도구와의 호환용 스냅샷이 필요할 때만 쓰는 명령이다.
+
 `validate`와 동일한 검증(§4의 `--strict-reproducible` 포함)을 내부에서 먼저
 수행한다 (fail-closed — 검증 안 된
 정의는 절대 export하지 않는다). 통과하면 `BuildRequestFactory`로

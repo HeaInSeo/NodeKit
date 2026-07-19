@@ -10,10 +10,10 @@ using NodeKit.Validation.Recipes;
 namespace NodeKit.Cli
 {
     /// <summary>
-    /// nodekit CLI 진입점 로직. legacy BuildRequest 경로만 다룬다:
+    /// nodekit CLI 진입점 로직. 로컬 recipe authoring/render 경로를 다룬다:
     /// RecipeDocument → RecipeValidator → RecipeRenderer → ToolDefinition →
-    /// 기존 L1 validator 체인 → BuildRequest 직렬화.
-    /// submit/build/gRPC 전송/NodeVault 조회는 이 CLI의 범위 밖이다.
+    /// 기존 L1 validator 체인 → ToolDefinition/BuildRequest JSON preview 또는 submit용 raw_spec.
+    /// SubmitCommand가 NodeVault ToolSpec gRPC 전송을 담당한다.
     /// </summary>
     internal static class CliApp
     {
@@ -110,6 +110,7 @@ namespace NodeKit.Cli
             if (args.Length < 2)
             {
                 stderr.WriteLine("사용법: nodekit render <recipe.json> --out <build-request.json> [--strict-reproducible]");
+                stderr.WriteLine("  (로컬 미리보기 전용 — 네트워크 호출 없음. submit의 입력이 아님. 실제 제출은 nodekit submit <recipe.json>)");
                 return 2;
             }
 

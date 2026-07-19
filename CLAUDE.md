@@ -33,8 +33,8 @@ At the start of each development session, observe NodeVault without editing it:
 - inspect `/opt/go/src/github.com/HeaInSeo/NodeVault/protos/nodevault/v1/nodevault.proto`
 
 NodeVault's planning/API documents are the upstream platform source of truth for
-NodeKit integration. If NodeVault has only partial new-path support, NodeKit must
-stay compatible with the legacy `BuildRequest` / `BuildAndRegister` path.
+NodeKit integration. The current NodeKit build submission path is ToolSpec-only;
+do not reintroduce a legacy `BuildAndRegister` fallback in NodeKit.
 
 NodeVault and adjacent platform services are tested on remote infrastructure by
 default. Discover live environment details from documents under
@@ -46,7 +46,7 @@ explicitly opted in.
 
 **NodeKit owns**: ToolDefinition authoring (UI forms, field validation), DataDefinition authoring
 (reference data metadata forms), L1 static validation (image URI checks, package version pinning),
-DockGuard policy execution via `WasmPolicyChecker`, BuildRequest / DataRegisterRequest generation
+DockGuard policy execution via `WasmPolicyChecker`, ToolSpec `raw_spec` / DataRegisterRequest generation
 and gRPC transmission to NodeVault, AdminToolList / AdminDataList display (via Catalog 서비스 REST API),
 and all admin UX semantics (status feedback, error display, policy management UI).
 
@@ -72,7 +72,7 @@ Do not implement editor UX, selection policy, or undo/redo in NodeKit — those 
 |------|-------|---------|
 | `ToolDefinition` | NodeKit | Tool authoring draft model. Not the final registered object. |
 | `DataDefinition` | NodeKit | Reference data authoring draft model. Not the final registered object. |
-| `BuildRequest` | NodeKit→NodeVault | What NodeKit sends over gRPC after L1 passes (tool). |
+| `ToolSpecRequest.raw_spec` | NodeKit→NodeVault | What NodeKit sends over gRPC after L1 passes (tool build). |
 | `DataRegisterRequest` | NodeKit→NodeVault | What NodeKit sends over gRPC for reference data registration. |
 | `RegisteredToolDefinition` | NodeVault | Post-L4 confirmed tool object. Harbor referrer + index. |
 | `RegisteredDataDefinition` | NodeVault | Confirmed reference data object. Harbor referrer + index. |
@@ -110,7 +110,7 @@ Interface must be finalized before implementation to minimize swap cost.
 
 ## 5. gRPC client responsibility
 
-NodeKit is a **gRPC client only**. It sends `BuildRequest` / `DataRegisterRequest` and receives
+NodeKit is a **gRPC client only**. It sends ToolSpec build requests / `DataRegisterRequest` and receives
 status/results. AdminToolList / AdminDataList display uses Catalog 서비스 REST API (not gRPC).
 Do not implement gRPC server logic in NodeKit. The proto contract is the boundary —
 any change to `.proto` definitions requires coordination with NodeVault.
@@ -163,6 +163,6 @@ Before marking a change complete, explicitly check for:
 - `WasmPolicyChecker` not loading the bundle (file missing, wrong path) silently passing all checks
 - `IPolicyBundleProvider` swap leaving stale bundle in memory
 - gRPC send failure not surfaced in UI (fire-and-forget without error propagation)
-- `BuildRequest` missing required fields after serialization round-trip
+- ToolSpec `raw_spec` missing required fields after serialization round-trip
 - `AdminToolList` / `AdminDataList` displaying stale data after successful registration
 - `DataRegisterRequest` missing required metadata fields after serialization round-trip

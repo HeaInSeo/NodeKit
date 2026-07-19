@@ -5,7 +5,7 @@ namespace NodeKit.Authoring
 {
     /// <summary>
     /// NodeKit authoring 단계의 Tool 초안 모델.
-    /// BuildRequest 생성 전까지의 작업 중인 정의다.
+    /// ToolSpec raw_spec 생성 전까지의 작업 중인 정의다.
     /// RegisteredToolDefinition과 구분: 이 객체는 NodeVault에 전달 전 초안이다.
     /// </summary>
     internal class ToolDefinition
