@@ -274,7 +274,12 @@ namespace NodeKit.Cli
 
         private static bool TryTakeNext(string[] options, ref int i, out string value)
         {
-            if (i + 1 >= options.Length)
+            // 다음 토큰이 없거나 그 자체가 또 다른 옵션처럼 보이면(-- 로 시작)
+            // "값 누락"으로 취급한다(CliOptionParser와 동일한 규칙) — 그렇지
+            // 않으면 `--method --non-interactive` 같은 실수가 "--non-interactive"를
+            // method 값으로 그대로 삼키고, 그 부작용으로 --non-interactive
+            // 플래그 자체가 다음 반복에서 건너뛰어져 조용히 무시된다.
+            if (i + 1 >= options.Length || options[i + 1].StartsWith("--", StringComparison.Ordinal))
             {
                 value = string.Empty;
                 return false;

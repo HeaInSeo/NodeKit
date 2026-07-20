@@ -77,6 +77,25 @@ namespace NodeKit.Cli.Tests
         }
 
         [Fact]
+        public void Method_ValueLooksLikeAnotherOption_ReturnsTwoWithExplicitError()
+        {
+            // Regression test (external review): --method's next token being another
+            // flag (typo'd or a genuine mistake, e.g. forgetting the value) used to be
+            // silently accepted as the method's literal value -- "알 수 없는
+            // method입니다: --non-interactive" was at least a somewhat legible error,
+            // but the real bug was the side effect: TryTakeNext's ref i increment
+            // consumed the "--non-interactive" token as a value, so the outer loop
+            // never saw it as a flag and --non-interactive was silently never set.
+            using var stderr = new StringWriter();
+
+            var exitCode = RunCreate(
+                new[] { "--method", "--non-interactive" }, stderr: stderr);
+
+            Assert.Equal(2, exitCode);
+            Assert.Contains("--method 옵션에는 값이 필요합니다", stderr.ToString());
+        }
+
+        [Fact]
         public void Dockerfile_WithAcceptWarningAndNonInteractive_IsAccepted()
         {
             var exitCode = RunCreate(DockerfileArgs());
