@@ -243,6 +243,79 @@ namespace NodeKit.Cli.Tests
         }
 
         [Fact]
+        public void Submit_WatchTimeoutOptionMissingValue_ReturnsTwoWithExplicitError()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--watch-timeout" },
+                stdout,
+                stderr);
+
+            Assert.Equal(2, exitCode);
+            Assert.Contains("--watch-timeout 옵션에는 값이 필요합니다", stderr.ToString());
+        }
+
+        [Theory]
+        [InlineData("abc")]
+        [InlineData("2x")]
+        [InlineData("0h")]
+        [InlineData("-5m")]
+        [InlineData("120")]
+        public void Submit_WatchTimeoutOptionInvalidValue_ReturnsTwoWithExplicitError(string value)
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--watch-timeout", value },
+                stdout,
+                stderr);
+
+            Assert.Equal(2, exitCode);
+            Assert.Contains("--watch-timeout 값이 올바르지 않습니다", stderr.ToString());
+        }
+
+        [Theory]
+        [InlineData("2h")]
+        [InlineData("90m")]
+        [InlineData("120s")]
+        [InlineData("1.5h")]
+        public void Submit_WatchTimeoutOptionValidDurationFormats_AreAccepted(string value)
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--watch-timeout", value },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(new[] { new BuildEvent { Kind = BuildEventKind.Succeeded } }));
+
+            Assert.Equal(0, exitCode);
+        }
+
+        [Fact]
+        public void Submit_WatchTimeoutOptionDuplicated_ReturnsTwoWithExplicitError()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--watch-timeout", "1h", "--watch-timeout", "2h" },
+                stdout,
+                stderr);
+
+            Assert.Equal(2, exitCode);
+            Assert.Contains("--watch-timeout 옵션이 여러 번 지정되었습니다", stderr.ToString());
+        }
+
+        [Fact]
         public void Submit_MissingRecipeFile_ReturnsTwo()
         {
             var missingPath = Path.Join(_workDir, "nonexistent.json");
@@ -548,6 +621,51 @@ namespace NodeKit.Cli.Tests
         }
 
         [Fact]
+        public void Submit_WatchTimeoutFires_AfterBuildIdReceived_ReturnsDistinctExitCodeAndDoesNotCancelServerBuild()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var client = new HangingDuringWatchToolSpecClient();
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--watch-timeout", "1s" },
+                stdout,
+                stderr,
+                toolSpecClient: client);
+
+            // 124(--connect-timeout)/130(Ctrl-C)과 구분되는 별도 exit code.
+            Assert.Equal(125, exitCode);
+            Assert.Contains("타임아웃되었습니다 (--watch-timeout)", stderr.ToString());
+            Assert.Contains("build-hanging-watch", stderr.ToString());
+
+            // Issue #71 결정: watch-timeout은 로컬 관찰만 끝낸다 — 서버 쪽 빌드는
+            // 여전히 진행 중일 수 있으므로 취소 요청을 보내지 않는다.
+            Assert.Empty(client.CancelledBuildIds);
+        }
+
+        [Fact]
+        public void Submit_WatchTimeout_DoesNotFireIfBuildCompletesFirst()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var events = new[]
+            {
+                new BuildEvent { Kind = BuildEventKind.JobCreated, BuildId = "build-fast" },
+                new BuildEvent { Kind = BuildEventKind.Succeeded, Message = "완료" },
+            };
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--watch-timeout", "1h" },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(events));
+
+            Assert.Equal(0, exitCode);
+        }
+
+        [Fact]
         public void Submit_ConnectTimeoutFires_AgainstRealGrpcToolSpecClient_ReturnsDistinctTimeoutExitCode()
         {
             // End-to-end regression test (external review): the two tests above
@@ -575,6 +693,36 @@ namespace NodeKit.Cli.Tests
 
             Assert.Equal(124, exitCode);
             Assert.Contains("타임아웃되었습니다 (--connect-timeout)", stderr.ToString());
+        }
+
+        [Fact]
+        public void Submit_WatchTimeoutFires_AgainstRealGrpcToolSpecClient_ReturnsDistinctTimeoutExitCode()
+        {
+            // End-to-end regression coverage (same rationale as the --connect-timeout
+            // end-to-end test above): drives SubmitCommand.Run through the real
+            // GrpcToolSpecClient wired to an in-process fake gRPC server whose
+            // WatchToolBuild sends one event then hangs (honoring the server-side
+            // context.CancellationToken, same infra as GrpcToolSpecClientWireTests).
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            using var server = new GrpcTestServer();
+            server.Fake.WatchEvents = new List<Nodevault.V1.BuildEvent>
+            {
+                new() { Kind = Nodevault.V1.BuildEventKind.Log, Status = "Building", BuildId = "build-real-watch-hang" },
+            };
+            server.Fake.HangAfterEvents = true;
+            using var client = new GrpcToolSpecClient(server.Channel);
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--watch-timeout", "1s" },
+                stdout,
+                stderr,
+                toolSpecClient: client);
+
+            Assert.Equal(125, exitCode);
+            Assert.Contains("타임아웃되었습니다 (--watch-timeout)", stderr.ToString());
+            Assert.Contains("build-real-watch-hang", stderr.ToString());
         }
 
         [Fact]
@@ -933,6 +1081,32 @@ namespace NodeKit.Cli.Tests
 
             public Task CancelBuildAsync(string buildId, CancellationToken cancellationToken = default) =>
                 Task.CompletedTask;
+        }
+
+        // Yields JobCreated then hangs forever without ever completing -- proves
+        // --watch-timeout can get the CLI out of a stuck WatchToolBuild stream, and
+        // tracks whether CancelBuildAsync was called (it must NOT be -- Issue #71
+        // decision: the server-side build may still be legitimately running).
+        private sealed class HangingDuringWatchToolSpecClient : IToolSpecBuildClient
+        {
+            public List<string> CancelledBuildIds { get; } = new();
+
+            public async IAsyncEnumerable<BuildEvent> ResolveAndBuildAsync(
+                string toolName,
+                string version,
+                string rawSpec,
+                [EnumeratorCancellation] CancellationToken cancellationToken = default)
+            {
+                yield return new BuildEvent { Kind = BuildEventKind.JobCreated, BuildId = "build-hanging-watch" };
+                await Task.Delay(Timeout.Infinite, cancellationToken);
+                yield break;
+            }
+
+            public Task CancelBuildAsync(string buildId, CancellationToken cancellationToken = default)
+            {
+                CancelledBuildIds.Add(buildId);
+                return Task.CompletedTask;
+            }
         }
     }
 }
