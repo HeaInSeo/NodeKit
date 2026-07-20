@@ -1543,6 +1543,43 @@ namespace NodeKit.Cli.Tests
         }
 
         [Fact]
+        public void ResolveRecipe_CalledWithBoundedTimeoutToken_NotCancellationTokenNone()
+        {
+            // Regression test (external review): the wizard is a synchronous/blocking
+            // console loop, so a user has no way to /cancel while a network call
+            // (ResolveRecipe here) is in flight -- the only escape is a bounded
+            // timeout. Confirms RecipeCreateFlow no longer passes
+            // CancellationToken.None (which would hang forever on a stalled network).
+            var outPath = Path.Join(_workDir, "recipe.json");
+            var resolveResult = new ResolveRecipeResult(
+                RecipeResolutionSource.NotFound,
+                Array.Empty<PackageResolution>());
+            var transcript = new[]
+            {
+                "2", "n", "n", "n", "y", "n", "n", "",
+                "bioconda", "",
+                "0",
+                "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
+                "bwa=0.7.17", "",
+            };
+
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var client = new FixedResolveRecipeClient(resolveResult);
+            var exitCode = RecipeCreateInteractiveRunner.Run(
+                outPath,
+                new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
+                new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
+                stderr,
+                new SequencedCancellationSource(checksBeforeCancellation: 1000),
+                resolveClient: client);
+
+            Assert.Equal(0, exitCode);
+            Assert.NotNull(client.CapturedCancellationToken);
+            Assert.True(client.CapturedCancellationToken!.Value.CanBeCanceled);
+        }
+
+        [Fact]
         public void ManualBaseImageEntry_MicromambaImageWithCondaEngine_WarnsButStillSaves()
         {
             // Issue #15/#16 follow-up: step-4 candidate auto-detection only
@@ -1662,6 +1699,10 @@ namespace NodeKit.Cli.Tests
             private readonly ResolveRecipeResult _result;
             internal FixedResolveRecipeClient(ResolveRecipeResult result) => _result = result;
 
+            // Regression test seam: captures the token it was called with, so a test
+            // can assert it's a real bounded timeout token, not CancellationToken.None.
+            internal System.Threading.CancellationToken? CapturedCancellationToken { get; private set; }
+
             public System.Threading.Tasks.Task<ResolveRecipeResult> ResolveAsync(
                 string toolName,
                 string version,
@@ -1669,7 +1710,10 @@ namespace NodeKit.Cli.Tests
                 System.Threading.CancellationToken cancellationToken,
                 NodeKit.Authoring.Recipes.RecipeBuildKind? buildKind = null,
                 string? packageMirrorUri = null)
-                => System.Threading.Tasks.Task.FromResult(_result);
+            {
+                CapturedCancellationToken = cancellationToken;
+                return System.Threading.Tasks.Task.FromResult(_result);
+            }
         }
 
         // Issue #13 regression: captures the packageMirrorUri it was called with,

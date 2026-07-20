@@ -29,7 +29,13 @@ namespace NodeKit.Cli
                 throw new RecipeCreateCancelledException();
             }
 
-            var result = digestResolver.ResolveAsync(imageUri, CancellationToken.None).GetAwaiter().GetResult();
+            // 마법사는 동기/블로킹 콘솔 루프라 이 호출 도중에는 사용자가 /cancel을
+            // 입력할 방법이 없다 — 유일한 탈출구는 타임아웃뿐이다. 구현체들
+            // (HarborImageDigestResolver/PublicRegistryImageDigestResolver)이
+            // TaskCanceledException을 이미 NetworkUnavailable 결과로 바꿔주므로
+            // 여기서 별도 try/catch가 필요 없다.
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+            var result = digestResolver.ResolveAsync(imageUri, timeoutCts.Token).GetAwaiter().GetResult();
             if (result.Status == ImageDigestResolutionStatus.Resolved && !string.IsNullOrWhiteSpace(result.Digest))
             {
                 return (result.Digest, result.ResolvedReference ?? imageUri);
