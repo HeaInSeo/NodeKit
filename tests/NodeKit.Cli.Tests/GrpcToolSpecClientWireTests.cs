@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -154,6 +155,58 @@ namespace NodeKit.Cli.Tests
             await client.CancelBuildAsync("build-xyz", CancellationToken.None);
 
             Assert.Equal(new[] { "build-xyz" }, server.Fake.CancelledBuildIds);
+        }
+
+        [Fact]
+        public async Task ResolveAndBuildAsync_CancelledDuringResolve_PropagatesCancellation_NotFailedEvent()
+        {
+            // Regression test (external review): GrpcToolSpecClient's Resolve/Submit
+            // steps used to catch ALL exceptions -- including OperationCanceledException
+            // and RpcException(Cancelled) -- and convert them into a plain Failed
+            // BuildEvent indistinguishable from any other RPC failure. That silently
+            // broke every caller-side cancellation handler: SubmitCommand's
+            // --connect-timeout could never actually report exit code 124 (it just
+            // fell through to the generic "빌드 실패" / exit 1 path instead), and the
+            // GUI's cancel-a-superseded-build handling had the same latent gap. Only
+            // a real GrpcToolSpecClient exercised against a real (if fake) gRPC
+            // server reproduces this -- the SubmitCommandTests fakes throw
+            // OperationCanceledException directly from the async-enumerable, bypassing
+            // the try/catch this bug lived in entirely.
+            //
+            // The fix checks cancellationToken.IsCancellationRequested rather than the
+            // exception's shape -- empirically, cancelling a hung in-process fake-server
+            // call does NOT reliably surface as OperationCanceledException or
+            // RpcException(Cancelled); it can come back as RpcException(Unknown,
+            // "Exception was thrown by handler.") depending on how the server-side
+            // handler's own cancellation unwinds. So this test only asserts that
+            // *something* propagates (i.e. it wasn't swallowed into a Failed event) --
+            // SubmitCommand separately treats "my own token is cancelled" as sufficient
+            // evidence of cancellation regardless of what shape reaches it.
+            using var server = new GrpcTestServer();
+            server.Fake.HangOnResolveToolSpec = true;
+            using var client = new GrpcToolSpecClient(server.Channel);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+
+            // cts.Token (not TestContext.Current.CancellationToken directly) is the point
+            // of this test -- it's cancelled explicitly below to simulate --connect-timeout
+            // firing, and is itself linked to the ambient test-cancellation token above.
+#pragma warning disable xUnit1051
+            var enumerator = client.ResolveAndBuildAsync("bwa", "0.7.17", "{}", cts.Token).GetAsyncEnumerator();
+#pragma warning restore xUnit1051
+            var moveNextTask = enumerator.MoveNextAsync().AsTask();
+            cts.Cancel();
+
+            Exception? thrown = null;
+            try
+            {
+                await moveNextTask;
+            }
+            catch (Exception ex)
+            {
+                thrown = ex;
+            }
+
+            Assert.NotNull(thrown);
         }
     }
 }

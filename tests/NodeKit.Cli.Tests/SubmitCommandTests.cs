@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Grpc.Core;
 using NodeKit.Cli;
+using NodeKit.Cli.Tests.Fakes;
 using NodeKit.Grpc;
 using Xunit;
 
@@ -131,6 +132,26 @@ namespace NodeKit.Cli.Tests
 
             var exitCode = SubmitCommand.Run(
                 new[] { "submit", recipePath, "--url" },
+                stdout,
+                stderr);
+
+            Assert.Equal(2, exitCode);
+            Assert.Contains("--url 옵션에는 값이 필요합니다", stderr.ToString());
+        }
+
+        [Fact]
+        public void Submit_UrlOptionValueLooksLikeAnotherOption_ReturnsTwoWithExplicitError()
+        {
+            // Regression test: --url used to accept whatever the next token was,
+            // even if it was itself another flag (e.g. "--url --strict-reproducible"
+            // silently stored "--strict-reproducible" as the URL) -- that must be
+            // treated the same as a missing value, not a valid (nonsensical) URL.
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--url", "--strict-reproducible" },
                 stdout,
                 stderr);
 
@@ -449,9 +470,12 @@ namespace NodeKit.Cli.Tests
 
             // 빌드 자체는 성공했으므로 exit code는 0 유지 — 기존 스크립트의
             // 성공 판정을 깨지 않기 위한 의도적 선택. 다만 무결성 상태
-            // degraded는 눈에 띄게 경고해야 한다.
+            // degraded는 눈에 띄게 경고해야 한다. stderr로 나가야 한다 —
+            // stdout은 digest 등 실제 결과값 전용(파이프/자동화가 stdout만
+            // 파싱해도 진단성 경고에 오염되지 않도록).
             Assert.Equal(0, exitCode);
-            Assert.Contains("경고: 무결성 상태가 Partial입니다", stdout.ToString());
+            Assert.Contains("경고: 무결성 상태가 Partial입니다", stderr.ToString());
+            Assert.DoesNotContain("경고: 무결성 상태", stdout.ToString());
         }
 
         [Fact]
@@ -480,6 +504,7 @@ namespace NodeKit.Cli.Tests
 
             Assert.Equal(0, exitCode);
             Assert.DoesNotContain("경고: 무결성 상태", stdout.ToString());
+            Assert.DoesNotContain("경고: 무결성 상태", stderr.ToString());
         }
 
         [Fact]
@@ -520,6 +545,36 @@ namespace NodeKit.Cli.Tests
                 toolSpecClient: client);
 
             Assert.Equal(0, exitCode);
+        }
+
+        [Fact]
+        public void Submit_ConnectTimeoutFires_AgainstRealGrpcToolSpecClient_ReturnsDistinctTimeoutExitCode()
+        {
+            // End-to-end regression test (external review): the two tests above
+            // ("fires" / "does not apply after buildId") both use a hand-written fake
+            // IToolSpecBuildClient that throws OperationCanceledException directly from
+            // the async-enumerable -- that shape does NOT match the real
+            // GrpcToolSpecClient, whose Resolve/Submit steps used to swallow every
+            // exception (including cancellation) into a plain Failed BuildEvent. This
+            // test drives SubmitCommand.Run through the real GrpcToolSpecClient wired
+            // to an in-process fake gRPC server (same infra as GrpcToolSpecClientWireTests)
+            // so a regression in that swallowing behavior fails here even if the plain
+            // fake-based tests above still (misleadingly) pass.
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            using var server = new GrpcTestServer();
+            server.Fake.HangOnResolveToolSpec = true;
+            using var client = new GrpcToolSpecClient(server.Channel);
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--connect-timeout", "1" },
+                stdout,
+                stderr,
+                toolSpecClient: client);
+
+            Assert.Equal(124, exitCode);
+            Assert.Contains("타임아웃되었습니다 (--connect-timeout)", stderr.ToString());
         }
 
         [Fact]
