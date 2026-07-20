@@ -196,12 +196,18 @@ namespace NodeKit.Cli.Tests
             var moveNextTask = enumerator.MoveNextAsync().AsTask();
             cts.Cancel();
 
+            // Intentionally broad: the whole point of this test (see the comment
+            // above) is that the exception's exact shape is unreliable, so narrowing
+            // this catch would defeat the test -- it only needs to know that
+            // *something* was thrown, not what.
             Exception? thrown = null;
             try
             {
                 await moveNextTask;
             }
+#pragma warning disable CA1031
             catch (Exception ex)
+#pragma warning restore CA1031
             {
                 thrown = ex;
             }
