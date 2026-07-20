@@ -121,8 +121,8 @@ namespace NodeKit.Cli
         {
             if (args.Length < 2)
             {
-                stderr.WriteLine("사용법: nodekit render <recipe.json> --out <build-request.json> [--strict-reproducible]");
-                stderr.WriteLine("  (로컬 미리보기 전용 — 네트워크 호출 없음. submit의 입력이 아님. 실제 제출은 nodekit submit <recipe.json>)");
+                stderr.WriteLine("사용법: nodekit render <recipe.json> --out <build-request.json> [--format build-request|raw-spec] [--strict-reproducible]");
+                stderr.WriteLine("  (로컬 미리보기 전용 — 네트워크 호출 없음. --format 기본값 build-request는 submit의 입력이 아님, raw-spec은 실제 submit wire payload와 동일. 실제 제출은 nodekit submit <recipe.json>)");
                 return 2;
             }
 
@@ -130,7 +130,7 @@ namespace NodeKit.Cli
                 args,
                 startIndex: 2,
                 stderr,
-                valueOptions: new[] { "--out" },
+                valueOptions: new[] { "--out", "--format" },
                 flagOptions: new[] { "--strict-reproducible" },
                 out var values,
                 out var flags))
@@ -141,6 +141,13 @@ namespace NodeKit.Cli
             if (!values.TryGetValue("--out", out var outPath))
             {
                 stderr.WriteLine("--out <build-request.json> 옵션이 필요합니다.");
+                return 2;
+            }
+
+            var format = values.GetValueOrDefault("--format", "build-request");
+            if (format != "build-request" && format != "raw-spec")
+            {
+                stderr.WriteLine($"--format 옵션 값이 올바르지 않습니다: {format} (build-request 또는 raw-spec)");
                 return 2;
             }
 
@@ -157,8 +164,9 @@ namespace NodeKit.Cli
             }
 
             var definition = RecipeRenderer.Render(recipe!);
-            var buildRequest = BuildRequestFactory.FromToolDefinition(definition);
-            var json = JsonSerializer.Serialize(buildRequest, _jsonOptions);
+            var json = format == "raw-spec"
+                ? ToolSpecRawSpecFactory.Build(definition)
+                : JsonSerializer.Serialize(BuildRequestFactory.FromToolDefinition(definition), _jsonOptions);
 
             if (outPath == "-")
             {

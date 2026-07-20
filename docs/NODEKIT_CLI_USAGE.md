@@ -851,24 +851,26 @@ $ echo $?
 1
 ```
 
-## 5. `nodekit render <recipe.json> --out <build-request.json> [--strict-reproducible]`
+## 5. `nodekit render <recipe.json> --out <build-request.json> [--format build-request|raw-spec] [--strict-reproducible]`
 
-**주의**: 이 명령의 출력 파일은 `nodekit submit`의 입력이 **아니다** —
-둘은 서로 무관한 별개 경로다. `submit`은 오직 `recipe.json`만 입력으로
-받아 내부에서 자체적으로 `raw_spec`을 만들어 NodeVault ToolSpec 경로로
-전송한다(§3 참고). `render`는 순수 로컬 미리보기/export 유틸리티로,
-recipe를 legacy `BuildRequest` POCO 형태(PascalCase, 필드명은 §7 스키마와
-다름)로 변환해 파일에 쓸 뿐이며 네트워크 호출이 전혀 없다 — 디버깅이나
-기존 도구와의 호환용 스냅샷이 필요할 때만 쓰는 명령이다.
+`--format`은 두 가지 서로 다른 미리보기 스키마 중 하나를 고른다(기본값
+`build-request`, 둘 다 네트워크 호출 없음):
+
+- `build-request`(기본값): legacy `BuildRequest` POCO 형태(PascalCase, 필드명은
+  §7 스키마와 다름) — 디버깅이나 기존 도구와의 호환용 스냅샷. **이 출력은
+  `nodekit submit`의 입력이 아니다** — `submit`은 오직 `recipe.json`만 입력으로
+  받아 내부에서 자체적으로 `raw_spec`을 만들어 NodeVault ToolSpec 경로로
+  전송한다(§3 참고). 둘은 서로 무관한 별개 경로다.
+- `raw-spec`: `submit`이 실제로 NodeVault `ResolveToolSpec`에 보내는 것과
+  **동일한 `ToolSpecRawSpecFactory` 함수**로 만든 실제 wire payload(snake_case)
+  미리보기 — 네트워크 호출 없이 실제 submit이 뭘 보내는지 확인하고 싶을 때
+  쓴다.
 
 `validate`와 동일한 검증(§4의 `--strict-reproducible` 포함)을 내부에서 먼저
 수행한다 (fail-closed — 검증 안 된
 정의는 절대 export하지 않는다). 옵션 파싱도 `validate`/`submit`과 동일하게
-엄격하다 — `--out` 값 누락/중복, 알 수 없는 옵션 모두 종료 코드 2로 명시적으로
-거부된다. 통과하면 `BuildRequestFactory`로
-`ToolDefinition → BuildRequest`를 매핑하고, legacy `BuildRequest` POCO 형태
-그대로(PascalCase 필드명) indented JSON으로 `--out` 경로에 쓴다. 네트워크
-호출 없음 — 파일만 쓴다.
+엄격하다 — `--out`/`--format` 값 누락/중복, 알 수 없는 옵션이나 `--format`의
+잘못된 값 모두 종료 코드 2로 명시적으로 거부된다.
 
 `--out -`을 쓰면 파일 대신 표준출력에 JSON을 찍는다.
 
@@ -905,6 +907,14 @@ $ echo $?
 1
 $ ls build-request.json
 ls: cannot access 'build-request.json': No such file or directory
+```
+
+`--format raw-spec`은 실제 submit wire payload(snake_case)를 그대로 찍는다 —
+`nodekit submit`이 `ResolveToolSpec`에 보내는 것과 바이트 단위로 동일하다:
+
+```bash
+$ nodekit render recipe.json --out - --format raw-spec
+{"tool_name":"bwa","version":"0.7.17","kind":1,"image_uri":"registry.example.com/bwa:0.7.17@sha256:...","dockerfile_content":"FROM registry.example.com/bwa:0.7.17@sha256:...\nRUN echo ok\n","script":"bwa mem","environment_spec":""}
 ```
 
 ## 6. 종료 코드

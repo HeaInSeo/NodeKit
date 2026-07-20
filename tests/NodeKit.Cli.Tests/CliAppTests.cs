@@ -201,6 +201,47 @@ namespace NodeKit.Cli.Tests
         }
 
         [Fact]
+        public void Render_RawSpecFormat_WritesActualSubmitWirePayloadAndReturnsZero()
+        {
+            // NodeKit#72: render's default output (--format build-request, the
+            // legacy BuildRequest shape) can be mistaken for what submit actually
+            // sends. --format raw-spec calls the same ToolSpecRawSpecFactory
+            // submit uses, so this preview is byte-for-byte what a real submit
+            // would put on the wire (no network call).
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            var outPath = Path.Join(_workDir, "raw-spec.json");
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = CliApp.Run(
+                new[] { "render", recipePath, "--out", outPath, "--format", "raw-spec" }, stdout, stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.True(File.Exists(outPath));
+            var json = File.ReadAllText(outPath);
+            Assert.Contains("\"tool_name\":\"bwa\"", json);
+            Assert.Contains("\"dockerfile_content\"", json);
+            Assert.Contains("\"kind\":1", json);
+            Assert.DoesNotContain("\"ToolName\"", json);
+        }
+
+        [Fact]
+        public void Render_UnknownFormatOption_ReturnsTwoWithExplicitError()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            var outPath = Path.Join(_workDir, "out.json");
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = CliApp.Run(
+                new[] { "render", recipePath, "--out", outPath, "--format", "bogus" }, stdout, stderr);
+
+            Assert.Equal(2, exitCode);
+            Assert.Contains("--format", stderr.ToString());
+            Assert.False(File.Exists(outPath));
+        }
+
+        [Fact]
         public void Render_InvalidRecipe_ReturnsOneAndDoesNotWriteOutputFile()
         {
             var recipePath = WriteFile("recipe.json", InvalidRecipeJson);
