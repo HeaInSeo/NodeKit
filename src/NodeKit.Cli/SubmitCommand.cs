@@ -42,7 +42,7 @@ namespace NodeKit.Cli
             }
 
             var recipePath = args[1];
-            if (!TryParseOptions(args, stderr, out var urlOption, out var connectTimeout))
+            if (!TryParseOptions(args, stderr, out var urlOption, out var connectTimeout, out var strictReproducible))
             {
                 return 2;
             }
@@ -89,7 +89,7 @@ namespace NodeKit.Cli
                 return 2;
             }
 
-            var validation = RecipeValidationPipeline.ValidateRecipe(recipe, CliApp.HasStrictReproducibleFlag(args));
+            var validation = RecipeValidationPipeline.ValidateRecipe(recipe, strictReproducible);
             if (!validation.IsValid)
             {
                 CliApp.PrintViolations(validation.Violations, stderr);
@@ -366,76 +366,44 @@ namespace NodeKit.Cli
         }
 
         // args[0]은 "submit", args[1]은 recipe 경로 — 옵션은 인덱스 2부터 시작한다.
-        // 알려지지 않은 옵션, --url/--connect-timeout 값 누락, --url 중복 지정을
-        // 명시적 에러로 만든다 — 이전에는 --url 값이 없으면 조용히 null이 되어
-        // "주소 필요"라는 일반 에러로 뭉개졌고, 오타난 플래그는 그냥 무시됐다.
+        // 공유 CliOptionParser가 알려지지 않은 옵션, 값 누락/중복/다른 옵션처럼
+        // 보이는 값을 명시적 에러로 걸러준다 — --connect-timeout의 "초 단위
+        // 양의 정수" 검증만 이 메서드에서 추가로 한다.
         private static bool TryParseOptions(
-            string[] args, TextWriter stderr, out string? url, out TimeSpan? connectTimeout)
+            string[] args, TextWriter stderr, out string? url, out TimeSpan? connectTimeout, out bool strictReproducible)
         {
             url = null;
             connectTimeout = null;
-            var urlSeen = false;
-            var connectTimeoutSeen = false;
+            strictReproducible = false;
 
-            for (var i = 2; i < args.Length; i++)
+            if (!CliOptionParser.TryParse(
+                args,
+                startIndex: 2,
+                stderr,
+                valueOptions: new[] { "--url", "--connect-timeout" },
+                flagOptions: new[] { "--strict-reproducible" },
+                out var values,
+                out var flags))
             {
-                var arg = args[i];
-                if (arg == "--url")
-                {
-                    if (urlSeen)
-                    {
-                        stderr.WriteLine("--url 옵션이 여러 번 지정되었습니다.");
-                        return false;
-                    }
-
-                    // 다음 토큰이 없거나 그 자체가 또 다른 옵션처럼 보이면(-- 로 시작)
-                    // "값 누락"으로 취급한다 — 그렇지 않으면 `--url --strict-reproducible`
-                    // 같은 실수가 "--strict-reproducible"을 URL 값으로 그대로 삼켜버린다.
-                    if (i + 1 >= args.Length || args[i + 1].StartsWith("--", StringComparison.Ordinal))
-                    {
-                        stderr.WriteLine("--url 옵션에는 값이 필요합니다.");
-                        return false;
-                    }
-
-                    url = args[i + 1];
-                    urlSeen = true;
-                    i++;
-                    continue;
-                }
-
-                if (arg == "--connect-timeout")
-                {
-                    if (connectTimeoutSeen)
-                    {
-                        stderr.WriteLine("--connect-timeout 옵션이 여러 번 지정되었습니다.");
-                        return false;
-                    }
-
-                    if (i + 1 >= args.Length)
-                    {
-                        stderr.WriteLine("--connect-timeout 옵션에는 초 단위 양의 정수 값이 필요합니다.");
-                        return false;
-                    }
-
-                    if (!int.TryParse(args[i + 1], out var seconds) || seconds <= 0)
-                    {
-                        stderr.WriteLine($"--connect-timeout 값이 올바르지 않습니다: '{args[i + 1]}' (초 단위 양의 정수여야 합니다).");
-                        return false;
-                    }
-
-                    connectTimeout = TimeSpan.FromSeconds(seconds);
-                    connectTimeoutSeen = true;
-                    i++;
-                    continue;
-                }
-
-                if (arg == "--strict-reproducible")
-                {
-                    continue;
-                }
-
-                stderr.WriteLine($"알 수 없는 옵션입니다: {arg} (지원: --url <url>, --connect-timeout <seconds>, --strict-reproducible)");
                 return false;
+            }
+
+            strictReproducible = flags.Contains("--strict-reproducible");
+
+            if (values.TryGetValue("--url", out var urlValue))
+            {
+                url = urlValue;
+            }
+
+            if (values.TryGetValue("--connect-timeout", out var timeoutValue))
+            {
+                if (!int.TryParse(timeoutValue, out var seconds) || seconds <= 0)
+                {
+                    stderr.WriteLine($"--connect-timeout 값이 올바르지 않습니다: '{timeoutValue}' (초 단위 양의 정수여야 합니다).");
+                    return false;
+                }
+
+                connectTimeout = TimeSpan.FromSeconds(seconds);
             }
 
             return true;

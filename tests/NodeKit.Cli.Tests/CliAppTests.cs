@@ -268,6 +268,79 @@ namespace NodeKit.Cli.Tests
             Assert.Contains("L1-RCP-016", stderr.ToString());
         }
 
+        // Design follow-up (NodeKit#66): validate/render used to silently ignore
+        // unrecognized options and only checked for --strict-reproducible via a bare
+        // Array.IndexOf, unlike submit's explicit CliOptionParser-based validation.
+        // Both commands now share the same parser (CliOptionParser) as submit.
+
+        [Fact]
+        public void Validate_UnknownOption_ReturnsTwoWithExplicitError()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = CliApp.Run(new[] { "validate", recipePath, "--typo-flag" }, stdout, stderr);
+
+            Assert.Equal(2, exitCode);
+            Assert.Contains("알 수 없는 옵션입니다: --typo-flag", stderr.ToString());
+        }
+
+        [Fact]
+        public void Render_UnknownOption_ReturnsTwoWithExplicitError()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            var outPath = Path.Join(_workDir, "build-request.json");
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = CliApp.Run(new[] { "render", recipePath, "--out", outPath, "--typo-flag" }, stdout, stderr);
+
+            Assert.Equal(2, exitCode);
+            Assert.Contains("알 수 없는 옵션입니다: --typo-flag", stderr.ToString());
+            Assert.False(File.Exists(outPath));
+        }
+
+        [Fact]
+        public void Render_OutOptionMissingValue_ReturnsTwoWithExplicitError()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = CliApp.Run(new[] { "render", recipePath, "--out" }, stdout, stderr);
+
+            Assert.Equal(2, exitCode);
+            Assert.Contains("--out 옵션에는 값이 필요합니다", stderr.ToString());
+        }
+
+        [Fact]
+        public void Render_OutOptionValueLooksLikeAnotherOption_ReturnsTwoWithExplicitError()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = CliApp.Run(new[] { "render", recipePath, "--out", "--strict-reproducible" }, stdout, stderr);
+
+            Assert.Equal(2, exitCode);
+            Assert.Contains("--out 옵션에는 값이 필요합니다", stderr.ToString());
+        }
+
+        [Fact]
+        public void Render_OutOptionDuplicated_ReturnsTwoWithExplicitError()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = CliApp.Run(
+                new[] { "render", recipePath, "--out", "a.json", "--out", "b.json" }, stdout, stderr);
+
+            Assert.Equal(2, exitCode);
+            Assert.Contains("--out 옵션이 여러 번 지정되었습니다", stderr.ToString());
+        }
+
         private string WriteFile(string name, string content)
         {
             var path = Path.Join(_workDir, name);

@@ -204,7 +204,7 @@ namespace NodeKit.Cli.Tests
                 stderr);
 
             Assert.Equal(2, exitCode);
-            Assert.Contains("--connect-timeout 옵션에는 초 단위 양의 정수 값이 필요합니다", stderr.ToString());
+            Assert.Contains("--connect-timeout 옵션에는 값이 필요합니다", stderr.ToString());
         }
 
         [Theory]
