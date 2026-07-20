@@ -89,12 +89,24 @@ namespace NodeKit.Cli
                 return 2;
             }
 
+            if (!CliOptionParser.TryParse(
+                args,
+                startIndex: 2,
+                stderr,
+                valueOptions: System.Array.Empty<string>(),
+                flagOptions: new[] { "--strict-reproducible" },
+                out _,
+                out var flags))
+            {
+                return 2;
+            }
+
             if (!TryLoadRecipe(args[1], stderr, out var recipe))
             {
                 return 2;
             }
 
-            var result = RecipeValidationPipeline.ValidateRecipe(recipe!, HasStrictReproducibleFlag(args));
+            var result = RecipeValidationPipeline.ValidateRecipe(recipe!, flags.Contains("--strict-reproducible"));
             if (result.IsValid)
             {
                 stdout.WriteLine("OK");
@@ -114,9 +126,21 @@ namespace NodeKit.Cli
                 return 2;
             }
 
-            var outPath = ParseOutOption(args, stderr);
-            if (outPath is null)
+            if (!CliOptionParser.TryParse(
+                args,
+                startIndex: 2,
+                stderr,
+                valueOptions: new[] { "--out" },
+                flagOptions: new[] { "--strict-reproducible" },
+                out var values,
+                out var flags))
             {
+                return 2;
+            }
+
+            if (!values.TryGetValue("--out", out var outPath))
+            {
+                stderr.WriteLine("--out <build-request.json> 옵션이 필요합니다.");
                 return 2;
             }
 
@@ -125,7 +149,7 @@ namespace NodeKit.Cli
                 return 2;
             }
 
-            var result = RecipeValidationPipeline.ValidateRecipe(recipe!, HasStrictReproducibleFlag(args));
+            var result = RecipeValidationPipeline.ValidateRecipe(recipe!, flags.Contains("--strict-reproducible"));
             if (!result.IsValid)
             {
                 PrintViolations(result.Violations, stderr);
@@ -146,21 +170,6 @@ namespace NodeKit.Cli
             }
 
             return 0;
-        }
-
-        internal static bool HasStrictReproducibleFlag(string[] args) =>
-            Array.IndexOf(args, "--strict-reproducible") >= 0;
-
-        private static string? ParseOutOption(string[] args, TextWriter stderr)
-        {
-            var outIndex = Array.IndexOf(args, "--out");
-            if (outIndex < 0 || outIndex + 1 >= args.Length)
-            {
-                stderr.WriteLine("--out <build-request.json> 옵션이 필요합니다.");
-                return null;
-            }
-
-            return args[outIndex + 1];
         }
 
         private static bool TryLoadRecipe(string path, TextWriter stderr, out RecipeDocument? recipe)

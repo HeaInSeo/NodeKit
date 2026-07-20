@@ -821,7 +821,8 @@ spec 해결 완료 (digest: 8f3a1c2d...)
 
 ## 4. `nodekit validate <recipe.json> [--strict-reproducible]`
 
-recipe를 검증만 한다. 파일을 만들지 않는다.
+recipe를 검증만 한다. 파일을 만들지 않는다. `submit`과 마찬가지로 옵션 파싱은
+엄격하다 — 알 수 없는 옵션은 종료 코드 2로 명시적으로 거부된다.
 
 1. `RecipeValidator.Validate(recipe, strictReproducible)` — recipe 레벨
    완전성 검사(build kind별 필수 필드, source checksum 형식). `--strict-reproducible`을
@@ -861,7 +862,9 @@ recipe를 legacy `BuildRequest` POCO 형태(PascalCase, 필드명은 §7 스키�
 
 `validate`와 동일한 검증(§4의 `--strict-reproducible` 포함)을 내부에서 먼저
 수행한다 (fail-closed — 검증 안 된
-정의는 절대 export하지 않는다). 통과하면 `BuildRequestFactory`로
+정의는 절대 export하지 않는다). 옵션 파싱도 `validate`/`submit`과 동일하게
+엄격하다 — `--out` 값 누락/중복, 알 수 없는 옵션 모두 종료 코드 2로 명시적으로
+거부된다. 통과하면 `BuildRequestFactory`로
 `ToolDefinition → BuildRequest`를 매핑하고, legacy `BuildRequest` POCO 형태
 그대로(PascalCase 필드명) indented JSON으로 `--out` 경로에 쓴다. 네트워크
 호출 없음 — 파일만 쓴다.
