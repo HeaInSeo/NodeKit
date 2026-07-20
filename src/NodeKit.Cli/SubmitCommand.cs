@@ -14,12 +14,16 @@ namespace NodeKit.Cli
 {
     /// <summary>
     /// nodekit submit &lt;recipe.json&gt; [--url &lt;nodevault-url&gt;] [--connect-timeout &lt;seconds&gt;]
+    /// [--watch-timeout &lt;duration&gt;]
     ///
     /// 경로: ResolveToolSpec → SubmitToolBuild → WatchToolBuild.
     /// NodeVault 주소: --url 옵션 또는 NODEKIT_NODEVAULT_URL 환경변수.
     /// --connect-timeout은 build ID를 받기 전(ResolveToolSpec/SubmitToolBuild)
-    /// 단계에만 적용된다 — WatchToolBuild로 실제 빌드를 관찰하는 동안은
-    /// 정상적으로 오래 걸릴 수 있어 적용되지 않는다(Ctrl-C만 유효).
+    /// 단계에만 적용된다. --watch-timeout은 그 반대 — build ID를 받은
+    /// 뒤(WatchToolBuild로 실제 빌드를 관찰하는 동안)에만 적용된다. 둘 다
+    /// 기본값 없음(옵트인) — --watch-timeout이 발동해도 서버 쪽 빌드는
+    /// 취소하지 않는다(실제로 여전히 진행 중일 수 있으므로), CLI의 로컬
+    /// watch만 끝낸다. 자세한 설계 배경은 Issue #71 참고.
     /// </summary>
     internal static class SubmitCommand
     {
@@ -37,12 +41,12 @@ namespace NodeKit.Cli
         {
             if (args.Length < 2)
             {
-                stderr.WriteLine("사용법: nodekit submit <recipe.json> [--url <nodevault-url>] [--connect-timeout <seconds>] [--strict-reproducible]");
+                stderr.WriteLine("사용법: nodekit submit <recipe.json> [--url <nodevault-url>] [--connect-timeout <seconds>] [--watch-timeout <duration>] [--strict-reproducible]");
                 return 2;
             }
 
             var recipePath = args[1];
-            if (!TryParseOptions(args, stderr, out var urlOption, out var connectTimeout, out var strictReproducible))
+            if (!TryParseOptions(args, stderr, out var urlOption, out var connectTimeout, out var watchTimeout, out var strictReproducible))
             {
                 return 2;
             }
@@ -105,12 +109,12 @@ namespace NodeKit.Cli
 
             if (toolSpecClient is not null)
             {
-                return SubmitAsync(definition.Name, definition.Version, rawSpec, toolSpecClient, stdout, stderr, connectTimeout)
+                return SubmitAsync(definition.Name, definition.Version, rawSpec, toolSpecClient, stdout, stderr, connectTimeout, watchTimeout)
                     .GetAwaiter().GetResult();
             }
 
             using var grpc = new GrpcToolSpecClient(url!);
-            return SubmitAsync(definition.Name, definition.Version, rawSpec, grpc, stdout, stderr, connectTimeout)
+            return SubmitAsync(definition.Name, definition.Version, rawSpec, grpc, stdout, stderr, connectTimeout, watchTimeout)
                 .GetAwaiter().GetResult();
         }
 
@@ -121,7 +125,8 @@ namespace NodeKit.Cli
             IToolSpecBuildClient client,
             TextWriter stdout,
             TextWriter stderr,
-            TimeSpan? connectTimeout = null)
+            TimeSpan? connectTimeout = null,
+            TimeSpan? watchTimeout = null)
         {
             using var cts = new CancellationTokenSource();
 
@@ -129,10 +134,16 @@ namespace NodeKit.Cli
             // ID가 아직 없는 상태)가 네트워크/서버 문제로 멈추면 Ctrl-C 외에는
             // 빠져나갈 방법이 없었다 — WatchToolBuild(실제 빌드 관찰) 단계는
             // 정상적으로 오래 걸릴 수 있어 같은 타임아웃을 적용하면 안 되므로,
-            // buildId를 처음 받는 순간 아래에서 이 타이머를 명시적으로 해제한다
-            // (CancelAfter(Timeout.InfiniteTimeSpan)로 예약된 취소를 취소).
+            // buildId를 처음 받는 순간 아래에서 이 타이머를 명시적으로 해제하고
+            // (CancelAfter(Timeout.InfiniteTimeSpan)로 예약된 취소를 취소),
+            // 대신 watchTimeoutCts를 그 시점에 새로 무장한다 — 정확히 반대
+            // 조건에서 서로 반대로 동작한다. watchTimeoutCts가 발동해도
+            // CancelServerBuildBestEffort를 부르지 않는다(Issue #71 결정) —
+            // 서버 쪽 빌드는 실제로 여전히 진행 중일 수 있으므로 그대로 둔다.
             using var connectTimeoutCts = new CancellationTokenSource();
-            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token, connectTimeoutCts.Token);
+            using var watchTimeoutCts = new CancellationTokenSource();
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
+                cts.Token, connectTimeoutCts.Token, watchTimeoutCts.Token);
             if (connectTimeout is { } timeout)
             {
                 connectTimeoutCts.CancelAfter(timeout);
@@ -143,6 +154,7 @@ namespace NodeKit.Cli
             string? lastImageDigest = null;
             string? lastImageRef = null;
             string? lastIntegrityHealth = null;
+            DateTimeOffset? lastEventReceivedAt = null;
             ConsoleCancelEventHandler onCancelKeyPress = (_, e) =>
             {
                 e.Cancel = true;
@@ -155,15 +167,24 @@ namespace NodeKit.Cli
                 await foreach (var ev in client.ResolveAndBuildAsync(toolName, version, rawSpec, linkedCts.Token))
                 {
                     PrintEvent(ev, stdout);
+                    lastEventReceivedAt = DateTimeOffset.Now;
                     if (!string.IsNullOrEmpty(ev.BuildId))
                     {
-                        buildId = ev.BuildId;
+                        if (buildId is null)
+                        {
+                            // 빌드 ID를 처음 받았다는 건 ResolveToolSpec/SubmitToolBuild가
+                            // 이미 끝났다는 뜻 — connect-timeout이 아직 발동 전이면
+                            // 여기서 해제해서 이후 WatchToolBuild 관찰 단계에는 영향을
+                            // 주지 않게 한다(이미 발동됐다면 이 호출은 안전한 no-op).
+                            // watchTimeout이 설정됐다면 정확히 이 시점부터 무장한다.
+                            connectTimeoutCts.CancelAfter(Timeout.InfiniteTimeSpan);
+                            if (watchTimeout is { } wt)
+                            {
+                                watchTimeoutCts.CancelAfter(wt);
+                            }
+                        }
 
-                        // 빌드 ID를 받았다는 건 ResolveToolSpec/SubmitToolBuild가
-                        // 이미 끝났다는 뜻 — connect-timeout이 아직 발동 전이면
-                        // 여기서 해제해서 이후 WatchToolBuild 관찰 단계에는 영향을
-                        // 주지 않게 한다. 이미 발동됐다면 이 호출은 안전한 no-op.
-                        connectTimeoutCts.CancelAfter(Timeout.InfiniteTimeSpan);
+                        buildId = ev.BuildId;
                     }
 
                     if (ev.Kind == BuildEventKind.DigestAcquired && !string.IsNullOrEmpty(ev.Digest))
@@ -265,6 +286,11 @@ namespace NodeKit.Cli
                     return ReportConnectTimeout(stderr, connectTimeout!.Value);
                 }
 
+                if (watchTimeoutCts.IsCancellationRequested && !cts.IsCancellationRequested)
+                {
+                    return ReportWatchTimeout(stderr, watchTimeout!.Value, buildId, lastEventReceivedAt);
+                }
+
                 await CancelServerBuildBestEffort(client, buildId, stderr);
                 stderr.WriteLine("빌드 요청이 취소되었습니다.");
                 return 130;
@@ -297,6 +323,35 @@ namespace NodeKit.Cli
                 $"NodeVault 연결이 {(int)timeout.TotalSeconds}초 동안 응답이 없어 타임아웃되었습니다 (--connect-timeout). " +
                 "주소와 네트워크 상태를 확인하세요.");
             return 124;
+        }
+
+        // --watch-timeout은 build ID를 받은 뒤(WatchToolBuild 관찰 단계)에만
+        // 적용된다 — 이 시점엔 서버에 실제로 진행 중인 빌드가 있을 수 있으므로
+        // (Issue #71 결정에 따라) CancelServerBuildBestEffort를 부르지 않는다 —
+        // CLI의 로컬 관찰만 끝내고 서버 빌드는 건드리지 않는다. exit code는
+        // --connect-timeout(124)/Ctrl-C(130)와 구분되는 별도 값을 쓴다.
+        private static int ReportWatchTimeout(
+            TextWriter stderr, TimeSpan timeout, string? buildId, DateTimeOffset? lastEventReceivedAt)
+        {
+            stderr.WriteLine($"Watch가 {FormatDuration(timeout)} 후 타임아웃되었습니다 (--watch-timeout).");
+            stderr.WriteLine();
+            stderr.WriteLine("서버에서는 빌드가 계속 진행 중일 수 있습니다.");
+            stderr.WriteLine($"Build ID: {(string.IsNullOrEmpty(buildId) ? "(알 수 없음)" : buildId)}");
+            stderr.WriteLine(
+                $"마지막 이벤트 수신 시각: {(lastEventReceivedAt is { } t ? t.ToString("yyyy-MM-ddTHH:mm:sszzz", System.Globalization.CultureInfo.InvariantCulture) : "(없음)")}");
+            stderr.WriteLine();
+            stderr.WriteLine("Build ID로 나중에 빌드 상태를 다시 확인하세요.");
+            return 125;
+        }
+
+        private static string FormatDuration(TimeSpan d)
+        {
+            if (d.TotalHours >= 1)
+            {
+                return d.Minutes == 0 ? $"{(int)d.TotalHours}시간" : $"{(int)d.TotalHours}시간 {d.Minutes}분";
+            }
+
+            return d.TotalMinutes >= 1 ? $"{(int)d.TotalMinutes}분" : $"{(int)d.TotalSeconds}초";
         }
 
         // linkedCts가 취소되지 않은 상태에서도(=내가 취소를 요청하지 않았어도)
@@ -368,19 +423,26 @@ namespace NodeKit.Cli
         // args[0]은 "submit", args[1]은 recipe 경로 — 옵션은 인덱스 2부터 시작한다.
         // 공유 CliOptionParser가 알려지지 않은 옵션, 값 누락/중복/다른 옵션처럼
         // 보이는 값을 명시적 에러로 걸러준다 — --connect-timeout의 "초 단위
-        // 양의 정수" 검증만 이 메서드에서 추가로 한다.
+        // 양의 정수", --watch-timeout의 "duration 형식(2h/90m/120s)" 검증만
+        // 이 메서드에서 추가로 한다.
         private static bool TryParseOptions(
-            string[] args, TextWriter stderr, out string? url, out TimeSpan? connectTimeout, out bool strictReproducible)
+            string[] args,
+            TextWriter stderr,
+            out string? url,
+            out TimeSpan? connectTimeout,
+            out TimeSpan? watchTimeout,
+            out bool strictReproducible)
         {
             url = null;
             connectTimeout = null;
+            watchTimeout = null;
             strictReproducible = false;
 
             if (!CliOptionParser.TryParse(
                 args,
                 startIndex: 2,
                 stderr,
-                valueOptions: new[] { "--url", "--connect-timeout" },
+                valueOptions: new[] { "--url", "--connect-timeout", "--watch-timeout" },
                 flagOptions: new[] { "--strict-reproducible" },
                 out var values,
                 out var flags))
@@ -406,7 +468,50 @@ namespace NodeKit.Cli
                 connectTimeout = TimeSpan.FromSeconds(seconds);
             }
 
+            if (values.TryGetValue("--watch-timeout", out var watchTimeoutValue))
+            {
+                if (!TryParseDuration(watchTimeoutValue, out var duration))
+                {
+                    stderr.WriteLine($"--watch-timeout 값이 올바르지 않습니다: '{watchTimeoutValue}' (예: 2h, 90m, 120s).");
+                    return false;
+                }
+
+                watchTimeout = duration;
+            }
+
             return true;
+        }
+
+        // "2h"/"90m"/"120s"(선택적으로 "1.5h"처럼 소수도 허용) 형식만 받는다 —
+        // --connect-timeout처럼 초 단위 정수만 받으면 --watch-timeout이 흔히
+        // 감당해야 하는 시간(수십 분~수 시간) 단위를 매번 초로 환산해야 해서
+        // 설정 실수가 생기기 쉽다(Issue #71).
+        private static bool TryParseDuration(string raw, out TimeSpan duration)
+        {
+            duration = default;
+            if (string.IsNullOrEmpty(raw) || raw.Length < 2)
+            {
+                return false;
+            }
+
+            var unit = raw[^1];
+            var numberPart = raw[..^1];
+            if (!double.TryParse(
+                numberPart, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var value)
+                || value <= 0)
+            {
+                return false;
+            }
+
+            duration = unit switch
+            {
+                's' => TimeSpan.FromSeconds(value),
+                'm' => TimeSpan.FromMinutes(value),
+                'h' => TimeSpan.FromHours(value),
+                _ => TimeSpan.Zero,
+            };
+
+            return duration > TimeSpan.Zero;
         }
     }
 }
