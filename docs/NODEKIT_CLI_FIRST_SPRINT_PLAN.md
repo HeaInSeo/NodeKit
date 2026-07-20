@@ -1,8 +1,8 @@
 # NodeKit Legacy-First Sprint Plan
 
-Status: Sprint 6 완료 / Sprint 7 진행 중(Task 1 완료, Task 2 — seoy fixture 3개 live 확인 완료, 전체 wizard 수동 테스트는 대기) / R18-R21(§13) 완료 / R22-B/C/D(§13) 완료 / 적대적 리뷰 Major-1(#41)/wizard 통합(#42)/3차 리뷰 follow-up(#45)/4차 리뷰 follow-up(proto+docs) 완료  
+Status: Sprint 6 완료 / Sprint 7 진행 중(Task 1 완료, 외부 CLI 리뷰 대응 3라운드 완료, Task 2 — seoy fixture 3개 live 확인 완료, 전체 wizard 수동 테스트는 대기) / R18-R21(§13) 완료 / R22-B/C/D(§13) 완료 / 적대적 리뷰 Major-1(#41)/wizard 통합(#42)/3차 리뷰 follow-up(#45)/4차 리뷰 follow-up(proto+docs) 완료  
 Created: 2026-06-17  
-Updated: 2026-07-19 (§0/§1/§5/§8 stale BuildAndRegister/IBuildClient references corrected — Sprint 7 Task 1 was already complete but several sections still described the pre-Phase-6 world)  
+Updated: 2026-07-21 (Sprint 7에 외부 CLI 리뷰 대응 3라운드(Issue #61-#71, PR #61-#70/#75 — --connect-timeout/--watch-timeout/CliOptionParser 통합) Progress 블록 추가 — 이전까지 두 스프린트 문서 어디에도 기록되지 않고 있었음)  
 Scope: NodeKit work — Sprint 0-6 완료, Sprint 7(Post-Migration Hardening) 진행 중,
 §13 Live Recipe Reproducibility Improvement(R18-R21) 완료, R22-B/C/D(SourceBuild
 구조화 intent authoring 모델 + 2-stage 렌더링 + RuntimeProfile hygiene advisor) 완료,
@@ -79,11 +79,15 @@ risky(curl 전용/buildpack-deps 등)하면 non-blocking 경고. 상세는 §13
 R22-D Progress 블록 참조. **R22(SourceBuild 구조화 intent) 이니셔티브
 전체(R22-B/C/D) 완료.**
 
-현재 NodeKit 초점 (2026-07-16 갱신):
+현재 NodeKit 초점 (2026-07-21 갱신):
 
 ```text
 Sprint 7 Task 1(Avalonia GUI ToolSpec 마이그레이션) 완료(2026-07-14, 아래
 Progress 블록 참조). R22-B/C/D, 적대적 리뷰 Major-1(#41)/wizard 통합(#42) 완료.
+외부 CLI 리뷰 대응 3라운드(Issue #61-#71, PR #61-#70/#75) 완료(2026-07-20,
+아래 Progress 블록 참조) — --connect-timeout/--watch-timeout, CliOptionParser
+공유화, recipe create 타임아웃/옵션파서 수정. #72/#73/#74는 설계 논의로
+분리되어 열려 있음(구현 안 함, 추적만).
 남은 것: Sprint 7 Task 2(seoy 원격 장비 nodekit submit 수동 테스트)
   — 2026-07-05: seoy 없이 heain 로컬 사전 검증 완료(TC-1~TC-13 전체), 버그 6건
     발견·수정·close (docs/NODEKIT_LOCAL_GRPC_TEST_SCENARIO.md §7 참조).
@@ -413,6 +417,72 @@ Done when:
 - Avalonia GUI도 ToolSpec 경로로 전환 완료.
 - CLI end-to-end 수동 테스트 통과 (seoy 장비).
 - IBuildClient / GrpcBuildClient 완전 제거 또는 명시적 ADR 후 유지 결정.
+```
+
+**Progress (외부 CLI 리뷰 대응 3라운드 완료, 2026-07-20, Issue #61/#62/#63/#64/
+#66/#71 close, PR #61/#62/#63/#65/#67/#68/#69/#70/#75):**
+
+```text
+Sprint 7 스코프("새 경로가 legacy를 완전히 대체할 만큼 신뢰할 수 있는가") 안에서
+nodekit submit/validate/render/recipe create에 대한 세 차례 외부 리뷰에 대응.
+
+1차 리뷰(5개 항목, 전부 대응):
+- item 1/5(PR #61): CancelServerBuildBestEffort가 CancellationToken.None으로
+  무한 대기할 수 있던 문제 → 자체 5초 타임아웃 부여.
+- item 2/5(Issue #64 → PR #65): --connect-timeout <seconds> 추가(build ID 받기
+  전 단계에만 적용, 기본값 없음).
+- item 3/5(PR #62): --url 옵션 명시적 검증(빈 값/중복/다음 플래그처럼 보이는
+  값 거부).
+- item 4/5(PR #63): 빌드가 성공해도 IntegrityHealth가 degraded면 stderr 경고
+  출력.
+- item 5/5(커밋 `7e2186a`): 리뷰가 지적한 stale/오해 소지 문구 수정.
+
+2차 리뷰(4개 항목):
+- HIGH(PR #67, #65의 회귀): GrpcToolSpecClient의 Resolve/Submit 단계가 취소
+  예외까지 통째로 삼켜 Failed 이벤트로 바꿔버려서 --connect-timeout이 실제로는
+  exit 124를 절대 반환하지 못했음(exit 1로 빠짐). `cancellationToken
+  .IsCancellationRequested` 기반 판별로 수정 — 예외 타입/상태코드 매칭은
+  신뢰 불가(in-process fake 서버에서 취소가 `RpcException(Unknown)`으로도
+  나옴을 실증, `GrpcToolSpecClientWireTests
+  .ResolveAndBuildAsync_CancelledDuringResolve_PropagatesCancellation_NotFailedEvent`
+  참조).
+- medium(--url 다음 토큰이 다른 플래그처럼 보이는 문제 + validate/render가
+  submit과 달리 여전히 permissive한 문제, 후자는 설계 논의라 Issue #66으로 분리
+  요청받음) → PR #68에서 `CliOptionParser` 공유 클래스 신설, submit/validate/
+  render 셋 다 동일한 엄격 규칙(unknown option/missing value/duplicate/
+  looks-like-another-flag) 적용.
+- low-medium(IntegrityHealth 경고의 stdout 오염): 재확인 결과 이미 stderr로
+  출력 중(`SubmitCommand.cs`) — 재현 안 됨.
+- 같은 라운드에서 recipe create 쪽 2개 항목도 대응: item 1/5(PR #69) 네트워크
+  호출 무한 대기(20초 타임아웃 부여), item 2/5(PR #70) 자체 옵션 파서
+  (`TryTakeNext`)가 값 필요한 옵션 뒤 다른 `--`플래그를 값으로 삼키던 문제
+  (submit 계열과 동일한 가드 추가, `--field Name=Value` 서브파싱 때문에
+  `CliOptionParser`로 완전 통합하지는 않음).
+
+3차 라운드(Issue #71 → PR #75): submit이 build ID를 받은 뒤(WatchToolBuild
+단계)에는 어떤 타임아웃도 없어 Ctrl-C 외에는 빠져나갈 방법이 없던 gap을
+`--watch-timeout <duration>`(2h/90m/120s, 옵트인, 기본값 없음)으로 해소.
+`--connect-timeout`과 반대 위상(build ID 받은 뒤에만 적용)이며 타임아웃이
+나도 서버 빌드는 취소하지 않음(exit 125, `--connect-timeout`의 124/Ctrl-C의
+130과 구분). idle-timeout+heartbeat+reconnect는 heartbeat 보장 없이는 안전하게
+구현할 수 없다고 판단해 별도 Issue #74로 분리.
+
+설계 논의로 분리한 채 열려 있는 이슈(구현 안 함, 추적만 — 다른 세션/에이전트가
+결정 전까지 손대지 않음):
+- #72: nodekit render 출력이 submit의 raw_spec 페이로드와 혼동될 수 있음.
+- #73: raw_spec이 Dictionary<string, object?>라 컴파일 타임 스키마 보증이 없음.
+- #74: --idle-timeout + heartbeat + reconnect(WatchToolBuild).
+
+CodeQL: 리뷰 대응 중 발견된 alert #541/#542(GrpcToolSpecClientWireTests의
+의도적 broad catch — 취소 예외의 shape가 신뢰 불가하다는 게 테스트 취지라
+narrowing하면 테스트가 무의미해짐)는 검토 후 dismiss, 재스캔 결과 그 외 열린
+alert 없음.
+
+문서: `docs/NODEKIT_CLI_USAGE.md` §3/§6에 `--connect-timeout`/`--watch-timeout`
+옵션과 종료 코드 124/125 반영 완료.
+
+이 라운드 이후 상태(2026-07-21 재확인): 675 total, 673 passed, 0 failed,
+2 skipped(옵트인 NodeVault 통합 테스트), 0 warnings.
 ```
 
 **Progress (Task 2 — seoy smoke fixture 3개 live 확인 완료, 2026-07-16, 커밋
