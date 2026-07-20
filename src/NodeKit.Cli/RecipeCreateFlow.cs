@@ -34,6 +34,11 @@ namespace NodeKit.Cli
         private const string QuitCommand = "/quit";
         private const string ExitCommand = "/exit";
 
+        // 마법사는 동기/블로킹 콘솔 루프라 네트워크 보조 호출(ResolveRecipe, base
+        // image digest 조회) 도중에는 사용자가 /cancel을 입력할 방법이 없다 —
+        // 유일한 탈출구는 타임아웃뿐이다.
+        private static readonly TimeSpan _networkCallTimeout = TimeSpan.FromSeconds(20);
+
         internal static RecipeCreateFlowResult Execute(
             string? outPathHint,
             RecipeAuthoringSession session,
@@ -117,18 +122,33 @@ namespace NodeKit.Cli
             if (document.Packages.Count > 0)
             {
                 ResolveRecipeResult resolveResult;
+                using var resolveTimeoutCts = new System.Threading.CancellationTokenSource(_networkCallTimeout);
                 try
                 {
                     resolveResult = recipeResolver
                         .ResolveAsync(document.ToolName ?? string.Empty, document.Version ?? string.Empty,
-                            document.Packages, System.Threading.CancellationToken.None, document.BuildKind,
+                            document.Packages, resolveTimeoutCts.Token, document.BuildKind,
                             document.PackageMirrorUri)
                         .GetAwaiter().GetResult();
                 }
-                catch (global::Grpc.Core.RpcException rpc)
+                catch (global::Grpc.Core.RpcException rpc) when (!resolveTimeoutCts.IsCancellationRequested)
                 {
                     console.WriteLine();
                     console.WriteLine($"⚠  패키지 빌드 문자열을 조회하지 못했습니다: {NodeKit.Grpc.BuildErrorMessages.Describe(rpc)}");
+                    console.WriteLine("   저장 후 nodekit submit 시점에 다시 해소를 시도할 수 있습니다.");
+                    console.WriteLine();
+                    resolveResult = ResolveRecipeResult.Unsupported();
+                }
+                // 타임아웃(내 토큰이 취소된 상태)에서 발생한 예외는 전부 시간 초과로
+                // 취급한다 — 정확히 어떤 예외 타입/RpcException 상태 코드로
+                // 나타나는지에 기대지 않는다(GrpcToolSpecClient 회귀에서 확인된 것과
+                // 같은 이유: 취소가 항상 깔끔한 모양으로 오지 않는다).
+#pragma warning disable CA1031
+                catch (Exception) when (resolveTimeoutCts.IsCancellationRequested)
+#pragma warning restore CA1031
+                {
+                    console.WriteLine();
+                    console.WriteLine("⚠  패키지 빌드 문자열 조회가 시간 초과되었습니다.");
                     console.WriteLine("   저장 후 nodekit submit 시점에 다시 해소를 시도할 수 있습니다.");
                     console.WriteLine();
                     resolveResult = ResolveRecipeResult.Unsupported();
@@ -385,8 +405,9 @@ namespace NodeKit.Cli
                 var selected = candidates[idx - 1];
                 console.WriteLine($"{selected.Reference} 의 digest를 조회합니다...");
 
+                using var digestTimeoutCts = new System.Threading.CancellationTokenSource(_networkCallTimeout);
                 var result = digestResolver
-                    .ResolveAsync(selected.Reference, System.Threading.CancellationToken.None)
+                    .ResolveAsync(selected.Reference, digestTimeoutCts.Token)
                     .GetAwaiter().GetResult();
 
                 if (result.Status == ImageDigestResolutionStatus.Resolved

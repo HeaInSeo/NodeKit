@@ -416,6 +416,45 @@ namespace NodeKit.Cli.Tests
             Assert.Contains("digest 조회 실패", stdout.ToString());
         }
 
+        [Fact]
+        public void Step4_DigestResolver_CalledWithBoundedTimeoutToken_NotCancellationTokenNone()
+        {
+            // Regression test (external review): the wizard is a synchronous/blocking
+            // console loop, so a user has no way to /cancel while a network call
+            // (base image digest resolution here) is in flight -- the only escape is a
+            // bounded timeout. Confirms RecipeCreateFlow no longer passes
+            // CancellationToken.None (which would hang forever on a stalled network).
+            var outPath = Path.Join(_workDir, "recipe.json");
+            var resolver = new FixedResultResolver(
+                ImageDigestResolutionResult.Resolved("sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"));
+
+            var transcript = new[]
+            {
+                "2",    // 빠른 설정 모드
+                "n", "n", "n", "y", "n", "n",
+                "",     // accept package
+                "bioconda", "",
+                "1",    // pick candidate [1] -> digest resolver called
+                "bwa-mem", "0.7.17", "run.sh",
+                "bwa=0.7.17=h5bf99c6_8", "",
+            };
+
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var exitCode = RecipeCreateInteractiveRunner.Run(
+                outPath,
+                new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
+                new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
+                stderr,
+                _noCancellation,
+                resolveClient: NullResolveRecipeClient.Instance,
+                imageDigestResolver: resolver);
+
+            Assert.Equal(0, exitCode);
+            Assert.NotNull(resolver.CapturedCancellationToken);
+            Assert.True(resolver.CapturedCancellationToken!.Value.CanBeCanceled);
+        }
+
         // ── BeginnerGuide + step 4 ────────────────────────────────────────────────
 
         [Fact]
@@ -480,11 +519,15 @@ namespace NodeKit.Cli.Tests
 
             public FixedResultResolver(ImageDigestResolutionResult result) => _result = result;
 
+            // Regression test seam: captures the token it was called with, so a test
+            // can assert it's a real bounded timeout token, not CancellationToken.None.
+            internal System.Threading.CancellationToken? CapturedCancellationToken { get; private set; }
+
             public System.Threading.Tasks.Task<ImageDigestResolutionResult> ResolveAsync(
                 string imageUri, System.Threading.CancellationToken cancellationToken)
             {
                 _ = imageUri;
-                _ = cancellationToken;
+                CapturedCancellationToken = cancellationToken;
                 return System.Threading.Tasks.Task.FromResult(_result);
             }
         }
