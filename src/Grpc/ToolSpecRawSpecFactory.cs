@@ -1,5 +1,5 @@
-using System.Collections.Generic;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using NodeKit.Authoring;
 
 namespace NodeKit.Grpc
@@ -29,17 +29,27 @@ namespace NodeKit.Grpc
 
         public static string Build(ToolDefinition definition)
         {
-            var payload = new Dictionary<string, object?>
-            {
-                ["tool_name"] = definition.Name,
-                ["version"] = definition.Version,
-                ["kind"] = BuildKindToolSpec,
-                ["image_uri"] = definition.ImageUri,
-                ["dockerfile_content"] = definition.DockerfileContent,
-                ["script"] = definition.Script,
-                ["environment_spec"] = definition.EnvironmentSpec,
-            };
+            var payload = new ToolSpecRawSpec(
+                ToolName: definition.Name,
+                Version: definition.Version,
+                Kind: BuildKindToolSpec,
+                ImageUri: definition.ImageUri,
+                DockerfileContent: definition.DockerfileContent,
+                Script: definition.Script,
+                EnvironmentSpec: definition.EnvironmentSpec);
             return JsonSerializer.Serialize(payload);
         }
+
+        // Field names/order are NodeVault's buildRequestFromResolved wire contract
+        // (see the class doc comment) — a rename or removal here must fail to
+        // compile every call site instead of silently changing what gets sent.
+        internal sealed record ToolSpecRawSpec(
+            [property: JsonPropertyName("tool_name")] string ToolName,
+            [property: JsonPropertyName("version")] string Version,
+            [property: JsonPropertyName("kind")] int Kind,
+            [property: JsonPropertyName("image_uri")] string ImageUri,
+            [property: JsonPropertyName("dockerfile_content")] string DockerfileContent,
+            [property: JsonPropertyName("script")] string Script,
+            [property: JsonPropertyName("environment_spec")] string EnvironmentSpec);
     }
 }
