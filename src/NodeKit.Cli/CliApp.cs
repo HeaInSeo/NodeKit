@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using NodeKit.Authoring.Recipes;
@@ -17,6 +18,25 @@ namespace NodeKit.Cli
     /// </summary>
     internal static class CliApp
     {
+        private const string TopLevelUsage =
+            "사용법:\n" +
+            "  nodekit validate <recipe.json> [--strict-reproducible]\n" +
+            "  nodekit render <recipe.json> --out <build-request.json> [--format build-request|raw-spec] [--pretty] [--strict-reproducible]\n" +
+            "  nodekit submit <recipe.json> [--url <url>] [--connect-timeout <seconds>] [--watch-timeout <duration>] [--strict-reproducible]\n" +
+            "  nodekit recipe create [<recipe.json>] [--method ...] [--non-interactive ...]\n" +
+            "\n" +
+            "각 명령의 자세한 옵션은 `nodekit <명령> --help`로 확인하세요 (예: nodekit submit --help).";
+
+        private const string ValidateUsage = "사용법: nodekit validate <recipe.json> [--strict-reproducible]";
+
+        private const string RenderUsageLine1 =
+            "사용법: nodekit render <recipe.json> --out <build-request.json> [--format build-request|raw-spec] [--pretty] [--strict-reproducible]";
+
+        private const string RenderUsageLine2 =
+            "  (로컬 미리보기 전용 — 네트워크 호출 없음. --format 기본값 build-request는 submit의 입력이 아님, raw-spec은 실제 submit이 ResolveToolSpec에 보내는 ToolSpecRequest의 raw_spec 필드 값과 동일(tool_name/version/requested_at 등 나머지 필드는 포함 안 함). raw-spec은 기본적으로 실제 전송 payload와 동일한 한 줄 JSON — 사람이 읽기 편하게 보려면 --pretty. 실제 제출은 nodekit submit <recipe.json>)";
+
+        private const string RecipeCreateUsage = "사용법: nodekit recipe create [<recipe.json>] [--method ...] [--non-interactive ...]";
+
         private static readonly JsonSerializerOptions _jsonOptions = new()
         {
             PropertyNameCaseInsensitive = true,
@@ -31,8 +51,14 @@ namespace NodeKit.Cli
         {
             if (args.Length == 0)
             {
-                stderr.WriteLine("사용법: nodekit validate <recipe.json> | nodekit render <recipe.json> --out <build-request.json> | nodekit submit <recipe.json> [--url <url>] | nodekit recipe create <recipe.json> [...]");
+                stderr.WriteLine(TopLevelUsage);
                 return 2;
+            }
+
+            if (args[0] is "--help" or "-h")
+            {
+                stdout.WriteLine(TopLevelUsage);
+                return 0;
             }
 
             return args[0] switch
@@ -45,11 +71,23 @@ namespace NodeKit.Cli
             };
         }
 
+        // 여러 서브커맨드가 각자 --help/-h를 인식해야 해서(P2 리뷰: 최상위와
+        // 서브커맨드 4개 전부) 하나로 통일 — args 어디에 있든 인식한다("nodekit
+        // submit recipe.json --help"도 동작).
+        private static bool IsHelpRequested(string[] args) =>
+            args.Any(a => a is "--help" or "-h");
+
         private static int RunRecipe(string[] args, TextReader stdin, TextWriter stdout, TextWriter stderr)
         {
+            if (IsHelpRequested(args))
+            {
+                stdout.WriteLine(RecipeCreateUsage);
+                return 0;
+            }
+
             if (args.Length < 2 || args[1] != "create")
             {
-                stderr.WriteLine("사용법: nodekit recipe create [<recipe.json>] [--method ...] [--non-interactive ...]");
+                stderr.WriteLine(RecipeCreateUsage);
                 return 2;
             }
 
@@ -83,9 +121,15 @@ namespace NodeKit.Cli
 
         private static int RunValidate(string[] args, TextWriter stdout, TextWriter stderr)
         {
+            if (IsHelpRequested(args))
+            {
+                stdout.WriteLine(ValidateUsage);
+                return 0;
+            }
+
             if (args.Length < 2)
             {
-                stderr.WriteLine("사용법: nodekit validate <recipe.json> [--strict-reproducible]");
+                stderr.WriteLine(ValidateUsage);
                 return 2;
             }
 
@@ -119,10 +163,17 @@ namespace NodeKit.Cli
 
         private static int RunRender(string[] args, TextWriter stdout, TextWriter stderr)
         {
+            if (IsHelpRequested(args))
+            {
+                stdout.WriteLine(RenderUsageLine1);
+                stdout.WriteLine(RenderUsageLine2);
+                return 0;
+            }
+
             if (args.Length < 2)
             {
-                stderr.WriteLine("사용법: nodekit render <recipe.json> --out <build-request.json> [--format build-request|raw-spec] [--pretty] [--strict-reproducible]");
-                stderr.WriteLine("  (로컬 미리보기 전용 — 네트워크 호출 없음. --format 기본값 build-request는 submit의 입력이 아님, raw-spec은 실제 submit이 ResolveToolSpec에 보내는 ToolSpecRequest의 raw_spec 필드 값과 동일(tool_name/version/requested_at 등 나머지 필드는 포함 안 함). raw-spec은 기본적으로 실제 전송 payload와 동일한 한 줄 JSON — 사람이 읽기 편하게 보려면 --pretty. 실제 제출은 nodekit submit <recipe.json>)");
+                stderr.WriteLine(RenderUsageLine1);
+                stderr.WriteLine(RenderUsageLine2);
                 return 2;
             }
 

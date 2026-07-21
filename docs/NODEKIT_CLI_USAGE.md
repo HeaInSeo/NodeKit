@@ -42,7 +42,9 @@ dotnet run --project src/NodeKit.Cli -- render recipe.json --out build-request.j
 ```
 
 아래 절들은 이 네 명령(`recipe create`, `validate`, `render`, `submit`)을 차례로
-자세히 설명한다.
+자세히 설명한다. 옵션이 기억 안 나면 문서를 찾는 대신 그때그때
+`nodekit --help`(전체 명령 목록) 또는 `nodekit <명령> --help`(예:
+`nodekit submit --help`)로 바로 확인할 수 있다 — 종료 코드 0.
 
 중간에 그만두려면 대부분의 프롬프트에서 다음 중 하나를 입력한다.
 
