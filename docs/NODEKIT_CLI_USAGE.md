@@ -851,7 +851,7 @@ $ echo $?
 1
 ```
 
-## 5. `nodekit render <recipe.json> --out <build-request.json> [--format build-request|raw-spec] [--strict-reproducible]`
+## 5. `nodekit render <recipe.json> --out <build-request.json> [--format build-request|raw-spec] [--pretty] [--strict-reproducible]`
 
 `--format`은 두 가지 서로 다른 미리보기 스키마 중 하나를 고른다(기본값
 `build-request`, 둘 다 네트워크 호출 없음):
@@ -861,10 +861,20 @@ $ echo $?
   `nodekit submit`의 입력이 아니다** — `submit`은 오직 `recipe.json`만 입력으로
   받아 내부에서 자체적으로 `raw_spec`을 만들어 NodeVault ToolSpec 경로로
   전송한다(§3 참고). 둘은 서로 무관한 별개 경로다.
-- `raw-spec`: `submit`이 실제로 NodeVault `ResolveToolSpec`에 보내는 것과
-  **동일한 `ToolSpecRawSpecFactory` 함수**로 만든 실제 wire payload(snake_case)
-  미리보기 — 네트워크 호출 없이 실제 submit이 뭘 보내는지 확인하고 싶을 때
-  쓴다.
+- `raw-spec`: `submit`이 실제로 NodeVault `ResolveToolSpec`에 보내는
+  `ToolSpecRequest{tool_name, version, raw_spec, requested_at}` 중
+  **`raw_spec` 필드 값만**(나머지 세 필드는 포함하지 않음) 동일한
+  `ToolSpecRawSpecFactory` 함수로 만들어 미리보기로 찍는다 — 네트워크 호출
+  없이 실제 submit이 raw_spec으로 뭘 보내는지 확인하고 싶을 때 쓴다.
+
+`--format` 값은 대소문자와 `_`/`-`를 구분하지 않는다(`RAW-SPEC`, `raw_spec`
+모두 `raw-spec`으로 인식) — 그래도 안 맞으면 종료 코드 2로 명시적으로
+거부한다.
+
+`--pretty`는 `raw-spec` 출력을 들여쓰기해서 사람이 읽기 좋게 만든다 —
+기본적으로 `raw-spec`은 실제 wire에 나가는 것과 동일한 한 줄 압축 JSON이라
+Dockerfile 내용이 긴 recipe는 검토하기 어렵다. `build-request`는 이미
+들여쓰기된 상태라 `--pretty`를 같이 써도 변화가 없다.
 
 `validate`와 동일한 검증(§4의 `--strict-reproducible` 포함)을 내부에서 먼저
 수행한다 (fail-closed — 검증 안 된
@@ -909,12 +919,28 @@ $ ls build-request.json
 ls: cannot access 'build-request.json': No such file or directory
 ```
 
-`--format raw-spec`은 실제 submit wire payload(snake_case)를 그대로 찍는다 —
-`nodekit submit`이 `ResolveToolSpec`에 보내는 것과 바이트 단위로 동일하다:
+`--format raw-spec`은 `submit`이 `ResolveToolSpec`에 보내는 `raw_spec` 필드
+값(snake_case)을 바이트 단위로 그대로 찍는다:
 
 ```bash
 $ nodekit render recipe.json --out - --format raw-spec
 {"tool_name":"bwa","version":"0.7.17","kind":1,"image_uri":"registry.example.com/bwa:0.7.17@sha256:...","dockerfile_content":"FROM registry.example.com/bwa:0.7.17@sha256:...\nRUN echo ok\n","script":"bwa mem","environment_spec":""}
+```
+
+`--pretty`를 같이 쓰면 같은 내용을 들여쓰기해서 찍는다(긴 Dockerfile 내용이
+있는 recipe를 검토할 때 유용하다):
+
+```bash
+$ nodekit render recipe.json --out - --format raw-spec --pretty
+{
+  "tool_name": "bwa",
+  "version": "0.7.17",
+  "kind": 1,
+  "image_uri": "registry.example.com/bwa:0.7.17@sha256:...",
+  "dockerfile_content": "FROM registry.example.com/bwa:0.7.17@sha256:...\nRUN echo ok\n",
+  "script": "bwa mem",
+  "environment_spec": ""
+}
 ```
 
 ## 6. 종료 코드

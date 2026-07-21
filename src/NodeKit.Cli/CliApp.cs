@@ -121,8 +121,8 @@ namespace NodeKit.Cli
         {
             if (args.Length < 2)
             {
-                stderr.WriteLine("사용법: nodekit render <recipe.json> --out <build-request.json> [--format build-request|raw-spec] [--strict-reproducible]");
-                stderr.WriteLine("  (로컬 미리보기 전용 — 네트워크 호출 없음. --format 기본값 build-request는 submit의 입력이 아님, raw-spec은 실제 submit wire payload와 동일. 실제 제출은 nodekit submit <recipe.json>)");
+                stderr.WriteLine("사용법: nodekit render <recipe.json> --out <build-request.json> [--format build-request|raw-spec] [--pretty] [--strict-reproducible]");
+                stderr.WriteLine("  (로컬 미리보기 전용 — 네트워크 호출 없음. --format 기본값 build-request는 submit의 입력이 아님, raw-spec은 실제 submit이 ResolveToolSpec에 보내는 ToolSpecRequest의 raw_spec 필드 값과 동일(tool_name/version/requested_at 등 나머지 필드는 포함 안 함). raw-spec은 기본적으로 실제 전송 payload와 동일한 한 줄 JSON — 사람이 읽기 편하게 보려면 --pretty. 실제 제출은 nodekit submit <recipe.json>)");
                 return 2;
             }
 
@@ -131,7 +131,7 @@ namespace NodeKit.Cli
                 startIndex: 2,
                 stderr,
                 valueOptions: new[] { "--out", "--format" },
-                flagOptions: new[] { "--strict-reproducible" },
+                flagOptions: new[] { "--strict-reproducible", "--pretty" },
                 out var values,
                 out var flags))
             {
@@ -144,10 +144,8 @@ namespace NodeKit.Cli
                 return 2;
             }
 
-            var format = values.GetValueOrDefault("--format", "build-request");
-            if (format != "build-request" && format != "raw-spec")
+            if (!TryNormalizeRenderFormat(values.GetValueOrDefault("--format", "build-request"), stderr, out var format))
             {
-                stderr.WriteLine($"--format 옵션 값이 올바르지 않습니다: {format} (build-request 또는 raw-spec)");
                 return 2;
             }
 
@@ -168,6 +166,11 @@ namespace NodeKit.Cli
                 ? ToolSpecRawSpecFactory.Build(definition)
                 : JsonSerializer.Serialize(BuildRequestFactory.FromToolDefinition(definition), _jsonOptions);
 
+            if (format == "raw-spec" && flags.Contains("--pretty"))
+            {
+                json = PrettyPrintJson(json);
+            }
+
             if (outPath == "-")
             {
                 stdout.WriteLine(json);
@@ -178,6 +181,31 @@ namespace NodeKit.Cli
             }
 
             return 0;
+        }
+
+        // Accepts case/underscore variants (RAW-SPEC, raw_spec, Raw-Spec, ...) so a
+        // typo'd --format value doesn't need to match "build-request"/"raw-spec"
+        // exactly — this mirrors --strict-reproducible etc. being case-sensitive
+        // flags the user types verbatim, but --format is a value users are more
+        // likely to guess-type from memory.
+        private static bool TryNormalizeRenderFormat(string rawFormat, TextWriter stderr, out string format)
+        {
+            var normalized = rawFormat.Trim().ToLowerInvariant().Replace('_', '-');
+            if (normalized is "build-request" or "raw-spec")
+            {
+                format = normalized;
+                return true;
+            }
+
+            format = string.Empty;
+            stderr.WriteLine($"--format 옵션 값이 올바르지 않습니다: {rawFormat} (build-request 또는 raw-spec)");
+            return false;
+        }
+
+        private static string PrettyPrintJson(string compactJson)
+        {
+            using var document = JsonDocument.Parse(compactJson);
+            return JsonSerializer.Serialize(document.RootElement, _jsonOptions);
         }
 
         private static bool TryLoadRecipe(string path, TextWriter stderr, out RecipeDocument? recipe)

@@ -241,6 +241,62 @@ namespace NodeKit.Cli.Tests
             Assert.False(File.Exists(outPath));
         }
 
+        [Theory]
+        [InlineData("RAW-SPEC")]
+        [InlineData("raw_spec")]
+        [InlineData("Raw-Spec")]
+        [InlineData(" raw-spec ")]
+        public void Render_FormatOptionCaseOrUnderscoreVariant_IsAccepted(string formatValue)
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            var outPath = Path.Join(_workDir, "raw-spec.json");
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = CliApp.Run(
+                new[] { "render", recipePath, "--out", outPath, "--format", formatValue }, stdout, stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.Contains("\"tool_name\":\"bwa\"", File.ReadAllText(outPath));
+        }
+
+        [Fact]
+        public void Render_RawSpecFormatWithPretty_WritesIndentedJson()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            var outPath = Path.Join(_workDir, "raw-spec.json");
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = CliApp.Run(
+                new[] { "render", recipePath, "--out", outPath, "--format", "raw-spec", "--pretty" }, stdout, stderr);
+
+            Assert.Equal(0, exitCode);
+            var json = File.ReadAllText(outPath);
+            Assert.Contains("\n", json);
+            Assert.Contains("\"tool_name\": \"bwa\"", json);
+        }
+
+        [Fact]
+        public void Render_BuildRequestFormatWithPretty_StaysIndentedAndUnchanged()
+        {
+            // --pretty only affects --format raw-spec (build-request is already
+            // indented by default) — this pins that combining the two doesn't
+            // change build-request's existing output shape.
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            var outPath = Path.Join(_workDir, "build-request.json");
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = CliApp.Run(
+                new[] { "render", recipePath, "--out", outPath, "--pretty" }, stdout, stderr);
+
+            Assert.Equal(0, exitCode);
+            var json = File.ReadAllText(outPath);
+            Assert.Contains("\"ToolName\"", json);
+            Assert.Contains("\n", json);
+        }
+
         [Fact]
         public void Render_InvalidRecipe_ReturnsOneAndDoesNotWriteOutputFile()
         {
