@@ -70,6 +70,31 @@ namespace NodeKit.Cli.Tests
         }
         """;
 
+        // 리뷰 지적: GrpcToolSpecClient(url!) 생성이 try/catch 밖에 있어서, 형식이
+        // 잘못된 --url 하나로 CLI가 스택트레이스와 함께 죽었다(exit 134). 재현 시
+        // 실제로 관찰된 예외가 UriFormatException("not-a-url")과
+        // InvalidOperationException("ftp://..." — 지원 안 하는 scheme) 두 가지라
+        // 둘 다 커버해야 한다. toolSpecClient를 주입하지 않아야(null) 실제
+        // GrpcToolSpecClient 생성 경로를 태운다.
+        [Theory]
+        [InlineData("not-a-url")]
+        [InlineData("ftp://example.com")]
+        [InlineData("http://")]
+        public void Submit_InvalidUrl_ReturnsTwoInsteadOfCrashing(string invalidUrl)
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--url", invalidUrl, "--connect-timeout", "1" },
+                stdout,
+                stderr);
+
+            Assert.Equal(2, exitCode);
+            Assert.Contains(invalidUrl, stderr.ToString());
+        }
+
         [Fact]
         public void Submit_RecipeMissingBuildKind_ReturnsTwoInsteadOfThrowing()
         {
