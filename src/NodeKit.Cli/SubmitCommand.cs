@@ -137,7 +137,7 @@ namespace NodeKit.Cli
                 }
             }
 
-            stdout.WriteLine($"NodeVault에 빌드를 제출합니다: {url ?? "(주입된 클라이언트)"}");
+            stdout.WriteLine($"NodeVault에 빌드 요청을 시작합니다: {url ?? "(주입된 클라이언트)"}");
             stdout.WriteLine($"  도구: {definition.Name} {definition.Version}");
             stdout.WriteLine();
 
@@ -202,7 +202,16 @@ namespace NodeKit.Cli
             {
                 await foreach (var ev in client.ResolveAndBuildAsync(toolName, version, rawSpec, linkedCts.Token))
                 {
-                    PrintEvent(ev, stdout);
+                    // Failed는 stdout에 찍지 않는다 — 아래에서 이 실패를 stderr로
+                    // 한 번 더 보고하므로(진단 로그는 stderr 전용, stdout은 digest
+                    // 같은 결과값 전용으로 유지하는 원칙은 아래 IntegrityHealth
+                    // 경고 처리와 동일), 여기서도 찍으면 같은 메시지가 stdout/
+                    // stderr에 중복으로 나가 자동화 스크립트가 stdout만 파싱해도
+                    // 실패 문구에 오염될 수 있었다(외부 리뷰로 발견).
+                    if (ev.Kind != BuildEventKind.Failed)
+                    {
+                        PrintEvent(ev, stdout);
+                    }
                     lastEventReceivedAt = DateTimeOffset.Now;
                     if (!string.IsNullOrEmpty(ev.BuildId))
                     {
