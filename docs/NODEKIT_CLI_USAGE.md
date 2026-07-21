@@ -801,7 +801,7 @@ nodekit submit recipe.json [--url <nodevault-url>] [--connect-timeout <seconds>]
 NodeVault URL은 `NODEKIT_NODEVAULT_URL` 환경변수 또는 `--url` 옵션으로 지정한다.
 
 ```bash
-export NODEKIT_NODEVAULT_URL=http://nodevault.lab.local:8080
+export NODEKIT_NODEVAULT_URL=http://nodevault.lab.local:50051
 nodekit submit recipe.json
 ```
 
