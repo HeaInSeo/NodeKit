@@ -1,8 +1,10 @@
 # NodeKit Legacy-First Sprint Plan
 
-Status: Sprint 6 완료 / Sprint 7 진행 중(Task 1 완료, 외부 CLI 리뷰 대응 3라운드 완료, Task 2 — seoy fixture 3개 live 확인 완료, 전체 wizard 수동 테스트는 대기) / R18-R21(§13) 완료 / R22-B/C/D(§13) 완료 / 적대적 리뷰 Major-1(#41)/wizard 통합(#42)/3차 리뷰 follow-up(#45)/4차 리뷰 follow-up(proto+docs) 완료  
+Status: Sprint 6 완료 / Sprint 7 진행 중(Task 1 완료, 외부 CLI 리뷰 대응 4라운드 완료, Task 2 — seoy fixture 3개 live 확인 완료, 전체 wizard 수동 테스트는 대기) / R18-R21(§13) 완료 / R22-B/C/D(§13) 완료 / 적대적 리뷰 Major-1(#41)/wizard 통합(#42)/3차 리뷰 follow-up(#45)/4차 리뷰 follow-up(proto+docs) 완료  
 Created: 2026-06-17  
-Updated: 2026-07-21 (Sprint 7에 외부 CLI 리뷰 대응 3라운드(Issue #61-#71, PR #61-#70/#75 — --connect-timeout/--watch-timeout/CliOptionParser 통합) Progress 블록 추가 — 이전까지 두 스프린트 문서 어디에도 기록되지 않고 있었음)  
+Updated: 2026-07-21 (Sprint 7에 외부 CLI 리뷰 대응 4라운드 Progress 블록 추가 — #73/#72(PR #76/#77)
+typed raw_spec DTO + render --format raw-spec, #49는 커밋 `35971ef`로 이미 완료돼 있던 걸
+재확인하고 GitHub 이슈만 close. #59/#74는 의도적으로 열어둠)  
 Scope: NodeKit work — Sprint 0-6 완료, Sprint 7(Post-Migration Hardening) 진행 중,
 §13 Live Recipe Reproducibility Improvement(R18-R21) 완료, R22-B/C/D(SourceBuild
 구조화 intent authoring 모델 + 2-stage 렌더링 + RuntimeProfile hygiene advisor) 완료,
@@ -84,10 +86,13 @@ R22-D Progress 블록 참조. **R22(SourceBuild 구조화 intent) 이니셔티�
 ```text
 Sprint 7 Task 1(Avalonia GUI ToolSpec 마이그레이션) 완료(2026-07-14, 아래
 Progress 블록 참조). R22-B/C/D, 적대적 리뷰 Major-1(#41)/wizard 통합(#42) 완료.
-외부 CLI 리뷰 대응 3라운드(Issue #61-#71, PR #61-#70/#75) 완료(2026-07-20,
-아래 Progress 블록 참조) — --connect-timeout/--watch-timeout, CliOptionParser
-공유화, recipe create 타임아웃/옵션파서 수정. #72/#73/#74는 설계 논의로
-분리되어 열려 있음(구현 안 함, 추적만).
+외부 CLI 리뷰 대응 3라운드(Issue #61-#71, PR #61-#70/#75) 완료(2026-07-20) —
+--connect-timeout/--watch-timeout, CliOptionParser 공유화, recipe create
+타임아웃/옵션파서 수정. 이어서 4라운드(Issue #49/#72/#73, PR #76/#77)도
+완료(2026-07-21, 아래 Progress 블록 참조) — typed raw_spec DTO, render
+--format raw-spec, #49는 이미 고쳐져 있던 걸 재확인 후 이슈만 close.
+남은 건 #59(live submit 검증, 실행 전 확인 필요)와 #74(idle-timeout,
+NodeVault 프로토콜 선행 필요) — 둘 다 의도적으로 열어둠.
 남은 것: Sprint 7 Task 2(seoy 원격 장비 nodekit submit 수동 테스트)
   — 2026-07-05: seoy 없이 heain 로컬 사전 검증 완료(TC-1~TC-13 전체), 버그 6건
     발견·수정·close (docs/NODEKIT_LOCAL_GRPC_TEST_SCENARIO.md §7 참조).
@@ -417,6 +422,46 @@ Done when:
 - Avalonia GUI도 ToolSpec 경로로 전환 완료.
 - CLI end-to-end 수동 테스트 통과 (seoy 장비).
 - IBuildClient / GrpcBuildClient 완전 제거 또는 명시적 ADR 후 유지 결정.
+```
+
+**Progress (외부 CLI 리뷰 대응 4라운드 완료, 2026-07-21, Issue #49/#72/#73
+close, PR #76/#77):**
+
+```text
+3라운드(위 블록)에서 넘어온 5개 잔여 이슈(#72/#73/#59/#49/#74)에 대해 외부
+리뷰가 우선순위(#73 → #72 → #59 → #49 → #74)를 제안, 검토 후 순서 일부
+조정(#49를 #59보다 앞으로 — 라이브 인프라 의존 없이 로컬에서 고칠 수 있는
+코드 버그라서)해 #73/#72/#49 세 개를 처리:
+
+- #73(PR #76): `ToolSpecRawSpecFactory.Build`가 만들던 `Dictionary
+  <string, object?>` payload를 `[JsonPropertyName]` 붙은 `record`
+  (`ToolSpecRawSpec`)로 교체 — 필드 rename/누락이 컴파일 타임에 드러남.
+  기존 `GrpcToolSpecClientWireTests`(실제 gRPC round trip, key typo는 잡지만
+  값이 조용히 잘못 매핑되는 건 못 잡음)는 그대로 유지하고, 정확한 직렬화
+  결과를 byte-for-byte 고정하는 golden test(`ToolSpecRawSpecFactoryTests`)를
+  추가 — typed DTO와 wire test는 서로 대체 관계가 아니라 각각 다른 실패
+  모드를 잡는다는 점을 명시.
+- #72(PR #77): `render`에 `--format build-request|raw-spec`(기본값
+  `build-request`, 기존 동작 그대로) 추가. `raw-spec`은 `submit`이 실제로
+  쓰는 `ToolSpecRawSpecFactory.Build`를 그대로 호출해 네트워크 호출 없이
+  실제 submit wire payload를 미리 볼 수 있게 함. `NODEKIT_CLI_USAGE.md` §5
+  갱신.
+- #49: 외부 리뷰가 "코드 구현 이미 완료, live 재검증만 남음"이라고 보고했으나
+  최초 확인 시 이 세션이 `BaseImageCatalog.cs`/`HarborImageDigestResolver.cs`
+  두 파일만 보고 "여전히 미해결"이라고 잘못 판단 — 실제로는 커밋 `35971ef`
+  (2026-07-16, `docs/NODEKIT_CLI_UX_IMPROVEMENT_SPRINT_PLAN.md` §U3-5 참조)가
+  새 파일(`HarborImageReferenceMapper`/`MappedHarborImageDigestResolver`)로
+  이미 완전히 고쳐뒀던 것을 두 기존 파일만 보고 놓친 것으로 재확인됨. 코드
+  변경 없이 GitHub 이슈만 close(커밋 메시지가 "closes #49" 키워드를 안 써서
+  자동으로 안 닫혀 있었음) — live seoy Harbor 재검증(infra-lab#35에 막힘)만
+  여전히 남음.
+
+#59(samtools-1.17.json live submit)와 #74(--idle-timeout, NodeVault 프로토콜
+선행 필요)는 의도적으로 열어둠 — 전자는 실행 자체가 사용자 확인이 필요한
+live 원격 작업, 후자는 cross-repo 스코프.
+
+이 라운드 이후 상태: 677 total, 675 passed, 0 failed, 2 skipped(옵트인
+NodeVault 통합 테스트), 0 warnings, dotnet format 클린.
 ```
 
 **Progress (외부 CLI 리뷰 대응 3라운드 완료, 2026-07-20, Issue #61/#62/#63/#64/

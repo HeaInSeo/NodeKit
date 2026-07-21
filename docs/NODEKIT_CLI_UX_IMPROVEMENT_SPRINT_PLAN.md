@@ -1,8 +1,10 @@
 # NodeKit CLI UX 개선 스프린트 계획
 
-Status: U1-U4 완료 / U5 진행 중 (U5-2 오픈망 2/4 완료, 폐쇄망 2/4 잔류)  
+Status: U1-U4 완료 / U5 진행 중 (U5-2 오픈망 2/4 완료, 폐쇄망 2/4 잔류 — 코드/테스트는
+완료, live seoy Harbor 재검증만 infra-lab#35에 막혀 남음)  
 Created: 2026-06-30  
-Updated: 2026-07-16  
+Updated: 2026-07-21 (GitHub Issue #49 close 반영 — 코드/테스트는 2026-07-16에 이미
+완료돼 있었는데 이슈 자체는 안 닫혀 있던 걸 재확인 후 close, 아래 §U3-5/후속 Progress 참조)  
 Scope: CLI UX 품질을 상업용 수준으로 끌어올리는 4개 스프린트
 
 이 계획은 `NODEKIT_CLI_FIRST_SPRINT_PLAN.md`의 Sprint 0-5 완료 이후 진행한다.
@@ -341,6 +343,13 @@ Unsupported). 637/637 통과(2 스킵), 0 warnings, dotnet format 클린.
 문제(infra-lab#35)가 풀려야 가능하다. 그 전까지 이 코드 경로는 fake HTTP
 계층으로만 검증된 상태다.
 
+**GitHub 이슈 close (2026-07-21)**: 코드/테스트는 위처럼 2026-07-16에 이미
+완료돼 있었으나, 고친 커밋(`35971ef`)의 메시지가 "closes #49" 키워드를 안 써서
+이슈 자체는 계속 OPEN으로 남아 있었다. 외부 리뷰가 잔여 이슈 우선순위를
+정리하며 #49를 "구현 완료, live 검증만 남음"으로 재확인하는 과정에서 발견해
+이슈에 코멘트 남기고 close — 코드 변경 없음, live 재검증 블로커만 여전히
+유효(infra-lab#35).
+
 ### U5-3. 커밋 + GitHub push
 
 **완료 기준**: 사용자 수동 테스트 통과 + 문서 업데이트 + push 완료.
@@ -366,7 +375,7 @@ Unsupported). 637/637 통과(2 스킵), 0 warnings, dotnet format 클린.
 | U3-2 | U3 | PublicRegistryImageDigestResolver (오픈망) | ✓ |
 | U3-3 | U3 | HarborImageDigestResolver 통합 (폐쇄망) | ✓ |
 | U3-4 | U3 | StubImageDigestResolver + 테스트 | ✓ |
-| U3-5 | U3 | 빌드 + 테스트 검증 | ◐ (폐쇄망 코드/테스트 완료, live 미검증 — Issue #49, infra-lab#35) |
+| U3-5 | U3 | 빌드 + 테스트 검증 | ◐ (폐쇄망 코드/테스트 완료, live 미검증 — Issue #49 close, infra-lab#35만 남음) |
 | U4-1 | U4 | outPathHint 시그니처 변경 | ✓ |
 | U4-2 | U4 | 임시 파일 draft 저장 | — (범위 조정: 제거) |
 | U4-3 | U4 | 저장 경로 확정 UI (PromptSavePath) | ✓ |
