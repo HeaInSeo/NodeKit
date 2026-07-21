@@ -103,6 +103,30 @@ namespace NodeKit.Cli
             var definition = RecipeRenderer.Render(recipe);
             var rawSpec = ToolSpecRawSpecFactory.Build(definition);
 
+            GrpcToolSpecClient? grpc = null;
+            if (toolSpecClient is null)
+            {
+                try
+                {
+                    grpc = new GrpcToolSpecClient(url!);
+                }
+                // 실증된 예외 종류가 최소 두 가지(UriFormatException — 형식 오류,
+                // InvalidOperationException — "No address resolver configured for
+                // the scheme 'ftp'"처럼 지원 안 하는 scheme)라 특정 타입 하나만
+                // 잡으면 부족하다. 둘 다 GrpcChannel.ForAddress/주소 resolver 선택의
+                // 내부 구현에 달려 있어 앞으로 더 늘어나도 이상하지 않다. 잘못된
+                // --url 값 하나로 CLI가 스택트레이스와 함께 죽으면 안 되므로 여기서는
+                // 넓게 잡는다.
+#pragma warning disable CA1031
+                catch (Exception ex)
+#pragma warning restore CA1031
+                {
+                    stderr.WriteLine($"NodeVault 주소 형식이 올바르지 않습니다: {url} ({ex.Message})");
+                    stderr.WriteLine("예: --url http://100.123.80.48:50051");
+                    return 2;
+                }
+            }
+
             stdout.WriteLine($"NodeVault에 빌드를 제출합니다: {url ?? "(주입된 클라이언트)"}");
             stdout.WriteLine($"  도구: {definition.Name} {definition.Version}");
             stdout.WriteLine();
@@ -113,9 +137,11 @@ namespace NodeKit.Cli
                     .GetAwaiter().GetResult();
             }
 
-            using var grpc = new GrpcToolSpecClient(url!);
-            return SubmitAsync(definition.Name, definition.Version, rawSpec, grpc, stdout, stderr, connectTimeout, watchTimeout)
-                .GetAwaiter().GetResult();
+            using (grpc)
+            {
+                return SubmitAsync(definition.Name, definition.Version, rawSpec, grpc!, stdout, stderr, connectTimeout, watchTimeout)
+                    .GetAwaiter().GetResult();
+            }
         }
 
         private static async Task<int> SubmitAsync(
