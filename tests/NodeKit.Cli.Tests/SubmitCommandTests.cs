@@ -136,6 +136,21 @@ namespace NodeKit.Cli.Tests
             }
         }
 
+        [Theory]
+        [InlineData("--help")]
+        [InlineData("-h")]
+        public void Submit_HelpFlag_ReturnsZeroWithUsage(string helpFlag)
+        {
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = SubmitCommand.Run(new[] { "submit", helpFlag }, stdout, stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.Contains("사용법: nodekit submit", stdout.ToString());
+            Assert.Empty(stderr.ToString());
+        }
+
         [Fact]
         public void Submit_MissingArgs_ReturnsTwo()
         {

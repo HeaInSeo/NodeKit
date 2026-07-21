@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
@@ -27,6 +28,9 @@ namespace NodeKit.Cli
     /// </summary>
     internal static class SubmitCommand
     {
+        private const string UsageLine =
+            "사용법: nodekit submit <recipe.json> [--url <nodevault-url>] [--connect-timeout <seconds>] [--watch-timeout <duration>] [--strict-reproducible]";
+
         private static readonly JsonSerializerOptions _recipeReadOptions = new()
         {
             PropertyNameCaseInsensitive = true,
@@ -39,9 +43,15 @@ namespace NodeKit.Cli
             TextWriter stderr,
             IToolSpecBuildClient? toolSpecClient = null)
         {
+            if (args.Any(a => a is "--help" or "-h"))
+            {
+                stdout.WriteLine(UsageLine);
+                return 0;
+            }
+
             if (args.Length < 2)
             {
-                stderr.WriteLine("사용법: nodekit submit <recipe.json> [--url <nodevault-url>] [--connect-timeout <seconds>] [--watch-timeout <duration>] [--strict-reproducible]");
+                stderr.WriteLine(UsageLine);
                 return 2;
             }
 

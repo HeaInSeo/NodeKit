@@ -324,6 +324,65 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(2, exitCode);
         }
 
+        // P2 리뷰: --help/-h가 사실상 없었다(최상위는 "알 수 없는 명령"으로,
+        // render/submit --help는 옵션 누락 에러로 처리됨) — 상업용 CLI 기준
+        // 사용자가 문서 없이 옵션을 발견할 방법이 없었다.
+        [Theory]
+        [InlineData("--help")]
+        [InlineData("-h")]
+        public void Run_TopLevelHelpFlag_ReturnsZeroWithUsage(string helpFlag)
+        {
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = CliApp.Run(new[] { helpFlag }, stdout, stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.Contains("nodekit validate", stdout.ToString());
+            Assert.Contains("nodekit render", stdout.ToString());
+            Assert.Contains("nodekit submit", stdout.ToString());
+            Assert.Contains("nodekit recipe create", stdout.ToString());
+            Assert.Empty(stderr.ToString());
+        }
+
+        [Fact]
+        public void Validate_HelpFlag_ReturnsZeroWithUsageInsteadOfRequiringRecipePath()
+        {
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = CliApp.Run(new[] { "validate", "--help" }, stdout, stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.Contains("사용법: nodekit validate", stdout.ToString());
+        }
+
+        [Fact]
+        public void Render_HelpFlag_ReturnsZeroWithUsageInsteadOfMissingOutError()
+        {
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = CliApp.Run(new[] { "render", "--help" }, stdout, stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.Contains("사용법: nodekit render", stdout.ToString());
+            Assert.Contains("--format", stdout.ToString());
+            Assert.Contains("--pretty", stdout.ToString());
+        }
+
+        [Fact]
+        public void RecipeCreate_HelpFlag_ReturnsZeroWithUsage()
+        {
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = CliApp.Run(new[] { "recipe", "create", "--help" }, stdout, stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.Contains("사용법: nodekit recipe create", stdout.ToString());
+        }
+
         // §13 R19: --strict-reproducible blocks version-only conda pins that
         // NodeKit's L1 otherwise allows during authoring but NodeVault's final
         // gate rejects (confirmed live, n03).
