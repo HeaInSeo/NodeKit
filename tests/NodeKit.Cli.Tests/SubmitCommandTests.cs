@@ -1063,8 +1063,12 @@ namespace NodeKit.Cli.Tests
         }
 
         [Fact]
-        public void Submit_FormatJsonl_BuildFailed_EmitsCompletedRecordWithBuildFailedErrorCode()
+        public void Submit_FormatJsonl_WatchTerminalFailed_EmitsBuildFailedWithConfirmedRemoteState()
         {
+            // Watch에서 실제 Failed 수신 -> BUILD_FAILED (외부 리뷰 follow-up:
+            // build ID가 이미 있는 상태에서 온 Failed만 WatchToolBuild가 실제로
+            // terminal 실패를 관측한 것이므로 remote_build_state를 "failed"로
+            // 확정할 수 있다).
             var recipePath = WriteFile("recipe.json", ValidRecipeJson);
             using var stdout = new StringWriter();
             using var stderr = new StringWriter();
@@ -1086,8 +1090,119 @@ namespace NodeKit.Cli.Tests
             Assert.Equal("completed", completed.GetProperty("type").GetString());
             Assert.Equal("Failed", completed.GetProperty("status").GetString());
             Assert.Equal("BUILD_FAILED", completed.GetProperty("error_code").GetString());
+            Assert.Equal("watch", completed.GetProperty("phase").GetString());
+            Assert.Equal("failed", completed.GetProperty("remote_build_state").GetString());
             Assert.Equal("이미지 없음", completed.GetProperty("message").GetString());
             Assert.Equal("build-jsonl-2", completed.GetProperty("build_id").GetString());
+        }
+
+        [Fact]
+        public void Submit_FormatJsonl_ResolveConnectFailure_EmitsPreWatchFailedWithUnknownRemoteState()
+        {
+            // Resolve 연결 실패 -> PRE_WATCH_FAILED. GrpcToolSpecClient converts a
+            // ResolveToolSpec-stage connection failure into a single Failed event
+            // with no BuildId -- SubmitCommand never learns a build ID, so it
+            // cannot claim the remote build didn't happen (SubmitToolBuild is
+            // never even reached in this scenario, but the CLI-observable shape
+            // is identical to a lost SubmitToolBuild response either way).
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var events = new[]
+            {
+                new BuildEvent { Kind = BuildEventKind.Failed, Message = "NodeVault에 연결할 수 없습니다. 주소와 네트워크 상태를 확인하세요." },
+            };
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--format", "jsonl" },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(events));
+
+            Assert.Equal(1, exitCode);
+            var lines = SplitNonEmptyLines(stdout.ToString());
+            var completed = ParseRecord(Assert.Single(lines));
+            Assert.Equal("completed", completed.GetProperty("type").GetString());
+            Assert.Equal("Failed", completed.GetProperty("status").GetString());
+            Assert.Equal("PRE_WATCH_FAILED", completed.GetProperty("error_code").GetString());
+            Assert.Equal("pre_watch", completed.GetProperty("phase").GetString());
+            Assert.Equal("unknown", completed.GetProperty("remote_build_state").GetString());
+            Assert.False(completed.TryGetProperty("build_id", out _),
+                "pre-watch 실패는 build ID를 받기 전이므로 build_id가 없어야 합니다.");
+
+            var message = completed.GetProperty("message").GetString();
+            Assert.DoesNotContain("생성되지 않았", message);
+            Assert.DoesNotContain("시작되지 않았", message);
+        }
+
+        [Fact]
+        public void Submit_FormatJsonl_SubmitRpcFailure_EmitsPreWatchFailedWithUnknownRemoteState()
+        {
+            // Submit RPC 실패 -> PRE_WATCH_FAILED. ResolveToolSpec succeeded first
+            // (a Log event, still no BuildId), then SubmitToolBuild itself failed --
+            // still no BuildId was ever received, so this must be indistinguishable
+            // from the resolve-failure case at the SubmitCommand level: same
+            // error_code/phase/remote_build_state.
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var events = new[]
+            {
+                new BuildEvent { Kind = BuildEventKind.Log, Message = "spec 해결 완료 (digest: 8f3a1c2d...)" },
+                new BuildEvent { Kind = BuildEventKind.Failed, Message = "연결된 NodeVault가 이 요청을 지원하지 않습니다: ..." },
+            };
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--format", "jsonl" },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(events));
+
+            Assert.Equal(1, exitCode);
+            var lines = SplitNonEmptyLines(stdout.ToString());
+            var completed = ParseRecord(lines[^1]);
+            Assert.Equal("completed", completed.GetProperty("type").GetString());
+            Assert.Equal("PRE_WATCH_FAILED", completed.GetProperty("error_code").GetString());
+            Assert.Equal("pre_watch", completed.GetProperty("phase").GetString());
+            Assert.Equal("unknown", completed.GetProperty("remote_build_state").GetString());
+            Assert.False(completed.TryGetProperty("build_id", out _));
+        }
+
+        [Fact]
+        public void Submit_FormatJsonl_PreWatchAndWatchFailures_HumanOutputAndExitCodeUnchanged()
+        {
+            // human 출력과 기존 exit code는 변경되지 않음(둘 다 exit 1, 동일한
+            // "빌드 실패: {message}" stderr 문구) -- phase/remote_build_state
+            // distinction is jsonl-only.
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var preWatchStdout = new StringWriter();
+            using var preWatchStderr = new StringWriter();
+            using var watchStdout = new StringWriter();
+            using var watchStderr = new StringWriter();
+
+            var preWatchExit = SubmitCommand.Run(
+                new[] { "submit", recipePath },
+                preWatchStdout,
+                preWatchStderr,
+                toolSpecClient: new StubToolSpecClient(new[]
+                {
+                    new BuildEvent { Kind = BuildEventKind.Failed, Message = "연결 실패" },
+                }));
+            var watchExit = SubmitCommand.Run(
+                new[] { "submit", recipePath },
+                watchStdout,
+                watchStderr,
+                toolSpecClient: new StubToolSpecClient(new[]
+                {
+                    new BuildEvent { Kind = BuildEventKind.JobCreated, BuildId = "build-x" },
+                    new BuildEvent { Kind = BuildEventKind.Failed, BuildId = "build-x", Message = "빌드 실패함" },
+                }));
+
+            Assert.Equal(1, preWatchExit);
+            Assert.Equal(1, watchExit);
+            Assert.Equal("빌드 실패: 연결 실패", preWatchStderr.ToString().Trim());
+            Assert.Contains("빌드 실패: 빌드 실패함", watchStderr.ToString());
+            Assert.DoesNotContain('{', preWatchStdout.ToString());
         }
 
         [Fact]

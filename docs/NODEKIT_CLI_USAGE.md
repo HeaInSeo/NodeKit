@@ -856,12 +856,33 @@ $ echo $?
 0
 ```
 
-실패(빌드 자체가 실패한 경우):
+실패에는 두 가지 서로 다른 상황이 있고, `error_code`/`phase`/`remote_build_state`로
+구분된다:
+
+- **`WatchToolBuild` 관찰 단계에서 NodeVault가 실제로 terminal 실패를 보고한
+  경우** — build ID가 이미 있는 상태다. `error_code: "BUILD_FAILED"`,
+  `phase: "watch"`, `remote_build_state: "failed"`(확정).
+- **`ResolveToolSpec`/`SubmitToolBuild` 단계 실패** — build ID를 아직 못 받은
+  상태다. `error_code: "PRE_WATCH_FAILED"`, `phase: "pre_watch"`,
+  `remote_build_state: "unknown"`. **"unknown"인 이유**: `SubmitToolBuild`
+  자체는 성공했는데 응답만 네트워크 문제로 유실됐을 수도 있다 — 이 경우 NodeKit은
+  build ID를 못 받았지만 NodeVault는 이미 빌드를 시작했을 수 있다. 그래서
+  "빌드가 생성되지 않았다"고 단정하지 않고 `unknown`으로만 표시한다. 실제로
+  원격 빌드가 생성됐는지 확인하려면 NodeVault 쪽 인덱스/로그를 직접 확인해야
+  한다(현재 CLI에는 idempotency key 기반 자동 조회/재시도 기능이 없다 —
+  [Issue #86](https://github.com/HeaInSeo/NodeKit/issues/86) 참고).
 
 ```bash
 $ nodekit submit recipe.json --format jsonl
 {"schema_version":"nodekit.submit.v1","type":"submitted","build_id":"abc-123"}
-{"schema_version":"nodekit.submit.v1","type":"completed","build_id":"abc-123","status":"Failed","error_code":"BUILD_FAILED","message":"..."}
+{"schema_version":"nodekit.submit.v1","type":"completed","build_id":"abc-123","status":"Failed","error_code":"BUILD_FAILED","phase":"watch","remote_build_state":"failed","message":"..."}
+$ echo $?
+1
+```
+
+```bash
+$ nodekit submit recipe.json --format jsonl
+{"schema_version":"nodekit.submit.v1","type":"completed","status":"Failed","error_code":"PRE_WATCH_FAILED","phase":"pre_watch","remote_build_state":"unknown","message":"..."}
 $ echo $?
 1
 ```
@@ -875,10 +896,11 @@ $ echo $?
 124
 ```
 
-`error_code`로 쓰이는 값: `BUILD_FAILED`, `STREAM_ENDED_WITHOUT_RESULT`,
-`CONNECT_TIMEOUT`, `WATCH_TIMEOUT`, `USER_CANCELLED`, `UNEXPECTED_ERROR`.
-자동화는 `message`가 아니라 `type`/`status`/`error_code`로 판단해야 한다 —
-`message`는 사람이 읽는 설명 텍스트일 뿐 안정적인 값 집합이 아니다.
+`error_code`로 쓰이는 값: `BUILD_FAILED`, `PRE_WATCH_FAILED`,
+`STREAM_ENDED_WITHOUT_RESULT`, `CONNECT_TIMEOUT`, `WATCH_TIMEOUT`,
+`USER_CANCELLED`, `UNEXPECTED_ERROR`. 자동화는 `message`가 아니라
+`type`/`status`/`error_code`로 판단해야 한다 — `message`는 사람이 읽는
+설명 텍스트일 뿐 안정적인 값 집합이 아니다.
 
 스키마는 additive하게만 바뀐다 — 새 필드나 새 `state` 값이 나중에 추가될 수
 있으니, 모르는 필드/값은 무시하도록 소비자를 작성하는 게 안전하다.
