@@ -766,7 +766,7 @@ nodekit recipe create /tmp/recipe.json \
 recipe를 검증하고 NodeVault에 빌드 제출한다.
 
 ```bash
-nodekit submit recipe.json [--url <nodevault-url>] [--connect-timeout <seconds>] [--watch-timeout <duration>] [--strict-reproducible]
+nodekit submit recipe.json [--url <nodevault-url>] [--connect-timeout <seconds>] [--watch-timeout <duration>] [--format human|jsonl] [--strict-reproducible]
 ```
 
 `ResolveToolSpec → SubmitToolBuild → WatchToolBuild`(NodeVault Phase 1)가 유일한
@@ -820,7 +820,68 @@ spec 해결 완료 (digest: 8f3a1c2d...)
 | `--url <url>` | NodeVault gRPC 엔드포인트 URL (환경변수 `NODEKIT_NODEVAULT_URL`이 없을 때 필수) |
 | `--connect-timeout <seconds>` | `ResolveToolSpec`/`SubmitToolBuild` 단계(아직 build ID가 없는 상태)가 이 시간(초) 안에 끝나지 않으면 타임아웃으로 종료한다(종료 코드 124). 기본값 없음 — 지정하지 않으면 이전과 동일하게 Ctrl-C 외에는 빠져나갈 방법이 없다. **build ID를 받은 뒤(`WatchToolBuild`로 실제 빌드를 관찰하는 동안)에는 적용되지 않는다** — 실제 빌드는 오래 걸리는 게 정상이라 같은 타임아웃을 적용하면 안 되기 때문. 그 단계는 대신 `--watch-timeout`이 담당한다. |
 | `--watch-timeout <duration>` | `--connect-timeout`의 반대 — build ID를 받은 뒤(`WatchToolBuild`로 실제 빌드를 관찰하는 동안)에만 적용된다. `2h`/`90m`/`120s`처럼 단위를 붙인 duration 형식(초 단위 정수인 `--connect-timeout`과 다름). 기본값 없음(옵트인) — 지정하지 않으면 Ctrl-C만 유효하다. 타임아웃이 나도 **서버 쪽 빌드는 취소하지 않는다** — 실제로는 여전히 진행 중일 수 있으므로 CLI의 로컬 관찰만 끝낸다. 종료 시 build ID와 마지막 이벤트 수신 시각을 출력하고, `--connect-timeout`(124)/Ctrl-C(130)와 구분되는 종료 코드 125를 반환한다. 설계 배경은 [Issue #71](https://github.com/HeaInSeo/NodeKit/issues/71) 참고. |
+| `--format human\|jsonl` | 출력 형식. 기본값 `human`(위 예시처럼 사람이 읽는 진행 로그). `jsonl`은 stdout에 한 줄당 독립적으로 parse 가능한 JSON 레코드(NDJSON)만 출력한다 — CI/스크립트에서 진행 상황이나 결과를 파싱할 때 쓴다. 아래 참고. |
 | `--strict-reproducible` | conda/micromamba 패키지가 `name=version`(버전만 고정)이면 제출 전에 차단한다. NodeVault 최종 게이트는 `name=version=build` 전체 고정만 받아들이는데, NodeKit L1은 authoring 편의를 위해 버전만 고정된 값도 기본적으로 허용한다 — 이 플래그로 그 불일치를 제출 전에 미리 잡을 수 있다. |
+
+### `--format jsonl`
+
+stdout에는 진행/안내 문구가 전혀 섞이지 않고 JSON 레코드만 한 줄씩 나온다 —
+사람이 읽는 안내 문구, `[빌드 시작]` 같은 prefix, digest 요약 문장은 전부
+`--format jsonl`에서 빠지고 그 정보가 아래 레코드 필드로 구조화된다.
+진단성 메시지가 필요하면(예: 서버에 취소 요청을 못 보냈다는 경고) stderr를
+그대로 쓴다 — stdout은 항상 JSON 레코드 전용이다.
+
+레코드 종류(`type` 필드로 구분)는 3가지뿐이다:
+
+- `submitted` — build ID를 처음 받았을 때 한 번.
+- `state` — 그 이후 진행 상황(빌드 상태, 이미지 참조/digest, integrity health 등).
+- `completed` — **스트림의 마지막 레코드, 항상 정확히 한 번**. 성공/실패/
+  `--connect-timeout`/`--watch-timeout`/Ctrl-C 취소/terminal 이벤트 없는 스트림
+  종료 전부 `type: "completed"`로 통일된다(별도 `"error"` type 없음) — 소비하는
+  쪽은 항상 마지막 줄을 같은 방식으로 처리하면 된다.
+
+모든 레코드는 `schema_version: "nodekit.submit.v1"`을 포함한다. `build_id`는
+모든 레코드에서 optional이다 — `--connect-timeout`처럼 build ID를 받기 전에
+끝나는 실패도 있기 때문. `status`/`error_code`는 `completed`에만 있고,
+`error_code`는 실패(`status != "Succeeded"`)일 때만 붙는다. 종료 코드 계약은
+`--format human`과 동일하다(0/1/124/125/130).
+
+```bash
+$ nodekit submit recipe.json --format jsonl
+{"schema_version":"nodekit.submit.v1","type":"submitted","build_id":"abc-123"}
+{"schema_version":"nodekit.submit.v1","type":"state","build_id":"abc-123","state":"Building"}
+{"schema_version":"nodekit.submit.v1","type":"state","build_id":"abc-123","state":"Pushing"}
+{"schema_version":"nodekit.submit.v1","type":"completed","build_id":"abc-123","status":"Succeeded","image_digest":"sha256:..."}
+$ echo $?
+0
+```
+
+실패(빌드 자체가 실패한 경우):
+
+```bash
+$ nodekit submit recipe.json --format jsonl
+{"schema_version":"nodekit.submit.v1","type":"submitted","build_id":"abc-123"}
+{"schema_version":"nodekit.submit.v1","type":"completed","build_id":"abc-123","status":"Failed","error_code":"BUILD_FAILED","message":"..."}
+$ echo $?
+1
+```
+
+build ID를 받기 전 `--connect-timeout`이 발동한 경우(`build_id` 필드 자체가 없다):
+
+```bash
+$ nodekit submit recipe.json --connect-timeout 30 --format jsonl
+{"schema_version":"nodekit.submit.v1","type":"completed","status":"Failed","error_code":"CONNECT_TIMEOUT","message":"..."}
+$ echo $?
+124
+```
+
+`error_code`로 쓰이는 값: `BUILD_FAILED`, `STREAM_ENDED_WITHOUT_RESULT`,
+`CONNECT_TIMEOUT`, `WATCH_TIMEOUT`, `USER_CANCELLED`, `UNEXPECTED_ERROR`.
+자동화는 `message`가 아니라 `type`/`status`/`error_code`로 판단해야 한다 —
+`message`는 사람이 읽는 설명 텍스트일 뿐 안정적인 값 집합이 아니다.
+
+스키마는 additive하게만 바뀐다 — 새 필드나 새 `state` 값이 나중에 추가될 수
+있으니, 모르는 필드/값은 무시하도록 소비자를 작성하는 게 안전하다.
 
 ## 4. `nodekit validate <recipe.json> [--strict-reproducible]`
 
@@ -961,6 +1022,8 @@ $ nodekit render recipe.json --out - --format raw-spec --pretty
 - `nodekit` 단독 실행, 또는 `validate`/`render`/`submit`/`recipe`가 아닌 명령 → 사용법
   안내 출력, 종료 코드 2.
 - `nodekit submit` 빌드 제출 실패 시 종료 코드 1. URL 미지정 시 종료 코드 2.
+- 위 종료 코드 표는 `nodekit submit --format jsonl`에서도 동일하게 적용된다 —
+  `--format`은 출력 형식만 바꾸고 종료 코드 계약은 바꾸지 않는다(§3 참고).
 
 ## 7. `recipe.json`을 손으로 쓰거나 고칠 때
 

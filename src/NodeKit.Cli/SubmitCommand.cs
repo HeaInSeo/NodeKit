@@ -29,12 +29,21 @@ namespace NodeKit.Cli
     internal static class SubmitCommand
     {
         private const string UsageLine =
-            "사용법: nodekit submit <recipe.json> [--url <nodevault-url>] [--connect-timeout <seconds>] [--watch-timeout <duration>] [--strict-reproducible]";
+            "사용법: nodekit submit <recipe.json> [--url <nodevault-url>] [--connect-timeout <seconds>] [--watch-timeout <duration>] [--format human|jsonl] [--strict-reproducible]";
 
         private static readonly JsonSerializerOptions _recipeReadOptions = new()
         {
             PropertyNameCaseInsensitive = true,
             Converters = { new JsonStringEnumConverter() },
+        };
+
+        // 압축(한 줄) 출력 — --format jsonl은 실제 wire payload처럼 매 줄이
+        // 그 자체로 독립적인 JSON이어야 하는 NDJSON 계약이라 들여쓰기하지
+        // 않는다. null 필드는 아예 생략한다(빈 문자열이 아니라 "이 레코드에는
+        // 이 값이 없다"는 뜻을 명확히 구분하기 위해).
+        private static readonly JsonSerializerOptions _jsonlOptions = new()
+        {
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         };
 
         public static int Run(
@@ -56,7 +65,7 @@ namespace NodeKit.Cli
             }
 
             var recipePath = args[1];
-            if (!TryParseOptions(args, stderr, out var urlOption, out var connectTimeout, out var watchTimeout, out var strictReproducible))
+            if (!TryParseOptions(args, stderr, out var urlOption, out var connectTimeout, out var watchTimeout, out var strictReproducible, out var jsonl))
             {
                 return 2;
             }
@@ -137,19 +146,25 @@ namespace NodeKit.Cli
                 }
             }
 
-            stdout.WriteLine($"NodeVault에 빌드 요청을 시작합니다: {url ?? "(주입된 클라이언트)"}");
-            stdout.WriteLine($"  도구: {definition.Name} {definition.Version}");
-            stdout.WriteLine();
+            // --format jsonl에서는 stdout에 JSON 레코드만 나가야 한다(Issue #82) —
+            // 이 안내 문구도 사람이 읽는 프리텍스트라 jsonl 모드에서는 생략한다.
+            // 그 대신 첫 "submitted" 레코드가 이 역할을 대신한다.
+            if (!jsonl)
+            {
+                stdout.WriteLine($"NodeVault에 빌드 요청을 시작합니다: {url ?? "(주입된 클라이언트)"}");
+                stdout.WriteLine($"  도구: {definition.Name} {definition.Version}");
+                stdout.WriteLine();
+            }
 
             if (toolSpecClient is not null)
             {
-                return SubmitAsync(definition.Name, definition.Version, rawSpec, toolSpecClient, stdout, stderr, connectTimeout, watchTimeout)
+                return SubmitAsync(definition.Name, definition.Version, rawSpec, toolSpecClient, stdout, stderr, connectTimeout, watchTimeout, jsonl)
                     .GetAwaiter().GetResult();
             }
 
             using (grpc)
             {
-                return SubmitAsync(definition.Name, definition.Version, rawSpec, grpc!, stdout, stderr, connectTimeout, watchTimeout)
+                return SubmitAsync(definition.Name, definition.Version, rawSpec, grpc!, stdout, stderr, connectTimeout, watchTimeout, jsonl)
                     .GetAwaiter().GetResult();
             }
         }
@@ -162,7 +177,8 @@ namespace NodeKit.Cli
             TextWriter stdout,
             TextWriter stderr,
             TimeSpan? connectTimeout = null,
-            TimeSpan? watchTimeout = null)
+            TimeSpan? watchTimeout = null,
+            bool jsonl = false)
         {
             using var cts = new CancellationTokenSource();
 
@@ -202,16 +218,44 @@ namespace NodeKit.Cli
             {
                 await foreach (var ev in client.ResolveAndBuildAsync(toolName, version, rawSpec, linkedCts.Token))
                 {
-                    // Failed는 stdout에 찍지 않는다 — 아래에서 이 실패를 stderr로
-                    // 한 번 더 보고하므로(진단 로그는 stderr 전용, stdout은 digest
-                    // 같은 결과값 전용으로 유지하는 원칙은 아래 IntegrityHealth
-                    // 경고 처리와 동일), 여기서도 찍으면 같은 메시지가 stdout/
-                    // stderr에 중복으로 나가 자동화 스크립트가 stdout만 파싱해도
-                    // 실패 문구에 오염될 수 있었다(외부 리뷰로 발견).
-                    if (ev.Kind != BuildEventKind.Failed)
+                    var isFirstBuildIdEvent = buildId is null && !string.IsNullOrEmpty(ev.BuildId);
+
+                    // Failed/Succeeded는 여기서 찍지 않는다 — 아래에서 terminal
+                    // completed 레코드(jsonl) 또는 별도 stderr 보고(human)로 한
+                    // 번만 다룬다. jsonl 모드에서는 첫 build_id 이벤트가
+                    // "submitted" 레코드가 되고, 그 외 진행 이벤트는 "state"
+                    // 레코드가 된다(Issue #82 결정).
+                    if (jsonl)
                     {
-                        PrintEvent(ev, stdout);
+                        if (ev.Kind != BuildEventKind.Succeeded && ev.Kind != BuildEventKind.Failed)
+                        {
+                            WriteJsonl(
+                                stdout,
+                                isFirstBuildIdEvent
+                                    ? SubmitJsonlRecord.Submitted(ev.BuildId)
+                                    : SubmitJsonlRecord.ProgressState(
+                                        string.IsNullOrEmpty(buildId) ? ev.BuildId : buildId,
+                                        DescribeState(ev),
+                                        ev.Message,
+                                        ev.ImageRef,
+                                        ev.ImageDigest,
+                                        ev.IntegrityHealth));
+                        }
                     }
+                    else
+                    {
+                        // stdout은 결과값 전용으로 유지하는 원칙(아래 IntegrityHealth
+                        // 경고 처리와 동일)에 따라 Failed는 여기서 찍지 않는다 —
+                        // 아래에서 stderr로만 한 번 보고한다. 이걸 여기서도 찍으면
+                        // 같은 메시지가 stdout/stderr에 중복으로 나가 자동화
+                        // 스크립트가 stdout만 파싱해도 실패 문구에 오염될 수
+                        // 있었다(외부 리뷰로 발견).
+                        if (ev.Kind != BuildEventKind.Failed)
+                        {
+                            PrintEvent(ev, stdout);
+                        }
+                    }
+
                     lastEventReceivedAt = DateTimeOffset.Now;
                     if (!string.IsNullOrEmpty(ev.BuildId))
                     {
@@ -257,6 +301,19 @@ namespace NodeKit.Cli
 
                     if (ev.Kind == BuildEventKind.Succeeded)
                     {
+                        if (jsonl)
+                        {
+                            WriteJsonl(
+                                stdout,
+                                SubmitJsonlRecord.Completed(
+                                    "Succeeded",
+                                    buildId,
+                                    imageRef: lastImageRef,
+                                    imageDigest: lastImageDigest,
+                                    integrityHealth: lastIntegrityHealth));
+                            return 0;
+                        }
+
                         if (!string.IsNullOrEmpty(lastImageDigest))
                         {
                             stdout.WriteLine(string.IsNullOrEmpty(lastImageRef)
@@ -296,6 +353,14 @@ namespace NodeKit.Cli
 
                     if (ev.Kind == BuildEventKind.Failed)
                     {
+                        if (jsonl)
+                        {
+                            WriteJsonl(
+                                stdout,
+                                SubmitJsonlRecord.Completed("Failed", buildId, "BUILD_FAILED", ev.Message));
+                            return 1;
+                        }
+
                         stderr.WriteLine($"빌드 실패: {ev.Message}");
                         return 1;
                     }
@@ -304,6 +369,18 @@ namespace NodeKit.Cli
                 // 스트림이 Succeeded/Failed 등 최종 상태 이벤트 없이 그냥 끝났다(서버
                 // 재시작, 네트워크 문제 등) — 빌드 결과를 실제로 확인하지 못한 것이므로
                 // 성공으로 간주하지 않는다.
+                if (jsonl)
+                {
+                    WriteJsonl(
+                        stdout,
+                        SubmitJsonlRecord.Completed(
+                            "Failed",
+                            buildId,
+                            "STREAM_ENDED_WITHOUT_RESULT",
+                            "서버 스트림이 최종 상태 이벤트 없이 종료되었습니다."));
+                    return 1;
+                }
+
                 stderr.WriteLine(string.IsNullOrEmpty(buildId)
                     ? "빌드 결과를 확인하지 못한 채 서버 스트림이 종료되었습니다."
                     : $"빌드 결과를 확인하지 못한 채 서버 스트림이 종료되었습니다 (build ID: {buildId}). NodeVault에서 빌드 상태를 직접 확인하세요.");
@@ -328,15 +405,27 @@ namespace NodeKit.Cli
             {
                 if (connectTimeoutCts.IsCancellationRequested && !cts.IsCancellationRequested)
                 {
-                    return ReportConnectTimeout(stderr, connectTimeout!.Value);
+                    return ReportConnectTimeout(stdout, stderr, connectTimeout!.Value, jsonl);
                 }
 
                 if (watchTimeoutCts.IsCancellationRequested && !cts.IsCancellationRequested)
                 {
-                    return ReportWatchTimeout(stderr, watchTimeout!.Value, buildId, lastEventReceivedAt);
+                    return ReportWatchTimeout(stdout, stderr, watchTimeout!.Value, buildId, lastEventReceivedAt, jsonl);
                 }
 
+                // 서버 취소 best-effort 알림 실패 경고는 진단성 성격이라(외부
+                // 리뷰가 이미 확인한 "진단은 stderr 전용" 원칙의 예외적 허용
+                // 범위) jsonl 모드에서도 그대로 stderr에 남긴다 — completed
+                // 레코드가 담는 1차 결과와는 별개의 부가 정보다.
                 await CancelServerBuildBestEffort(client, buildId, stderr);
+                if (jsonl)
+                {
+                    WriteJsonl(
+                        stdout,
+                        SubmitJsonlRecord.Completed("Cancelled", buildId, "USER_CANCELLED", "빌드 요청이 취소되었습니다."));
+                    return 130;
+                }
+
                 stderr.WriteLine("빌드 요청이 취소되었습니다.");
                 return 130;
             }
@@ -348,6 +437,14 @@ namespace NodeKit.Cli
             // crash with a raw stack trace.
             catch (Exception ex)
             {
+                if (jsonl)
+                {
+                    WriteJsonl(
+                        stdout,
+                        SubmitJsonlRecord.Completed("Failed", buildId, "UNEXPECTED_ERROR", BuildErrorMessages.Describe(ex)));
+                    return 1;
+                }
+
                 stderr.WriteLine(BuildErrorMessages.Describe(ex));
                 return 1;
             }
@@ -362,11 +459,22 @@ namespace NodeKit.Cli
         // 시작된 빌드가 없다. CancelServerBuildBestEffort를 부를 대상 자체가
         // 없다는 뜻이라 사용자 Ctrl-C 취소(exit 130)와 다른, 구분되는 exit
         // code(124, `timeout(1)` 셸 명령의 관례와 동일)를 쓴다.
-        private static int ReportConnectTimeout(TextWriter stderr, TimeSpan timeout)
+        private static int ReportConnectTimeout(TextWriter stdout, TextWriter stderr, TimeSpan timeout, bool jsonl)
         {
-            stderr.WriteLine(
+            var message =
                 $"NodeVault 연결이 {(int)timeout.TotalSeconds}초 동안 응답이 없어 타임아웃되었습니다 (--connect-timeout). " +
-                "주소와 네트워크 상태를 확인하세요.");
+                "주소와 네트워크 상태를 확인하세요.";
+
+            if (jsonl)
+            {
+                // connect-timeout은 정의상 buildId를 받기 전(ResolveToolSpec/
+                // SubmitToolBuild 단계)에만 발동하므로 completed 레코드에
+                // build_id가 붙는 경우는 없다.
+                WriteJsonl(stdout, SubmitJsonlRecord.Completed("Failed", errorCode: "CONNECT_TIMEOUT", message: message));
+                return 124;
+            }
+
+            stderr.WriteLine(message);
             return 124;
         }
 
@@ -376,14 +484,30 @@ namespace NodeKit.Cli
         // CLI의 로컬 관찰만 끝내고 서버 빌드는 건드리지 않는다. exit code는
         // --connect-timeout(124)/Ctrl-C(130)와 구분되는 별도 값을 쓴다.
         private static int ReportWatchTimeout(
-            TextWriter stderr, TimeSpan timeout, string? buildId, DateTimeOffset? lastEventReceivedAt)
+            TextWriter stdout, TextWriter stderr, TimeSpan timeout, string? buildId, DateTimeOffset? lastEventReceivedAt, bool jsonl)
         {
+            if (jsonl)
+            {
+                var lastEventAtText = lastEventReceivedAt is { } t
+                    ? t.ToString("yyyy-MM-ddTHH:mm:sszzz", System.Globalization.CultureInfo.InvariantCulture)
+                    : null;
+                WriteJsonl(
+                    stdout,
+                    SubmitJsonlRecord.Completed(
+                        "Failed",
+                        buildId,
+                        "WATCH_TIMEOUT",
+                        $"Watch가 {FormatDuration(timeout)} 후 타임아웃되었습니다. 서버에서는 빌드가 계속 진행 중일 수 있습니다." +
+                        (lastEventAtText is null ? string.Empty : $" 마지막 이벤트 수신 시각: {lastEventAtText}.")));
+                return 125;
+            }
+
             stderr.WriteLine($"Watch가 {FormatDuration(timeout)} 후 타임아웃되었습니다 (--watch-timeout).");
             stderr.WriteLine();
             stderr.WriteLine("서버에서는 빌드가 계속 진행 중일 수 있습니다.");
             stderr.WriteLine($"Build ID: {(string.IsNullOrEmpty(buildId) ? "(알 수 없음)" : buildId)}");
             stderr.WriteLine(
-                $"마지막 이벤트 수신 시각: {(lastEventReceivedAt is { } t ? t.ToString("yyyy-MM-ddTHH:mm:sszzz", System.Globalization.CultureInfo.InvariantCulture) : "(없음)")}");
+                $"마지막 이벤트 수신 시각: {(lastEventReceivedAt is { } t2 ? t2.ToString("yyyy-MM-ddTHH:mm:sszzz", System.Globalization.CultureInfo.InvariantCulture) : "(없음)")}");
             stderr.WriteLine();
             stderr.WriteLine("Build ID로 나중에 빌드 상태를 다시 확인하세요.");
             return 125;
@@ -465,6 +589,17 @@ namespace NodeKit.Cli
             }
         }
 
+        private static void WriteJsonl(TextWriter stdout, SubmitJsonlRecord record) =>
+            stdout.WriteLine(JsonSerializer.Serialize(record, _jsonlOptions));
+
+        // --format jsonl의 "state" 필드 값 — ev.Status(WatchToolBuild 경로가
+        // NodeVault buildstate.Status를 그대로 실어 보내는 문자열, 예:
+        // "Building"/"Running")가 있으면 그대로 쓰고, 없으면(legacy
+        // BuildAndRegister 경로처럼 Status가 안 채워지는 경우) Kind 이름으로
+        // 대체한다.
+        private static string DescribeState(BuildEvent ev) =>
+            string.IsNullOrEmpty(ev.Status) ? ev.Kind.ToString() : ev.Status;
+
         // args[0]은 "submit", args[1]은 recipe 경로 — 옵션은 인덱스 2부터 시작한다.
         // 공유 CliOptionParser가 알려지지 않은 옵션, 값 누락/중복/다른 옵션처럼
         // 보이는 값을 명시적 에러로 걸러준다 — --connect-timeout의 "초 단위
@@ -476,18 +611,20 @@ namespace NodeKit.Cli
             out string? url,
             out TimeSpan? connectTimeout,
             out TimeSpan? watchTimeout,
-            out bool strictReproducible)
+            out bool strictReproducible,
+            out bool jsonl)
         {
             url = null;
             connectTimeout = null;
             watchTimeout = null;
             strictReproducible = false;
+            jsonl = false;
 
             if (!CliOptionParser.TryParse(
                 args,
                 startIndex: 2,
                 stderr,
-                valueOptions: new[] { "--url", "--connect-timeout", "--watch-timeout" },
+                valueOptions: new[] { "--url", "--connect-timeout", "--watch-timeout", "--format" },
                 flagOptions: new[] { "--strict-reproducible" },
                 out var values,
                 out var flags))
@@ -522,6 +659,18 @@ namespace NodeKit.Cli
                 }
 
                 watchTimeout = duration;
+            }
+
+            if (values.TryGetValue("--format", out var formatValue))
+            {
+                var normalized = formatValue.Trim().ToLowerInvariant();
+                if (normalized != "human" && normalized != "jsonl")
+                {
+                    stderr.WriteLine($"--format 옵션 값이 올바르지 않습니다: {formatValue} (human 또는 jsonl)");
+                    return false;
+                }
+
+                jsonl = normalized == "jsonl";
             }
 
             return true;
