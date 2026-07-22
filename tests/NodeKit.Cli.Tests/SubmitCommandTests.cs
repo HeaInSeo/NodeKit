@@ -814,6 +814,58 @@ namespace NodeKit.Cli.Tests
             Assert.Contains("빌드 실패", stderr.ToString());
         }
 
+        // 외부 리뷰: PrintEvent가 모든 이벤트를 무조건 stdout에 찍어서, Failed
+        // 이벤트가 오면 stdout("[실패] ...")과 stderr("빌드 실패: ...") 양쪽에
+        // 같은 메시지가 중복으로 나갔다 — stdout은 결과값 전용, 진단은 stderr
+        // 전용이라는 이 코드베이스의 기존 원칙(IntegrityHealth 경고와 동일)에
+        // 어긋났다. 자동화 스크립트가 stdout만 파싱해도 실패 문구에 오염될 수
+        // 있었다.
+        [Fact]
+        public void Submit_BuildFailed_MessageAppearsOnlyOnStderr_NotDuplicatedOnStdout()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var events = new[]
+            {
+                new BuildEvent { Kind = BuildEventKind.Log, Message = "spec 해결 완료" },
+                new BuildEvent { Kind = BuildEventKind.Failed, Message = "NodeVault에 연결할 수 없습니다." },
+            };
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(events));
+
+            Assert.Equal(1, exitCode);
+            Assert.Contains("NodeVault에 연결할 수 없습니다.", stderr.ToString());
+            Assert.DoesNotContain("NodeVault에 연결할 수 없습니다.", stdout.ToString());
+        }
+
+        // 외부 리뷰: 첫 RPC(ResolveToolSpec) 호출 전에 "빌드를 제출합니다"라고
+        // 찍어서, 연결 실패나 ResolveToolSpec 실패로 실제로는 아무것도
+        // 제출되지 않았어도 사용자가 제출된 것으로 오해할 수 있었다. 문구를
+        // "빌드 요청을 시작합니다"로 완화했다 — 실제 제출 확인은 서버가
+        // JobCreated 이벤트를 보내야만 나오는 "[빌드 시작]" 로그가 담당한다.
+        [Fact]
+        public void Submit_AnnouncementWording_DoesNotClaimSubmissionBeforeAnyRpc()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(new[] { new BuildEvent { Kind = BuildEventKind.Succeeded } }));
+
+            Assert.Equal(0, exitCode);
+            Assert.Contains("빌드 요청을 시작합니다", stdout.ToString());
+            Assert.DoesNotContain("빌드를 제출합니다", stdout.ToString());
+        }
+
         [Fact]
         public void Submit_OperationCanceled_CallsCancelBuildAndReturns130()
         {
