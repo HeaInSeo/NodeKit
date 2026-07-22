@@ -355,9 +355,31 @@ namespace NodeKit.Cli
                     {
                         if (jsonl)
                         {
+                            // build ID를 아직 못 받았다는 건 WatchToolBuild가 시작되기도
+                            // 전(ResolveToolSpec/SubmitToolBuild 단계)에 이 Failed가 왔다는
+                            // 뜻이다 — 이 경우 원격 빌드가 실제로 생성됐는지는 알 수 없다
+                            // (예: SubmitToolBuild 응답만 유실되고 서버는 이미 빌드를
+                            // 시작했을 수 있음). 그래서 "빌드가 실패했다"고 단정하는
+                            // BUILD_FAILED 대신 별도 코드를 쓰고, remote_build_state를
+                            // "unknown"으로 명시한다 — build ID가 있는 상태에서 온 Failed만
+                            // WatchToolBuild가 실제로 terminal 실패를 관측한 것이므로
+                            // BUILD_FAILED/failed로 확정할 수 있다.
                             WriteJsonl(
                                 stdout,
-                                SubmitJsonlRecord.Completed("Failed", buildId, "BUILD_FAILED", ev.Message));
+                                buildId is null
+                                    ? SubmitJsonlRecord.Completed(
+                                        "Failed",
+                                        errorCode: "PRE_WATCH_FAILED",
+                                        message: ev.Message,
+                                        phase: "pre_watch",
+                                        remoteBuildState: "unknown")
+                                    : SubmitJsonlRecord.Completed(
+                                        "Failed",
+                                        buildId,
+                                        "BUILD_FAILED",
+                                        ev.Message,
+                                        phase: "watch",
+                                        remoteBuildState: "failed"));
                             return 1;
                         }
 
