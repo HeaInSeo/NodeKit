@@ -1,10 +1,10 @@
 # NodeKit Legacy-First Sprint Plan
 
-Status: Sprint 6 완료 / Sprint 7 진행 중(Task 1 완료, 외부 CLI 리뷰 대응 4라운드 완료, Task 2 — seoy fixture 3개 live 확인 완료, 전체 wizard 수동 테스트는 대기) / R18-R21(§13) 완료 / R22-B/C/D(§13) 완료 / 적대적 리뷰 Major-1(#41)/wizard 통합(#42)/3차 리뷰 follow-up(#45)/4차 리뷰 follow-up(proto+docs) 완료  
+Status: Sprint 6 완료 / Sprint 7 진행 중(Task 1 완료, 외부 CLI 리뷰 대응 6라운드 완료, Task 2 — seoy fixture 3개 live 확인 완료, 전체 wizard 수동 테스트는 대기) / R18-R21(§13) 완료 / R22-B/C/D(§13) 완료 / 적대적 리뷰 Major-1(#41)/wizard 통합(#42)/3차 리뷰 follow-up(#45)/4차 리뷰 follow-up(proto+docs) 완료  
 Created: 2026-06-17  
-Updated: 2026-07-21 (Sprint 7에 외부 CLI 리뷰 대응 4라운드 Progress 블록 추가 — #73/#72(PR #76/#77)
-typed raw_spec DTO + render --format raw-spec, #49는 커밋 `35971ef`로 이미 완료돼 있던 걸
-재확인하고 GitHub 이슈만 close. #59/#74는 의도적으로 열어둠)  
+Updated: 2026-07-22 (Sprint 7에 외부 CLI 리뷰 대응 5/6라운드 Progress 블록 추가 — PR #80/#81
+--url 크래시 수정 + --help/-h, PR #83/#84 문서 포트 수정 + stdout/stderr 중복 제거,
+Issue #82(machine-readable 출력) filed. CodeQL alert #543 dismiss)  
 Scope: NodeKit work — Sprint 0-6 완료, Sprint 7(Post-Migration Hardening) 진행 중,
 §13 Live Recipe Reproducibility Improvement(R18-R21) 완료, R22-B/C/D(SourceBuild
 구조화 intent authoring 모델 + 2-stage 렌더링 + RuntimeProfile hygiene advisor) 완료,
@@ -81,18 +81,22 @@ risky(curl 전용/buildpack-deps 등)하면 non-blocking 경고. 상세는 §13
 R22-D Progress 블록 참조. **R22(SourceBuild 구조화 intent) 이니셔티브
 전체(R22-B/C/D) 완료.**
 
-현재 NodeKit 초점 (2026-07-21 갱신):
+현재 NodeKit 초점 (2026-07-22 갱신):
 
 ```text
 Sprint 7 Task 1(Avalonia GUI ToolSpec 마이그레이션) 완료(2026-07-14, 아래
 Progress 블록 참조). R22-B/C/D, 적대적 리뷰 Major-1(#41)/wizard 통합(#42) 완료.
 외부 CLI 리뷰 대응 3라운드(Issue #61-#71, PR #61-#70/#75) 완료(2026-07-20) —
 --connect-timeout/--watch-timeout, CliOptionParser 공유화, recipe create
-타임아웃/옵션파서 수정. 이어서 4라운드(Issue #49/#72/#73, PR #76/#77)도
-완료(2026-07-21, 아래 Progress 블록 참조) — typed raw_spec DTO, render
---format raw-spec, #49는 이미 고쳐져 있던 걸 재확인 후 이슈만 close.
-남은 건 #59(live submit 검증, 실행 전 확인 필요)와 #74(idle-timeout,
-NodeVault 프로토콜 선행 필요) — 둘 다 의도적으로 열어둠.
+타임아웃/옵션파서 수정. 4라운드(Issue #49/#72/#73, PR #76/#77) 완료(2026-07-21)
+— typed raw_spec DTO, render --format raw-spec, #49는 이미 고쳐져 있던 걸
+재확인 후 이슈만 close. 5라운드(PR #80/#81) 완료(2026-07-21) — --url 크래시
+수정, --help/-h 추가, machine-readable 출력은 Issue #82로 분리. 6라운드
+(PR #83/#84) 완료(2026-07-22) — 문서 포트 예시 수정, submit stdout/stderr
+중복 제거. 상세는 각 Progress 블록 참조.
+남은 이슈: #59(live submit 검증, 실행 전 확인 필요), #74(idle-timeout,
+NodeVault 프로토콜 선행 필요), #79(AdminToolList revision UI, NodeVault#6
+API 대기), #82(machine-readable 출력, 설계 미정) — 전부 의도적으로 열어둠.
 남은 것: Sprint 7 Task 2(seoy 원격 장비 nodekit submit 수동 테스트)
   — 2026-07-05: seoy 없이 heain 로컬 사전 검증 완료(TC-1~TC-13 전체), 버그 6건
     발견·수정·close (docs/NODEKIT_LOCAL_GRPC_TEST_SCENARIO.md §7 참조).
@@ -422,6 +426,68 @@ Done when:
 - Avalonia GUI도 ToolSpec 경로로 전환 완료.
 - CLI end-to-end 수동 테스트 통과 (seoy 장비).
 - IBuildClient / GrpcBuildClient 완전 제거 또는 명시적 ADR 후 유지 결정.
+```
+
+**Progress (외부 CLI 리뷰 대응 6라운드 완료, 2026-07-22, PR #83/#84):**
+
+```text
+5라운드(아래 블록)에서 PR #77(render --format raw-spec)에 대해 이어진
+적대적 리뷰(2회차)에서 나온 3개 지적 중 P1/P2 대응:
+
+- P1(PR #83): NODEKIT_CLI_USAGE.md §1의 NODEKIT_NODEVAULT_URL 예시가
+  `:8080`(Catalog REST API 포트, ARCHITECTURE.md:90)을 쓰고 있었음 —
+  실제로는 NodeVault BuildService gRPC 포트 `:50051`(ARCHITECTURE.md:88)
+  이어야 함. 그대로 따라하면 잘못된 포트로 gRPC 연결 시도. 한 줄 수정.
+- P2(PR #84, 2개): (1) PrintEvent가 모든 이벤트를 무조건 stdout에 찍어서
+  BuildEventKind.Failed가 오면 stdout("[실패] ...")과 stderr("빌드 실패:
+  ...") 양쪽에 같은 메시지가 중복 — stdout은 결과값 전용, 진단은 stderr
+  전용이라는 기존 원칙(IntegrityHealth 경고와 동일)에 어긋났음. Failed는
+  PrintEvent에서 제외해 해소. (2) 첫 RPC 호출 전에 "NodeVault에 빌드를
+  제출합니다"라고 찍어서, 연결 실패 시 실제로는 아무것도 제출 안 됐는데
+  제출된 것으로 오해할 수 있었음 → "빌드 요청을 시작합니다"로 완화(실제
+  제출 확인은 JobCreated 이벤트가 와야 찍히는 "[빌드 시작]"이 담당).
+  P3(문서 §5 discoverability, --format raw-spec이 render 최상위 usage에
+  없던 문제)는 5라운드(아래)에서 이미 해소됨 — 이번 리뷰는 그 반영이
+  맞는지 확인만.
+
+CodeQL: 새 alert 없음(재확인).
+
+이 라운드 이후: 697 total, 695 passed, 0 failed, 2 skipped, 0 warnings,
+dotnet format 클린.
+```
+
+**Progress (외부 CLI 리뷰 대응 5라운드 완료, 2026-07-21, PR #80/#81, Issue #82 filed):**
+
+```text
+4라운드(아래 블록)에서 PR #77(render --format raw-spec)에 대해 이어진
+적대적 리뷰에서 나온 5개 지적 중 3개는 같은 PR #77 위에 바로 반영(PR #78 —
+--pretty, 문구 명확화, --format 값 대소문자/언더스코어 허용; 나머지 2개는
+근거 있게 기각, 이슈로도 안 남김), 그 다음 라운드에서 나온 새 리뷰의 4개
+지적 중 P1/P2 대응:
+
+- P1(PR #80): `SubmitCommand.Run`이 `GrpcToolSpecClient(url!)`을 try/catch
+  밖에서 생성해서, 형식이 잘못된 `--url` 하나로 CLI가 스택트레이스와 함께
+  죽었음(재현: `--url not-a-url --connect-timeout 1` → exit 134). 실제
+  관찰된 예외가 `UriFormatException`(형식 오류)과 `InvalidOperationException`
+  ("No address resolver configured for the scheme 'ftp'", 미지원 scheme)
+  두 가지라 둘 다 커버하는 넓은 catch로 수정, 클라이언트 생성 시도를 "제출
+  중" 안내보다 먼저로 이동. 회귀 테스트를 `git stash`로 되돌려 실패
+  재현까지 확인.
+- P2(PR #81): `--help`/`-h`가 사실상 없었음(최상위는 "알 수 없는 명령",
+  render/submit --help는 옵션 누락 에러로 처리됨) → 최상위 및 4개
+  서브커맨드(validate/render/submit/recipe create) 전부에서 `--help`/`-h`를
+  exit 0으로 인식하도록 추가, usage 문자열을 상수로 추출해 에러 경로와
+  --help 경로가 어긋나지 않게 함.
+- P3(같은 PR #81): 최상위 usage가 render의 `--format`/`--pretty`를 반영 안
+  하던 문제도 같이 수정.
+- P2(machine-readable 출력, `--format json`/`--quiet`): 설계 결정이 필요해
+  구현하지 않고 Issue #82로 분리(미결정, 추적만).
+
+CodeQL: PR #80이 추가한 넓은 catch가 새 alert #543
+(`cs/catch-of-all-exceptions`)으로 잡혀 근거 남기고 dismiss(2026-07-22).
+
+이 라운드 이후: 692 total, 690 passed, 0 failed, 2 skipped, 0 warnings,
+dotnet format 클린.
 ```
 
 **Progress (외부 CLI 리뷰 대응 4라운드 완료, 2026-07-21, Issue #49/#72/#73
