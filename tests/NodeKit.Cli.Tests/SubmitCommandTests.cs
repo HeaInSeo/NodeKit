@@ -994,6 +994,268 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(1, kind.GetInt32());
         }
 
+        // ── Issue #82: --format jsonl ────────────────────────────────────────
+
+        [Fact]
+        public void Submit_FormatJsonlUnknownValue_ReturnsTwoWithExplicitError()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--format", "bogus" },
+                stdout,
+                stderr);
+
+            Assert.Equal(2, exitCode);
+            Assert.Contains("--format", stderr.ToString());
+        }
+
+        [Fact]
+        public void Submit_FormatJsonl_BuildSucceeded_EmitsSubmittedStateAndCompletedRecords()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var events = new[]
+            {
+                new BuildEvent { Kind = BuildEventKind.JobCreated, BuildId = "build-jsonl-1", Status = "Building" },
+                new BuildEvent { Kind = BuildEventKind.Log, BuildId = "build-jsonl-1", Status = "Pushing" },
+                new BuildEvent
+                {
+                    Kind = BuildEventKind.Succeeded,
+                    BuildId = "build-jsonl-1",
+                    ImageRef = "registry.example.com/bwa:0.7.17",
+                    ImageDigest = "sha256:abc123",
+                    IntegrityHealth = "Healthy",
+                },
+            };
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--format", "jsonl" },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(events));
+
+            Assert.Equal(0, exitCode);
+            var lines = SplitNonEmptyLines(stdout.ToString());
+            Assert.Equal(3, lines.Count);
+
+            var submitted = ParseRecord(lines[0]);
+            Assert.Equal("nodekit.submit.v1", submitted.GetProperty("schema_version").GetString());
+            Assert.Equal("submitted", submitted.GetProperty("type").GetString());
+            Assert.Equal("build-jsonl-1", submitted.GetProperty("build_id").GetString());
+            Assert.False(submitted.TryGetProperty("status", out _), "submitted 레코드에는 status가 없어야 합니다.");
+
+            var state = ParseRecord(lines[1]);
+            Assert.Equal("state", state.GetProperty("type").GetString());
+            Assert.Equal("Pushing", state.GetProperty("state").GetString());
+
+            var completed = ParseRecord(lines[2]);
+            Assert.Equal("completed", completed.GetProperty("type").GetString());
+            Assert.Equal("Succeeded", completed.GetProperty("status").GetString());
+            Assert.Equal("build-jsonl-1", completed.GetProperty("build_id").GetString());
+            Assert.Equal("sha256:abc123", completed.GetProperty("image_digest").GetString());
+            Assert.False(completed.TryGetProperty("error_code", out _), "성공 시 error_code가 없어야 합니다.");
+
+            Assert.Empty(stderr.ToString());
+        }
+
+        [Fact]
+        public void Submit_FormatJsonl_BuildFailed_EmitsCompletedRecordWithBuildFailedErrorCode()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var events = new[]
+            {
+                new BuildEvent { Kind = BuildEventKind.JobCreated, BuildId = "build-jsonl-2" },
+                new BuildEvent { Kind = BuildEventKind.Failed, BuildId = "build-jsonl-2", Message = "이미지 없음" },
+            };
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--format", "jsonl" },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(events));
+
+            Assert.Equal(1, exitCode);
+            var lines = SplitNonEmptyLines(stdout.ToString());
+            var completed = ParseRecord(lines[^1]);
+            Assert.Equal("completed", completed.GetProperty("type").GetString());
+            Assert.Equal("Failed", completed.GetProperty("status").GetString());
+            Assert.Equal("BUILD_FAILED", completed.GetProperty("error_code").GetString());
+            Assert.Equal("이미지 없음", completed.GetProperty("message").GetString());
+            Assert.Equal("build-jsonl-2", completed.GetProperty("build_id").GetString());
+        }
+
+        [Fact]
+        public void Submit_FormatJsonl_StreamEndsWithoutTerminalEvent_EmitsCompletedRecordWithStreamEndedErrorCode()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var events = new[]
+            {
+                new BuildEvent { Kind = BuildEventKind.JobCreated, BuildId = "build-jsonl-3" },
+            };
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--format", "jsonl" },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(events));
+
+            Assert.Equal(1, exitCode);
+            var lines = SplitNonEmptyLines(stdout.ToString());
+            var completed = ParseRecord(lines[^1]);
+            Assert.Equal("completed", completed.GetProperty("type").GetString());
+            Assert.Equal("Failed", completed.GetProperty("status").GetString());
+            Assert.Equal("STREAM_ENDED_WITHOUT_RESULT", completed.GetProperty("error_code").GetString());
+        }
+
+        [Fact]
+        public void Submit_FormatJsonl_ConnectTimeoutFires_EmitsCompletedRecordWithoutBuildId()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var client = new HangingBeforeAnyEventToolSpecClient();
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--connect-timeout", "1", "--format", "jsonl" },
+                stdout,
+                stderr,
+                toolSpecClient: client);
+
+            Assert.Equal(124, exitCode);
+            var lines = SplitNonEmptyLines(stdout.ToString());
+            var completed = ParseRecord(Assert.Single(lines));
+            Assert.Equal("completed", completed.GetProperty("type").GetString());
+            Assert.Equal("Failed", completed.GetProperty("status").GetString());
+            Assert.Equal("CONNECT_TIMEOUT", completed.GetProperty("error_code").GetString());
+            Assert.False(completed.TryGetProperty("build_id", out _),
+                "connect-timeout은 build ID를 받기 전에만 발동하므로 build_id가 없어야 합니다.");
+            Assert.Empty(stderr.ToString());
+        }
+
+        [Fact]
+        public void Submit_FormatJsonl_WatchTimeoutFires_EmitsCompletedRecordWithBuildId()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var client = new HangingDuringWatchToolSpecClient();
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--watch-timeout", "1s", "--format", "jsonl" },
+                stdout,
+                stderr,
+                toolSpecClient: client);
+
+            Assert.Equal(125, exitCode);
+            var lines = SplitNonEmptyLines(stdout.ToString());
+            var completed = ParseRecord(lines[^1]);
+            Assert.Equal("completed", completed.GetProperty("type").GetString());
+            Assert.Equal("Failed", completed.GetProperty("status").GetString());
+            Assert.Equal("WATCH_TIMEOUT", completed.GetProperty("error_code").GetString());
+            Assert.Equal("build-hanging-watch", completed.GetProperty("build_id").GetString());
+            Assert.Empty(client.CancelledBuildIds);
+        }
+
+        [Fact]
+        public void Submit_FormatJsonl_Cancelled_EmitsCompletedRecordWithUserCancelledErrorCode()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var client = new CancellingToolSpecClient("build-jsonl-cancel", new OperationCanceledException());
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--format", "jsonl" },
+                stdout,
+                stderr,
+                toolSpecClient: client);
+
+            Assert.Equal(130, exitCode);
+            // CancellingToolSpecClient yields a JobCreated (build_id-bearing) event
+            // before throwing, so a "submitted" record precedes the "completed" one.
+            var lines = SplitNonEmptyLines(stdout.ToString());
+            var submitted = ParseRecord(lines[0]);
+            Assert.Equal("submitted", submitted.GetProperty("type").GetString());
+            var completed = ParseRecord(lines[^1]);
+            Assert.Equal("completed", completed.GetProperty("type").GetString());
+            Assert.Equal("Cancelled", completed.GetProperty("status").GetString());
+            Assert.Equal("USER_CANCELLED", completed.GetProperty("error_code").GetString());
+            Assert.Equal("build-jsonl-cancel", completed.GetProperty("build_id").GetString());
+        }
+
+        [Fact]
+        public void Submit_FormatJsonl_EveryStdoutLineIsIndependentlyValidJson()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var events = new[]
+            {
+                new BuildEvent { Kind = BuildEventKind.JobCreated, BuildId = "build-jsonl-4", Status = "Building" },
+                new BuildEvent { Kind = BuildEventKind.JobRunning, BuildId = "build-jsonl-4", Status = "Running" },
+                new BuildEvent { Kind = BuildEventKind.Succeeded, BuildId = "build-jsonl-4" },
+            };
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--format", "jsonl" },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(events));
+
+            Assert.Equal(0, exitCode);
+            var lines = SplitNonEmptyLines(stdout.ToString());
+            Assert.True(lines.Count >= 2);
+            foreach (var line in lines)
+            {
+                // JsonDocument.Parse throws on anything that isn't valid, standalone JSON --
+                // this is the "every line independently parses" contract check.
+                using var doc = JsonDocument.Parse(line);
+                Assert.Equal("nodekit.submit.v1", doc.RootElement.GetProperty("schema_version").GetString());
+            }
+        }
+
+        [Fact]
+        public void Submit_FormatHumanExplicit_MatchesDefaultOutput()
+        {
+            // --format human (explicit) must produce byte-identical output to omitting
+            // --format entirely -- "human" is the default, not a distinct third mode.
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdoutDefault = new StringWriter();
+            using var stderrDefault = new StringWriter();
+            using var stdoutExplicit = new StringWriter();
+            using var stderrExplicit = new StringWriter();
+            var events = new[] { new BuildEvent { Kind = BuildEventKind.Succeeded } };
+
+            var exitDefault = SubmitCommand.Run(
+                new[] { "submit", recipePath },
+                stdoutDefault,
+                stderrDefault,
+                toolSpecClient: new StubToolSpecClient(events));
+            var exitExplicit = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--format", "human" },
+                stdoutExplicit,
+                stderrExplicit,
+                toolSpecClient: new StubToolSpecClient(events));
+
+            Assert.Equal(exitDefault, exitExplicit);
+            Assert.Equal(stdoutDefault.ToString(), stdoutExplicit.ToString());
+            Assert.Equal(stderrDefault.ToString(), stderrExplicit.ToString());
+            Assert.DoesNotContain('{', stdoutDefault.ToString());
+        }
+
+        private static IReadOnlyList<string> SplitNonEmptyLines(string text) =>
+            text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        private static JsonElement ParseRecord(string line) => JsonDocument.Parse(line).RootElement;
+
         // ── 헬퍼 ──────────────────────────────────────────────────────────────
 
         private string WriteFile(string name, string content)

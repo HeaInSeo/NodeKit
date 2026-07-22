@@ -22,7 +22,7 @@ namespace NodeKit.Cli
             "사용법:\n" +
             "  nodekit validate <recipe.json> [--strict-reproducible]\n" +
             "  nodekit render <recipe.json> --out <build-request.json> [--format build-request|raw-spec] [--pretty] [--strict-reproducible]\n" +
-            "  nodekit submit <recipe.json> [--url <url>] [--connect-timeout <seconds>] [--watch-timeout <duration>] [--strict-reproducible]\n" +
+            "  nodekit submit <recipe.json> [--url <url>] [--connect-timeout <seconds>] [--watch-timeout <duration>] [--format human|jsonl] [--strict-reproducible]\n" +
             "  nodekit recipe create [<recipe.json>] [--method ...] [--non-interactive ...]\n" +
             "\n" +
             "각 명령의 자세한 옵션은 `nodekit <명령> --help`로 확인하세요 (예: nodekit submit --help).";
