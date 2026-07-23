@@ -833,12 +833,16 @@ stdout에는 진행/안내 문구가 전혀 섞이지 않고 JSON 레코드만 �
 
 레코드 종류(`type` 필드로 구분)는 3가지뿐이다:
 
-- `submitted` — build ID를 처음 받았을 때 한 번.
+- `submitted` — build ID를 처음 받았을 때 한 번. **예외**: build ID를 처음
+  받는 이벤트가 곧바로 terminal(예: 즉시 완료되는 빌드)이면 `submitted`는
+  생략되고 `completed`에 `build_id`가 바로 담긴다 — `build_id` 자체는 항상
+  보존되지만 "`submitted` 다음에 `completed`" 순서가 매번 보장되지는 않는다.
 - `state` — 그 이후 진행 상황(빌드 상태, 이미지 참조/digest, integrity health 등).
 - `completed` — **스트림의 마지막 레코드, 항상 정확히 한 번**. 성공/실패/
   `--connect-timeout`/`--watch-timeout`/Ctrl-C 취소/terminal 이벤트 없는 스트림
   종료 전부 `type: "completed"`로 통일된다(별도 `"error"` type 없음) — 소비하는
-  쪽은 항상 마지막 줄을 같은 방식으로 처리하면 된다.
+  쪽은 항상 마지막 줄을 같은 방식으로 처리하면 된다. `status`는
+  `Succeeded`/`Failed`/`Cancelled`(Ctrl-C) 셋 중 하나다.
 
 모든 레코드는 `schema_version: "nodekit.submit.v1"`을 포함한다. `build_id`는
 모든 레코드에서 optional이다 — `--connect-timeout`처럼 build ID를 받기 전에
@@ -894,6 +898,15 @@ $ nodekit submit recipe.json --connect-timeout 30 --format jsonl
 {"schema_version":"nodekit.submit.v1","type":"completed","status":"Failed","error_code":"CONNECT_TIMEOUT","message":"..."}
 $ echo $?
 124
+```
+
+Ctrl-C로 취소한 경우(`status: "Cancelled"` — `Failed`가 아니다):
+
+```bash
+$ nodekit submit recipe.json --format jsonl
+^C{"schema_version":"nodekit.submit.v1","type":"completed","build_id":"abc-123","status":"Cancelled","error_code":"USER_CANCELLED","message":"..."}
+$ echo $?
+130
 ```
 
 `error_code`로 쓰이는 값: `BUILD_FAILED`, `PRE_WATCH_FAILED`,
