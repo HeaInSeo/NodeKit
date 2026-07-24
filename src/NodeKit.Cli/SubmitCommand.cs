@@ -785,20 +785,41 @@ namespace NodeKit.Cli
 
             var unit = raw[^1];
             var numberPart = raw[..^1];
+
+            // 리뷰 지적: double.TryParse는 NumberStyles.Float에서 "NaN"/"Infinity"를
+            // 유효한 값으로 파싱하고, "1e400"처럼 오버플로하는 지수도 조용히
+            // +∞로 만든다. value <= 0 검사는 이 값들을 걸러내지 못한다(NaN <= 0도
+            // +∞ <= 0도 false) — 그대로 TimeSpan.FromHours/Minutes/Seconds에
+            // 넘기면 ArgumentException(NaN)/OverflowException(무한대)이 그대로
+            // 터져서 옵션 파싱 단계(try/catch 밖)에서 CLI가 죽었다. double.IsFinite로
+            // 두 경우 다 막는다.
             if (!double.TryParse(
                 numberPart, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var value)
+                || !double.IsFinite(value)
                 || value <= 0)
             {
                 return false;
             }
 
-            duration = unit switch
+            // 리뷰 지적(연장): double.IsFinite만으로는 부족하다 — "1e10h"나
+            // "999999999h"처럼 유한하지만 TimeSpan이 표현 가능한 범위(~10,675,199일)를
+            // 넘는 값은 TimeSpan.FromHours/Minutes/Seconds에서 그대로
+            // OverflowException을 던진다. try/catch로 감싸 어떤 단위든 동일하게
+            // 막는다 — 단위별로 다른 임계값을 직접 계산하지 않아도 된다.
+            try
             {
-                's' => TimeSpan.FromSeconds(value),
-                'm' => TimeSpan.FromMinutes(value),
-                'h' => TimeSpan.FromHours(value),
-                _ => TimeSpan.Zero,
-            };
+                duration = unit switch
+                {
+                    's' => TimeSpan.FromSeconds(value),
+                    'm' => TimeSpan.FromMinutes(value),
+                    'h' => TimeSpan.FromHours(value),
+                    _ => TimeSpan.Zero,
+                };
+            }
+            catch (OverflowException)
+            {
+                return false;
+            }
 
             return duration > TimeSpan.Zero;
         }

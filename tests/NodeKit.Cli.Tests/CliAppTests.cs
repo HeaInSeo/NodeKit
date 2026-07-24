@@ -200,6 +200,37 @@ namespace NodeKit.Cli.Tests
             Assert.Contains("bwa", json);
         }
 
+        // 리뷰 지적: File.WriteAllText가 try/catch 밖에 있어서 --out에 쓸 수
+        // 없는 경로(디렉터리 자체, 존재하지 않는 상위 디렉터리, 권한 없음)를
+        // 주면 스택트레이스와 함께 크래시했다 — TryLoadRecipe의 읽기 쪽엔
+        // 이미 있던 IOException 보호가 쓰기 쪽엔 없었다.
+        [Fact]
+        public void Render_OutPathIsDirectory_ReturnsTwoInsteadOfCrashing()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = CliApp.Run(new[] { "render", recipePath, "--out", _workDir }, stdout, stderr);
+
+            Assert.Equal(2, exitCode);
+            Assert.Contains("출력 파일을 쓸 수 없습니다", stderr.ToString());
+        }
+
+        [Fact]
+        public void Render_OutPathHasNonexistentParentDirectory_ReturnsTwoInsteadOfCrashing()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            var outPath = Path.Join(_workDir, "no-such-subdir", "out.json");
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = CliApp.Run(new[] { "render", recipePath, "--out", outPath }, stdout, stderr);
+
+            Assert.Equal(2, exitCode);
+            Assert.Contains("출력 파일을 쓸 수 없습니다", stderr.ToString());
+        }
+
         [Fact]
         public void Render_RawSpecFormat_WritesActualSubmitWirePayloadAndReturnsZero()
         {
