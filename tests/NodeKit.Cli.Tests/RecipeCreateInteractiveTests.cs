@@ -265,6 +265,25 @@ namespace NodeKit.Cli.Tests
         }
 
         [Fact]
+        public void ModeSelector_StdinEndsBeforeAnyInput_CancelsInsteadOfLoopingForever()
+        {
+            // 리뷰 지적: AuthoringModeSelector.Prompt(마법사 진입 화면)만
+            // #10/#11/#12에서 나머지 프롬프트가 이미 받은 EOF 가드가 없었다 —
+            // stdin이 아예 비어 있으면(예: `nodekit recipe create < /dev/null`)
+            // while(true)가 무한 반복 + 무한 출력됐다.
+            var outPath = Path.Join(_workDir, "recipe.json");
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = CliApp.Run(
+                new[] { "recipe", "create", outPath }, new StringReader(string.Empty), stdout, stderr);
+
+            Assert.Equal(130, exitCode);
+            Assert.False(File.Exists(outPath));
+            Assert.Contains("recipe 생성을 취소했습니다.", stdout.ToString());
+        }
+
+        [Fact]
         public void InteractiveAndNonInteractive_ProduceIdenticalRecipeDocument_ForSameLogicalAnswers()
         {
             var interactiveOutPath = Path.Join(_workDir, "interactive.json");

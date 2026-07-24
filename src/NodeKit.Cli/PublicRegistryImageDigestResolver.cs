@@ -68,6 +68,18 @@ namespace NodeKit.Cli
             {
                 return ImageDigestResolutionResult.NetworkUnavailable("요청 시간이 초과되었습니다.");
             }
+            // 리뷰 지적: ResolveDockerHubAsync가 토큰 응답 본문을
+            // JsonDocument.Parse로 파싱하는데, 200 응답이라도 실제 JSON이 아닌
+            // 경우(캡티브 포털, 사내 프록시 인증 안내 HTML 등)가 있다 — 이 경우
+            // JsonException이 여기 잡히는 두 예외 종류 밖으로 그대로 빠져나가서
+            // wizard 전체가 크래시했다. resolver 실패는 항상 수동 입력으로
+            // 대체(degrade)돼야 한다는 계약(ImageDigestAutoResolveHelper 참조)을
+            // 어기고 있었다.
+            catch (JsonException ex)
+            {
+                return ImageDigestResolutionResult.NetworkUnavailable(
+                    $"레지스트리 응답을 파싱할 수 없습니다: {ex.Message}");
+            }
         }
 
         private async Task<ImageDigestResolutionResult> ResolveDockerHubAsync(
