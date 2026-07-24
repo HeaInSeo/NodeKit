@@ -51,5 +51,32 @@ namespace NodeKit.Cli.Tests
 
             Assert.Equal(GrpcBuildEventKind.JobRunning, result.Kind);
         }
+
+        // 리뷰 지적: ev.Timestamp는 서버가 보내는 자유 형식 int64라 형식 계약이
+        // 없다 — DateTimeOffset이 표현 가능한 범위를 벗어나면
+        // DateTimeOffset.FromUnixTimeMilliseconds가 ArgumentOutOfRangeException을
+        // 던져서, 이 이벤트 하나 때문에 WatchToolBuild 스트림 전체가 중단됐다.
+        [Theory]
+        [InlineData(long.MaxValue)]
+        [InlineData(long.MinValue)]
+        public void MapWatchEvent_TimestampOutOfDateTimeOffsetRange_DoesNotThrow(long timestamp)
+        {
+            var result = GrpcToolSpecClient.MapWatchEvent(
+                new BuildEvent { Kind = BuildEventKind.JobRunning, Timestamp = timestamp });
+
+            Assert.Equal(GrpcBuildEventKind.JobRunning, result.Kind);
+        }
+
+        [Fact]
+        public void MapWatchEvent_ValidTimestamp_ConvertsCorrectly()
+        {
+            // 2026-01-01T00:00:00Z in Unix milliseconds.
+            const long validTimestamp = 1767225600000;
+
+            var result = GrpcToolSpecClient.MapWatchEvent(
+                new BuildEvent { Kind = BuildEventKind.JobRunning, Timestamp = validTimestamp });
+
+            Assert.Equal(2026, result.Timestamp.Year);
+        }
     }
 }
