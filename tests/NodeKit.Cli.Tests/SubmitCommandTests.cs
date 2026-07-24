@@ -504,6 +504,10 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void Submit_BuildSucceeded_WithDigestAcquired_DoesNotPrintFallbackNotice()
         {
+            // 리뷰 지적: lastImageDigest가 legacy ev.Digest(DigestAcquired)에서
+            // 채워지지 않아서, fallback 문구는 안 뜨지만("제공되지 않았습니다"
+            // 없음, digestReceived=true라서) 정작 "이미지 digest: ..." 요약
+            // 줄도 안 떴었다 -- 둘 다 확인한다.
             var recipePath = WriteFile("recipe.json", ValidRecipeJson);
             using var stdout = new StringWriter();
             using var stderr = new StringWriter();
@@ -522,6 +526,35 @@ namespace NodeKit.Cli.Tests
 
             Assert.Equal(0, exitCode);
             Assert.DoesNotContain("제공되지 않았습니다", stdout.ToString());
+            Assert.Contains("이미지 digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", stdout.ToString());
+        }
+
+        [Fact]
+        public void Submit_FormatJsonl_LegacyDigestAcquired_PopulatesImageDigestInCompletedRecord()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var events = new[]
+            {
+                new BuildEvent { Kind = BuildEventKind.JobCreated, BuildId = "build-legacy-digest" },
+                new BuildEvent { Kind = BuildEventKind.DigestAcquired, Digest = "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" },
+                new BuildEvent { Kind = BuildEventKind.Succeeded },
+            };
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--format", "jsonl" },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(events));
+
+            Assert.Equal(0, exitCode);
+            var lines = SplitNonEmptyLines(stdout.ToString());
+            var completed = ParseRecord(lines[^1]);
+            Assert.Equal("completed", completed.GetProperty("type").GetString());
+            Assert.Equal(
+                "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                completed.GetProperty("image_digest").GetString());
         }
 
         [Fact]
@@ -1060,6 +1093,109 @@ namespace NodeKit.Cli.Tests
             Assert.False(completed.TryGetProperty("error_code", out _), "성공 시 error_code가 없어야 합니다.");
 
             Assert.Empty(stderr.ToString());
+        }
+
+        [Fact]
+        public void Submit_FormatJsonl_ProgressEventWithoutBuildId_OmitsBuildIdFieldEntirely()
+        {
+            // 리뷰 지적(High): ResolveToolSpec 성공 직후 뜨는 흔한 Log 이벤트("spec
+            // 해결 완료...")처럼 build ID가 아직 없는 진행 이벤트가 오면
+            // ProgressState가 build_id를 빈 문자열("")로 채워서 직렬화했었다 --
+            // "optional 필드는 아예 생략한다"는 계약과 어긋난다. 이 테스트는 그
+            // 정확한 입력 모양(빈 BuildId를 가진 Log 이벤트가 먼저 옴)을 재현해서
+            // 첫 번째 state 레코드에 build_id 자체가 없는지 확인한다.
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var events = new[]
+            {
+                new BuildEvent { Kind = BuildEventKind.Log, Message = "spec 해결 완료 (digest: 8f3a1c2d...)" },
+                new BuildEvent { Kind = BuildEventKind.JobCreated, BuildId = "build-jsonl-progress" },
+                new BuildEvent { Kind = BuildEventKind.Succeeded, BuildId = "build-jsonl-progress" },
+            };
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--format", "jsonl" },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(events));
+
+            Assert.Equal(0, exitCode);
+            var lines = SplitNonEmptyLines(stdout.ToString());
+            var firstState = ParseRecord(lines[0]);
+            Assert.Equal("state", firstState.GetProperty("type").GetString());
+            Assert.False(firstState.TryGetProperty("build_id", out _),
+                "build ID를 아직 모를 때는 build_id 필드 자체가 없어야 합니다(빈 문자열 아님).");
+
+            var submitted = ParseRecord(lines[1]);
+            Assert.Equal("submitted", submitted.GetProperty("type").GetString());
+            Assert.Equal("build-jsonl-progress", submitted.GetProperty("build_id").GetString());
+        }
+
+        [Fact]
+        public void Submit_FormatJsonl_DegradedIntegrityHealth_FieldPresentButNoStderrWarning()
+        {
+            // human 모드는 degraded IntegrityHealth를 stderr 경고로도 알리지만,
+            // jsonl 모드는 completed 레코드의 integrity_health 필드에 이미
+            // 구조화되어 있으므로 별도 stderr 경고를 내지 않는다(SubmitCommand.cs
+            // 주석 참조) -- 데이터가 실제로 필드에 담기는지, stderr가 비어있는지
+            // 둘 다 확인한다.
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var events = new[]
+            {
+                new BuildEvent { Kind = BuildEventKind.JobCreated, BuildId = "build-jsonl-health" },
+                new BuildEvent
+                {
+                    Kind = BuildEventKind.Succeeded,
+                    BuildId = "build-jsonl-health",
+                    ImageDigest = "sha256:abc123",
+                    IntegrityHealth = "Partial",
+                },
+            };
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--format", "jsonl" },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(events));
+
+            Assert.Equal(0, exitCode);
+            var lines = SplitNonEmptyLines(stdout.ToString());
+            var completed = ParseRecord(lines[^1]);
+            Assert.Equal("Partial", completed.GetProperty("integrity_health").GetString());
+            Assert.Empty(stderr.ToString());
+        }
+
+        [Fact]
+        public void Submit_FormatJsonl_FirstBuildIdEventIsTerminal_SkipsSubmittedRecordButKeepsBuildId()
+        {
+            // 리뷰 지적: build ID를 처음 받는 이벤트가 곧바로 terminal(Succeeded/
+            // Failed)이면 "submitted" 레코드 자체가 생략된다(loop이 Succeeded/
+            // Failed를 submitted/state 분기에서 명시적으로 제외하기 때문) --
+            // build_id는 completed 레코드에 정상적으로 담기므로 데이터 손실은
+            // 아니지만, "submitted 다음에 completed" 순서가 항상 보장되지는
+            // 않는다는 걸 문서화하는 회귀 테스트.
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var events = new[]
+            {
+                new BuildEvent { Kind = BuildEventKind.Succeeded, BuildId = "build-instant" },
+            };
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--format", "jsonl" },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(events));
+
+            Assert.Equal(0, exitCode);
+            var lines = SplitNonEmptyLines(stdout.ToString());
+            var only = ParseRecord(Assert.Single(lines));
+            Assert.Equal("completed", only.GetProperty("type").GetString());
+            Assert.Equal("build-instant", only.GetProperty("build_id").GetString());
         }
 
         [Fact]

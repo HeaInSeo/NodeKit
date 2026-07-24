@@ -278,7 +278,13 @@ namespace NodeKit.Cli
 
                     if (ev.Kind == BuildEventKind.DigestAcquired && !string.IsNullOrEmpty(ev.Digest))
                     {
+                        // 리뷰 지적: lastImageDigest가 여기서 안 채워지면(예전엔
+                        // 안 채웠음) legacy 경로에서도 최종 Succeeded 요약 줄(human)과
+                        // completed 레코드의 image_digest(jsonl) 둘 다 비어버린다 —
+                        // PrintEvent가 진행 중에 digest를 보여준 것과 별개로, 최종
+                        // 결과 요약에는 반영이 안 됐었다.
                         digestReceived = true;
+                        lastImageDigest = ev.Digest;
                     }
 
                     // ToolSpec 경로(WatchToolBuild)는 Kind가 항상 LOG이고 위
@@ -303,6 +309,12 @@ namespace NodeKit.Cli
                     {
                         if (jsonl)
                         {
+                            // 아래 human 전용 분기의 degraded IntegrityHealth stderr 경고를
+                            // 여기서는 일부러 안 낸다 — CancelServerBuildBestEffort 실패
+                            // 경고(위 참조)와 달리 이 정보는 completed 레코드의
+                            // integrity_health 필드에 이미 구조화되어 들어 있어 stderr에
+                            // 따로 안내할 게 없다. 소비자는 문서 안내대로 status/error_code/
+                            // 필드 값으로 판단해야 한다.
                             WriteJsonl(
                                 stdout,
                                 SubmitJsonlRecord.Completed(
@@ -584,6 +596,13 @@ namespace NodeKit.Cli
             }
         }
 
+        // human 출력(PrintEvent)과 jsonl 출력(위 이벤트 루프의 jsonl 분기 +
+        // DescribeState)은 BuildEvent/BuildEventKind를 각자 따로 switch/분기
+        // 처리한다 — 공유 매핑이 없다. 새 BuildEventKind나 BuildEvent 필드가
+        // 추가되면 두 곳 다 손봐야 하고, 하나만 고치면 조용히 어긋난다(리뷰로
+        // 실제 발견: legacy ev.Digest가 human 최종 요약/jsonl completed 양쪽에서
+        // 누락됐던 문제). 새 필드/이벤트 종류를 추가할 때는 이 사실을 염두에
+        // 두고 두 경로 모두 확인할 것.
         private static void PrintEvent(BuildEvent ev, TextWriter stdout)
         {
             var prefix = ev.Kind switch

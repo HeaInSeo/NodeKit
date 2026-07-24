@@ -71,7 +71,7 @@ namespace NodeKit.Cli
             new()
             {
                 Type = "state",
-                BuildId = buildId,
+                BuildId = string.IsNullOrEmpty(buildId) ? null : buildId,
                 State = string.IsNullOrEmpty(state) ? null : state,
                 Message = string.IsNullOrEmpty(message) ? null : message,
                 ImageRef = string.IsNullOrEmpty(imageRef) ? null : imageRef,
@@ -93,7 +93,7 @@ namespace NodeKit.Cli
             {
                 Type = "completed",
                 Status = status,
-                BuildId = buildId,
+                BuildId = string.IsNullOrEmpty(buildId) ? null : buildId,
                 ErrorCode = errorCode,
                 Message = string.IsNullOrEmpty(message) ? null : message,
                 ImageRef = string.IsNullOrEmpty(imageRef) ? null : imageRef,
