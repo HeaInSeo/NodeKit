@@ -4,9 +4,11 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using NodeKit.Authoring.Recipes;
+using NodeKit.Authoring.ToolFunctionRecipes;
 using NodeKit.Grpc;
 using NodeKit.Validation;
 using NodeKit.Validation.Recipes;
+using NodeKit.Validation.ToolFunctionRecipes;
 
 namespace NodeKit.Cli
 {
@@ -24,8 +26,19 @@ namespace NodeKit.Cli
             "  nodekit render <recipe.json> --out <build-request.json> [--format build-request|raw-spec] [--pretty] [--strict-reproducible]\n" +
             "  nodekit submit <recipe.json> [--url <url>] [--connect-timeout <seconds>] [--watch-timeout <duration>] [--format human|jsonl] [--strict-reproducible]\n" +
             "  nodekit recipe create [<recipe.json>] [--method ...] [--non-interactive ...]\n" +
+            "  nodekit function-recipe create [<path>] --tool-spec-digest <digest> --base-tool-image-digest <digest> [--non-interactive --field Name=Value ...]\n" +
+            "  nodekit function-recipe validate <path>\n" +
+            "  nodekit function-recipe render <path> --out <out.json> [--pretty]\n" +
+            "  nodekit function-recipe submit <path>\n" +
             "\n" +
             "각 명령의 자세한 옵션은 `nodekit <명령> --help`로 확인하세요 (예: nodekit submit --help).";
+
+        private const string FunctionRecipeUsage =
+            "사용법:\n" +
+            "  nodekit function-recipe create [<path>] --tool-spec-digest <digest> --base-tool-image-digest <digest> [--non-interactive --field Name=Value ...]\n" +
+            "  nodekit function-recipe validate <path>\n" +
+            "  nodekit function-recipe render <path> --out <out.json> [--pretty]\n" +
+            "  nodekit function-recipe submit <path>";
 
         private const string ValidateUsage = "사용법: nodekit validate <recipe.json> [--strict-reproducible]";
 
@@ -67,8 +80,68 @@ namespace NodeKit.Cli
                 "render" => RunRender(args, stdout, stderr),
                 "submit" => SubmitCommand.Run(args, stdout, stderr),
                 "recipe" => RunRecipe(args, stdin, stdout, stderr),
+                "function-recipe" => RunFunctionRecipe(args, stdin, stdout, stderr),
                 _ => Unknown(args[0], stderr),
             };
+        }
+
+        private static int RunFunctionRecipe(string[] args, TextReader stdin, TextWriter stdout, TextWriter stderr)
+        {
+            if (args.Length < 2 || (args.Length >= 2 && args[1] is "--help" or "-h"))
+            {
+                stdout.WriteLine(FunctionRecipeUsage);
+                return args.Length < 2 ? 2 : 0;
+            }
+
+            return args[1] switch
+            {
+                "create" => RunFunctionRecipeCreate(args, stdin, stdout, stderr),
+                "validate" => RunFunctionRecipeValidate(args, stdout, stderr),
+                "render" => ToolFunctionRecipeRenderCommand.Run(args, stdout, stderr),
+                "submit" => ToolFunctionRecipeSubmitCommand.Run(args, stdout, stderr),
+                _ when IsHelpRequested(args) => Help(FunctionRecipeUsage, stdout),
+                _ => Unknown($"function-recipe {args[1]}", stderr),
+            };
+        }
+
+        private static int Help(string usage, TextWriter stdout)
+        {
+            stdout.WriteLine(usage);
+            return 0;
+        }
+
+        private static int RunFunctionRecipeCreate(string[] args, TextReader stdin, TextWriter stdout, TextWriter stderr)
+        {
+            IRecipeConsole console = (!Console.IsOutputRedirected && !Console.IsInputRedirected)
+                ? new AnsiRecipeConsole()
+                : new PlainTextRecipeConsole(stdin, stdout);
+
+            return ToolFunctionRecipeCreateCommand.Run(args, console, stdout, stderr);
+        }
+
+        private static int RunFunctionRecipeValidate(string[] args, TextWriter stdout, TextWriter stderr)
+        {
+            if (args.Length < 3)
+            {
+                stderr.WriteLine("사용법: nodekit function-recipe validate <path>");
+                return 2;
+            }
+
+            if (!ToolFunctionRecipeCliIo.TryLoad(args[2], stderr, out var recipe))
+            {
+                return 2;
+            }
+
+            var result = ToolFunctionRecipeValidationPipeline.Validate(recipe!);
+            if (!result.IsValid)
+            {
+                PrintViolations(result.Violations, stderr);
+                return 1;
+            }
+
+            File.WriteAllText(args[2], JsonSerializer.Serialize(recipe, ToolFunctionRecipeCliIo.JsonOptions));
+            stdout.WriteLine("검증 통과");
+            return 0;
         }
 
         // 여러 서브커맨드가 각자 --help/-h를 인식해야 해서(P2 리뷰: 최상위와
@@ -115,7 +188,7 @@ namespace NodeKit.Cli
 
         private static int Unknown(string command, TextWriter stderr)
         {
-            stderr.WriteLine($"알 수 없는 명령입니다: {command} (validate | render | submit | recipe 만 지원합니다)");
+            stderr.WriteLine($"알 수 없는 명령입니다: {command} (validate | render | submit | recipe | function-recipe 만 지원합니다)");
             return 2;
         }
 

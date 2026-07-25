@@ -610,7 +610,6 @@ namespace NodeKit.Cli.Tests
                 "bwa-mem", "0.7.17", "run.sh",
                 "condaforge/miniforge3:24.3.0-0", // ImageRef
                 "sha256:bad", // ImageDigest — malformed, passes authoring but fails final validation
-                "", // Command optional list — skip
                 "1", // recovery: the only action, editing ImageRef+ImageDigest together
                 "condaforge/miniforge3:24.3.0-0", // re-enter ImageRef unchanged
                 DigestOnly, // re-enter ImageDigest, corrected
@@ -643,7 +642,6 @@ namespace NodeKit.Cli.Tests
                 "0.7.17", "run.sh",
                 "condaforge/miniforge3:24.3.0-0", // ImageRef
                 DigestOnly, // ImageDigest
-                "", // Command optional list — skip
             };
 
             using var stdout = new StringWriter();
@@ -677,7 +675,6 @@ namespace NodeKit.Cli.Tests
                 "run.sh", // Script
                 "condaforge/miniforge3:24.3.0-0", // ImageRef
                 DigestOnly, // ImageDigest
-                "", // Command optional list — skip
             };
 
             using var stdout = new StringWriter();
@@ -797,7 +794,6 @@ namespace NodeKit.Cli.Tests
                 "run.sh",
                 "condaforge/miniforge3:24.3.0-0",
                 DigestOnly,
-                "", // Command optional list — skip
             };
 
             using var stdout = new StringWriter();
@@ -826,7 +822,6 @@ namespace NodeKit.Cli.Tests
                 "bwa mem",
                 "condaforge/miniforge3:24.3.0-0",
                 DigestOnly,
-                "", // Command optional list — skip
             };
 
             using var stdout = new StringWriter();
@@ -861,7 +856,6 @@ namespace NodeKit.Cli.Tests
                 "bwa mem",
                 "condaforge/miniforge3:24.3.0-0",
                 DigestOnly,
-                "", // Command optional list — skip
             };
 
             using var stdout = new StringWriter();
@@ -1099,7 +1093,6 @@ namespace NodeKit.Cli.Tests
                 "bwa-mem", "0.7.17", "run.sh",
                 "condaforge/miniforge3:24.3.0-0", // ImageRef
                 DigestOnly, // ImageDigest
-                "", // Command optional list — skip
             };
 
             using var stdout = new StringWriter();
@@ -1172,7 +1165,6 @@ namespace NodeKit.Cli.Tests
                 "bwa-mem", "0.7.17", "bwa mem",
                 "condaforge/miniforge3:24.3.0-0", // ImageRef
                 "sha256:bad",   // ImageDigest — malformed, fails final validation
-                "",             // Command optional list — skip
                 "1",            // select recovery action (edit ImageRef + ImageDigest)
                 "/back",        // /back during recovery → shows not-supported message, returns true
                 // session still invalid → recovery menu shown again
@@ -1208,7 +1200,6 @@ namespace NodeKit.Cli.Tests
                 "bwa-mem", "0.7.17", "run.sh",
                 "condaforge/miniforge3:24.3.0-0", // ImageRef
                 "sha256:bad",   // ImageDigest — malformed, fails final validation
-                "",             // Command — skip
                 "",             // empty selection at recovery menu → return false
             };
 
@@ -1235,7 +1226,6 @@ namespace NodeKit.Cli.Tests
                 "bwa-mem", "0.7.17", "run.sh",
                 "condaforge/miniforge3:24.3.0-0",
                 "sha256:bad",
-                "",
                 "99", // invalid: out of range → "알 수 없는 선택입니다.", recurse
                 "1",  // valid action
                 "condaforge/miniforge3:24.3.0-0", DigestOnly, // fix the digest
@@ -1265,7 +1255,6 @@ namespace NodeKit.Cli.Tests
                 "bwa-mem", "0.7.17", "run.sh",
                 "condaforge/miniforge3:24.3.0-0",
                 "sha256:bad",
-                "",
                 "/cancel", // at recovery menu → ThrowIfCancel → exit 130
             };
 

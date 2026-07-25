@@ -483,7 +483,25 @@ namespace NodeKit.Cli
 
                 try
                 {
-                    PromptField(session, field, console, cancellation, imageDigestResolver);
+                    // FR-024: Command 입력 단계는 ToolFunctionRecipe(nodekit
+                    // function-recipe create)로 대체되었다 — 더 이상 값을
+                    // 요구하지 않고 안내만 표시한 뒤 건너뛴다. Command는 모든
+                    // method에서 Optional인 StringList 필드라 빈 목록인 채로
+                    // CompleteListField로 완료 처리한다(RequiredFieldsValidator도
+                    // 빈 Command를 요구하지 않는다).
+                    if (field.Name == "Command")
+                    {
+                        console.WriteLine();
+                        console.WriteLine("이 단계는 nodekit function-recipe create로 대체되었습니다.");
+                        console.WriteLine("포트/명령 설정은 확정된 ToolSpec image를 기반으로 그 명령에서 진행하세요.");
+                        console.WriteLine();
+                        session.CompleteListField(field.Name);
+                    }
+                    else
+                    {
+                        PromptField(session, field, console, cancellation, imageDigestResolver);
+                    }
+
                     history.Add(field);
                 }
                 catch (RecipeCreateBackRequestedException)
@@ -1089,106 +1107,21 @@ namespace NodeKit.Cli
             }
         }
 
+        // FR-024: Inputs/Outputs 입력 단계는 nodekit function-recipe create로
+        // 대체되었다 — 더 이상 포트 프리셋을 물어보지 않고 안내만 표시한다.
+        // document.Inputs/Outputs는 빈 상태로 남는다(RequiredFieldsValidator는
+        // 이 필드를 요구하지 않는다).
         private static void PromptPortSelection(
             RecipeDocument document, IRecipeConsole console, IRecipeCreateCancellationSource cancellation)
         {
+            _ = document;
+            _ = cancellation;
+
             RecipeCreateScreen.ClearForNewStep(console);
-            console.WriteLine("── 포트 설정 (선택사항) ────────────────────────────────────");
-            console.WriteLine("이 도구가 받는 입력 파일 유형을 설정합니다.");
-            console.WriteLine("나중에 ToolFunctionSpec으로 교체할 초안입니다.");
+            console.WriteLine("── 포트/명령 설정 ──────────────────────────────────────────");
+            console.WriteLine("이 단계는 nodekit function-recipe create로 대체되었습니다.");
+            console.WriteLine("확정된 ToolSpec image digest를 참조해 그 명령에서 포트/명령을 작성하세요.");
             console.WriteLine();
-
-            var inputPresets = InputOutputPresetCatalog.InputPresets;
-            for (var i = 0; i < inputPresets.Count; i++)
-            {
-                var p = inputPresets[i];
-                console.WriteLine($"  [{i + 1}] {p.Label.Get("ko")}");
-                console.WriteLine($"      {p.Description.Get("ko")}");
-                if (p.Examples.Count > 0)
-                {
-                    console.WriteLine($"      예: {string.Join(", ", p.Examples)}");
-                }
-            }
-
-            console.WriteLine();
-            console.WriteLine("번호 입력 (쉼표 구분, 빈 줄 = 건너뛰기):");
-
-            if (cancellation.IsCancellationRequested)
-            {
-                throw new RecipeCreateCancelledException();
-            }
-
-            var inputLine = (console.ReadLine() ?? string.Empty).Trim();
-            RecipeCreateEscapeCommands.ThrowIfCancel(inputLine);
-
-            if (inputLine.Length > 0 && !RecipeCreateEscapeCommands.IsBack(inputLine))
-            {
-                foreach (var preset in ParseNumberList(inputLine, inputPresets.Count)
-                    .Select(idx => inputPresets[idx])
-                    .Where(preset => preset.Id != InputOutputPresetCatalog.CustomPresetId))
-                {
-                    document.Inputs.Add(new ToolInput
-                    {
-                        Name = preset.Role,
-                        Role = preset.Role,
-                        Format = preset.Format,
-                        Shape = preset.Shape,
-                        Required = true,
-                    });
-                }
-            }
-
-            console.WriteLine();
-            console.WriteLine("이 도구가 생성하는 출력 파일 유형을 설정합니다.");
-            console.WriteLine();
-
-            var outputPresets = InputOutputPresetCatalog.OutputPresets;
-            for (var i = 0; i < outputPresets.Count; i++)
-            {
-                var p = outputPresets[i];
-                console.WriteLine($"  [{i + 1}] {p.Label.Get("ko")}");
-                console.WriteLine($"      {p.Description.Get("ko")}");
-                if (p.Examples.Count > 0)
-                {
-                    console.WriteLine($"      예: {string.Join(", ", p.Examples)}");
-                }
-            }
-
-            console.WriteLine();
-            console.WriteLine("번호 입력 (쉼표 구분, 빈 줄 = 건너뛰기):");
-
-            var outputLine = (console.ReadLine() ?? string.Empty).Trim();
-            RecipeCreateEscapeCommands.ThrowIfCancel(outputLine);
-
-            if (outputLine.Length > 0 && !RecipeCreateEscapeCommands.IsBack(outputLine))
-            {
-                foreach (var preset in ParseNumberList(outputLine, outputPresets.Count)
-                    .Select(idx => outputPresets[idx])
-                    .Where(preset => preset.Id != InputOutputPresetCatalog.CustomPresetId))
-                {
-                    document.Outputs.Add(new ToolOutput
-                    {
-                        Name = preset.Role,
-                        Role = preset.Role,
-                        Format = preset.Format,
-                        Shape = "single",
-                        Class = preset.Class,
-                    });
-                }
-            }
-        }
-
-        private static IReadOnlyList<int> ParseNumberList(string input, int maxCount)
-        {
-            return input.Split(',')
-                .Select(part => part.Trim())
-                .Select(trimmed => int.TryParse(
-                    trimmed, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var n)
-                    ? n
-                    : (int?)null)
-                .Where(n => n.HasValue && n.Value >= 1 && n.Value <= maxCount)
-                .Select(n => n!.Value - 1)
-                .ToList();
         }
 
         // Returns the resolved save path, or null if the user chose to restart the wizard.

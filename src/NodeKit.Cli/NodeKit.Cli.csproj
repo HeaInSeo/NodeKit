@@ -96,6 +96,20 @@
     <Compile Include="..\Authoring\Recipes\ImageReferenceNormalizeResult.cs" Link="Authoring\Recipes\ImageReferenceNormalizeResult.cs" />
     <Compile Include="..\Authoring\Recipes\ImageReferenceNormalizer.cs" Link="Authoring\Recipes\ImageReferenceNormalizer.cs" />
 
+    <Compile Include="..\Authoring\ToolFunctionRecipes\ToolFunctionRecipeState.cs" Link="Authoring\ToolFunctionRecipes\ToolFunctionRecipeState.cs" />
+    <Compile Include="..\Authoring\ToolFunctionRecipes\CommandContract.cs" Link="Authoring\ToolFunctionRecipes\CommandContract.cs" />
+    <Compile Include="..\Authoring\ToolFunctionRecipes\EnvironmentEntry.cs" Link="Authoring\ToolFunctionRecipes\EnvironmentEntry.cs" />
+    <Compile Include="..\Authoring\ToolFunctionRecipes\TimeoutPolicy.cs" Link="Authoring\ToolFunctionRecipes\TimeoutPolicy.cs" />
+    <Compile Include="..\Authoring\ToolFunctionRecipes\PortContract.cs" Link="Authoring\ToolFunctionRecipes\PortContract.cs" />
+    <Compile Include="..\Authoring\ToolFunctionRecipes\FixtureReference.cs" Link="Authoring\ToolFunctionRecipes\FixtureReference.cs" />
+    <Compile Include="..\Authoring\ToolFunctionRecipes\ExpectedResult.cs" Link="Authoring\ToolFunctionRecipes\ExpectedResult.cs" />
+    <Compile Include="..\Authoring\ToolFunctionRecipes\IntermediateFilePolicyEntry.cs" Link="Authoring\ToolFunctionRecipes\IntermediateFilePolicyEntry.cs" />
+    <Compile Include="..\Authoring\ToolFunctionRecipes\ParameterContract.cs" Link="Authoring\ToolFunctionRecipes\ParameterContract.cs" />
+    <Compile Include="..\Authoring\ToolFunctionRecipes\ResourceContract.cs" Link="Authoring\ToolFunctionRecipes\ResourceContract.cs" />
+    <Compile Include="..\Authoring\ToolFunctionRecipes\ExecutionEnvironmentContract.cs" Link="Authoring\ToolFunctionRecipes\ExecutionEnvironmentContract.cs" />
+    <Compile Include="..\Authoring\ToolFunctionRecipes\ValidationRequirements.cs" Link="Authoring\ToolFunctionRecipes\ValidationRequirements.cs" />
+    <Compile Include="..\Authoring\ToolFunctionRecipes\ToolFunctionRecipe.cs" Link="Authoring\ToolFunctionRecipes\ToolFunctionRecipe.cs" />
+
     <Compile Include="..\Validation\IValidator.cs" Link="Validation\IValidator.cs" />
     <Compile Include="..\Validation\ValidationResult.cs" Link="Validation\ValidationResult.cs" />
     <Compile Include="..\Validation\ValidationViolation.cs" Link="Validation\ValidationViolation.cs" />
@@ -106,6 +120,8 @@
     <Compile Include="..\Validation\Recipes\RecipeValidator.cs" Link="Validation\Recipes\RecipeValidator.cs" />
     <Compile Include="..\Validation\Recipes\RecipeValidationPipeline.cs" Link="Validation\Recipes\RecipeValidationPipeline.cs" />
     <Compile Include="..\Validation\Recipes\PackagePinClassifier.cs" Link="Validation\Recipes\PackagePinClassifier.cs" />
+    <Compile Include="..\Validation\ToolFunctionRecipes\ToolFunctionRecipeValidator.cs" Link="Validation\ToolFunctionRecipes\ToolFunctionRecipeValidator.cs" />
+    <Compile Include="..\Validation\ToolFunctionRecipes\ToolFunctionRecipeValidationPipeline.cs" Link="Validation\ToolFunctionRecipes\ToolFunctionRecipeValidationPipeline.cs" />
 
     <Compile Include="..\Policy\DockerfileParser.cs" Link="Policy\DockerfileParser.cs" />
     <Compile Include="..\Policy\DockerfileInstruction.cs" Link="Policy\DockerfileInstruction.cs" />
@@ -118,5 +134,6 @@
     <Compile Include="..\Grpc\IToolSpecBuildClient.cs" Link="Grpc\IToolSpecBuildClient.cs" />
     <Compile Include="..\Grpc\GrpcToolSpecClient.cs" Link="Grpc\GrpcToolSpecClient.cs" />
     <Compile Include="..\Grpc\ToolSpecRawSpecFactory.cs" Link="Grpc\ToolSpecRawSpecFactory.cs" />
+    <Compile Include="..\Grpc\ToolFunctionBuildRequestPreviewFactory.cs" Link="Grpc\ToolFunctionBuildRequestPreviewFactory.cs" />
   </ItemGroup>
 </Project>
