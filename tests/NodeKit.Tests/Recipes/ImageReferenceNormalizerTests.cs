@@ -173,7 +173,7 @@ namespace NodeKit.Tests.Recipes
             session.SetField("ImageDigest", imageDigest);
             session.CompleteListField("Command");
             var doc = session.Build();
-            doc.BuildKind = RecipeBuildKindResolver.Resolve(RecipeMethodId.Container, doc);
+            doc.BuildKind = RecipeKindResolver.Resolve(RecipeMethodId.Container, doc);
             return doc;
         }
     }

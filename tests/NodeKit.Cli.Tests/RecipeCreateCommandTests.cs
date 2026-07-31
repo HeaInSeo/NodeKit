@@ -271,7 +271,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void SourceStructured_UnknownMethodName_StillRejected()
         {
-            // "source-build-structured" is the *internal* RecipeBuildKind
+            // "source-build-structured" is the *internal* RecipeKind
             // name, not the CLI --method value ("source-structured") —
             // confirms the friendly-error guard covers the new kind too.
             var exitCode = Run("--non-interactive", "--method", "source-build-structured");

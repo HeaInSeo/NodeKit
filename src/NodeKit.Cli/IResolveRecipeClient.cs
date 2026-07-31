@@ -45,7 +45,7 @@ namespace NodeKit.Cli
             string version,
             IReadOnlyList<string> packages,
             CancellationToken cancellationToken,
-            RecipeBuildKind? buildKind = null,
+            RecipeKind? buildKind = null,
             string? packageMirrorUri = null);
     }
 }

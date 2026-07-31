@@ -39,25 +39,25 @@ namespace NodeKit.Authoring.Recipes
 
             switch (recipe.BuildKind!.Value)
             {
-                case RecipeBuildKind.Conda:
+                case RecipeKind.Conda:
                     RenderInstallerFamily(recipe, definition, "conda", recipe.Channels);
                     break;
-                case RecipeBuildKind.Micromamba:
+                case RecipeKind.Micromamba:
                     RenderInstallerFamily(recipe, definition, "micromamba", recipe.Channels);
                     break;
-                case RecipeBuildKind.PackageMirror:
+                case RecipeKind.PackageMirror:
                     RenderInstallerFamily(recipe, definition, "conda", new List<string> { recipe.PackageMirrorUri });
                     break;
-                case RecipeBuildKind.BioContainer:
+                case RecipeKind.BioContainer:
                     RenderBioContainer(recipe, definition);
                     break;
-                case RecipeBuildKind.SourceBuild:
+                case RecipeKind.SourceBuild:
                     RenderSourceBuild(recipe, definition);
                     break;
-                case RecipeBuildKind.SourceBuildStructured:
+                case RecipeKind.SourceBuildStructured:
                     RenderSourceBuildStructured(recipe, definition);
                     break;
-                case RecipeBuildKind.DockerfileFallback:
+                case RecipeKind.DockerfileFallback:
                     definition.ImageUri = recipe.BaseImage;
                     definition.DockerfileContent = recipe.DockerfileContent;
                     break;

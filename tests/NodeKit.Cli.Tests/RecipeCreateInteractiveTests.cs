@@ -1697,7 +1697,7 @@ namespace NodeKit.Cli.Tests
                 string version,
                 System.Collections.Generic.IReadOnlyList<string> packages,
                 System.Threading.CancellationToken cancellationToken,
-                NodeKit.Authoring.Recipes.RecipeBuildKind? buildKind = null,
+                NodeKit.Authoring.Recipes.RecipeKind? buildKind = null,
                 string? packageMirrorUri = null)
             {
                 CapturedCancellationToken = cancellationToken;
@@ -1719,7 +1719,7 @@ namespace NodeKit.Cli.Tests
                 string version,
                 System.Collections.Generic.IReadOnlyList<string> packages,
                 System.Threading.CancellationToken cancellationToken,
-                NodeKit.Authoring.Recipes.RecipeBuildKind? buildKind = null,
+                NodeKit.Authoring.Recipes.RecipeKind? buildKind = null,
                 string? packageMirrorUri = null)
             {
                 CapturedPackageMirrorUri = packageMirrorUri;

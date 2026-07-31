@@ -93,7 +93,7 @@ namespace NodeKit.Tests.Recipes
         {
             var recipe = new RecipeDocument
             {
-                BuildKind = RecipeBuildKind.SourceBuildStructured,
+                BuildKind = RecipeKind.SourceBuildStructured,
                 ToolName = "bwa-mem",
                 Version = "0.7.17",
                 Script = "bwa mem -t 4 ref.fa reads_1.fq reads_2.fq",

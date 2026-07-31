@@ -17,9 +17,9 @@ namespace NodeKit.Cli
     /// </summary>
     internal static class BuildDependenciesAdvisor
     {
-        public static string? Describe(RecipeBuildKind buildKind, IReadOnlyList<string> buildDependencies)
+        public static string? Describe(RecipeKind buildKind, IReadOnlyList<string> buildDependencies)
         {
-            if (buildKind != RecipeBuildKind.SourceBuild || buildDependencies.Count == 0)
+            if (buildKind != RecipeKind.SourceBuild || buildDependencies.Count == 0)
             {
                 return null;
             }

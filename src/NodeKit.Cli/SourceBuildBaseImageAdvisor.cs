@@ -24,11 +24,11 @@ namespace NodeKit.Cli
     /// still only warns (not blocks): NodeVault's actual policy decision is
     /// out of NodeKit's L1 authority, and allow_runtime_tools could exempt a
     /// given submission (though NodeKit has no UI for that field yet).
-    /// RecipeBuildKind.SourceBuildStructured (2-stage, no RUN in the final
+    /// RecipeKind.SourceBuildStructured (2-stage, no RUN in the final
     /// stage) is not affected by this NodeVault policy.
     ///
     /// Scope note (R22-D, Issue #39): this advisor is legacy
-    /// RecipeBuildKind.SourceBuild only. SourceBuildStructured's own final
+    /// RecipeKind.SourceBuild only. SourceBuildStructured's own final
     /// stage (RuntimeProfile/RuntimeProfileImage) is covered by the sibling
     /// RuntimeProfileHygieneAdvisor instead — legacy SourceBuild's BaseImage
     /// plays both fetch-source and final-runtime roles, which is exactly the
@@ -51,9 +51,9 @@ namespace NodeKit.Cli
             "alpine/curl",
         };
 
-        public static string? Describe(RecipeBuildKind buildKind, string? baseImage)
+        public static string? Describe(RecipeKind buildKind, string? baseImage)
         {
-            if (buildKind != RecipeBuildKind.SourceBuild)
+            if (buildKind != RecipeKind.SourceBuild)
             {
                 return null;
             }

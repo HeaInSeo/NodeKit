@@ -51,7 +51,7 @@
     <Compile Include="..\Authoring\ToolInput.cs" Link="Authoring\ToolInput.cs" />
     <Compile Include="..\Authoring\ToolOutput.cs" Link="Authoring\ToolOutput.cs" />
     <Compile Include="..\Authoring\Recipes\RecipeDocument.cs" Link="Authoring\Recipes\RecipeDocument.cs" />
-    <Compile Include="..\Authoring\Recipes\RecipeBuildKind.cs" Link="Authoring\Recipes\RecipeBuildKind.cs" />
+    <Compile Include="..\Authoring\Recipes\RecipeKind.cs" Link="Authoring\Recipes\RecipeKind.cs" />
     <Compile Include="..\Authoring\Recipes\SourceBuildProfileEntry.cs" Link="Authoring\Recipes\SourceBuildProfileEntry.cs" />
     <Compile Include="..\Authoring\Recipes\SourceBuildProfileCatalog.cs" Link="Authoring\Recipes\SourceBuildProfileCatalog.cs" />
     <Compile Include="..\Authoring\Recipes\RecipeRenderer.cs" Link="Authoring\Recipes\RecipeRenderer.cs" />
@@ -75,7 +75,7 @@
     <Compile Include="..\Authoring\Recipes\RecipeMethodRecommender.cs" Link="Authoring\Recipes\RecipeMethodRecommender.cs" />
     <Compile Include="..\Authoring\Recipes\RecipeMethodRecommendation.cs" Link="Authoring\Recipes\RecipeMethodRecommendation.cs" />
     <Compile Include="..\Authoring\Recipes\RecipeMethodCandidate.cs" Link="Authoring\Recipes\RecipeMethodCandidate.cs" />
-    <Compile Include="..\Authoring\Recipes\RecipeBuildKindResolver.cs" Link="Authoring\Recipes\RecipeBuildKindResolver.cs" />
+    <Compile Include="..\Authoring\Recipes\RecipeKindResolver.cs" Link="Authoring\Recipes\RecipeKindResolver.cs" />
     <Compile Include="..\Authoring\Recipes\InputOutputPresetCatalog.cs" Link="Authoring\Recipes\InputOutputPresetCatalog.cs" />
     <Compile Include="..\Authoring\Recipes\ToolInputPreset.cs" Link="Authoring\Recipes\ToolInputPreset.cs" />
     <Compile Include="..\Authoring\Recipes\ToolOutputPreset.cs" Link="Authoring\Recipes\ToolOutputPreset.cs" />

@@ -151,7 +151,7 @@ namespace NodeKit.Cli
             }
 
             var document = session.Build();
-            document.BuildKind = RecipeBuildKindResolver.Resolve(method, document);
+            document.BuildKind = RecipeKindResolver.Resolve(method, document);
 
             var mismatch = BaseImageEngineMismatchChecker.DescribeMismatch(document.BuildKind.Value, document.BaseImage);
             if (mismatch != null)

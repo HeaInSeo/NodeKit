@@ -13,7 +13,7 @@ namespace NodeKit.Cli
     /// </summary>
     internal static class BaseImageEngineMismatchChecker
     {
-        public static string? DescribeMismatch(RecipeBuildKind buildKind, string? baseImage)
+        public static string? DescribeMismatch(RecipeKind buildKind, string? baseImage)
         {
             if (string.IsNullOrEmpty(baseImage))
             {
@@ -27,13 +27,13 @@ namespace NodeKit.Cli
 
             return buildKind switch
             {
-                RecipeBuildKind.Conda when looksLikeMicromambaImage =>
+                RecipeKind.Conda when looksLikeMicromambaImage =>
                     "BaseImage가 micromamba 전용 이미지로 보이는데 PackageEngine은 conda입니다. " +
                     "--engine micromamba를 빠뜨리지 않았는지, 또는 base image가 맞는지 확인하세요.",
-                RecipeBuildKind.Micromamba when looksLikeCondaImage =>
+                RecipeKind.Micromamba when looksLikeCondaImage =>
                     "BaseImage가 conda 계열 이미지로 보이는데 PackageEngine은 micromamba입니다. " +
                     "의도한 조합이 맞는지, 이미지에 micromamba 바이너리가 있는지 확인하세요.",
-                RecipeBuildKind.PackageMirror when looksLikeMicromambaImage =>
+                RecipeKind.PackageMirror when looksLikeMicromambaImage =>
                     "BaseImage가 micromamba 전용 이미지로 보이는데 mirror 방식은 항상 conda로 렌더링됩니다. " +
                     "conda가 포함된 base image를 사용하세요.",
                 _ => null,

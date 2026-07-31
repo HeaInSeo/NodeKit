@@ -42,14 +42,20 @@ namespace NodeKit.Cli
             string version,
             IReadOnlyList<string> packages,
             CancellationToken cancellationToken,
-            RecipeBuildKind? buildKind = null,
+            NodeKit.Authoring.Recipes.RecipeKind? buildKind = null,
             string? packageMirrorUri = null)
         {
             var request = new ResolveRecipeRequest
             {
                 ToolName = toolName,
                 Version = version,
-                Variant = MapVariant(buildKind),
+                RecipeKind = buildKind switch
+                {
+                    NodeKit.Authoring.Recipes.RecipeKind.Micromamba => Nodevault.V1.RecipeKind.Micromamba,
+                    NodeKit.Authoring.Recipes.RecipeKind.PackageMirror => Nodevault.V1.RecipeKind.PackageMirror,
+                    NodeKit.Authoring.Recipes.RecipeKind.BioContainer => Nodevault.V1.RecipeKind.Biocontainer,
+                    _ => Nodevault.V1.RecipeKind.Conda,
+                },
                 PackageMirrorUri = packageMirrorUri ?? string.Empty,
             };
 
@@ -87,14 +93,6 @@ namespace NodeKit.Cli
             var ver = eq2 < 0 ? rest.Trim() : rest[..eq2].Trim();
             return new PackageSpec { Name = name, Version = ver };
         }
-
-        private static RecipeVariant MapVariant(RecipeBuildKind? buildKind) => buildKind switch
-        {
-            RecipeBuildKind.Micromamba => RecipeVariant.Micromamba,
-            RecipeBuildKind.PackageMirror => RecipeVariant.PackageMirror,
-            RecipeBuildKind.BioContainer => RecipeVariant.Biocontainer,
-            _ => RecipeVariant.Conda,
-        };
 
         private static ResolveRecipeResult MapResponse(ResolveRecipeResponse response)
         {

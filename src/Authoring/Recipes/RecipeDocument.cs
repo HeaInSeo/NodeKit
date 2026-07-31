@@ -13,7 +13,7 @@ namespace NodeKit.Authoring.Recipes
 
         public string SchemaVersion { get; set; } = "draft-1";
 
-        public RecipeBuildKind? BuildKind { get; set; }
+        public RecipeKind? BuildKind { get; set; }
 
         public string ToolName { get; set; } = string.Empty;
 
@@ -70,7 +70,7 @@ namespace NodeKit.Authoring.Recipes
         /// <summary>source method authoring field, Recommended (not blocking) — see design doc Section 9.6.</summary>
         public List<string> BuildDependencies { get; set; } = new();
 
-        // ── SourceBuild (structured, RecipeBuildKind.SourceBuildStructured) ──
+        // ── SourceBuild (structured, RecipeKind.SourceBuildStructured) ──
         // SourceUri/SourceChecksum/SourceBuildCommands/BuildDependencies above
         // are reused as-is — see
         // docs/NODEKIT_SOURCEBUILD_STRUCTURED_INTENT_DESIGN.md §5. These

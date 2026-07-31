@@ -64,7 +64,7 @@ namespace NodeKit.Cli
             // 단계 6: 빌드 + 검증 + recovery
             var method = session.Snapshot().SelectedMethod!.Value;
             var document = session.Build();
-            document.BuildKind = RecipeBuildKindResolver.Resolve(method, document);
+            document.BuildKind = RecipeKindResolver.Resolve(method, document);
 
             var result = RecipeValidationPipeline.ValidateRecipe(document);
             while (!result.IsValid)
@@ -78,7 +78,7 @@ namespace NodeKit.Cli
                 }
 
                 document = session.Build();
-                document.BuildKind = RecipeBuildKindResolver.Resolve(session.Snapshot().SelectedMethod!.Value, document);
+                document.BuildKind = RecipeKindResolver.Resolve(session.Snapshot().SelectedMethod!.Value, document);
                 result = RecipeValidationPipeline.ValidateRecipe(document);
             }
 

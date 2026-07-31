@@ -36,7 +36,7 @@ namespace NodeKit.Cli.Tests
                 version: "0.7.17",
                 packages: new List<string> { "bwa=0.7.17" },
                 cancellationToken: cts.Token,
-                buildKind: NodeKit.Authoring.Recipes.RecipeBuildKind.Conda);
+                buildKind: NodeKit.Authoring.Recipes.RecipeKind.Conda);
 
             Assert.NotEqual(RecipeResolutionSource.Unsupported, result.Source);
         }
