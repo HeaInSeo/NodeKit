@@ -28,6 +28,26 @@ namespace NodeKit.Tests
             Assert.Contains(expectedSubstring, message, StringComparison.Ordinal);
         }
 
+        // 리뷰 지적: NodeVault가 실제로 가장 흔히 돌려주는 거부 사유(재현성
+        // 위반/정책 거부/resolve 결과 만료)가 예전엔 이 Theory에 없어서 전부
+        // 일반 fallthrough("gRPC 오류 (코드): 상세")로만 나왔다 — recipe
+        // 작성자가 가장 필요로 하는 메시지가 제일 부실했다. 이 세 코드는(위
+        // 5개와 달리) 서버 원문 상세를 메시지에 그대로 포함한다 — 세부
+        // 원인은 문자열 매칭으로 재추측하지 않고 원문을 그대로 보여주는
+        // 방침이라 따로 검증한다.
+        [Theory]
+        [InlineData(StatusCode.FailedPrecondition, "재현성")]
+        [InlineData(StatusCode.InvalidArgument, "정책 위반이거나")]
+        [InlineData(StatusCode.NotFound, "만료")]
+        public void Describe_RpcException_MapsCommonRejectionCodesToActionableMessagesWithDetail(
+            StatusCode code, string expectedSubstring)
+        {
+            var message = BuildErrorMessages.Describe(new RpcException(new Status(code, "detail")));
+
+            Assert.Contains(expectedSubstring, message, StringComparison.Ordinal);
+            Assert.Contains("detail", message, StringComparison.Ordinal);
+        }
+
         [Fact]
         public void Describe_RpcException_UnknownStatusCode_IncludesStatusCodeAndDetail()
         {

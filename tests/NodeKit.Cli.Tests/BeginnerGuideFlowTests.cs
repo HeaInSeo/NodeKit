@@ -421,7 +421,7 @@ namespace NodeKit.Cli.Tests
         {
             // Adversarial review Major-1 follow-up (Issue #43): the guided
             // beginner source-clue path used to select legacy
-            // RecipeBuildKind.SourceBuild — rejected almost unconditionally
+            // RecipeKind.SourceBuild — rejected almost unconditionally
             // by NodeVault's Sprint 9 policy (#41). It now selects
             // SourceStructured with the curated generic/minimal profiles
             // pre-filled (BeginnerGuideFlow.SelectSourceStructured), so

@@ -130,8 +130,6 @@ namespace NodeKit.Cli.Tests
                 "bwa-mem", "0.7.17", "run.sh",
                 "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
                 "bwa=0.7.17=h5bf99c6_8", "",
-                "",     // Port input (skip)
-                "",     // Port output (skip)
                 // Step 9: path prompt
                 customPath, // user enters full custom path
             };
@@ -234,8 +232,6 @@ namespace NodeKit.Cli.Tests
                 "0",             // 기반 이미지: 직접 입력
                 "bwa-mem", "0.7.17", "run.sh", imageRef,
                 "bwa=0.7.17=h5bf99c6_8", "",
-                "",     // Port input (skip)
-                "",     // Port output (skip)
                 "n",    // Step 9 path prompt: restart
 
                 // Second attempt (QuickSetup, Package again)
@@ -245,8 +241,6 @@ namespace NodeKit.Cli.Tests
                 "0",             // 기반 이미지: 직접 입력
                 "bwa-mem", "0.7.17", "run.sh", imageRef,
                 "bwa=0.7.17=h5bf99c6_8", "",
-                "",     // Port input (skip)
-                "",     // Port output (skip)
                 outPath,  // Step 9: save to concrete path
             };
 

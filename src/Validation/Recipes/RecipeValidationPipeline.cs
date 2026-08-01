@@ -19,7 +19,7 @@ namespace NodeKit.Validation.Recipes
             {
                 throw new InvalidOperationException(
                     "Recipe BuildKind가 설정되지 않았습니다. " +
-                    "ValidateRecipe() 호출 전에 RecipeBuildKindResolver.Resolve()를 먼저 호출하세요.");
+                    "ValidateRecipe() 호출 전에 RecipeKindResolver.Resolve()를 먼저 호출하세요.");
             }
 
             var recipeResult = RecipeValidator.Validate(recipe, strictReproducible);

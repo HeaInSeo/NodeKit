@@ -5,7 +5,7 @@ namespace NodeKit.Authoring.Recipes
 {
     /// <summary>
     /// Curated Build/Runtime profile -> pinned image map for
-    /// RecipeBuildKind.SourceBuildStructured (§13 R22-B). Every image below
+    /// RecipeKind.SourceBuildStructured (§13 R22-B). Every image below
     /// was verified locally with `buildah run` for the tools its role
     /// requires before being added — see
     /// docs/NODEKIT_SOURCEBUILD_STRUCTURED_INTENT_DESIGN.md §16. This is a

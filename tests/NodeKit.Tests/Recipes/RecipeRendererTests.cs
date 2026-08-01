@@ -25,7 +25,7 @@ namespace NodeKit.Tests.Recipes
         [Fact]
         public void Render_Conda_SetsImageUriAndDockerfileWithInstallLine()
         {
-            var recipe = NewRecipe(RecipeBuildKind.Conda);
+            var recipe = NewRecipe(RecipeKind.Conda);
             recipe.BaseImage = PinnedBaseImage;
             recipe.Channels.AddRange(new[] { "bioconda", "conda-forge" });
             recipe.Packages.Add("bwa=0.7.17=h5bf99c6_8");
@@ -41,7 +41,7 @@ namespace NodeKit.Tests.Recipes
         [Fact]
         public void Render_Conda_PassesFullL1ValidatorChain()
         {
-            var recipe = NewRecipe(RecipeBuildKind.Conda);
+            var recipe = NewRecipe(RecipeKind.Conda);
             recipe.BaseImage = PinnedBaseImage;
             recipe.Channels.AddRange(new[] { "bioconda", "conda-forge" });
             recipe.Packages.Add("bwa=0.7.17=h5bf99c6_8");
@@ -61,7 +61,7 @@ namespace NodeKit.Tests.Recipes
             // "No target prefix specified" regardless of package validity —
             // found via a real local NodeVault + buildah build during Micromamba
             // engine test coverage.
-            var recipe = NewRecipe(RecipeBuildKind.Micromamba);
+            var recipe = NewRecipe(RecipeKind.Micromamba);
             recipe.BaseImage = PinnedBaseImage;
             recipe.Channels.Add("bioconda");
             recipe.Packages.Add("samtools=1.17=h00cdaf9_0");
@@ -77,7 +77,7 @@ namespace NodeKit.Tests.Recipes
         [Fact]
         public void Render_PackageMirror_UsesMirrorUriAsChannel()
         {
-            var recipe = NewRecipe(RecipeBuildKind.PackageMirror);
+            var recipe = NewRecipe(RecipeKind.PackageMirror);
             recipe.BaseImage = PinnedBaseImage;
             recipe.PackageMirrorUri = "https://mirror.internal/conda-channel";
             recipe.Packages.Add("bwa=0.7.17=h5bf99c6_8");
@@ -92,7 +92,7 @@ namespace NodeKit.Tests.Recipes
         [Fact]
         public void Render_BioContainer_SetsImageUriAndMinimalWrapperDockerfile()
         {
-            var recipe = NewRecipe(RecipeBuildKind.BioContainer);
+            var recipe = NewRecipe(RecipeKind.BioContainer);
             recipe.BioContainerImageUri = PinnedBioContainerImage;
 
             var definition = RecipeRenderer.Render(recipe);
@@ -106,7 +106,7 @@ namespace NodeKit.Tests.Recipes
         [Fact]
         public void Render_SourceBuild_EmbedsBareHexChecksumNotPrefixed()
         {
-            var recipe = NewRecipe(RecipeBuildKind.SourceBuild);
+            var recipe = NewRecipe(RecipeKind.SourceBuild);
             recipe.BaseImage = PinnedBaseImage;
             recipe.SourceUri = "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz";
             recipe.SourceChecksum = "sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd";
@@ -126,7 +126,7 @@ namespace NodeKit.Tests.Recipes
             // PackageMirror (pinned package installs only) — closest in risk to
             // dockerfile fallback, so its generated Dockerfile should not leave
             // the image running as root by default.
-            var recipe = NewRecipe(RecipeBuildKind.SourceBuild);
+            var recipe = NewRecipe(RecipeKind.SourceBuild);
             recipe.BaseImage = PinnedBaseImage;
             recipe.SourceUri = "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz";
             recipe.SourceChecksum = "sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd";
@@ -140,7 +140,7 @@ namespace NodeKit.Tests.Recipes
         [Fact]
         public void Render_SourceBuild_PassesFullL1ValidatorChain()
         {
-            var recipe = NewRecipe(RecipeBuildKind.SourceBuild);
+            var recipe = NewRecipe(RecipeKind.SourceBuild);
             recipe.BaseImage = PinnedBaseImage;
             recipe.SourceUri = "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz";
             recipe.SourceChecksum = "sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd";
@@ -162,7 +162,7 @@ namespace NodeKit.Tests.Recipes
         [Fact]
         public void Render_SourceBuildStructured_CuratedProfiles_ProducesTwoStageDockerfile()
         {
-            var recipe = NewRecipe(RecipeBuildKind.SourceBuildStructured);
+            var recipe = NewRecipe(RecipeKind.SourceBuildStructured);
             recipe.BuildProfile = "generic";
             recipe.RuntimeProfile = "minimal";
             recipe.SourceUri = "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz";
@@ -194,7 +194,7 @@ namespace NodeKit.Tests.Recipes
         public void Render_SourceBuildStructured_AdvancedBuildAndRuntimeProfiles_UseCustomImages()
         {
             const string customRuntimeImage = "debian:bookworm@sha256:1111111111111111111111111111111111111111111111111111111111111a";
-            var recipe = NewRecipe(RecipeBuildKind.SourceBuildStructured);
+            var recipe = NewRecipe(RecipeKind.SourceBuildStructured);
             recipe.BuildProfile = "advanced";
             recipe.BuildProfileImage = PinnedBaseImage;
             recipe.RuntimeProfile = "advanced";
@@ -213,7 +213,7 @@ namespace NodeKit.Tests.Recipes
         [Fact]
         public void Render_SourceBuildStructured_PassesFullL1ValidatorChain()
         {
-            var recipe = NewRecipe(RecipeBuildKind.SourceBuildStructured);
+            var recipe = NewRecipe(RecipeKind.SourceBuildStructured);
             recipe.BuildProfile = "generic";
             recipe.RuntimeProfile = "minimal";
             recipe.SourceUri = "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz";
@@ -229,7 +229,7 @@ namespace NodeKit.Tests.Recipes
         [Fact]
         public void Render_DockerfileFallback_PassesThroughVerbatim()
         {
-            var recipe = NewRecipe(RecipeBuildKind.DockerfileFallback);
+            var recipe = NewRecipe(RecipeKind.DockerfileFallback);
             recipe.BaseImage = PinnedBaseImage;
             recipe.DockerfileContent = $"FROM {PinnedBaseImage}\nRUN echo ok\n";
 
@@ -241,7 +241,7 @@ namespace NodeKit.Tests.Recipes
             Assert.Empty(violations);
         }
 
-        private static RecipeDocument NewRecipe(RecipeBuildKind buildKind) =>
+        private static RecipeDocument NewRecipe(RecipeKind buildKind) =>
             new()
             {
                 BuildKind = buildKind,

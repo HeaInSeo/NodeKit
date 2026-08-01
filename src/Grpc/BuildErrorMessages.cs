@@ -28,6 +28,14 @@ namespace NodeKit.Grpc
             _ => $"gRPC 오류: {ex.Message}",
         };
 
+        // 리뷰 지적: NodeVault가 가장 흔히 돌려주는 실제 거부 사유(재현성 위반,
+        // DockGuard 정책 거부, resolve 결과 만료)가 전부 아래 일반 fallthrough로
+        // 빠져서 그냥 "gRPC 오류 (코드): 상세"만 나왔다 — 정작 recipe 작성자가
+        // 가장 필요로 하는 메시지인데 제일 부실했다. NodeVault 쪽 상세 문자열은
+        // 자유 형식이라 더 세분화해서 파싱하지 않는다(--format jsonl 작업에서
+        // 이미 정한 원칙과 동일 — 문자열 매칭으로 세부 원인을 추측하지 않음) —
+        // 대신 이 세 StatusCode 자체가 이미 신뢰할 수 있는 분류 신호이므로,
+        // 무슨 "종류"의 문제인지만 한국어로 명확히 하고 원문 상세는 그대로 붙인다.
         private static string DescribeRpc(RpcException rpc) => rpc.StatusCode switch
         {
             StatusCode.Unavailable => "NodeVault에 연결할 수 없습니다. 주소와 네트워크 상태를 확인하세요.",
@@ -36,6 +44,15 @@ namespace NodeKit.Grpc
             StatusCode.DeadlineExceeded => "요청 시간이 초과되었습니다.",
             StatusCode.Cancelled => "요청이 취소되었습니다.",
             StatusCode.Unimplemented => DescribeUnimplemented(rpc),
+            StatusCode.FailedPrecondition =>
+                $"NodeVault가 재현성 조건을 만족하지 않는다고 판단해 이 recipe를 거부했습니다 " +
+                $"(예: base image digest 미고정). 상세: {rpc.Status.Detail}",
+            StatusCode.InvalidArgument =>
+                $"NodeVault가 이 recipe를 거부했습니다 — 정책 위반이거나 요청 형식이 잘못됐을 수 있습니다. " +
+                $"상세: {rpc.Status.Detail}",
+            StatusCode.NotFound =>
+                $"NodeVault에서 이전 단계의 결과를 찾지 못했습니다 — resolve 결과가 만료됐을 수 있습니다. " +
+                $"처음부터 다시 시도하세요. 상세: {rpc.Status.Detail}",
             _ => $"gRPC 오류 ({rpc.StatusCode}): {rpc.Status.Detail}",
         };
 

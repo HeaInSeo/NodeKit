@@ -180,7 +180,7 @@ namespace NodeKit.Grpc
             {
                 Kind = kind,
                 Message = ev.Message,
-                Timestamp = DateTimeOffset.FromUnixTimeMilliseconds(ev.Timestamp).UtcDateTime,
+                Timestamp = SafeFromUnixTimeMilliseconds(ev.Timestamp),
                 Digest = ev.Digest,
                 BuildId = ev.BuildId,
                 Status = ev.Status,
@@ -189,6 +189,25 @@ namespace NodeKit.Grpc
                 SpecReferrerDigest = ev.SpecReferrerDigest,
                 IntegrityHealth = ev.IntegrityHealth,
             };
+        }
+
+        // 리뷰 지적: ev.Timestamp는 서버가 보내는 자유 형식 int64라 형식 계약이
+        // 없다 — 오늘은 NodeVault가 항상 now.UnixMilli()를 보내서 안전하지만,
+        // 값이 DateTimeOffset이 표현 가능한 범위(대략 서기 1~9999년)를 벗어나면
+        // FromUnixTimeMilliseconds가 ArgumentOutOfRangeException을 던져서 이
+        // 이벤트 하나 때문에 WatchToolBuild 스트림 전체(진행 중인 빌드 관찰)가
+        // 중단됐다. Timestamp는 진단/표시용이라 정확성이 필수는 아니므로,
+        // 파싱 실패 시 "지금"으로 안전하게 대체한다.
+        private static DateTime SafeFromUnixTimeMilliseconds(long unixMilliseconds)
+        {
+            try
+            {
+                return DateTimeOffset.FromUnixTimeMilliseconds(unixMilliseconds).UtcDateTime;
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                return DateTime.UtcNow;
+            }
         }
 
         private static BuildEventKind MapProtoKind(Nodevault.V1.BuildEventKind kind) => kind switch

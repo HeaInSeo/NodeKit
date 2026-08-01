@@ -10,7 +10,7 @@ namespace NodeKit.Cli.Tests
         public void Describe_AdvancedRuntimeProfileWithCurlImage_ReturnsWarning()
         {
             var message = RuntimeProfileHygieneAdvisor.Describe(
-                RecipeBuildKind.SourceBuildStructured,
+                RecipeKind.SourceBuildStructured,
                 "advanced",
                 "docker.io/curlimages/curl:8.8.0@sha256:cbe461f2f26e573c5f4296c5f6c904011e3f1296dabf53e73b3f126d689c3463");
 
@@ -25,7 +25,7 @@ namespace NodeKit.Cli.Tests
             // (buildpack-deps, which deliberately includes curl/gcc/make) into
             // RuntimeProfileImage instead of a minimal runtime image.
             var message = RuntimeProfileHygieneAdvisor.Describe(
-                RecipeBuildKind.SourceBuildStructured,
+                RecipeKind.SourceBuildStructured,
                 "advanced",
                 "docker.io/library/buildpack-deps:bookworm@sha256:4efddd9a54ddc095e672b2fdf514f1ee4d3bb6e1f6ffc988b022c75e6ea99383");
 
@@ -36,7 +36,7 @@ namespace NodeKit.Cli.Tests
         public void Describe_AdvancedRuntimeProfileWithOrdinaryImage_ReturnsNull()
         {
             var message = RuntimeProfileHygieneAdvisor.Describe(
-                RecipeBuildKind.SourceBuildStructured,
+                RecipeKind.SourceBuildStructured,
                 "advanced",
                 "debian:bookworm-slim@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
 
@@ -50,7 +50,7 @@ namespace NodeKit.Cli.Tests
             // applies to the "advanced" escape hatch, where NodeKit has never
             // inspected the image.
             var message = RuntimeProfileHygieneAdvisor.Describe(
-                RecipeBuildKind.SourceBuildStructured,
+                RecipeKind.SourceBuildStructured,
                 "minimal",
                 "docker.io/curlimages/curl:8.8.0@sha256:cbe461f2f26e573c5f4296c5f6c904011e3f1296dabf53e73b3f126d689c3463");
 
@@ -61,7 +61,7 @@ namespace NodeKit.Cli.Tests
         public void Describe_NonSourceBuildStructuredKind_ReturnsNullEvenWithCurlImage()
         {
             var message = RuntimeProfileHygieneAdvisor.Describe(
-                RecipeBuildKind.SourceBuild,
+                RecipeKind.SourceBuild,
                 "advanced",
                 "docker.io/curlimages/curl:8.8.0@sha256:cbe461f2f26e573c5f4296c5f6c904011e3f1296dabf53e73b3f126d689c3463");
 
@@ -71,7 +71,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void Describe_NullRuntimeProfileImage_ReturnsNull()
         {
-            var message = RuntimeProfileHygieneAdvisor.Describe(RecipeBuildKind.SourceBuildStructured, "advanced", null);
+            var message = RuntimeProfileHygieneAdvisor.Describe(RecipeKind.SourceBuildStructured, "advanced", null);
 
             Assert.Null(message);
         }

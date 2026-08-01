@@ -202,7 +202,7 @@ namespace NodeKit.Tests.Recipes
 
         private static RecipeDocument MinimalSourceBuildStructured() => new()
         {
-            BuildKind = RecipeBuildKind.SourceBuildStructured,
+            BuildKind = RecipeKind.SourceBuildStructured,
             ToolName = "bwa-mem",
             Version = "0.7.17",
             Script = "bwa mem -t 4 ref.fa reads_1.fq reads_2.fq",
@@ -217,7 +217,7 @@ namespace NodeKit.Tests.Recipes
 
         private static RecipeDocument MinimalConda() => new()
         {
-            BuildKind = RecipeBuildKind.Conda,
+            BuildKind = RecipeKind.Conda,
             ToolName = "bwa-mem",
             Version = "0.7.17",
             Script = "bwa mem -t 4 ref.fa reads_1.fq reads_2.fq",

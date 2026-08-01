@@ -4,7 +4,7 @@ using Xunit;
 
 namespace NodeKit.Tests.Recipes
 {
-    public class RecipeBuildKindResolverTests
+    public class RecipeKindResolverTests
     {
         [Fact]
         public void Resolve_PackageWithoutEngine_Throws()
@@ -12,7 +12,7 @@ namespace NodeKit.Tests.Recipes
             var document = new RecipeDocument { PackageEngine = string.Empty };
 
             Assert.Throws<InvalidOperationException>(
-                () => RecipeBuildKindResolver.Resolve(RecipeMethodId.Package, document));
+                () => RecipeKindResolver.Resolve(RecipeMethodId.Package, document));
         }
 
         [Fact]
@@ -21,7 +21,7 @@ namespace NodeKit.Tests.Recipes
             var document = new RecipeDocument { PackageEngine = "   " };
 
             Assert.Throws<InvalidOperationException>(
-                () => RecipeBuildKindResolver.Resolve(RecipeMethodId.Package, document));
+                () => RecipeKindResolver.Resolve(RecipeMethodId.Package, document));
         }
 
         [Fact]
@@ -29,9 +29,9 @@ namespace NodeKit.Tests.Recipes
         {
             var document = new RecipeDocument { PackageEngine = "conda" };
 
-            var result = RecipeBuildKindResolver.Resolve(RecipeMethodId.Package, document);
+            var result = RecipeKindResolver.Resolve(RecipeMethodId.Package, document);
 
-            Assert.Equal(RecipeBuildKind.Conda, result);
+            Assert.Equal(RecipeKind.Conda, result);
         }
 
         [Fact]
@@ -39,56 +39,56 @@ namespace NodeKit.Tests.Recipes
         {
             var document = new RecipeDocument { PackageEngine = "micromamba" };
 
-            var result = RecipeBuildKindResolver.Resolve(RecipeMethodId.Package, document);
+            var result = RecipeKindResolver.Resolve(RecipeMethodId.Package, document);
 
-            Assert.Equal(RecipeBuildKind.Micromamba, result);
+            Assert.Equal(RecipeKind.Micromamba, result);
         }
 
         [Fact]
         public void Resolve_Container_ResolvesToBioContainer()
         {
-            var result = RecipeBuildKindResolver.Resolve(RecipeMethodId.Container, new RecipeDocument());
+            var result = RecipeKindResolver.Resolve(RecipeMethodId.Container, new RecipeDocument());
 
-            Assert.Equal(RecipeBuildKind.BioContainer, result);
+            Assert.Equal(RecipeKind.BioContainer, result);
         }
 
         [Fact]
         public void Resolve_Mirror_ResolvesToPackageMirror()
         {
-            var result = RecipeBuildKindResolver.Resolve(RecipeMethodId.Mirror, new RecipeDocument());
+            var result = RecipeKindResolver.Resolve(RecipeMethodId.Mirror, new RecipeDocument());
 
-            Assert.Equal(RecipeBuildKind.PackageMirror, result);
+            Assert.Equal(RecipeKind.PackageMirror, result);
         }
 
         [Fact]
         public void Resolve_Source_ResolvesToSourceBuild()
         {
-            var result = RecipeBuildKindResolver.Resolve(RecipeMethodId.Source, new RecipeDocument());
+            var result = RecipeKindResolver.Resolve(RecipeMethodId.Source, new RecipeDocument());
 
-            Assert.Equal(RecipeBuildKind.SourceBuild, result);
+            Assert.Equal(RecipeKind.SourceBuild, result);
         }
 
         [Fact]
         public void Resolve_SourceStructured_ResolvesToSourceBuildStructured()
         {
-            var result = RecipeBuildKindResolver.Resolve(RecipeMethodId.SourceStructured, new RecipeDocument());
+            var result = RecipeKindResolver.Resolve(RecipeMethodId.SourceStructured, new RecipeDocument());
 
-            Assert.Equal(RecipeBuildKind.SourceBuildStructured, result);
+            Assert.Equal(RecipeKind.SourceBuildStructured, result);
         }
 
         [Fact]
         public void Resolve_Dockerfile_ResolvesToDockerfileFallback()
         {
-            var result = RecipeBuildKindResolver.Resolve(RecipeMethodId.Dockerfile, new RecipeDocument());
+            var result = RecipeKindResolver.Resolve(RecipeMethodId.Dockerfile, new RecipeDocument());
 
-            Assert.Equal(RecipeBuildKind.DockerfileFallback, result);
+            Assert.Equal(RecipeKind.DockerfileFallback, result);
         }
 
         [Fact]
         public void Resolve_NullDocument_Throws()
         {
             Assert.Throws<ArgumentNullException>(
-                () => RecipeBuildKindResolver.Resolve(RecipeMethodId.Container, null!));
+                () => RecipeKindResolver.Resolve(RecipeMethodId.Container, null!));
         }
     }
 }

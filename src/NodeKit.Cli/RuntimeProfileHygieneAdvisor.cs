@@ -31,9 +31,9 @@ namespace NodeKit.Cli
             "buildpack-deps",
         };
 
-        public static string? Describe(RecipeBuildKind buildKind, string? runtimeProfile, string? runtimeProfileImage)
+        public static string? Describe(RecipeKind buildKind, string? runtimeProfile, string? runtimeProfileImage)
         {
-            if (buildKind != RecipeBuildKind.SourceBuildStructured
+            if (buildKind != RecipeKind.SourceBuildStructured
                 || runtimeProfile != SourceBuildProfileCatalog.AdvancedKey
                 || string.IsNullOrEmpty(runtimeProfileImage))
             {

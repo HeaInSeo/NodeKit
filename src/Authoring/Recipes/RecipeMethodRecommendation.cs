@@ -4,7 +4,7 @@ namespace NodeKit.Authoring.Recipes
 {
     /// <summary>
     /// Method-centric recommendation result. Does not resolve the internal
-    /// RecipeBuildKind — see
+    /// RecipeKind — see
     /// docs/NODEKIT_CLI_RECIPE_AUTHORING_UX_BEGINNER_DESIGN.md Section 11.1.
     /// </summary>
     internal sealed record RecipeMethodRecommendation(

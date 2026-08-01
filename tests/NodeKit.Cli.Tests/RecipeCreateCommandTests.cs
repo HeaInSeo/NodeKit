@@ -271,7 +271,7 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void SourceStructured_UnknownMethodName_StillRejected()
         {
-            // "source-build-structured" is the *internal* RecipeBuildKind
+            // "source-build-structured" is the *internal* RecipeKind
             // name, not the CLI --method value ("source-structured") —
             // confirms the friendly-error guard covers the new kind too.
             var exitCode = Run("--non-interactive", "--method", "source-build-structured");
@@ -505,6 +505,71 @@ namespace NodeKit.Cli.Tests
             // 여기서 만든 경우(ownedStderr != null)에만 스코프 종료 시 dispose된다.
             using var ownedStderr = stderr is null ? new StringWriter() : null;
             return CliApp.Run(fullArgs.ToArray(), stdout, stderr ?? ownedStderr!);
+        }
+
+        // --- FR-024/FR-025 회귀 케이스 (US3, /speckit-analyze T030) ---
+
+        [Fact]
+        public void Command_StepNoLongerPromptsForInput_ShowsGuidanceInstead()
+        {
+            var outPath = Path.Join(_workDir, "recipe.json");
+            var transcript = new[]
+            {
+                "2",                // 빠른 설정 모드
+                "n", "n", "y", "n", "n", "n", // Q&A -> recommend container
+                "",                 // accept recommended method
+                "bwa-mem", "0.7.17", "run.sh",
+                "condaforge/miniforge3:24.3.0-0", // ImageRef
+                DigestOnly,         // ImageDigest
+                "",                 // 저장 확인
+            };
+
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var exitCode = CliApp.Run(
+                new[] { "recipe", "create", outPath },
+                new StringReader(string.Join("\n", transcript)),
+                stdout,
+                stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.Empty(stderr.ToString());
+            Assert.Contains("nodekit function-recipe create", stdout.ToString());
+            Assert.True(File.Exists(outPath));
+
+            var json = File.ReadAllText(outPath);
+            Assert.Contains("\"Command\": []", json);
+        }
+
+        [Fact]
+        public void LegacyRecipeWithInputsOutputsCommand_ValidatesWithoutError()
+        {
+            // FR-025: 과거에 Inputs/Outputs/Command 값을 채운 RecipeDocument
+            // JSON을 다시 불러와도 역직렬화/검증 단계에서 예외 없이 처리되어야
+            // 한다(research.md §11 — System.Text.Json이 남는 필드를 그대로
+            // 역직렬화하므로 코드 변경 없이 성립함을 고정하는 회귀 테스트).
+            var legacyPath = Path.Join(_workDir, "legacy-recipe.json");
+            File.WriteAllText(legacyPath, """
+                {
+                  "BuildKind": "BioContainer",
+                  "ToolName": "bwa-mem",
+                  "Version": "0.7.17",
+                  "BioContainerImageUri": "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                  "Script": "run.sh",
+                  "Command": ["run.sh", "--threads", "4"],
+                  "Inputs": [{ "Name": "reads", "Role": "sample-fastq", "Format": "fastq", "Shape": "single", "Required": true }],
+                  "Outputs": [{ "Name": "aligned_bam", "Role": "aligned-bam", "Format": "bam", "Shape": "single", "Class": "primary" }]
+                }
+                """);
+
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var exitCode = CliApp.Run(new[] { "validate", legacyPath }, stdout, stderr);
+
+            // 오류 없이 처리(디코딩/렌더링 예외 없음)됨을 확인한다 — 검증 자체는
+            // 통과(0)해야 한다(레거시 값이 있어도 나머지 필드는 유효하므로).
+            Assert.Equal(0, exitCode);
+            Assert.Equal("OK", stdout.ToString().Trim());
         }
     }
 }

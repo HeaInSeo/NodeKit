@@ -383,8 +383,8 @@ namespace NodeKit.Tests.Recipes
         {
             // PackageEngine is Defaulted, so the session reports IsComplete == true
             // without it ever being explicitly set — PackageEngine stays "" on the
-            // document. RecipeBuildKindResolver.Resolve(Package, ...) throws when
-            // PackageEngine is blank (see RecipeBuildKindResolverTests), so if
+            // document. RecipeKindResolver.Resolve(Package, ...) throws when
+            // PackageEngine is blank (see RecipeKindResolverTests), so if
             // ValidateDraft() ever called the resolver internally, this would throw.
             var session = CompletePackageSession();
             Assert.True(session.IsComplete);
@@ -409,7 +409,7 @@ namespace NodeKit.Tests.Recipes
             Assert.True(session.IsComplete);
 
             var document = session.Build();
-            document.BuildKind = RecipeBuildKindResolver.Resolve(RecipeMethodId.Container, document);
+            document.BuildKind = RecipeKindResolver.Resolve(RecipeMethodId.Container, document);
 
             var result = RecipeValidationPipeline.ValidateRecipe(document);
 

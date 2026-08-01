@@ -66,8 +66,8 @@ namespace NodeKit.Validation.Recipes
 
             switch (recipe.BuildKind!.Value)
             {
-                case RecipeBuildKind.Conda:
-                case RecipeBuildKind.Micromamba:
+                case RecipeKind.Conda:
+                case RecipeKind.Micromamba:
                     ValidateBaseImagePresent(recipe, violations);
                     ValidatePackagesPresent(recipe, violations);
                     ValidatePackageFormats(recipe, violations);
@@ -78,7 +78,7 @@ namespace NodeKit.Validation.Recipes
                     }
 
                     break;
-                case RecipeBuildKind.PackageMirror:
+                case RecipeKind.PackageMirror:
                     ValidateBaseImagePresent(recipe, violations);
                     ValidatePackagesPresent(recipe, violations);
                     ValidatePackageFormats(recipe, violations);
@@ -103,7 +103,7 @@ namespace NodeKit.Validation.Recipes
                     }
 
                     break;
-                case RecipeBuildKind.BioContainer:
+                case RecipeKind.BioContainer:
                     if (string.IsNullOrWhiteSpace(recipe.BioContainerImageUri))
                     {
                         violations.Add(new ValidationViolation(
@@ -113,14 +113,14 @@ namespace NodeKit.Validation.Recipes
                     }
 
                     break;
-                case RecipeBuildKind.SourceBuild:
+                case RecipeKind.SourceBuild:
                     ValidateBaseImagePresent(recipe, violations);
                     ValidateSourceFetchFields(recipe, violations);
                     break;
-                case RecipeBuildKind.SourceBuildStructured:
+                case RecipeKind.SourceBuildStructured:
                     ValidateSourceBuildStructured(recipe, violations);
                     break;
-                case RecipeBuildKind.DockerfileFallback:
+                case RecipeKind.DockerfileFallback:
                     ValidateBaseImagePresent(recipe, violations);
                     if (string.IsNullOrWhiteSpace(recipe.DockerfileContent))
                     {
@@ -234,7 +234,7 @@ namespace NodeKit.Validation.Recipes
         // — SourceBuild류는 DockerfileFallback과 달리 USER/ENV 보안 재검사도
         // 받지 않는 build kind라 이 경로로 그 검사를 통째로 우회할 수 있다.
         //
-        // RecipeBuildKind.SourceBuild(legacy)와 SourceBuildStructured가
+        // RecipeKind.SourceBuild(legacy)와 SourceBuildStructured가
         // SourceUri/SourceChecksum/SourceBuildCommands 필드를 그대로 재사용하므로
         // (docs/NODEKIT_SOURCEBUILD_STRUCTURED_INTENT_DESIGN.md §5), 검증
         // 로직도 공유한다 — legacy 쪽 동작은 이 추출로 전혀 바뀌지 않는다.

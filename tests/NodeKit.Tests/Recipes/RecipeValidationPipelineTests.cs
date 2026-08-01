@@ -15,7 +15,7 @@ namespace NodeKit.Tests.Recipes
             var ex = Assert.Throws<InvalidOperationException>(
                 () => RecipeValidationPipeline.ValidateRecipe(doc));
 
-            Assert.Contains("RecipeBuildKindResolver.Resolve()", ex.Message);
+            Assert.Contains("RecipeKindResolver.Resolve()", ex.Message);
         }
     }
 }
