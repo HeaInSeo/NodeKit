@@ -74,6 +74,21 @@ namespace NodeKit.Validation
                     nameof(definition.ImageUri));
             }
 
+            // stub resolver가 발급한 고정 placeholder digest는 형식은 맞지만 어떤
+            // 레지스트리에도 실재하지 않는다. 이 값으로 저작된 레시피가 제출 가능한
+            // 산출물이 되지 않도록 여기서 거절한다. hex는 대문자로 올 수 있으므로
+            // (L1-IMG-005 정규식이 [0-9a-fA-F] 허용) 비교는 대소문자를 무시한다.
+            if (string.Equals(
+                    "sha256:" + digest,
+                    KnownPlaceholderDigests.BaseImageStub,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return ValidationResult.Fail(
+                    "L1-IMG-007",
+                    $"stub digest로 저작된 레시피는 제출할 수 없습니다. NODEKIT_BASE_IMAGE_STUB을 끄고 실제 base image digest로 다시 해소하세요. ({uri})",
+                    nameof(definition.ImageUri));
+            }
+
             // ImageUri는 Dockerfile의 첫 번째 FROM base image와 같아야 한다 —
             // 둘 다 빌드 전부터 이미 존재하는 동일한 pinned input 이미지를 가리킨다.
             if (!string.IsNullOrWhiteSpace(definition.DockerfileContent))

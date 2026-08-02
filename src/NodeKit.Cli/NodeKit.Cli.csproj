@@ -115,6 +115,7 @@
     <Compile Include="..\Validation\ValidationViolation.cs" Link="Validation\ValidationViolation.cs" />
     <Compile Include="..\Validation\RequiredFieldsValidator.cs" Link="Validation\RequiredFieldsValidator.cs" />
     <Compile Include="..\Validation\ImageUriValidator.cs" Link="Validation\ImageUriValidator.cs" />
+    <Compile Include="..\Validation\KnownPlaceholderDigests.cs" Link="Validation\KnownPlaceholderDigests.cs" />
     <Compile Include="..\Validation\DockerfileStructureValidator.cs" Link="Validation\DockerfileStructureValidator.cs" />
     <Compile Include="..\Validation\PackageVersionValidator.cs" Link="Validation\PackageVersionValidator.cs" />
     <Compile Include="..\Validation\Recipes\RecipeValidator.cs" Link="Validation\Recipes\RecipeValidator.cs" />

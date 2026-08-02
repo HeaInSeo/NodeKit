@@ -123,6 +123,44 @@ namespace NodeKit.Tests
             Assert.Contains(result.Violations, v => v.RuleId == "L1-IMG-006");
         }
 
+        // E-17: the fixed placeholder digest emitted by the NODEKIT_BASE_IMAGE_STUB
+        // resolver has the right format but exists in no registry, so a recipe
+        // authored with it must not become a submittable artifact.
+        private const string StubDigestHex =
+            "0000000000000000000000000000000000000000000000000000000000000001";
+
+        [Fact]
+        public void Fail_WhenDigestIsBaseImageStubPlaceholder()
+        {
+            var def = Def($"registry.example.com/bwa-mem2:2.2.1@sha256:{StubDigestHex}");
+            var result = _sut.Validate(def);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-IMG-007");
+        }
+
+        [Fact]
+        public void Fail_WhenDigestIsBaseImageStubPlaceholder_CaseInsensitivePrefix()
+        {
+            // L1-IMG-005's regex allows [0-9a-fA-F] and the '@sha256:' lookup is
+            // case-insensitive, so the placeholder rejection must be too.
+            var def = Def($"registry.example.com/bwa-mem2:2.2.1@SHA256:{StubDigestHex}");
+            var result = _sut.Validate(def);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-IMG-007");
+        }
+
+        [Fact]
+        public void Pass_WhenDigestIsNotThePlaceholder_ButShapedSimilarly()
+        {
+            // Only the exact placeholder is blocked — a real all-hex digest that
+            // merely resembles it must still pass (no regression on L1-IMG-005).
+            var def = Def(
+                "registry.example.com/bwa-mem2:2.2.1@sha256:0000000000000000000000000000000000000000000000000000000000000002");
+            Assert.True(_sut.Validate(def).IsValid);
+        }
+
         private const string ValidDigest = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
         private static ToolDefinition Def(string imageUri) =>
