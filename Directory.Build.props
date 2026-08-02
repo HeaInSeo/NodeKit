@@ -3,13 +3,10 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
-  <!-- 1순위: NodeKit 저장소 내 벤더링된 proto (독립 빌드 — NodeVault 불필요) -->
+  <!-- 저장소에 벤더링된 proto를 쓴다. 외부 경로 fallback은 없다.
+       /p:ApiProtosRoot= 로 명시 override는 계속 가능하다. 출처는 protos/SOURCE.md 참조. -->
   <!-- MSBuildThisFileDirectory: Directory.Build.props 파일 위치 = 항상 저장소 루트 -->
   <PropertyGroup Condition="'$(ApiProtosRoot)' == '' and Exists('$(MSBuildThisFileDirectory)protos')">
     <ApiProtosRoot>$(MSBuildThisFileDirectory)protos</ApiProtosRoot>
-  </PropertyGroup>
-  <!-- 2순위: 개발 장비에 NodeVault 저장소가 함께 있는 경우 -->
-  <PropertyGroup Condition="'$(ApiProtosRoot)' == '' and Exists('/opt/go/src/github.com/HeaInSeo/NodeVault/protos')">
-    <ApiProtosRoot>/opt/go/src/github.com/HeaInSeo/NodeVault/protos</ApiProtosRoot>
   </PropertyGroup>
 </Project>

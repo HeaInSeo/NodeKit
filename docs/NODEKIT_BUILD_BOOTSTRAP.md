@@ -26,18 +26,16 @@
 ### 경로 설정
 
 `NodeKit.csproj`는 `ApiProtosRoot` MSBuild 속성 아래에서 `nodevault/v1/nodevault.proto`를 찾는다.
-
-1. 기본 탐지 경로 사용 (자동 감지)
-   * `/opt/go/src/github.com/HeaInSeo/NodeVault/protos` ← canonical
-
-2. 명시적으로 경로 지정
+기본값은 저장소에 벤더링된 `protos/` 디렉터리이므로 **NodeVault 체크아웃 없이 빌드된다**
+(출처는 `protos/SOURCE.md`).
 
 ```bash
-dotnet test --solution NodeKit.sln /p:ApiProtosRoot=/opt/go/src/github.com/HeaInSeo/NodeVault/protos
-dotnet build NodeKit.sln /p:ApiProtosRoot=/opt/go/src/github.com/HeaInSeo/NodeVault/protos
+dotnet test --solution NodeKit.sln
+dotnet build NodeKit.sln
 ```
 
-`ApiProtosRoot`가 비어 있거나 `nodevault.proto`가 없으면 빌드가 명확한 에러 메시지와 함께 중단된다.
+필요하면 `/p:ApiProtosRoot=<경로>`로 명시 override할 수 있다.
+`ApiProtosRoot`가 비어 있거나 `nodevault.proto`가 없으면(벤더 사본 누락) 빌드가 명확한 에러 메시지와 함께 중단된다.
 
 ---
 
@@ -91,5 +89,5 @@ dotnet test --solution NodeKit.sln
 ```
 
 현재 개발 환경 경로:
-- NodeVault protos: `/opt/go/src/github.com/HeaInSeo/NodeVault/protos` (canonical)
+- NodeVault protos: 저장소 내 `protos/` (NodeVault에서 벤더링, 출처는 `protos/SOURCE.md`)
 - DockGuard: `/opt/dotnet/src/github.com/HeaInSeo/DockGuard`
