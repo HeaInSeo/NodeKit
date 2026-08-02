@@ -209,7 +209,7 @@ NavToolListButton / NavDataListButton 클릭
 
 | 외부 의존성 | 용도 | 경로 |
 |-------------|------|------|
-| `NodeVault/protos/` | `nodevault.proto` 빌드 시 proto 컴파일 | `ApiProtosRoot` MSBuild 속성 (자동 탐지) |
+| `NodeVault/protos/` | `nodevault.proto` 빌드 시 proto 컴파일 | 저장소 내 `protos/` (NodeVault에서 벤더링, 출처는 `protos/SOURCE.md`) |
 | `DockGuard` 저장소 | `dockguard.wasm` 번들 생성 | `make policy DOCKGUARD=...` |
 
 api-protos Sprint 1-4 완료. canonical source는 `NodeVault/protos/nodevault/v1/`.

@@ -12,7 +12,7 @@
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
   <Target Name="ValidateApiProtosRoot" BeforeTargets="PrepareForBuild">
-    <Error Condition="'$(ApiProtosRoot)' == ''" Text="ApiProtosRoot is not set. Set /p:ApiProtosRoot=/opt/go/src/github.com/HeaInSeo/NodeVault/protos or equivalent." />
+    <Error Condition="'$(ApiProtosRoot)' == ''" Text="ApiProtosRoot is not set. The vendored proto at protos/nodevault/v1/nodevault.proto should set it automatically; if it is empty the vendored copy is missing (see protos/SOURCE.md)." />
     <Error Condition="!Exists('$(ApiProtosRoot)/nodevault/v1/nodevault.proto')" Text="nodevault.proto not found under ApiProtosRoot='$(ApiProtosRoot)'. Expected '$(ApiProtosRoot)/nodevault/v1/nodevault.proto'." />
   </Target>
   <ItemGroup>

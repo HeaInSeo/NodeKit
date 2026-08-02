@@ -7,13 +7,26 @@ namespace NodeKit.Cli.Tests
 {
     /// <summary>
     /// Tests for U3 — step 4 base image selection + digest auto-resolution in
-    /// RecipeCreateFlow. Uses StubImageDigestResolver injected via
+    /// RecipeCreateFlow. Uses injected digest resolvers via
     /// RecipeCreateInteractiveRunner.Run so no live HTTP calls are made.
     /// </summary>
     public class BaseImageSelectionStepTests : IDisposable
     {
         private static readonly IRecipeCreateCancellationSource _noCancellation =
             new FixedCancellationSource(false);
+
+        // E-17: a valid (non-placeholder) resolved digest for full-flow tests
+        // that must pass the L1 submission gate. The stub placeholder digest is
+        // deliberately rejected by ImageUriValidator (L1-IMG-007), so tests that
+        // assert on the saved recipe use this real-shaped digest instead. The
+        // stub itself is still exercised at the authoring stage by
+        // StubResolver_ReturnsFixedDigest and blocked at the submission gate by
+        // Step4_StubDigest_RejectedAtSubmissionGate.
+        private const string ResolvedDigest =
+            "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+        private static IImageDigestResolver ValidDigestResolver() =>
+            new FixedResultResolver(ImageDigestResolutionResult.Resolved(ResolvedDigest));
 
         private readonly string _workDir =
             Path.Join(Path.GetTempPath(), "nodekit-base-image-tests-" + Guid.NewGuid());
@@ -81,10 +94,47 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(StubImageDigestResolver.StubDigest, result.Digest);
         }
 
-        // ── Full flow: step 4 with StubResolver (Package method, QuickSetup) ────
+        // E-17: the stub resolver keeps working at the authoring stage (above),
+        // but a recipe authored with its placeholder digest must be rejected at
+        // the submission gate (RecipeValidationPipeline via RecipeCreateFlow),
+        // so no submittable recipe file is produced.
+        [Fact]
+        public void Step4_StubDigest_RejectedAtSubmissionGate()
+        {
+            var outPath = Path.Join(_workDir, "recipe.json");
+
+            var transcript = new[]
+            {
+                "2",    // 빠른 설정 모드
+                "n", "n", "n", "y", "n", "n",
+                "",     // accept package
+                "bioconda", "",
+                "1",    // step 4: pick candidate [1] → stub resolves placeholder digest
+                "bwa-mem", "0.7.17", "run.sh",
+                "bwa=0.7.17=h5bf99c6_8", "",
+                "",     // final validation fails (L1-IMG-007) → recovery prompt: give up
+            };
+
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var exitCode = RecipeCreateInteractiveRunner.Run(
+                outPath,
+                new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
+                new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
+                stderr,
+                _noCancellation,
+                resolveClient: NullResolveRecipeClient.Instance,
+                imageDigestResolver: StubImageDigestResolver.Instance);
+
+            Assert.NotEqual(0, exitCode);
+            Assert.False(File.Exists(outPath));
+            Assert.Contains("L1-IMG-007", stderr.ToString());
+        }
+
+        // ── Full flow: step 4 base image selection (Package method, QuickSetup) ────
 
         [Fact]
-        public void Step4_PackageMethod_WithStubResolver_SetsImageRefAutoAndSkipsManualEntry()
+        public void Step4_PackageMethod_WithResolver_SetsImageRefAutoAndSkipsManualEntry()
         {
             var outPath = Path.Join(_workDir, "recipe.json");
 
@@ -121,21 +171,21 @@ namespace NodeKit.Cli.Tests
                 stderr,
                 _noCancellation,
                 resolveClient: NullResolveRecipeClient.Instance,
-                imageDigestResolver: StubImageDigestResolver.Instance);
+                imageDigestResolver: ValidDigestResolver());
 
             Assert.Equal(0, exitCode);
             Assert.Empty(stderr.ToString());
             Assert.True(File.Exists(outPath));
 
             var json = File.ReadAllText(outPath);
-            // Auto-resolved digest from stub must appear in the saved recipe.
-            Assert.Contains(StubImageDigestResolver.StubDigest, json);
+            // Auto-resolved digest must appear in the saved recipe.
+            Assert.Contains(ResolvedDigest, json);
             Assert.Contains("condaforge/miniforge3", json);
             Assert.Contains("bwa-mem", json);
         }
 
         [Fact]
-        public void Step4_PackageMethod_WithStubResolver_PickSecondCandidate_SetsMicromamba()
+        public void Step4_PackageMethod_WithResolver_PickSecondCandidate_SetsMicromamba()
         {
             // Regression: quick-setup has no dedicated question for
             // conda-vs-micromamba, so picking the micromamba base image
@@ -164,7 +214,7 @@ namespace NodeKit.Cli.Tests
                 stderr,
                 _noCancellation,
                 resolveClient: NullResolveRecipeClient.Instance,
-                imageDigestResolver: StubImageDigestResolver.Instance);
+                imageDigestResolver: ValidDigestResolver());
 
             Assert.Equal(0, exitCode);
             Assert.True(File.Exists(outPath));
@@ -172,11 +222,11 @@ namespace NodeKit.Cli.Tests
             var json = File.ReadAllText(outPath);
             Assert.Contains("mambaorg/micromamba", json);
             Assert.Contains("\"PackageEngine\": \"micromamba\"", json);
-            Assert.Contains(StubImageDigestResolver.StubDigest, json);
+            Assert.Contains(ResolvedDigest, json);
         }
 
         [Fact]
-        public void Step4_PackageMethod_WithStubResolver_PickFirstCandidate_KeepsCondaEngine()
+        public void Step4_PackageMethod_WithResolver_PickFirstCandidate_KeepsCondaEngine()
         {
             // Sanity counterpart: picking the conda-forge candidate must NOT
             // be affected by the micromamba auto-detection.
@@ -202,7 +252,7 @@ namespace NodeKit.Cli.Tests
                 stderr,
                 _noCancellation,
                 resolveClient: NullResolveRecipeClient.Instance,
-                imageDigestResolver: StubImageDigestResolver.Instance);
+                imageDigestResolver: ValidDigestResolver());
 
             Assert.Equal(0, exitCode);
             Assert.True(File.Exists(outPath));
@@ -243,7 +293,7 @@ namespace NodeKit.Cli.Tests
                 stderr,
                 _noCancellation,
                 resolveClient: NullResolveRecipeClient.Instance,
-                imageDigestResolver: StubImageDigestResolver.Instance);
+                imageDigestResolver: ValidDigestResolver());
 
             Assert.Equal(0, exitCode);
             Assert.True(File.Exists(outPath));
@@ -458,7 +508,7 @@ namespace NodeKit.Cli.Tests
         // ── BeginnerGuide + step 4 ────────────────────────────────────────────────
 
         [Fact]
-        public void Step4_BeginnerGuide_InstallCommand_WithStubResolver_SetsImageRefAuto()
+        public void Step4_BeginnerGuide_InstallCommand_WithResolver_SetsImageRefAuto()
         {
             var outPath = Path.Join(_workDir, "recipe.json");
 
@@ -489,14 +539,14 @@ namespace NodeKit.Cli.Tests
                 stderr,
                 _noCancellation,
                 resolveClient: NullResolveRecipeClient.Instance,
-                imageDigestResolver: StubImageDigestResolver.Instance);
+                imageDigestResolver: ValidDigestResolver());
 
             Assert.Equal(0, exitCode);
             Assert.Empty(stderr.ToString());
             Assert.True(File.Exists(outPath));
 
             var json = File.ReadAllText(outPath);
-            Assert.Contains(StubImageDigestResolver.StubDigest, json);
+            Assert.Contains(ResolvedDigest, json);
             Assert.Contains("condaforge/miniforge3", json);
             Assert.Contains("bwa=0.7.17=h5bf99c6_8", json);
             Assert.Contains("bioconda", json);

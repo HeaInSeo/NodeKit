@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using NodeKit.Validation;
 
 namespace NodeKit.Cli
 {
@@ -10,8 +11,7 @@ namespace NodeKit.Cli
     /// </summary>
     internal sealed class StubImageDigestResolver : IImageDigestResolver
     {
-        internal const string StubDigest =
-            "sha256:0000000000000000000000000000000000000000000000000000000000000001";
+        internal const string StubDigest = KnownPlaceholderDigests.BaseImageStub;
 
         public static StubImageDigestResolver Instance { get; } = new();
 
