@@ -1,0 +1,49 @@
+name: Base image runtime split POC
+
+on:
+  push:
+    branches:
+      - poc/conda-runtime-split-20260811
+    paths:
+      - 'experiments/base-image-runtime-split/**'
+      - '.github/workflows/base-image-runtime-split-poc.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-split-poc:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - name: Checkout POC branch
+        uses: actions/checkout@v4
+
+      - name: Show Docker environment
+        run: |
+          docker version
+          docker info
+
+      - name: Run builder to runtime split POC
+        run: |
+          chmod +x experiments/base-image-runtime-split/run-poc.sh
+          experiments/base-image-runtime-split/run-poc.sh
+
+      - name: Publish report in job summary
+        if: always()
+        run: |
+          if [ -f experiments/base-image-runtime-split/out/REPORT.md ]; then
+            cat experiments/base-image-runtime-split/out/REPORT.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'POC report was not produced.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload POC evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: base-image-runtime-split-poc
+          path: experiments/base-image-runtime-split/out/
+          if-no-files-found: warn
+          retention-days: 14
