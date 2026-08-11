@@ -58,7 +58,7 @@ ARG PACKAGE
 ENV MAMBA_ROOT_PREFIX=/opt/nodekit/mamba-root
 RUN mkdir -p /opt/nodekit && \
     micromamba create -y -p /opt/nodekit/env -c conda-forge -c bioconda "\${PACKAGE}" && \
-    micromamba list -p /opt/nodekit/env --explicit > /opt/nodekit/explicit.txt && \
+    micromamba list -p /opt/nodekit/env > /opt/nodekit/explicit.txt && \
     micromamba clean --all --yes
 
 FROM ${DEBIAN_PINNED} AS runtime-debian
@@ -180,7 +180,9 @@ for engine in micromamba conda; do
       continue
     fi
 
-    # Preserve solver-selected exact package/build URLs as evidence.
+    # Preserve solver-selected package/build evidence. Conda emits explicit URLs;
+    # micromamba 1.5.8 does not support `list --explicit`, so its normal list is
+    # retained with exact version/build columns instead.
     cid="$(docker create "${builder_image}" /__nodekit_export_only__)"
     docker cp "${cid}:/opt/nodekit/explicit.txt" "${OUT_DIR}/${combo}.explicit.txt" >/dev/null 2>&1 || true
     docker rm "${cid}" >/dev/null
