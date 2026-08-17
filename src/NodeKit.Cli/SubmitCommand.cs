@@ -74,7 +74,14 @@ namespace NodeKit.Cli
 
             if (toolSpecClient is null && string.IsNullOrWhiteSpace(url))
             {
-                stderr.WriteLine("NodeVault 주소가 필요합니다. --url 옵션 또는 NODEKIT_NODEVAULT_URL 환경변수를 설정하세요.");
+                const string message = "NodeVault 주소가 필요합니다. --url 옵션 또는 NODEKIT_NODEVAULT_URL 환경변수를 설정하세요.";
+                if (jsonl)
+                {
+                    WriteJsonl(stdout, SubmitJsonlRecord.Completed("Failed", errorCode: "URL_REQUIRED", message: message, recovery: RecoveryDisposition.Terminal));
+                    return 2;
+                }
+
+                stderr.WriteLine(message);
                 stderr.WriteLine("예: NODEKIT_NODEVAULT_URL=http://100.123.80.48:50051 nodekit submit recipe.json");
                 return 2;
             }
@@ -88,16 +95,36 @@ namespace NodeKit.Cli
             }
             catch (IOException ex)
             {
-                stderr.WriteLine($"recipe 파일을 읽을 수 없습니다: {recipePath} ({ex.Message})");
+                var message = $"recipe 파일을 읽을 수 없습니다: {recipePath} ({ex.Message})";
+                if (jsonl)
+                {
+                    WriteJsonl(stdout, SubmitJsonlRecord.Completed("Failed", errorCode: "RECIPE_READ_FAILED", message: message, recovery: RecoveryDisposition.Terminal));
+                    return 2;
+                }
+
+                stderr.WriteLine(message);
                 return 2;
             }
             catch (JsonException ex)
             {
-                stderr.WriteLine($"recipe JSON 파싱에 실패했습니다: {recipePath} ({ex.Message})");
+                var message = $"recipe JSON 파싱에 실패했습니다: {recipePath} ({ex.Message})";
+                if (jsonl)
+                {
+                    WriteJsonl(stdout, SubmitJsonlRecord.Completed("Failed", errorCode: "RECIPE_PARSE_FAILED", message: message, recovery: RecoveryDisposition.Terminal));
+                    return 2;
+                }
+
+                stderr.WriteLine(message);
                 return 2;
             }
             catch (InvalidOperationException ex)
             {
+                if (jsonl)
+                {
+                    WriteJsonl(stdout, SubmitJsonlRecord.Completed("Failed", errorCode: "RECIPE_EMPTY", message: ex.Message, recovery: RecoveryDisposition.Terminal));
+                    return 2;
+                }
+
                 stderr.WriteLine(ex.Message);
                 return 2;
             }
@@ -106,16 +133,31 @@ namespace NodeKit.Cli
 
             if (recipe.BuildKind is null)
             {
-                stderr.WriteLine(
+                var message =
                     $"recipe 파일에 buildKind가 없습니다: {recipePath} " +
-                    "(Conda | Micromamba | BioContainer | SourceBuild | PackageMirror | DockerfileFallback 중 하나를 지정하세요.)");
+                    "(Conda | Micromamba | BioContainer | SourceBuild | PackageMirror | DockerfileFallback 중 하나를 지정하세요.)";
+                if (jsonl)
+                {
+                    WriteJsonl(stdout, SubmitJsonlRecord.Completed("Failed", errorCode: "MISSING_BUILD_KIND", message: message, recovery: RecoveryDisposition.Terminal));
+                    return 2;
+                }
+
+                stderr.WriteLine(message);
                 return 2;
             }
 
             var validation = RecipeValidationPipeline.ValidateRecipe(recipe, strictReproducible);
             if (!validation.IsValid)
             {
+                // PrintViolations는 상세 위반 내역을 stderr로 낸다(사람이 읽는
+                // 진단) — jsonl 모드에서도 stdout은 JSON 전용으로 유지하되
+                // 계약상 단일 completed 레코드를 stdout에 한 번 낸다.
                 CliApp.PrintViolations(validation.Violations, stderr);
+                if (jsonl)
+                {
+                    WriteJsonl(stdout, SubmitJsonlRecord.Completed("Failed", errorCode: "L1_VALIDATION_FAILED", message: "L1 검증 실패", recovery: RecoveryDisposition.Terminal));
+                }
+
                 return 1;
             }
 
@@ -140,7 +182,14 @@ namespace NodeKit.Cli
                 catch (Exception ex)
 #pragma warning restore CA1031
                 {
-                    stderr.WriteLine($"NodeVault 주소 형식이 올바르지 않습니다: {url} ({ex.Message})");
+                    var message = $"NodeVault 주소 형식이 올바르지 않습니다: {url} ({ex.Message})";
+                    if (jsonl)
+                    {
+                        WriteJsonl(stdout, SubmitJsonlRecord.Completed("Failed", errorCode: "INVALID_URL", message: message, recovery: RecoveryDisposition.Terminal));
+                        return 2;
+                    }
+
+                    stderr.WriteLine(message);
                     stderr.WriteLine("예: --url http://100.123.80.48:50051");
                     return 2;
                 }
