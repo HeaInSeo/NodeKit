@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Grpc.Core;
 using NodeKit.Authoring;
 using NodeKit.Grpc;
 using ReactiveUI;
@@ -99,30 +100,36 @@ namespace NodeKit.UI.ViewModels
             _disposed = true;
         }
 
-        private static async IAsyncEnumerable<BuildEvent> EnumerateEvents(
-            GrpcToolSpecClient client,
-            ToolDefinition definition,
-            string rawSpec,
-            [EnumeratorCancellation] CancellationToken cancellationToken)
-        {
-#pragma warning disable CA2007 // IAsyncEnumerable does not support ConfigureAwait directly
-            await foreach (var ev in client.ResolveAndBuildAsync(definition.Name, definition.Version, rawSpec, cancellationToken))
-#pragma warning restore CA2007
-            {
-                yield return ev;
-            }
-        }
+        // CLI의 SubmitCommand.IsCancellationShaped와 동일한 이유로 동일한 검사를
+        // 쓴다 — MainWindow의 예전 catch (OperationCanceledException)만으로는
+        // gRPC 계층이 취소를 RpcException(Cancelled)로 보고하는 경우(취소 자체가
+        // 항상 OperationCanceledException으로 나온다는 보장이 없다는 게 CLI
+        // 쪽 회귀 테스트로 실증된 적 있음, GrpcToolSpecClientWireTests 참조)를
+        // 못 잡아서, 새 빌드가 이전 빌드를 정상적으로 대체(supersede)했을 뿐인데
+        // "빌드 실패" 패널이 잘못 뜰 수 있었다.
+        internal static bool IsCancellationShaped(Exception ex) =>
+            ex is OperationCanceledException || (ex is RpcException rpc && rpc.StatusCode == StatusCode.Cancelled);
 
         // 클라이언트 취소는 로컬 스트림만 끊을 뿐 서버 빌드를 멈추지 않는다 —
         // CancelBuildAsync를 명시적으로 호출해야 서버가 실제로 빌드를 중단한다.
         // nodekit submit(SubmitCommand.CancelServerBuildBestEffort)과 동일한 이유로
         // 동일한 패턴을 적용한다. 실패해도 새 빌드/Dispose를 막지 않는다.
-        private static async Task CancelServerBuildBestEffort(GrpcToolSpecClient client, string? buildId)
+        // IToolSpecBuildClient(구현체 GrpcToolSpecClient가 아니라)를 받는 이유는
+        // 순전히 테스트 목적 — hang하는 fake client로 5초 타임아웃이 실제로
+        // 지켜지는지 검증할 수 있게 internal로 열어둔다.
+        internal static async Task CancelServerBuildBestEffort(IToolSpecBuildClient client, string? buildId)
         {
             if (string.IsNullOrEmpty(buildId))
             {
                 return;
             }
+
+            // 리뷰 지적(High): 예전엔 CancellationToken.None으로 호출해서 서버가
+            // 응답하지 않으면 무한정 대기했다 — supersede 경로(SubmitAsync 시작
+            // 부분)는 이 호출을 await하므로, 새 빌드 제출도, 창 닫기(Dispose의
+            // ContinueWith도 이 Task가 끝나야 실행됨)도 같이 막혔다. CLI와 동일한
+            // 5초 타임아웃으로 bound한다.
+            using var cancelCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
             // Any exception here (RpcException from the server being gone/
             // unreachable, network failure, etc.) — the caller can't do
@@ -136,7 +143,7 @@ namespace NodeKit.UI.ViewModels
 #pragma warning disable CA1031
             try
             {
-                await client.CancelBuildAsync(buildId).ConfigureAwait(false);
+                await client.CancelBuildAsync(buildId, cancelCts.Token).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -148,6 +155,20 @@ namespace NodeKit.UI.ViewModels
                 _ = ex;
             }
 #pragma warning restore CA1031
+        }
+
+        private static async IAsyncEnumerable<BuildEvent> EnumerateEvents(
+            GrpcToolSpecClient client,
+            ToolDefinition definition,
+            string rawSpec,
+            [EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+#pragma warning disable CA2007 // IAsyncEnumerable does not support ConfigureAwait directly
+            await foreach (var ev in client.ResolveAndBuildAsync(definition.Name, definition.Version, rawSpec, cancellationToken))
+#pragma warning restore CA2007
+            {
+                yield return ev;
+            }
         }
 
         private GrpcToolSpecClient GetClient(string address)

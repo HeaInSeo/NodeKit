@@ -339,10 +339,10 @@ namespace NodeKit.UI
                     Dispatcher.UIThread.Post(() => HandleBuildEvent(captured));
                 }
             }
-            catch (OperationCanceledException)
+
+            // 빌드 대체(supersede) — 이유는 BuildSubmissionViewModel.IsCancellationShaped 주석 참조.
+            catch (Exception ex) when (BuildSubmissionViewModel.IsCancellationShaped(ex))
             {
-                // 새 빌드가 이전 빌드를 대체했다 — ViewModel이 이미 서버 취소를
-                // best-effort로 시도했으므로 여기서는 조용히 넘어간다.
             }
 
             // Top-level catch — Avalonia has no default recovery for an exception escaping an event handler (same reasoning below).
