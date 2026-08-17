@@ -131,7 +131,6 @@
     <Compile Include="..\Grpc\BuildRequestFactory.cs" Link="Grpc\BuildRequestFactory.cs" />
     <Compile Include="..\Grpc\BuildEvent.cs" Link="Grpc\BuildEvent.cs" />
     <Compile Include="..\Grpc\BuildEventKind.cs" Link="Grpc\BuildEventKind.cs" />
-    <Compile Include="..\Grpc\RecoveryDisposition.cs" Link="Grpc\RecoveryDisposition.cs" />
     <Compile Include="..\Grpc\BuildErrorMessages.cs" Link="Grpc\BuildErrorMessages.cs" />
     <Compile Include="..\Grpc\IToolSpecBuildClient.cs" Link="Grpc\IToolSpecBuildClient.cs" />
     <Compile Include="..\Grpc\GrpcToolSpecClient.cs" Link="Grpc\GrpcToolSpecClient.cs" />

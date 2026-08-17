@@ -1,4 +1,4 @@
-namespace NodeKit.Grpc
+namespace NodeKit.Cli
 {
     /// <summary>
     /// V14 recovery-disposition 계약 — `nodekit submit --format jsonl`의 terminal

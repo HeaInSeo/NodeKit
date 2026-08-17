@@ -1,5 +1,4 @@
 using System.Text.Json.Serialization;
-using NodeKit.Grpc;
 
 namespace NodeKit.Cli
 {
