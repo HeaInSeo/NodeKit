@@ -47,7 +47,13 @@ namespace NodeKit.Cli
                 console.WriteLine();
                 console.WriteLine("선택:");
 
-                var line = (console.ReadLine() ?? string.Empty).Trim();
+                // 리뷰 지적: console.ReadLine() ?? string.Empty로는 stdin EOF와
+                // 빈 줄 입력을 구분 못 해서, 파이프된 stdin이 소진되면(예:
+                // `nodekit recipe create < /dev/null`) default 분기로 계속
+                // 떨어져 while(true)가 무한 반복 + 무한 출력됐다. 이 파일을 뺀
+                // 나머지 프롬프트는 전부 ReadLineOrCancel(EOF를 /cancel과 동일하게
+                // 처리)을 이미 쓰고 있었다 — 여기 진입 화면만 놓쳤다.
+                var line = console.ReadLineOrCancel().Trim();
                 RecipeCreateEscapeCommands.ThrowIfCancel(line);
                 switch (line)
                 {

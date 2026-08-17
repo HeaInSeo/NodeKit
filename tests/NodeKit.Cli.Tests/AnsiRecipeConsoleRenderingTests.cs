@@ -57,5 +57,26 @@ namespace NodeKit.Cli.Tests
             // Zone 3 (input): ">" prompt marker
             Assert.Contains('>', output);
         }
+
+        [Fact]
+        public void WriteHints_CalledMultipleTimesBeforeReadLine_AllLinesAppearInOutput()
+        {
+            // 리뷰 지적: 예전엔 _pendingHints가 string? 필드 하나라 여러 번
+            // WriteHints를 부르면 마지막 호출만 남고 나머지는 조용히
+            // 사라졌다 — AuthoringModeSelector.Prompt의 8줄 명령어 목록이
+            // 정확히 이 패턴으로 호출된다.
+            var testConsole = new TestConsole();
+            var console = new AnsiRecipeConsole(testConsole, new StringReader("1\n"));
+
+            console.WriteHints("첫 번째 힌트");
+            console.WriteHints("두 번째 힌트");
+            console.WriteHints("세 번째 힌트");
+            console.ReadLine();
+
+            var output = testConsole.Output;
+            Assert.Contains("첫 번째 힌트", output);
+            Assert.Contains("두 번째 힌트", output);
+            Assert.Contains("세 번째 힌트", output);
+        }
     }
 }

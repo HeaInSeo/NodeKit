@@ -51,6 +51,25 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(ImageDigestResolutionStatus.Resolved, result.Status);
         }
 
+        [Fact]
+        public async Task ResolveAsync_TokenEndpointReturnsNonJson_ReturnsNetworkUnavailableInsteadOfThrowing()
+        {
+            // 리뷰 지적: 캡티브 포털/사내 프록시가 200과 함께 HTML 인증 안내
+            // 페이지를 돌려주는 경우, ResolveDockerHubAsync가 그 본문을
+            // JsonDocument.Parse에 그대로 넘겨서 JsonException이 미처리 상태로
+            // wizard 전체를 크래시시켰다 — resolver 실패는 항상 수동 입력으로
+            // degrade해야 한다는 계약을 어겼다.
+            var htmlResponse = new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("<html><body>로그인이 필요합니다</body></html>"),
+            };
+
+            using var resolver = new PublicRegistryImageDigestResolver(new FixedResponseHandler(htmlResponse));
+            var result = await resolver.ResolveAsync("alpine:3.20", CancellationToken.None);
+
+            Assert.Equal(ImageDigestResolutionStatus.NetworkUnavailable, result.Status);
+        }
+
         private sealed class FixedResponseHandler : HttpMessageHandler
         {
             private readonly HttpResponseMessage _response;
