@@ -17,7 +17,7 @@ namespace NodeKit.Validation.Recipes
     /// </summary>
     internal static class RecipeValidator
     {
-        // All four patterns below anchor with \z, not $. .NET's $ (without
+        // All five patterns below anchor with \z, not $. .NET's $ (without
         // RegexOptions.Multiline) matches either the true end of the string
         // OR the position immediately before a single trailing '\n' — so
         // "bwa=0.7.17\n" (or any of these fields with one trailing newline)
@@ -26,6 +26,18 @@ namespace NodeKit.Validation.Recipes
         // \z matches only the absolute end of the string, closing that hole.
         private static readonly Regex _sourceChecksumPattern =
             new(@"\Asha256:[0-9a-fA-F]{64}\z", RegexOptions.Compiled);
+
+        // ValidateProfileSelection(advanced 분기)의 *ProfileImage 필드용. 외부
+        // 리뷰 발견(High): 예전엔 profileImage.Contains("@sha256:")만 검사해서
+        // "…@sha256:<진짜 digest>\nUSER root\nRUN <임의 명령>" 같은 값이
+        // 그대로 통과했다 — @sha256: 뒤에 진짜 digest가 있다는 사실과 그 뒤에
+        // 아무것도 더 없다는 사실은 서로 다른데, 뒤쪽을 전혀 검사하지 않았다.
+        // RecipeRenderer(RenderSourceBuildStructured)가 이 값을 그대로
+        // "FROM " + profileImage + "\n"에 이어 붙이므로, 개행이 있으면 Dockerfile에
+        // 임의 명령을 그대로 주입할 수 있었다(ImageUriValidator의 ImageUri는
+        // 이미 \z-anchored 패턴으로 막혀 있었음 — 이 필드만 놓친 것).
+        private static readonly Regex _profileImageDigestPattern =
+            new(@"\A[0-9a-fA-F]{64}\z", RegexOptions.Compiled);
 
         // RecipeRenderer는 Packages/Channels/PackageMirrorUri를 셸 인용 없이
         // 그대로 "RUN conda install ..." / "RUN conda config --add channels ..."
@@ -348,12 +360,25 @@ namespace NodeKit.Validation.Recipes
                         $"{profileField}를 advanced로 선택했으면 {profileImageField}에 digest가 포함된 이미지를 직접 지정해야 합니다.",
                         profileImageField));
                 }
-                else if (!profileImage.Contains("@sha256:", StringComparison.OrdinalIgnoreCase))
+                else
                 {
-                    violations.Add(new ValidationViolation(
-                        ruleId,
-                        $"{profileImageField}에 digest(@sha256:...)가 없습니다. 재현성 보장을 위해 digest 고정이 필수입니다. ({profileImage})",
-                        profileImageField));
+                    var digestIndex = profileImage.IndexOf("@sha256:", StringComparison.OrdinalIgnoreCase);
+                    if (digestIndex < 0)
+                    {
+                        violations.Add(new ValidationViolation(
+                            ruleId,
+                            $"{profileImageField}에 digest(@sha256:...)가 없습니다. 재현성 보장을 위해 digest 고정이 필수입니다. ({profileImage})",
+                            profileImageField));
+                    }
+                    else if (!_profileImageDigestPattern.IsMatch(profileImage[(digestIndex + "@sha256:".Length)..]))
+                    {
+                        // @sha256: 뒤에 정확히 64자리 hex만 있어야 한다 — 그 뒤에
+                        // 개행/공백/다른 문자가 더 있으면 거부한다(위 클래스 주석 참조).
+                        violations.Add(new ValidationViolation(
+                            ruleId,
+                            $"{profileImageField}의 digest 형식이 올바르지 않습니다. @sha256: 뒤에는 정확히 64자리 16진수만 있어야 합니다(그 뒤에 다른 문자가 있으면 안 됩니다).",
+                            profileImageField));
+                    }
                 }
 
                 return;
