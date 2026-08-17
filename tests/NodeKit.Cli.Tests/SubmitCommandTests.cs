@@ -1502,6 +1502,247 @@ namespace NodeKit.Cli.Tests
             Assert.DoesNotContain('{', stdoutDefault.ToString());
         }
 
+        // ── V14: recovery-disposition (OP-V14-RECOVERY-CAP) ──────────────────
+        // 세 값(none/terminal/uncertain)이 각 terminal 경로에서 결정론적으로
+        // 나오는지 검증한다. jsonl 전용이며 human 출력/exit code는 불변.
+
+        [Fact]
+        public void Submit_FormatJsonl_Succeeded_EmitsRecoveryNone()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var events = new[]
+            {
+                new BuildEvent { Kind = BuildEventKind.JobCreated, BuildId = "build-rec-ok" },
+                new BuildEvent { Kind = BuildEventKind.Succeeded, BuildId = "build-rec-ok" },
+            };
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--format", "jsonl" },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(events));
+
+            Assert.Equal(0, exitCode);
+            var completed = ParseRecord(SplitNonEmptyLines(stdout.ToString())[^1]);
+            Assert.Equal("Succeeded", completed.GetProperty("status").GetString());
+            Assert.Equal("none", completed.GetProperty("recovery").GetString());
+        }
+
+        [Fact]
+        public void Submit_FormatJsonl_WatchFailed_EmitsRecoveryTerminal()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var events = new[]
+            {
+                new BuildEvent { Kind = BuildEventKind.JobCreated, BuildId = "build-rec-fail" },
+                new BuildEvent { Kind = BuildEventKind.Failed, BuildId = "build-rec-fail", Message = "이미지 없음" },
+            };
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--format", "jsonl" },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(events));
+
+            Assert.Equal(1, exitCode);
+            var completed = ParseRecord(SplitNonEmptyLines(stdout.ToString())[^1]);
+            Assert.Equal("BUILD_FAILED", completed.GetProperty("error_code").GetString());
+            // 확정 실패 -> terminal. 재제출은 재시도가 아니라 새 작업이다.
+            Assert.Equal("terminal", completed.GetProperty("recovery").GetString());
+        }
+
+        [Fact]
+        public void Submit_FormatJsonl_PreWatchFailed_EmitsRecoveryUncertain()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var events = new[]
+            {
+                new BuildEvent { Kind = BuildEventKind.Failed, Message = "NodeVault에 연결할 수 없습니다." },
+            };
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--format", "jsonl" },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(events));
+
+            Assert.Equal(1, exitCode);
+            var completed = ParseRecord(Assert.Single(SplitNonEmptyLines(stdout.ToString())));
+            Assert.Equal("PRE_WATCH_FAILED", completed.GetProperty("error_code").GetString());
+            // build ID를 못 받아 원격 결과 미확인 -> uncertain (idempotency key로 reconcile).
+            Assert.Equal("uncertain", completed.GetProperty("recovery").GetString());
+        }
+
+        [Fact]
+        public void Submit_FormatJsonl_StreamEndedWithoutResult_EmitsRecoveryUncertain()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var events = new[]
+            {
+                new BuildEvent { Kind = BuildEventKind.JobCreated, BuildId = "build-rec-stream" },
+            };
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--format", "jsonl" },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(events));
+
+            Assert.Equal(1, exitCode);
+            var completed = ParseRecord(SplitNonEmptyLines(stdout.ToString())[^1]);
+            Assert.Equal("STREAM_ENDED_WITHOUT_RESULT", completed.GetProperty("error_code").GetString());
+            Assert.Equal("uncertain", completed.GetProperty("recovery").GetString());
+        }
+
+        [Fact]
+        public void Submit_FormatJsonl_UserCancelled_EmitsRecoveryTerminal()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var client = new CancellingToolSpecClient("build-rec-cancel", new OperationCanceledException());
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--format", "jsonl" },
+                stdout,
+                stderr,
+                toolSpecClient: client);
+
+            Assert.Equal(130, exitCode);
+            var completed = ParseRecord(SplitNonEmptyLines(stdout.ToString())[^1]);
+            Assert.Equal("USER_CANCELLED", completed.GetProperty("error_code").GetString());
+            // 사용자 abort는 확정 종료 -> terminal.
+            Assert.Equal("terminal", completed.GetProperty("recovery").GetString());
+        }
+
+        [Fact]
+        public void Submit_FormatJsonl_UnexpectedError_EmitsRecoveryUncertain()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var client = new ThrowingToolSpecClient("build-rec-error", new InvalidOperationException("예상치 못한 오류"));
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--format", "jsonl" },
+                stdout,
+                stderr,
+                toolSpecClient: client);
+
+            Assert.Equal(1, exitCode);
+            var completed = ParseRecord(SplitNonEmptyLines(stdout.ToString())[^1]);
+            Assert.Equal("UNEXPECTED_ERROR", completed.GetProperty("error_code").GetString());
+            Assert.Equal("uncertain", completed.GetProperty("recovery").GetString());
+        }
+
+        [Fact]
+        public void Submit_FormatJsonl_ConnectTimeout_EmitsRecoveryUncertain()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var client = new HangingBeforeAnyEventToolSpecClient();
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--connect-timeout", "1", "--format", "jsonl" },
+                stdout,
+                stderr,
+                toolSpecClient: client);
+
+            Assert.Equal(124, exitCode);
+            var completed = ParseRecord(Assert.Single(SplitNonEmptyLines(stdout.ToString())));
+            Assert.Equal("CONNECT_TIMEOUT", completed.GetProperty("error_code").GetString());
+            Assert.Equal("uncertain", completed.GetProperty("recovery").GetString());
+        }
+
+        [Fact]
+        public void Submit_FormatJsonl_WatchTimeout_EmitsRecoveryUncertain()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var client = new HangingDuringWatchToolSpecClient();
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--watch-timeout", "1s", "--format", "jsonl" },
+                stdout,
+                stderr,
+                toolSpecClient: client);
+
+            Assert.Equal(125, exitCode);
+            var completed = ParseRecord(SplitNonEmptyLines(stdout.ToString())[^1]);
+            Assert.Equal("WATCH_TIMEOUT", completed.GetProperty("error_code").GetString());
+            Assert.Equal("uncertain", completed.GetProperty("recovery").GetString());
+        }
+
+        [Fact]
+        public void Submit_FormatJsonl_Recovery_OnlyOnCompletedRecords_NotSubmittedOrState()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var events = new[]
+            {
+                new BuildEvent { Kind = BuildEventKind.JobCreated, BuildId = "build-rec-scope", Status = "Building" },
+                new BuildEvent { Kind = BuildEventKind.JobRunning, BuildId = "build-rec-scope", Status = "Running" },
+                new BuildEvent { Kind = BuildEventKind.Succeeded, BuildId = "build-rec-scope" },
+            };
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--format", "jsonl" },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(events));
+
+            Assert.Equal(0, exitCode);
+            var lines = SplitNonEmptyLines(stdout.ToString());
+            foreach (var line in lines)
+            {
+                var record = ParseRecord(line);
+                var type = record.GetProperty("type").GetString();
+                if (type == "completed")
+                {
+                    Assert.True(record.TryGetProperty("recovery", out _), "completed 레코드에는 recovery가 있어야 합니다.");
+                }
+                else
+                {
+                    Assert.False(record.TryGetProperty("recovery", out _), $"{type} 레코드에는 recovery가 없어야 합니다.");
+                }
+            }
+        }
+
+        [Fact]
+        public void Submit_HumanMode_NeverEmitsRecoveryField()
+        {
+            // "UI 수정 금지": human 출력에는 recovery 개념이 전혀 나타나지 않는다.
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var events = new[]
+            {
+                new BuildEvent { Kind = BuildEventKind.JobCreated, BuildId = "build-human" },
+                new BuildEvent { Kind = BuildEventKind.Succeeded, BuildId = "build-human" },
+            };
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(events));
+
+            Assert.Equal(0, exitCode);
+            Assert.DoesNotContain("recovery", stdout.ToString());
+            Assert.DoesNotContain("recovery", stderr.ToString());
+        }
+
         private static IReadOnlyList<string> SplitNonEmptyLines(string text) =>
             text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
@@ -1575,6 +1816,35 @@ namespace NodeKit.Cli.Tests
             public Task CancelBuildAsync(string buildId, CancellationToken cancellationToken = default) =>
                 Task.CompletedTask;
 #pragma warning restore CS1998, IDE0060
+        }
+
+        // Yields a build_id-bearing event, then throws a NON-cancellation exception
+        // to drive SubmitCommand's final-fallback catch (UNEXPECTED_ERROR path).
+        private sealed class ThrowingToolSpecClient : IToolSpecBuildClient
+        {
+            private readonly string _buildId;
+            private readonly Exception _exception;
+
+            public ThrowingToolSpecClient(string buildId, Exception exception)
+            {
+                _buildId = buildId;
+                _exception = exception;
+            }
+
+#pragma warning disable CS1998
+            public async IAsyncEnumerable<BuildEvent> ResolveAndBuildAsync(
+                string toolName,
+                string version,
+                string rawSpec,
+                [EnumeratorCancellation] CancellationToken cancellationToken = default)
+            {
+                yield return new BuildEvent { Kind = BuildEventKind.JobCreated, BuildId = _buildId };
+                throw _exception;
+            }
+#pragma warning restore CS1998
+
+            public Task CancelBuildAsync(string buildId, CancellationToken cancellationToken = default) =>
+                Task.CompletedTask;
         }
 
         // Console.CancelKeyPress는 테스트에서 직접 발생시킬 수 없으므로, 이미

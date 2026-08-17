@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using NodeKit.Grpc;
 
 namespace NodeKit.Cli
 {
@@ -58,6 +59,12 @@ namespace NodeKit.Cli
         [JsonPropertyName("integrity_health")]
         public string? IntegrityHealth { get; init; }
 
+        // V14 recovery-disposition — terminal completed 레코드에만 실린다.
+        // "none"/"terminal"/"uncertain" 중 하나. RecoveryDisposition enum 참조.
+        // 추가 optional 필드(하위 호환) — submitted/state 레코드에는 없다.
+        [JsonPropertyName("recovery")]
+        public string? Recovery { get; init; }
+
         internal static SubmitJsonlRecord Submitted(string buildId) =>
             new() { Type = "submitted", BuildId = buildId };
 
@@ -88,7 +95,8 @@ namespace NodeKit.Cli
             string? imageDigest = null,
             string? integrityHealth = null,
             string? phase = null,
-            string? remoteBuildState = null) =>
+            string? remoteBuildState = null,
+            RecoveryDisposition? recovery = null) =>
             new()
             {
                 Type = "completed",
@@ -101,6 +109,15 @@ namespace NodeKit.Cli
                 IntegrityHealth = string.IsNullOrEmpty(integrityHealth) ? null : integrityHealth,
                 Phase = phase,
                 RemoteBuildState = remoteBuildState,
+                Recovery = recovery is null
+                    ? null
+                    : recovery.Value switch
+                    {
+                        RecoveryDisposition.None => "none",
+                        RecoveryDisposition.Terminal => "terminal",
+                        RecoveryDisposition.Uncertain => "uncertain",
+                        _ => null,
+                    },
             };
     }
 }
