@@ -304,6 +304,19 @@ namespace NodeKit.Cli.Tests
         [InlineData("0h")]
         [InlineData("-5m")]
         [InlineData("120")]
+        // 리뷰 지적(High): double.TryParse(NumberStyles.Float)는 "NaN"/"Infinity"를
+        // 유효한 값으로 파싱하고, "1e400" 같은 오버플로 지수도 조용히 +∞로
+        // 만든다 -- value <= 0 검사로는 못 걸러내서 TimeSpan.FromHours/Minutes/
+        // Seconds가 그대로 ArgumentException/OverflowException을 던져 CLI가
+        // try/catch 밖에서 죽었다(옵션 파싱은 recipe 로드보다도 먼저 실행됨).
+        // "1e10h"/"999999999h"는 유한하지만 TimeSpan 표현 범위(~10,675,199일)를
+        // 넘어 같은 OverflowException 경로를 탄다.
+        [InlineData("NaNh")]
+        [InlineData("Infinitym")]
+        [InlineData("1e400h")]
+        [InlineData("1e309s")]
+        [InlineData("1e10h")]
+        [InlineData("999999999h")]
         public void Submit_WatchTimeoutOptionInvalidValue_ReturnsTwoWithExplicitError(string value)
         {
             var recipePath = WriteFile("recipe.json", ValidRecipeJson);

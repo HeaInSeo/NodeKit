@@ -301,7 +301,22 @@ namespace NodeKit.Cli
             }
             else
             {
-                File.WriteAllText(outPath, json);
+                // 리뷰 지적: TryLoadRecipe의 읽기 쪽은 IOException을 잡는데, 쓰기
+                // 쪽은 아무 보호 없이 그대로 던졌다 — --out .(디렉터리),
+                // 존재하지 않는 상위 디렉터리, 권한 없는 경로 모두 스택트레이스와
+                // 함께 크래시했다. UnauthorizedAccessException은 IOException의
+                // 하위 타입이 아니라서 둘 다 잡아야 한다(방금 열거한 세 가지
+                // 재현 케이스가 각각 IOException 계열/UnauthorizedAccessException으로
+                // 나뉜다).
+                try
+                {
+                    File.WriteAllText(outPath, json);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    stderr.WriteLine($"출력 파일을 쓸 수 없습니다: {outPath} ({ex.Message})");
+                    return 2;
+                }
             }
 
             return 0;
