@@ -848,7 +848,14 @@ stdout에는 진행/안내 문구가 전혀 섞이지 않고 JSON 레코드만 �
 모든 레코드에서 optional이다 — `--connect-timeout`처럼 build ID를 받기 전에
 끝나는 실패도 있기 때문. `status`/`error_code`는 `completed`에만 있고,
 `error_code`는 실패(`status != "Succeeded"`)일 때만 붙는다. 종료 코드 계약은
-`--format human`과 동일하다(0/1/124/125/130).
+`--format human`과 동일하다(0/1/2/124/125/130). 제출 이전(로컬)에 확정 실패하는
+경우 — 주소 누락, recipe 읽기/파싱 실패, buildKind 누락, L1 검증 실패,
+잘못된 `--url` 등 — 도 `completed` 레코드를 정확히 한 번 내보낸다(exit 1 또는
+2). 이 로컬 실패들은 원격 빌드가 아예 생성되지 않았으므로 `recovery: "terminal"`
+이다(재제출은 재시도가 아니라 완전히 새로운 작업). 단, 사용법/옵션 파싱
+오류(잘못된 옵션, recipe 인자 누락, `--help` 등)는 `--format`이 확정되기 전에
+종료하므로 jsonl 레코드 없이 exit 2다 — `completed` 레코드 보장은 recipe 인자와
+옵션이 정상 파싱된 이후의 제출 경로에 적용된다.
 
 `recovery` 필드도 **`completed` 레코드에만** 나타나며 세 값 중 하나다 —
 소비하는 쪽이 실패를 어떻게 다뤄야 하는지에 대한 typed 신호다(V14):
@@ -925,6 +932,16 @@ $ echo $?
 `USER_CANCELLED`, `UNEXPECTED_ERROR`. 자동화는 `message`가 아니라
 `type`/`status`/`error_code`로 판단해야 한다 — `message`는 사람이 읽는
 설명 텍스트일 뿐 안정적인 값 집합이 아니다.
+
+제출 이전(로컬) 확정 실패에 쓰이는 값 — 전부 `recovery: "terminal"`:
+
+- `URL_REQUIRED` — NodeVault 주소가 없다(`--url`/`NODEKIT_NODEVAULT_URL` 미설정). exit 2.
+- `RECIPE_READ_FAILED` — recipe 파일을 읽을 수 없다(I/O 오류). exit 2.
+- `RECIPE_PARSE_FAILED` — recipe JSON 파싱 실패. exit 2.
+- `RECIPE_EMPTY` — recipe 파일이 비어 있다. exit 2.
+- `MISSING_BUILD_KIND` — recipe에 `buildKind`가 없다. exit 2.
+- `L1_VALIDATION_FAILED` — L1 정적 검증 실패(상세 위반 내역은 stderr에 출력). exit 1.
+- `INVALID_URL` — `--url` 주소 형식이 올바르지 않다. exit 2.
 
 스키마는 additive하게만 바뀐다 — 새 필드나 새 `state` 값이 나중에 추가될 수
 있으니, 모르는 필드/값은 무시하도록 소비자를 작성하는 게 안전하다.

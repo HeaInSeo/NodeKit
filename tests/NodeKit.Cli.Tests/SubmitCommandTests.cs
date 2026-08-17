@@ -1743,6 +1743,176 @@ namespace NodeKit.Cli.Tests
             Assert.DoesNotContain("recovery", stderr.ToString());
         }
 
+        // ── 제출 이전(pre-submit) terminal 경로도 jsonl completed 레코드를 낸다 ──
+        // 계약(NODEKIT_CLI_USAGE.md §--format jsonl): completed는 "스트림의 마지막
+        // 레코드, 항상 정확히 한 번". 예전에는 제출 전 로컬 실패(주소 누락, recipe
+        // 읽기/파싱 실패, buildKind 누락, L1 실패, 잘못된 --url)가 stderr에만 사람용
+        // 메시지를 쓰고 stdout에는 아무 jsonl 레코드도 안 내보내, jsonl 소비자에게는
+        // stdout이 비어 보였다. 이 경로들은 원격 빌드가 아예 생성되지 않은 로컬
+        // 확정 실패이므로 recovery는 terminal이다.
+
+        [Fact]
+        public void Submit_FormatJsonl_MissingUrl_EmitsSingleCompletedTerminalRecord()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var previousUrl = Environment.GetEnvironmentVariable("NODEKIT_NODEVAULT_URL");
+            Environment.SetEnvironmentVariable("NODEKIT_NODEVAULT_URL", null);
+            try
+            {
+                var exitCode = SubmitCommand.Run(
+                    new[] { "submit", recipePath, "--format", "jsonl" }, stdout, stderr);
+
+                Assert.Equal(2, exitCode);
+                AssertSingleCompletedTerminalFailure(stdout.ToString(), "URL_REQUIRED");
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable("NODEKIT_NODEVAULT_URL", previousUrl);
+            }
+        }
+
+        [Fact]
+        public void Submit_FormatJsonl_RecipeReadFailed_EmitsSingleCompletedTerminalRecord()
+        {
+            var missingPath = Path.Join(_workDir, "nonexistent.json");
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", missingPath, "--format", "jsonl" },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(new[] { new BuildEvent { Kind = BuildEventKind.Succeeded } }));
+
+            Assert.Equal(2, exitCode);
+            AssertSingleCompletedTerminalFailure(stdout.ToString(), "RECIPE_READ_FAILED");
+        }
+
+        [Fact]
+        public void Submit_FormatJsonl_RecipeParseFailed_EmitsSingleCompletedTerminalRecord()
+        {
+            var recipePath = WriteFile("bad.json", "{ not valid json }");
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--format", "jsonl" },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(new[] { new BuildEvent { Kind = BuildEventKind.Succeeded } }));
+
+            Assert.Equal(2, exitCode);
+            AssertSingleCompletedTerminalFailure(stdout.ToString(), "RECIPE_PARSE_FAILED");
+        }
+
+        [Fact]
+        public void Submit_FormatJsonl_RecipeEmpty_EmitsSingleCompletedTerminalRecord()
+        {
+            // JSON 리터럴 null → Deserialize가 null 반환 → "recipe 파일이 비어있습니다."
+            var recipePath = WriteFile("empty.json", "null");
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--format", "jsonl" },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(new[] { new BuildEvent { Kind = BuildEventKind.Succeeded } }));
+
+            Assert.Equal(2, exitCode);
+            AssertSingleCompletedTerminalFailure(stdout.ToString(), "RECIPE_EMPTY");
+        }
+
+        [Fact]
+        public void Submit_FormatJsonl_MissingBuildKind_EmitsSingleCompletedTerminalRecord()
+        {
+            var recipePath = WriteFile("recipe.json", MissingBuildKindRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--format", "jsonl" },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(new[] { new BuildEvent { Kind = BuildEventKind.Succeeded } }));
+
+            Assert.Equal(2, exitCode);
+            AssertSingleCompletedTerminalFailure(stdout.ToString(), "MISSING_BUILD_KIND");
+        }
+
+        [Fact]
+        public void Submit_FormatJsonl_L1ValidationFailure_EmitsSingleCompletedTerminalRecordAndViolationsOnStderr()
+        {
+            var recipePath = WriteFile("recipe.json", InvalidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--format", "jsonl" },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(new[] { new BuildEvent { Kind = BuildEventKind.Succeeded } }));
+
+            Assert.Equal(1, exitCode);
+            AssertSingleCompletedTerminalFailure(stdout.ToString(), "L1_VALIDATION_FAILED");
+            // 상세 위반 내역은 사람용으로 stderr에만 남고, stdout은 JSON 전용이다.
+            Assert.Contains("L1-SRC-001", stderr.ToString());
+            Assert.DoesNotContain("L1-SRC-001", stdout.ToString());
+        }
+
+        [Fact]
+        public void Submit_FormatJsonl_InvalidUrl_EmitsSingleCompletedTerminalRecord()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            // toolSpecClient를 주입하지 않아 실제 GrpcToolSpecClient(url) 생성 경로를
+            // 태운다 — "not-a-url"은 ctor에서 예외를 던진다.
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath, "--url", "not-a-url", "--format", "jsonl" },
+                stdout,
+                stderr);
+
+            Assert.Equal(2, exitCode);
+            AssertSingleCompletedTerminalFailure(stdout.ToString(), "INVALID_URL");
+        }
+
+        [Fact]
+        public void Submit_HumanMode_MissingBuildKind_WritesStderrAndNoJsonOnStdout()
+        {
+            // human 모드 회귀 보호: stdout에 JSON completed 레코드가 새지 않고,
+            // 기존대로 사람용 메시지는 stderr로 간다(계약 불변).
+            var recipePath = WriteFile("recipe.json", MissingBuildKindRecipeJson);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = SubmitCommand.Run(
+                new[] { "submit", recipePath },
+                stdout,
+                stderr,
+                toolSpecClient: new StubToolSpecClient(new[] { new BuildEvent { Kind = BuildEventKind.Succeeded } }));
+
+            Assert.Equal(2, exitCode);
+            Assert.Contains("buildKind", stderr.ToString());
+            Assert.DoesNotContain("\"type\"", stdout.ToString());
+            Assert.DoesNotContain("completed", stdout.ToString());
+        }
+
+        private static void AssertSingleCompletedTerminalFailure(string stdoutText, string expectedErrorCode)
+        {
+            var lines = SplitNonEmptyLines(stdoutText);
+            Assert.Single(lines);
+            var completed = ParseRecord(lines[0]);
+            Assert.Equal("completed", completed.GetProperty("type").GetString());
+            Assert.Equal("Failed", completed.GetProperty("status").GetString());
+            Assert.Equal(expectedErrorCode, completed.GetProperty("error_code").GetString());
+            Assert.Equal("terminal", completed.GetProperty("recovery").GetString());
+        }
+
         private static IReadOnlyList<string> SplitNonEmptyLines(string text) =>
             text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
