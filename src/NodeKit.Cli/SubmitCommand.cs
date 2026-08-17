@@ -322,7 +322,8 @@ namespace NodeKit.Cli
                                     buildId,
                                     imageRef: lastImageRef,
                                     imageDigest: lastImageDigest,
-                                    integrityHealth: lastIntegrityHealth));
+                                    integrityHealth: lastIntegrityHealth,
+                                    recovery: RecoveryDisposition.None));
                             return 0;
                         }
 
@@ -384,14 +385,16 @@ namespace NodeKit.Cli
                                         errorCode: "PRE_WATCH_FAILED",
                                         message: ev.Message,
                                         phase: "pre_watch",
-                                        remoteBuildState: "unknown")
+                                        remoteBuildState: "unknown",
+                                        recovery: RecoveryDisposition.Uncertain)
                                     : SubmitJsonlRecord.Completed(
                                         "Failed",
                                         buildId,
                                         "BUILD_FAILED",
                                         ev.Message,
                                         phase: "watch",
-                                        remoteBuildState: "failed"));
+                                        remoteBuildState: "failed",
+                                        recovery: RecoveryDisposition.Terminal));
                             return 1;
                         }
 
@@ -411,7 +414,8 @@ namespace NodeKit.Cli
                             "Failed",
                             buildId,
                             "STREAM_ENDED_WITHOUT_RESULT",
-                            "서버 스트림이 최종 상태 이벤트 없이 종료되었습니다."));
+                            "서버 스트림이 최종 상태 이벤트 없이 종료되었습니다.",
+                            recovery: RecoveryDisposition.Uncertain));
                     return 1;
                 }
 
@@ -456,7 +460,7 @@ namespace NodeKit.Cli
                 {
                     WriteJsonl(
                         stdout,
-                        SubmitJsonlRecord.Completed("Cancelled", buildId, "USER_CANCELLED", "빌드 요청이 취소되었습니다."));
+                        SubmitJsonlRecord.Completed("Cancelled", buildId, "USER_CANCELLED", "빌드 요청이 취소되었습니다.", recovery: RecoveryDisposition.Terminal));
                     return 130;
                 }
 
@@ -475,7 +479,7 @@ namespace NodeKit.Cli
                 {
                     WriteJsonl(
                         stdout,
-                        SubmitJsonlRecord.Completed("Failed", buildId, "UNEXPECTED_ERROR", BuildErrorMessages.Describe(ex)));
+                        SubmitJsonlRecord.Completed("Failed", buildId, "UNEXPECTED_ERROR", BuildErrorMessages.Describe(ex), recovery: RecoveryDisposition.Uncertain));
                     return 1;
                 }
 
@@ -504,7 +508,7 @@ namespace NodeKit.Cli
                 // connect-timeout은 정의상 buildId를 받기 전(ResolveToolSpec/
                 // SubmitToolBuild 단계)에만 발동하므로 completed 레코드에
                 // build_id가 붙는 경우는 없다.
-                WriteJsonl(stdout, SubmitJsonlRecord.Completed("Failed", errorCode: "CONNECT_TIMEOUT", message: message));
+                WriteJsonl(stdout, SubmitJsonlRecord.Completed("Failed", errorCode: "CONNECT_TIMEOUT", message: message, recovery: RecoveryDisposition.Uncertain));
                 return 124;
             }
 
@@ -532,7 +536,8 @@ namespace NodeKit.Cli
                         buildId,
                         "WATCH_TIMEOUT",
                         $"Watch가 {FormatDuration(timeout)} 후 타임아웃되었습니다. 서버에서는 빌드가 계속 진행 중일 수 있습니다." +
-                        (lastEventAtText is null ? string.Empty : $" 마지막 이벤트 수신 시각: {lastEventAtText}.")));
+                        (lastEventAtText is null ? string.Empty : $" 마지막 이벤트 수신 시각: {lastEventAtText}."),
+                        recovery: RecoveryDisposition.Uncertain));
                 return 125;
             }
 
