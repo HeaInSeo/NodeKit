@@ -116,7 +116,7 @@ namespace NodeKit.Cli
                         RecoveryDisposition.None => "none",
                         RecoveryDisposition.Terminal => "terminal",
                         RecoveryDisposition.Uncertain => "uncertain",
-                        _ => null,
+                        _ => throw new System.ArgumentOutOfRangeException(nameof(recovery), recovery, null),
                     },
             };
     }

@@ -850,12 +850,23 @@ stdout에는 진행/안내 문구가 전혀 섞이지 않고 JSON 레코드만 �
 `error_code`는 실패(`status != "Succeeded"`)일 때만 붙는다. 종료 코드 계약은
 `--format human`과 동일하다(0/1/124/125/130).
 
+`recovery` 필드도 **`completed` 레코드에만** 나타나며 세 값 중 하나다 —
+소비하는 쪽이 실패를 어떻게 다뤄야 하는지에 대한 typed 신호다(V14):
+
+- `none` — 성공. 회복이 무의미하다.
+- `terminal` — 로컬 작업이 확정 종료됨(확정 실패 또는 사용자 중단). 재제출은
+  재시도가 아니라 완전히 새로운 작업이다.
+- `uncertain` — 원격 결과가 확인되지 않음. 재제출을 고려하기 전에 NodeVault
+  인덱스/로그로 원격 상태를 직접 확인해야 한다("그냥 다시 시도해도 안전함"이
+  아니다). idempotency key 기반 자동 조회/재조정은 현재 CLI에 없는 미구현
+  기능이다([Issue #86](https://github.com/HeaInSeo/NodeKit/issues/86)).
+
 ```bash
 $ nodekit submit recipe.json --format jsonl
 {"schema_version":"nodekit.submit.v1","type":"submitted","build_id":"abc-123"}
 {"schema_version":"nodekit.submit.v1","type":"state","build_id":"abc-123","state":"Building"}
 {"schema_version":"nodekit.submit.v1","type":"state","build_id":"abc-123","state":"Pushing"}
-{"schema_version":"nodekit.submit.v1","type":"completed","build_id":"abc-123","status":"Succeeded","image_digest":"sha256:..."}
+{"schema_version":"nodekit.submit.v1","type":"completed","build_id":"abc-123","status":"Succeeded","image_digest":"sha256:...","recovery":"none"}
 $ echo $?
 0
 ```
@@ -879,14 +890,14 @@ $ echo $?
 ```bash
 $ nodekit submit recipe.json --format jsonl
 {"schema_version":"nodekit.submit.v1","type":"submitted","build_id":"abc-123"}
-{"schema_version":"nodekit.submit.v1","type":"completed","build_id":"abc-123","status":"Failed","error_code":"BUILD_FAILED","phase":"watch","remote_build_state":"failed","message":"..."}
+{"schema_version":"nodekit.submit.v1","type":"completed","build_id":"abc-123","status":"Failed","error_code":"BUILD_FAILED","phase":"watch","remote_build_state":"failed","message":"...","recovery":"terminal"}
 $ echo $?
 1
 ```
 
 ```bash
 $ nodekit submit recipe.json --format jsonl
-{"schema_version":"nodekit.submit.v1","type":"completed","status":"Failed","error_code":"PRE_WATCH_FAILED","phase":"pre_watch","remote_build_state":"unknown","message":"..."}
+{"schema_version":"nodekit.submit.v1","type":"completed","status":"Failed","error_code":"PRE_WATCH_FAILED","phase":"pre_watch","remote_build_state":"unknown","message":"...","recovery":"uncertain"}
 $ echo $?
 1
 ```
@@ -895,7 +906,7 @@ build ID를 받기 전 `--connect-timeout`이 발동한 경우(`build_id` 필드
 
 ```bash
 $ nodekit submit recipe.json --connect-timeout 30 --format jsonl
-{"schema_version":"nodekit.submit.v1","type":"completed","status":"Failed","error_code":"CONNECT_TIMEOUT","message":"..."}
+{"schema_version":"nodekit.submit.v1","type":"completed","status":"Failed","error_code":"CONNECT_TIMEOUT","message":"...","recovery":"uncertain"}
 $ echo $?
 124
 ```
@@ -904,7 +915,7 @@ Ctrl-C로 취소한 경우(`status: "Cancelled"` — `Failed`가 아니다):
 
 ```bash
 $ nodekit submit recipe.json --format jsonl
-^C{"schema_version":"nodekit.submit.v1","type":"completed","build_id":"abc-123","status":"Cancelled","error_code":"USER_CANCELLED","message":"..."}
+^C{"schema_version":"nodekit.submit.v1","type":"completed","build_id":"abc-123","status":"Cancelled","error_code":"USER_CANCELLED","message":"...","recovery":"terminal"}
 $ echo $?
 130
 ```
