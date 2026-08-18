@@ -1,0 +1,322 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="NodeKit.UI.Spikes.V16AuthoringSpikeWindow"
+        Title="NodeKit — v16 Authoring Avalonia Spike"
+        Width="1280"
+        Height="840"
+        MinWidth="980"
+        MinHeight="600"
+        WindowStartupLocation="CenterScreen"
+        Background="#0a0a10">
+
+  <Window.Styles>
+    <Style Selector="TextBlock.page-title">
+      <Setter Property="FontSize" Value="19" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="#f1eef8" />
+    </Style>
+    <Style Selector="TextBlock.page-subtitle">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="Foreground" Value="#aaa6bf" />
+    </Style>
+    <Style Selector="TextBlock.section-title">
+      <Setter Property="FontSize" Value="14.5" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="#d9d5e7" />
+    </Style>
+    <Style Selector="TextBlock.section-copy">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="#85819c" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="TextBlock.field-label">
+      <Setter Property="FontSize" Value="12.5" />
+      <Setter Property="Foreground" Value="#aaa6bf" />
+    </Style>
+    <Style Selector="TextBlock.helper">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="#85819c" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="TextBox.author-field">
+      <Setter Property="MinHeight" Value="34" />
+      <Setter Property="FontSize" Value="13.5" />
+      <Setter Property="Padding" Value="10,6" />
+      <Setter Property="Background" Value="#0d0d16" />
+      <Setter Property="Foreground" Value="#f1eef8" />
+      <Setter Property="BorderBrush" Value="#34334d" />
+    </Style>
+    <Style Selector="Button.rail-item">
+      <Setter Property="MinHeight" Value="38" />
+      <Setter Property="Padding" Value="4,8" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="#85819c" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="FontSize" Value="11" />
+    </Style>
+    <Style Selector="Button.rail-item.active">
+      <Setter Property="Background" Value="#2c2b48" />
+      <Setter Property="Foreground" Value="#f1eef8" />
+    </Style>
+    <Style Selector="Button.surface-item">
+      <Setter Property="MinHeight" Value="34" />
+      <Setter Property="Padding" Value="12,6" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="#aaa6bf" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style Selector="Button.surface-item.active">
+      <Setter Property="Background" Value="#242235" />
+      <Setter Property="Foreground" Value="#f1eef8" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBlock.support-title">
+      <Setter Property="FontSize" Value="11.5" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="#d9d5e7" />
+    </Style>
+    <Style Selector="TextBlock.support-copy">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="#aaa6bf" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="TextBlock.support-row">
+      <Setter Property="FontSize" Value="10.5" />
+      <Setter Property="Foreground" Value="#aaa6bf" />
+    </Style>
+  </Window.Styles>
+
+  <Grid RowDefinitions="Auto,*,Auto" Background="#12111a">
+    <!-- Native window chrome is intentionally retained. The HTML custom span controls are not carried over. -->
+    <Border Grid.Row="0" Background="#1c1b2b" BorderBrush="#2a2a40" BorderThickness="0,0,0,1" Padding="8,6">
+      <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto" ColumnSpacing="8">
+        <Border Grid.Column="0" Width="30" Height="30" Background="#8a6a2e" CornerRadius="4">
+          <TextBlock Text="NK" Foreground="#12111a" FontWeight="Bold" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </Border>
+        <Button Grid.Column="1" Content="로컬 레지스트리  ⌄" Padding="10,5" Background="Transparent" Foreground="#aaa6bf" AutomationProperties.Name="레지스트리 컨텍스트" />
+
+        <!-- Global Activity is a shell slot on every surface. Raw states stay separate while Decision 101 is held. -->
+        <Button Grid.Column="3" Padding="10,5" Background="#181723" BorderBrush="#39384e" Foreground="#d9d5e7" AutomationProperties.Name="Activity, 실패 1건, 중단 1건">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Text="Activity" FontSize="11.5" />
+            <TextBlock Text="실패 1 · 중단 1" FontSize="10.5" Foreground="#d98d82" />
+          </StackPanel>
+        </Button>
+        <Button Grid.Column="4" Content="MCP" Padding="8,5" Background="Transparent" Foreground="#7fc8c6" AutomationProperties.Name="MCP 연결 상태" />
+        <Button Grid.Column="5" Content="계정" Padding="8,5" Background="Transparent" Foreground="#aaa6bf" AutomationProperties.Name="계정" />
+      </Grid>
+    </Border>
+
+    <Grid Grid.Row="1" ColumnDefinitions="56,176,*,230" MinHeight="0">
+      <!-- Rail: visible labels are used in this spike instead of the ambiguous geometric glyph set. -->
+      <Border Grid.Column="0" Background="#16151f" BorderBrush="#2a2a40" BorderThickness="0,0,1,0" Padding="4,8">
+        <StackPanel Spacing="4">
+          <Button Classes="rail-item" Content="저작" ToolTip.Tip="저작" />
+          <Button Classes="rail-item" Content="도구" ToolTip.Tip="도구" />
+          <Button Classes="rail-item active" Content="데이터" ToolTip.Tip="데이터" AutomationProperties.Name="데이터, 현재" />
+          <Button Classes="rail-item" Content="정책" ToolTip.Tip="정책" />
+        </StackPanel>
+      </Border>
+
+      <!-- Left context owns surface navigation only. The four-item page TOC is intentionally omitted in this discovery spike. -->
+      <Border Grid.Column="1" Background="#16151f" BorderBrush="#2a2a40" BorderThickness="0,0,1,0">
+        <Grid RowDefinitions="Auto,*,Auto">
+          <Border Grid.Row="0" Padding="12,10" BorderBrush="#22213a" BorderThickness="0,0,0,1">
+            <TextBlock Text="데이터" FontSize="11" Foreground="#aaa6bf" FontWeight="SemiBold" />
+          </Border>
+          <StackPanel Grid.Row="1" Margin="0,8,0,0" Spacing="2">
+            <Button Classes="surface-item active" Content="데이터 저작" AutomationProperties.Name="데이터 저작, 현재 화면" />
+            <Button Classes="surface-item" Content="등록된 데이터" AutomationProperties.Name="등록된 데이터" />
+          </StackPanel>
+          <Border Grid.Row="2" Padding="12" BorderBrush="#22213a" BorderThickness="0,1,0,0">
+            <StackPanel Spacing="4">
+              <TextBlock Text="상태 구분" FontSize="12" FontWeight="SemiBold" Foreground="#d9d5e7" />
+              <TextBlock Text="관리 상태 · 검증 증거 · 무결성은 서로 다른 정보입니다." FontSize="11.5" Foreground="#85819c" TextWrapping="Wrap" />
+            </StackPanel>
+          </Border>
+        </Grid>
+      </Border>
+
+      <!-- Center remains the owner of canonical authored values. -->
+      <Grid Grid.Column="2" RowDefinitions="Auto,*,Auto" Background="#12111a" MinWidth="0">
+        <Border Grid.Row="0" Background="#141320" BorderBrush="#2a2a40" BorderThickness="0,0,0,1" Padding="18,12">
+          <StackPanel Spacing="5">
+            <TextBlock Text="데이터 › 데이터 저작" FontSize="11" Foreground="#706d86" />
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Bottom">
+                <TextBlock Classes="page-title" Text="데이터 저작" />
+                <TextBlock Classes="page-subtitle" Text="재사용할 참조 데이터의 선언을 작성합니다" VerticalAlignment="Bottom" />
+              </StackPanel>
+              <Border Grid.Column="1" Padding="7,4" BorderBrush="#4d4122" BorderThickness="1" Background="#1d190b" CornerRadius="12">
+                <TextBlock Text="초안" FontSize="10.5" Foreground="#d1a75e" />
+              </Border>
+            </Grid>
+          </StackPanel>
+        </Border>
+
+        <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+          <StackPanel MaxWidth="860" HorizontalAlignment="Left">
+            <Border Padding="18" BorderBrush="#1c1b2b" BorderThickness="0,0,0,1">
+              <StackPanel Spacing="13">
+                <Grid ColumnDefinitions="32,*" ColumnSpacing="10">
+                  <TextBlock Grid.Column="0" Text="01" FontSize="10.5" Foreground="#706d86" Margin="0,3,0,0" />
+                  <StackPanel Grid.Column="1" Spacing="4">
+                    <TextBlock Classes="section-title" Text="이름과 버전" />
+                    <TextBlock Classes="section-copy" Text="이 데이터를 다른 화면에서도 같은 이름으로 식별할 수 있게 선언합니다." />
+                  </StackPanel>
+                </Grid>
+                <Grid Margin="42,0,0,0" ColumnDefinitions="*,150" ColumnSpacing="16">
+                  <StackPanel Grid.Column="0" Spacing="5">
+                    <TextBlock Classes="field-label" Text="데이터 이름  ·  필수" />
+                    <TextBox Classes="author-field" Text="hg002-chr20" AutomationProperties.Name="데이터 이름" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" Spacing="5">
+                    <TextBlock Classes="field-label" Text="버전  ·  필수" />
+                    <TextBox Classes="author-field" Text="v1" AutomationProperties.Name="버전" />
+                  </StackPanel>
+                </Grid>
+              </StackPanel>
+            </Border>
+
+            <Border Padding="18" BorderBrush="#1c1b2b" BorderThickness="0,0,0,1">
+              <StackPanel Spacing="13">
+                <Grid ColumnDefinitions="32,*" ColumnSpacing="10">
+                  <TextBlock Grid.Column="0" Text="02" FontSize="10.5" Foreground="#706d86" Margin="0,3,0,0" />
+                  <StackPanel Grid.Column="1" Spacing="4">
+                    <TextBlock Classes="section-title" Text="출처와 형식" />
+                    <TextBlock Classes="section-copy" Text="원본이 어디에서 왔고 어떤 형식인지 선언합니다." />
+                  </StackPanel>
+                </Grid>
+                <StackPanel Margin="42,0,0,0" Spacing="12">
+                  <StackPanel Spacing="5">
+                    <TextBlock Classes="field-label" Text="출처 URI  ·  필수" />
+                    <TextBox Classes="author-field" Text="https://ftp.1000genomes.ebi.ac.uk/vol1/…/HG002.bam" FontFamily="Consolas" AutomationProperties.Name="출처 URI" />
+                    <TextBlock Classes="helper" Text="원본의 provenance 위치입니다. 플랫폼 저장 위치와는 다릅니다." />
+                  </StackPanel>
+                  <StackPanel Spacing="5" MaxWidth="220" HorizontalAlignment="Left">
+                    <TextBlock Classes="field-label" Text="형식  ·  필수" />
+                    <TextBox Classes="author-field" Text="BAM" FontFamily="Consolas" AutomationProperties.Name="형식" />
+                    <TextBlock Classes="helper" Text="예: FASTA · FASTQ · BAM · VCF" />
+                  </StackPanel>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <Border Padding="18" BorderBrush="#1c1b2b" BorderThickness="0,0,0,1">
+              <StackPanel Spacing="13">
+                <Grid ColumnDefinitions="32,*" ColumnSpacing="10">
+                  <TextBlock Grid.Column="0" Text="03" FontSize="10.5" Foreground="#706d86" Margin="0,3,0,0" />
+                  <StackPanel Grid.Column="1" Spacing="4">
+                    <TextBlock Classes="section-title" Text="무결성" />
+                    <TextBlock Classes="section-copy" Text="원본을 확인할 수 있는 체크섬을 선언합니다." />
+                  </StackPanel>
+                </Grid>
+                <StackPanel Margin="42,0,0,0" Spacing="8">
+                  <TextBlock Classes="field-label" Text="원본 체크섬 · SHA-256  ·  선택" />
+                  <TextBox Classes="author-field" Watermark="sha256:…" FontFamily="Consolas" AutomationProperties.Name="원본 체크섬 SHA-256" />
+                  <TextBlock Classes="helper" Text="원본 제공처 또는 사용자가 확인한 SHA-256입니다. 플랫폼이 만드는 콘텐츠 식별 정보와는 구분합니다." />
+                  <Border Margin="0,4,0,0" Padding="11" Background="#101620" BorderBrush="#2a3450" BorderThickness="1">
+                    <StackPanel Spacing="3">
+                      <TextBlock Text="등록 뒤 만들어지는 시스템 정보는 별도로 표시됩니다." FontSize="11.5" FontWeight="SemiBold" Foreground="#a9b6d4" />
+                      <TextBlock Text="저장 위치와 콘텐츠 식별 정보는 이 선언을 저장한 뒤 지원 정보에서 확인합니다." FontSize="10.8" Foreground="#8fa2c8" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <Border Padding="18" Background="#111018">
+              <StackPanel Spacing="13">
+                <Grid ColumnDefinitions="32,*" ColumnSpacing="10">
+                  <TextBlock Grid.Column="0" Text="04" FontSize="10.5" Foreground="#706d86" Margin="0,3,0,0" />
+                  <StackPanel Grid.Column="1" Spacing="4">
+                    <TextBlock Classes="section-title" Text="표시" />
+                    <TextBlock Classes="section-copy" Text="목록과 탐색에서 보이는 표현입니다. 데이터 내용 자체를 바꾸지 않습니다." />
+                  </StackPanel>
+                </Grid>
+                <Grid Margin="42,0,0,0" ColumnDefinitions="*,*" ColumnSpacing="16" RowDefinitions="Auto,Auto" RowSpacing="12">
+                  <StackPanel Grid.Row="0" Grid.Column="0" Spacing="5">
+                    <TextBlock Classes="field-label" Text="표시 레이블  ·  선택" />
+                    <TextBox Classes="author-field" Text="HG002 chr20 alignment" />
+                  </StackPanel>
+                  <StackPanel Grid.Row="0" Grid.Column="1" Spacing="5">
+                    <TextBlock Classes="field-label" Text="카테고리  ·  선택" />
+                    <TextBox Classes="author-field" Text="Reference data" />
+                  </StackPanel>
+                  <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Spacing="5">
+                    <TextBlock Classes="field-label" Text="표시 설명 / 태그  ·  선택" />
+                    <TextBox Classes="author-field" Text="GIAB HG002 chromosome 20 reference alignment · GIAB, HG002, chr20, BAM" />
+                  </StackPanel>
+                </Grid>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+
+        <!-- No dead CTA: the spike keeps the current capability boundary visible without inventing a clickable registration action. -->
+        <Border Grid.Row="2" Background="#14131d" BorderBrush="#2a2a40" BorderThickness="0,1,0,0" Padding="16,10">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+            <StackPanel Grid.Column="0" Spacing="3">
+              <TextBlock Text="현재 결과 · 초안 작성 중" FontSize="12" FontWeight="SemiBold" Foreground="#d9d5e7" />
+              <TextBlock Text="다음 행동 · 필요한 선언을 계속 작성하세요. 등록 동작은 현재 이 제품 화면에 연결되어 있지 않습니다." FontSize="11" Foreground="#aaa6bf" TextWrapping="Wrap" />
+            </StackPanel>
+            <TextBlock Grid.Column="1" Text="등록 연결 전" FontSize="10.5" Foreground="#85819c" VerticalAlignment="Center" />
+          </Grid>
+        </Border>
+      </Grid>
+
+      <!-- Supporting is reduced to live information. Empty post-registration rows are collapsed to one sentence. -->
+      <Border Grid.Column="3" Background="#12111a" BorderBrush="#2f2e43" BorderThickness="1,0,0,0">
+        <Grid RowDefinitions="Auto,*">
+          <Border Grid.Row="0" Padding="12,10" Background="#14131e" BorderBrush="#242337" BorderThickness="0,0,0,1">
+            <StackPanel Spacing="3">
+              <TextBlock Text="지원 정보" FontSize="12.5" FontWeight="SemiBold" Foreground="#d9d5e7" />
+              <TextBlock Text="증거와 제안" FontSize="9.5" Foreground="#7fc8c6" />
+            </StackPanel>
+          </Border>
+          <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Padding="12" Spacing="12">
+              <Border Padding="11" Background="#101a21" BorderBrush="#2d4f5b" BorderThickness="3,1,1,1" CornerRadius="5">
+                <StackPanel Spacing="8">
+                  <TextBlock Classes="support-title" Text="Checksum 제안" />
+                  <TextBlock Classes="support-copy" Text="출처 URI에서 계산한 값이 있습니다. Center의 canonical field는 사용자가 적용할 때만 바뀝니다." />
+                  <TextBlock Text="sha256:a71c4f2d…40d" FontSize="10" FontFamily="Consolas" Foreground="#9fb4bd" TextWrapping="Wrap" />
+                  <Button Content="Center에 적용" MinHeight="30" FontSize="10.5" IsEnabled="False" ToolTip.Tip="레이아웃 스파이크: 상호작용은 아직 연결하지 않음" AutomationProperties.Name="Checksum 제안을 Center에 적용" />
+                </StackPanel>
+              </Border>
+
+              <Border Padding="2,12" BorderBrush="#242337" BorderThickness="0,0,0,1">
+                <StackPanel Spacing="6">
+                  <TextBlock Classes="support-title" Text="등록 후 생성되는 정보" />
+                  <TextBlock Classes="support-copy" Text="저장 위치 · 콘텐츠 식별 정보 · 표현 증거는 등록 후 생성됩니다." />
+                </StackPanel>
+              </Border>
+
+              <StackPanel Spacing="7">
+                <TextBlock Classes="support-title" Text="현재 의미 있는 상태축" />
+                <Grid ColumnDefinitions="*,Auto" MinHeight="33">
+                  <TextBlock Grid.Column="0" Classes="support-row" Text="선언 유효성" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="1" Classes="support-row" Text="검사 전" Foreground="#85819c" VerticalAlignment="Center" />
+                </Grid>
+                <Border BorderBrush="#242337" BorderThickness="0,1,0,0" />
+                <Grid ColumnDefinitions="*,Auto" MinHeight="33">
+                  <TextBlock Grid.Column="0" Classes="support-row" Text="원본 검증 증거" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="1" Classes="support-row" Text="제안 있음" Foreground="#7fc8c6" FontWeight="SemiBold" VerticalAlignment="Center" />
+                </Grid>
+              </StackPanel>
+            </StackPanel>
+          </ScrollViewer>
+        </Grid>
+      </Border>
+    </Grid>
+
+    <Border Grid.Row="2" Background="#16151f" BorderBrush="#2a2a40" BorderThickness="0,1,0,0" Padding="10,6">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <TextBlock Grid.Column="0" Text="●" FontSize="10" Foreground="#d1a75e" VerticalAlignment="Center" />
+        <TextBlock Grid.Column="1" Margin="8,0,0,0" Text="데이터 저작" FontSize="10" Foreground="#85819c" VerticalAlignment="Center" />
+        <Button Grid.Column="2" Content="기술 상세" Padding="8,3" Background="Transparent" Foreground="#aaa6bf" FontSize="10" AutomationProperties.Name="기술 상세" />
+      </Grid>
+    </Border>
+  </Grid>
+</Window>
