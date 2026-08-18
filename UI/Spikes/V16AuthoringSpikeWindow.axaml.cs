@@ -26,6 +26,8 @@ namespace NodeKit.UI.Spikes
 
             Width = ReadPositiveDouble("NODEKIT_UI_CAPTURE_WIDTH", Width);
             Height = ReadPositiveDouble("NODEKIT_UI_CAPTURE_HEIGHT", Height);
+            MinWidth = ReadNonNegativeDouble("NODEKIT_UI_CAPTURE_MIN_WIDTH", MinWidth);
+            MinHeight = ReadNonNegativeDouble("NODEKIT_UI_CAPTURE_MIN_HEIGHT", MinHeight);
             Opened += (_, _) =>
             {
                 _captureTimer = DispatcherTimer.RunOnce(
@@ -41,6 +43,16 @@ namespace NodeKit.UI.Spikes
             return double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
                 && double.IsFinite(parsed)
                 && parsed > 0
+                ? parsed
+                : fallback;
+        }
+
+        private static double ReadNonNegativeDouble(string variable, double fallback)
+        {
+            var value = Environment.GetEnvironmentVariable(variable);
+            return double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
+                && double.IsFinite(parsed)
+                && parsed >= 0
                 ? parsed
                 : fallback;
         }
@@ -62,6 +74,7 @@ namespace NodeKit.UI.Spikes
                 bitmap.Save(fullPath);
             }
 
+            var screen = Screens.ScreenFromWindow(this);
             var diagnostic = new
             {
                 requestedWidth = Width,
@@ -73,6 +86,13 @@ namespace NodeKit.UI.Spikes
                 renderScaling = scaling,
                 pixelWidth = pixelSize.Width,
                 pixelHeight = pixelSize.Height,
+                screenScaling = screen?.Scaling,
+                screenBoundsPixelWidth = screen?.Bounds.Width,
+                screenBoundsPixelHeight = screen?.Bounds.Height,
+                workingAreaPixelWidth = screen?.WorkingArea.Width,
+                workingAreaPixelHeight = screen?.WorkingArea.Height,
+                workingAreaDipWidth = screen is null ? (double?)null : screen.WorkingArea.Width / screen.Scaling,
+                workingAreaDipHeight = screen is null ? (double?)null : screen.WorkingArea.Height / screen.Scaling,
                 platform = Environment.OSVersion.ToString(),
             };
             var jsonPath = Path.ChangeExtension(fullPath, ".json");
