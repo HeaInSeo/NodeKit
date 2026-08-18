@@ -38,6 +38,8 @@ Captured usable frames:
 
 - `980 × 600`
 - capture-only unclamped stress: `980 × 560`, `900 × 560`, `900 × 520`
+- keyboard-navigation focus: Center input at `980 × 600`
+- keyboard-navigation focus: Activity at `980 × 600`
 
 Requests for `1093 × 614` and `1280 × 720` were width-clamped by the hosted runner's 1024px display and must **not** be treated as evidence for those requested widths.
 
@@ -86,7 +88,21 @@ The carried `9.5` Supporting kicker value (`증거와 제안`) is visibly smalle
 
 The current `10–11` technical/helper values remain readable in the hosted 100% Windows renderer, but this does **not** prove their readability at 125%/150% user scaling on the target devices.
 
-## 5. What this evidence does not prove
+## 5. Keyboard-focus finding
+
+The capture harness now applies focus using keyboard-navigation semantics rather than pointer/programmatic focus alone.
+
+At `980 × 600` on the hosted Windows renderer:
+
+- the first Center TextBox shows a high-visibility blue focus border
+- the global Activity control shows a high-visibility light focus outline
+- both remain visually distinguishable from their unfocused surrounding controls
+
+Current verdict: **native focus visibility PASS for this spike at the hosted Windows runner's 100% scaling**.
+
+Do not add an explicit custom focus-ring override solely to solve a defect that is not reproduced here. Re-open this only if the real 125%/150% device captures show the native theme focus treatment becoming ambiguous.
+
+## 6. What this evidence does not prove
 
 The hosted Windows runner is `1024 × 768 @ 100%` with a `1024 × 720` working area. It cannot reproduce the two required target device cases:
 
@@ -95,9 +111,9 @@ The hosted Windows runner is `1024 × 768 @ 100%` with a `1024 × 720` working a
 
 Also, `RenderTargetBitmap` captures the Avalonia client visual, not the native Windows title bar. Therefore these CI artifacts do not close the native-device gate.
 
-Avalonia exposes `Screen.Bounds`, `Screen.WorkingArea`, and `Screen.Scaling`; the spike now records those values in every capture JSON so the eventual device captures can be compared using actual working-area evidence rather than nominal display resolution.
+The spike records Avalonia Screen Bounds, WorkingArea, and Scaling in every capture JSON so the eventual device captures can be compared using actual working-area evidence rather than nominal display resolution.
 
-## 6. Current decisions after these probes
+## 7. Current decisions after these probes
 
 Do **not** make the following normative yet:
 
@@ -112,16 +128,17 @@ Keep for the next device check:
 - provisional width hypothesis: `980 DIP`
 - next height candidate to falsify: `560 DIP`
 - typography candidate: remove the `9.5` secondary-label probe before a final floor is declared
+- native focus treatment: keep unless target-device evidence falsifies it
 
 No backend capability or registration CTA should be added as part of this sizing work.
 
-## 7. Remaining device gate
+## 8. Remaining device gate
 
 On actual Windows devices, capture and record:
 
 1. `1366 × 768 @ 125%`
 2. `1920 × 1080 @ 150%`
-3. actual `Screen.Bounds`, `Screen.WorkingArea`, and `Screen.Scaling`
+3. actual Screen Bounds, WorkingArea, and Scaling
 4. full window at startup
 5. Center scrolled to section 04
 6. keyboard focus on a Center input
