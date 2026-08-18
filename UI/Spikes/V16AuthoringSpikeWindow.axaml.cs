@@ -11,7 +11,7 @@ namespace NodeKit.UI.Spikes
 {
     internal partial class V16AuthoringSpikeWindow : Window
     {
-        private static readonly JsonSerializerOptions DiagnosticJsonOptions = new() { WriteIndented = true };
+        private static readonly JsonSerializerOptions _diagnosticJsonOptions = new() { WriteIndented = true };
         private IDisposable? _captureTimer;
 
         public V16AuthoringSpikeWindow()
@@ -76,7 +76,7 @@ namespace NodeKit.UI.Spikes
                 platform = Environment.OSVersion.ToString(),
             };
             var jsonPath = Path.ChangeExtension(fullPath, ".json");
-            File.WriteAllText(jsonPath, JsonSerializer.Serialize(diagnostic, DiagnosticJsonOptions));
+            File.WriteAllText(jsonPath, JsonSerializer.Serialize(diagnostic, _diagnosticJsonOptions));
 
             _captureTimer?.Dispose();
             _captureTimer = null;
