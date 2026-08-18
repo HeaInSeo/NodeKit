@@ -39,6 +39,13 @@ jobs:
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force -Path 'TestResults/UI-Spike-Windows' | Out-Null
 
+          function Invoke-Capture([string]$Name, [int]$Width, [int]$Height) {
+            dotnet run --project NodeKit.csproj --no-build --configuration Release
+            if ($LASTEXITCODE -ne 0) {
+              throw "Capture $Name failed with exit code $LASTEXITCODE"
+            }
+          }
+
           function Capture-Frame([string]$Name, [int]$Width, [int]$Height) {
             $env:NODEKIT_UI_SPIKE = 'v16'
             $env:NODEKIT_UI_CAPTURE = "TestResults/UI-Spike-Windows/$Name.png"
@@ -46,22 +53,34 @@ jobs:
             $env:NODEKIT_UI_CAPTURE_HEIGHT = "$Height"
             Remove-Item Env:NODEKIT_UI_CAPTURE_MIN_WIDTH -ErrorAction SilentlyContinue
             Remove-Item Env:NODEKIT_UI_CAPTURE_MIN_HEIGHT -ErrorAction SilentlyContinue
+            Invoke-Capture $Name $Width $Height
+          }
 
-            dotnet run --project NodeKit.csproj --no-build --configuration Release
-            if ($LASTEXITCODE -ne 0) {
-              throw "Capture $Name failed with exit code $LASTEXITCODE"
-            }
+          function Capture-Unclamped([string]$Name, [int]$Width, [int]$Height) {
+            $env:NODEKIT_UI_SPIKE = 'v16'
+            $env:NODEKIT_UI_CAPTURE = "TestResults/UI-Spike-Windows/$Name.png"
+            $env:NODEKIT_UI_CAPTURE_WIDTH = "$Width"
+            $env:NODEKIT_UI_CAPTURE_HEIGHT = "$Height"
+            $env:NODEKIT_UI_CAPTURE_MIN_WIDTH = '0'
+            $env:NODEKIT_UI_CAPTURE_MIN_HEIGHT = '0'
+            Invoke-Capture $Name $Width $Height
           }
 
           Capture-Frame 'windows_runner_1093x614' 1093 614
           Capture-Frame 'windows_runner_1280x720' 1280 720
           Capture-Frame 'windows_runner_980x600' 980 600
 
+          # Capture-only stress sizes below the current 980x600 hypothesis.
+          Capture-Unclamped 'windows_stress_980x560' 980 560
+          Capture-Unclamped 'windows_stress_900x560' 900 560
+          Capture-Unclamped 'windows_stress_900x520' 900 520
+
           @'
           These captures are produced by Avalonia on the GitHub-hosted Windows runner.
           JSON siblings record the runner's actual Avalonia Screen Bounds, WorkingArea, and Scaling.
           They are useful for Windows font fallback/rendering and platform-layout comparison.
           RenderTargetBitmap captures the Avalonia client visual; it is not a screenshot of native title-bar chrome.
+          The *_stress_* frames use capture-only MinWidth/MinHeight overrides and do not change normal startup behavior.
           The hosted runner's scaling is not assumed to equal 125% or 150%, so these frames do NOT replace
           the required native Windows device evidence at 1366x768@125% and 1920x1080@150%.
           '@ | Set-Content -Path 'TestResults/UI-Spike-Windows/README.txt' -Encoding utf8
