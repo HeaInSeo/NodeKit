@@ -1,11 +1,13 @@
 using System;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 
 namespace NodeKit.UI.Spikes
 {
@@ -24,6 +26,7 @@ namespace NodeKit.UI.Spikes
                 return;
             }
 
+            var captureFocus = Environment.GetEnvironmentVariable("NODEKIT_UI_CAPTURE_FOCUS");
             Width = ReadPositiveDouble("NODEKIT_UI_CAPTURE_WIDTH", Width);
             Height = ReadPositiveDouble("NODEKIT_UI_CAPTURE_HEIGHT", Height);
             MinWidth = ReadNonNegativeDouble("NODEKIT_UI_CAPTURE_MIN_WIDTH", MinWidth);
@@ -31,8 +34,16 @@ namespace NodeKit.UI.Spikes
             Opened += (_, _) =>
             {
                 _captureTimer = DispatcherTimer.RunOnce(
-                    () => CaptureAndClose(capturePath),
-                    TimeSpan.FromMilliseconds(350),
+                    () =>
+                    {
+                        ApplyCaptureFocus(captureFocus);
+                        _captureTimer?.Dispose();
+                        _captureTimer = DispatcherTimer.RunOnce(
+                            () => CaptureAndClose(capturePath, captureFocus),
+                            TimeSpan.FromMilliseconds(120),
+                            DispatcherPriority.Loaded);
+                    },
+                    TimeSpan.FromMilliseconds(250),
                     DispatcherPriority.Loaded);
             };
         }
@@ -57,7 +68,29 @@ namespace NodeKit.UI.Spikes
                 : fallback;
         }
 
-        private void CaptureAndClose(string capturePath)
+        private void ApplyCaptureFocus(string? captureFocus)
+        {
+            if (string.Equals(captureFocus, "center-input", StringComparison.OrdinalIgnoreCase))
+            {
+                this.GetVisualDescendants().OfType<TextBox>().FirstOrDefault()?.Focus();
+                return;
+            }
+
+            if (!string.Equals(captureFocus, "activity", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            this.GetVisualDescendants()
+                .OfType<Button>()
+                .FirstOrDefault(
+                    button => button.Content is StackPanel panel
+                        && panel.Children.OfType<TextBlock>().Any(
+                            text => string.Equals(text.Text, "Activity", StringComparison.Ordinal)))
+                ?.Focus();
+        }
+
+        private void CaptureAndClose(string capturePath, string? captureFocus)
         {
             var fullPath = Path.GetFullPath(capturePath);
             var directory = Path.GetDirectoryName(fullPath);
@@ -83,6 +116,7 @@ namespace NodeKit.UI.Spikes
                 clientHeight = ClientSize.Height,
                 minWidth = MinWidth,
                 minHeight = MinHeight,
+                captureFocus,
                 renderScaling = scaling,
                 pixelWidth = pixelSize.Width,
                 pixelHeight = pixelSize.Height,
