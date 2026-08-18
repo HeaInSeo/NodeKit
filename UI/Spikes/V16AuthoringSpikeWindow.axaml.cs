@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.Json;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -72,7 +73,10 @@ namespace NodeKit.UI.Spikes
         {
             if (string.Equals(captureFocus, "center-input", StringComparison.OrdinalIgnoreCase))
             {
-                this.GetVisualDescendants().OfType<TextBox>().FirstOrDefault()?.Focus();
+                this.GetVisualDescendants()
+                    .OfType<TextBox>()
+                    .FirstOrDefault()
+                    ?.Focus(NavigationMethod.Tab, KeyModifiers.None);
                 return;
             }
 
@@ -87,7 +91,7 @@ namespace NodeKit.UI.Spikes
                     button => button.Content is StackPanel panel
                         && panel.Children.OfType<TextBlock>().Any(
                             text => string.Equals(text.Text, "Activity", StringComparison.Ordinal)))
-                ?.Focus();
+                ?.Focus(NavigationMethod.Tab, KeyModifiers.None);
         }
 
         private void CaptureAndClose(string capturePath, string? captureFocus)
