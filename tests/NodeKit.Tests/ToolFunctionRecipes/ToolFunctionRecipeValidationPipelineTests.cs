@@ -46,6 +46,20 @@ namespace NodeKit.Tests.ToolFunctionRecipes
         }
 
         [Fact]
+        public void ZeroPortRecipe_TransitionsStateDraftToReady()
+        {
+            var recipe = ValidRecipe();
+            recipe.InputPorts.Clear();
+            recipe.OutputPorts.Clear();
+            recipe.Command.Arguments.Clear();
+
+            var result = ToolFunctionRecipeValidationPipeline.Validate(recipe);
+
+            Assert.True(result.IsValid);
+            Assert.Equal(ToolFunctionRecipeState.Ready, recipe.State);
+        }
+
+        [Fact]
         public void ValidationFails_StateStaysDraftAndViolationsReported()
         {
             var recipe = ValidRecipe();

@@ -220,16 +220,8 @@ namespace NodeKit.Validation.ToolFunctionRecipes
                 violations.Add(new ValidationViolation("L1-TFR-006", "command.executable이 필요합니다.", "Command.Executable"));
             }
 
-            if (recipe.InputPorts.Count == 0)
-            {
-                violations.Add(new ValidationViolation("L1-TFR-006", "최소 1개 이상의 입력 포트가 필요합니다.", nameof(recipe.InputPorts)));
-            }
-
-            if (recipe.OutputPorts.Count == 0)
-            {
-                violations.Add(new ValidationViolation("L1-TFR-006", "최소 1개 이상의 출력 포트가 필요합니다.", nameof(recipe.OutputPorts)));
-            }
-
+            // 입력/출력 포트 개수에는 최소값이 없다: input-only, output-only, 포트 없는
+            // 함수도 유효하다(NodeVault/proto와 동일). 포트 이름 중복은 L1-TFR-004가 담당한다.
             if (recipe.FixtureReferences.Count == 0)
             {
                 violations.Add(new ValidationViolation("L1-TFR-006", "최소 1개 이상의 샘플 데이터/fixture 참조가 필요합니다.", nameof(recipe.FixtureReferences)));
