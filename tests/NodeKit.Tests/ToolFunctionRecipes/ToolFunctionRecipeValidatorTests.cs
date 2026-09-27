@@ -184,5 +184,47 @@ namespace NodeKit.Tests.ToolFunctionRecipes
 
             Assert.Contains(result.Violations, v => v.RuleId == "L1-TFR-004");
         }
+
+        [Fact]
+        public void ExpectedResultReferencingExistingOutput_Passes()
+        {
+            var recipe = ValidRecipe();
+            recipe.ExpectedResults.Add(new ExpectedResult { OutputPortName = "sortedBam", ExpectedValueOrRule = "non-empty" });
+
+            var result = ToolFunctionRecipeValidator.Validate(recipe);
+
+            Assert.True(result.IsValid, string.Join("; ", result.Violations));
+        }
+
+        // zero-output recipe에 남은 ExpectedResult는 참조 대상이 없으므로 거부한다.
+        [Fact]
+        public void ExpectedResultWithNoOutputPorts_FailsWithL1TFR007()
+        {
+            var recipe = ValidRecipe();
+            recipe.OutputPorts.Clear();
+            recipe.ExpectedResults.Add(new ExpectedResult { OutputPortName = "sortedBam", ExpectedValueOrRule = "non-empty" });
+
+            var result = ToolFunctionRecipeValidator.Validate(recipe);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-TFR-007" && v.Field == "ExpectedResults[0].OutputPortName");
+        }
+
+        [Theory]
+        [InlineData("removedPort")]
+        [InlineData("bam")]
+        [InlineData("")]
+        public void ExpectedResultReferencingUnknownOutput_FailsWithL1TFR007(string portName)
+        {
+            var recipe = ValidRecipe();
+            recipe.ExpectedResults.Add(new ExpectedResult { OutputPortName = "sortedBam", ExpectedValueOrRule = "non-empty" });
+            recipe.ExpectedResults.Add(new ExpectedResult { OutputPortName = portName, ExpectedValueOrRule = "non-empty" });
+
+            var result = ToolFunctionRecipeValidator.Validate(recipe);
+
+            var violation = Assert.Single(result.Violations);
+            Assert.Equal("L1-TFR-007", violation.RuleId);
+            Assert.Equal("ExpectedResults[1].OutputPortName", violation.Field);
+        }
     }
 }

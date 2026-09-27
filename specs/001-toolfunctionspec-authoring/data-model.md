@@ -71,7 +71,7 @@ Ready ──(향후 제출 API, 이번 범위 밖)──▶ Submitted ──▶ 
 |---|---|---|---|
 | `FixtureReference.LocalPath` | `string` | LocalPath/ContentDigest 중 하나 필수 | FR-009 |
 | `FixtureReference.ContentDigest` | `string` | 위와 동일 | FR-009 |
-| `ExpectedResult.OutputPortName` | `string` | 필수, 존재하는 `OutputPorts` 이름을 참조 | FR-010 |
+| `ExpectedResult.OutputPortName` | `string` | 필수, 존재하는 `OutputPorts` 이름을 참조(L1-TFR-007) | FR-010 |
 | `ExpectedResult.ExpectedValueOrRule` | `string` | 필수 | FR-010 |
 
 ## IntermediateFilePolicyEntry
@@ -134,6 +134,7 @@ Ready ──(향후 제출 API, 이번 범위 밖)──▶ Submitted ──▶ 
 | `L1-TFR-004` | `InputPorts`+`OutputPorts` | `Name` 중복(입출력 통틀어) 시 실패 |
 | `L1-TFR-005` | `EnforcedResources` | `*Limit < *Request` 시 실패 |
 | `L1-TFR-006` | 전체 | 필수 필드(functionId/command executable/fixture 최소 1개/enforced resource) 누락 시 실패. 포트 개수는 필수 조건이 아니다 |
+| `L1-TFR-007` | `ExpectedResults` | `OutputPortName`이 현재 `OutputPorts` 이름 중 하나가 아니면 실패(출력 포트가 없으면 `ExpectedResults`도 비어 있어야 함) |
 
 ## Renderer 산출물 — `ToolFunctionBuildRequestPreview`
 
