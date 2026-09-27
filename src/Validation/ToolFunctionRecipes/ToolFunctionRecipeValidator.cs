@@ -35,6 +35,7 @@ namespace NodeKit.Validation.ToolFunctionRecipes
             ValidatePortNameUniqueness(recipe, violations);
             ValidateEnforcedResources(recipe, violations);
             ValidateRequiredFields(recipe, violations);
+            ValidateExpectedResultReferences(recipe, violations);
 
             return new ValidationResult(violations);
         }
@@ -220,16 +221,8 @@ namespace NodeKit.Validation.ToolFunctionRecipes
                 violations.Add(new ValidationViolation("L1-TFR-006", "command.executable이 필요합니다.", "Command.Executable"));
             }
 
-            if (recipe.InputPorts.Count == 0)
-            {
-                violations.Add(new ValidationViolation("L1-TFR-006", "최소 1개 이상의 입력 포트가 필요합니다.", nameof(recipe.InputPorts)));
-            }
-
-            if (recipe.OutputPorts.Count == 0)
-            {
-                violations.Add(new ValidationViolation("L1-TFR-006", "최소 1개 이상의 출력 포트가 필요합니다.", nameof(recipe.OutputPorts)));
-            }
-
+            // 입력/출력 포트 개수에는 최소값이 없다: input-only, output-only, 포트 없는
+            // 함수도 유효하다(NodeVault/proto와 동일). 포트 이름 중복은 L1-TFR-004가 담당한다.
             if (recipe.FixtureReferences.Count == 0)
             {
                 violations.Add(new ValidationViolation("L1-TFR-006", "최소 1개 이상의 샘플 데이터/fixture 참조가 필요합니다.", nameof(recipe.FixtureReferences)));
@@ -246,6 +239,27 @@ namespace NodeKit.Validation.ToolFunctionRecipes
                     "L1-TFR-006",
                     "enforced 자원(CpuRequest/CpuLimit/MemoryRequest/MemoryLimit)이 모두 필요합니다.",
                     nameof(recipe.EnforcedResources)));
+            }
+        }
+
+        // L1-TFR-007: 모든 ExpectedResult는 남아 있는 OutputPorts 이름을 참조해야 한다
+        // (data-model.md). 출력 포트가 없으면 ExpectedResults도 비어 있어야 한다.
+        private static void ValidateExpectedResultReferences(ToolFunctionRecipe recipe, List<ValidationViolation> violations)
+        {
+            var outputNames = new HashSet<string>(
+                recipe.OutputPorts.Select(p => p.Name).Where(name => !string.IsNullOrWhiteSpace(name)),
+                StringComparer.Ordinal);
+
+            for (var i = 0; i < recipe.ExpectedResults.Count; i++)
+            {
+                var portName = recipe.ExpectedResults[i].OutputPortName;
+                if (!outputNames.Contains(portName))
+                {
+                    violations.Add(new ValidationViolation(
+                        "L1-TFR-007",
+                        $"ExpectedResult가 존재하지 않는 출력 포트를 참조합니다: '{portName}'",
+                        $"ExpectedResults[{i}].OutputPortName"));
+                }
             }
         }
     }

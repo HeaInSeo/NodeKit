@@ -17,8 +17,8 @@ spec.md의 Key Entities와 Functional Requirements, research.md의 결정을 근
 | `ScriptPath` | `string` | 필수 | FR-004 — 로컬 파일 경로 참조, 내용을 인라인으로 담지 않음 |
 | `NanCompatibility` | `string` | 선택 | FR-005(이번 정정판에서는 spec 최신 버전 기준 명시적 FR 번호 없음 — nan 필드는 Recipe에 요구하지 않음, FR-004 후반부 참고. **주의**: 최신 spec.md는 nan 관련 필드를 Recipe에 요구하지 않는다고 명시하므로 이 필드는 포함하지 않는다) |
 | `Command` | `CommandContract` | 필수 | FR-005, FR-006 |
-| `InputPorts` | `List<PortContract>` (Direction=Input) | 최소 1개 | FR-007 |
-| `OutputPorts` | `List<PortContract>` (Direction=Output) | 최소 1개 | FR-008 |
+| `InputPorts` | `List<PortContract>` (Direction=Input) | 0개 이상(최소값 없음) | FR-007 |
+| `OutputPorts` | `List<PortContract>` (Direction=Output) | 0개 이상(최소값 없음) | FR-008 |
 | `FixtureReferences` | `List<FixtureReference>` | 최소 1개 | FR-009, FR-017 |
 | `ExpectedResults` | `List<ExpectedResult>` | 출력 포트당 권장 1개 | FR-010 |
 | `IntermediateFilePolicies` | `List<IntermediateFilePolicyEntry>` | 선택 | FR-011 |
@@ -71,7 +71,7 @@ Ready ──(향후 제출 API, 이번 범위 밖)──▶ Submitted ──▶ 
 |---|---|---|---|
 | `FixtureReference.LocalPath` | `string` | LocalPath/ContentDigest 중 하나 필수 | FR-009 |
 | `FixtureReference.ContentDigest` | `string` | 위와 동일 | FR-009 |
-| `ExpectedResult.OutputPortName` | `string` | 필수, 존재하는 `OutputPorts` 이름을 참조 | FR-010 |
+| `ExpectedResult.OutputPortName` | `string` | 필수, 존재하는 `OutputPorts` 이름을 참조(L1-TFR-007) | FR-010 |
 | `ExpectedResult.ExpectedValueOrRule` | `string` | 필수 | FR-010 |
 
 ## IntermediateFilePolicyEntry
@@ -133,7 +133,8 @@ Ready ──(향후 제출 API, 이번 범위 밖)──▶ Submitted ──▶ 
 | `L1-TFR-003` | `Command.Executable` | 공백/`|`/`;`/`>`/`<` 포함 시 실패 |
 | `L1-TFR-004` | `InputPorts`+`OutputPorts` | `Name` 중복(입출력 통틀어) 시 실패 |
 | `L1-TFR-005` | `EnforcedResources` | `*Limit < *Request` 시 실패 |
-| `L1-TFR-006` | 전체 | 필수 필드(functionId/command/포트 최소 1개씩/fixture 최소 1개/enforced resource) 누락 시 실패 |
+| `L1-TFR-006` | 전체 | 필수 필드(functionId/command executable/fixture 최소 1개/enforced resource) 누락 시 실패. 포트 개수는 필수 조건이 아니다 |
+| `L1-TFR-007` | `ExpectedResults` | `OutputPortName`이 현재 `OutputPorts` 이름 중 하나가 아니면 실패(출력 포트가 없으면 `ExpectedResults`도 비어 있어야 함) |
 
 ## Renderer 산출물 — `ToolFunctionBuildRequestPreview`
 

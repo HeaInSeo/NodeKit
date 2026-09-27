@@ -46,6 +46,34 @@ namespace NodeKit.Tests.ToolFunctionRecipes
         }
 
         [Fact]
+        public void ZeroPortRecipe_TransitionsStateDraftToReady()
+        {
+            var recipe = ValidRecipe();
+            recipe.InputPorts.Clear();
+            recipe.OutputPorts.Clear();
+            recipe.Command.Arguments.Clear();
+
+            var result = ToolFunctionRecipeValidationPipeline.Validate(recipe);
+
+            Assert.True(result.IsValid);
+            Assert.Equal(ToolFunctionRecipeState.Ready, recipe.State);
+        }
+
+        [Fact]
+        public void ZeroOutputRecipeWithOrphanExpectedResult_StaysDraft()
+        {
+            var recipe = ValidRecipe();
+            recipe.ExpectedResults.Add(new ExpectedResult { OutputPortName = "sortedBam", ExpectedValueOrRule = "non-empty" });
+            recipe.OutputPorts.Clear();
+
+            var result = ToolFunctionRecipeValidationPipeline.Validate(recipe);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Violations, v => v.RuleId == "L1-TFR-007");
+            Assert.Equal(ToolFunctionRecipeState.Draft, recipe.State);
+        }
+
+        [Fact]
         public void ValidationFails_StateStaysDraftAndViolationsReported()
         {
             var recipe = ValidRecipe();

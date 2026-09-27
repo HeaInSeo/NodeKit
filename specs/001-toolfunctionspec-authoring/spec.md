@@ -62,7 +62,7 @@ NodeKit 사용자(도구 작성자)는 이미 확정된 ToolSpec image digest를
 
 1. **Given** 이미 확정된 `toolSpecDigest`와 `baseToolImageDigest`, **When** 사용자가 이를 참조하여 새 ToolFunctionRecipe를 시작하면, **Then** 두 값 모두 read-only 참조로 Recipe에 고정되고 편집할 수 없으며 Recipe는 `Draft` 상태로 생성된다.
 2. **Given** 작성 중인 Recipe, **When** 사용자가 명령을 `bash -c "..."`같은 단일 셸 문자열로 입력하면, **Then** 시스템은 이를 거부하고 executable/arguments 배열로 구조화하라고 안내한다.
-3. **Given** 모든 필수 필드(functionId, 명령, 최소 1개 입력 포트, 최소 1개 출력 포트, 샘플 데이터/fixture 참조, enforced 자원)가 채워진 Recipe, **When** 사용자가 검증을 실행하면, **Then** 검증이 통과하고 Recipe 상태가 `Ready`로 전이된다.
+3. **Given** 모든 필수 필드(functionId, 명령 executable, 샘플 데이터/fixture 참조, enforced 자원)가 채워진 Recipe — 입력/출력 포트는 0개 이상이며 input-only, output-only, 포트 없는 Recipe도 포함 — **When** 사용자가 검증을 실행하면, **Then** 검증이 통과하고 Recipe 상태가 `Ready`로 전이된다.
 4. **Given** 출력 포트 이름과 입력 포트 이름이 동일한 Recipe, **When** 검증을 실행하면, **Then** 포트 이름 충돌 오류가 표시되고 상태는 `Draft`에 머무른다.
 5. **Given** enforced 자원에서 memory limit이 memory request보다 작게 입력된 Recipe, **When** 검증을 실행하면, **Then** limit이 request 이상이어야 한다는 오류가 표시된다.
 
@@ -106,7 +106,7 @@ NodeKit 사용자(도구 작성자)는 이미 확정된 ToolSpec image digest를
 - `functionId`가 형식 규칙(공백/허용 문자/대소문자 규칙 등)을 어기면 어떻게 되는가? → 검증 실패, 형식 안내 메시지 표시.
 - 같은 `functionId`로 여러 revision의 Recipe 파일을 동시에 만들면 어떻게 되는가? → 로컬 파일 경로/이름 충돌을 감지하고 명확히 안내한다(덮어쓰기 묵인 금지).
 - 사용자가 (아직 존재하지 않는) 제출 동작을 시도하면 어떻게 되는가? → 오류 코드 노출이나 무응답 대신 "NodeVault ToolFunction 빌드 게이트 미개방"이라는 사용자 친화적 안내를 표시하며 상태 전이는 일어나지 않는다.
-- 필수 포트나 자원 필드가 비어 있는 상태로 렌더링을 시도하면 어떻게 되는가? → 렌더링이 거부되고 어떤 필드가 누락됐는지 표시된다.
+- 필수 자원 필드가 비어 있는 상태로 렌더링을 시도하면 어떻게 되는가? → 렌더링이 거부되고 어떤 필드가 누락됐는지 표시된다. 포트가 0개인 것은 누락이 아니다.
 - 사용자가 로컬에서 직접 Recipe 상태를 `Submitted`/`Built`/`Validated`/`Approved`로 바꾸려 하면 어떻게 되는가? → 이 상태들은 NodeVault/NodeSentinel의 실제 처리 결과를 반영하는 자리이며, 이번 기능은 이 상태로의 전이 수단을 제공하지 않는다.
 
 ## Requirements *(mandatory)*
@@ -119,8 +119,8 @@ NodeKit 사용자(도구 작성자)는 이미 확정된 ToolSpec image digest를
 - **FR-004**: 시스템은 사용자/실행 스크립트를 로컬 파일 참조로 캡처해야 하며, 이는 기존 `ToolDefinition.Script` 필드와 별개의 개념으로 다뤄야 한다. nan을 이 스크립트에 결합하는 방식은 NodeVault ToolFunction image builder의 내부 구현이므로 Recipe는 nan 관련 필드를 요구하지 않는다.
 - **FR-005**: 시스템은 명령을 executable, 순서 있는 arguments 배열, workingDirectory, environment allowlist, 성공 exit code 목록, timeout 정책으로 구조화하여 입력받아야 한다.
 - **FR-006**: 시스템은 명령이 단일 raw shell 문자열로 입력되는 것을 거부해야 한다.
-- **FR-007**: 시스템은 하나 이상의 named 입력 포트(데이터 종류/형식, cardinality, 필수/선택 여부, 경로 배치 규칙, companion file 선언)를 입력받아야 한다.
-- **FR-008**: 시스템은 하나 이상의 named 출력 포트(형식, cardinality, 경로/glob, 완료 검증법, downstream 호환성 메모)를 입력받아야 한다.
+- **FR-007**: 시스템은 0개 이상의 named 입력 포트(데이터 종류/형식, cardinality, 필수/선택 여부, 경로 배치 규칙, companion file 선언)를 입력받아야 한다. 입력 포트 개수에 최소값은 없다.
+- **FR-008**: 시스템은 0개 이상의 named 출력 포트(형식, cardinality, 경로/glob, 완료 검증법, downstream 호환성 메모)를 입력받아야 한다. 출력 포트 개수에 최소값은 없다.
 - **FR-009**: 시스템은 dry-run에 사용할 샘플 데이터/fixture에 대한 참조(로컬 경로 또는 content digest)를 입력받아야 한다. 실제 dry-run 실행 자체는 이 기능의 범위 밖이다(NodeSentinel 소관).
 - **FR-010**: 시스템은 각 출력 포트에 대한 예상 결과(기대값 또는 비교 규칙)를 선언 입력으로 받아야 한다. 실제 비교 실행과 판정은 이 기능의 범위 밖이다.
 - **FR-011**: 시스템은 중간/숨은 파일 정책(ephemeral/cache/checkpoint/sidecar-output/sensitive-temp)을 파일 또는 패턴 단위로 선언받아야 한다.
