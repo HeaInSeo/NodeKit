@@ -1,0 +1,98 @@
+name: UI Spike Layout Probe
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "App.axaml.cs"
+      - "UI/Spikes/**"
+      - "docs/console-ui/**"
+      - ".github/workflows/ui-spike-layout.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  layout-probe:
+    if: startsWith(github.head_ref, 'ux/console-avalonia-v16-spike')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore NodeKit.sln --locked-mode
+
+      - name: Build spike
+        run: dotnet build NodeKit.csproj --no-restore --configuration Release /p:TreatWarningsAsErrors=true /p:EnforceCodeStyleInBuild=true
+
+      - name: Capture logical viewport probes
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v xvfb-run
+          mkdir -p TestResults/UI-Spike
+
+          capture() {
+            local name="$1"
+            local width="$2"
+            local height="$3"
+            NODEKIT_UI_SPIKE=v16 \
+            NODEKIT_UI_CAPTURE="TestResults/UI-Spike/${name}.png" \
+            NODEKIT_UI_CAPTURE_WIDTH="$width" \
+            NODEKIT_UI_CAPTURE_HEIGHT="$height" \
+              xvfb-run -a dotnet run --project NodeKit.csproj --no-build --configuration Release
+          }
+
+          capture_unclamped() {
+            local name="$1"
+            local width="$2"
+            local height="$3"
+            NODEKIT_UI_SPIKE=v16 \
+            NODEKIT_UI_CAPTURE="TestResults/UI-Spike/${name}.png" \
+            NODEKIT_UI_CAPTURE_WIDTH="$width" \
+            NODEKIT_UI_CAPTURE_HEIGHT="$height" \
+            NODEKIT_UI_CAPTURE_MIN_WIDTH=0 \
+            NODEKIT_UI_CAPTURE_MIN_HEIGHT=0 \
+              xvfb-run -a dotnet run --project NodeKit.csproj --no-build --configuration Release
+          }
+
+          # Layout-budget proxies only. They are not substitutes for native Windows DPI screenshots.
+          # 1366x768 / 1.25 ~= 1093x614 DIPs before OS working-area deductions.
+          capture "1366x768_at_125pct_nominal_logical" 1093 614
+          # 1920x1080 / 1.50 = 1280x720 DIPs before OS working-area deductions.
+          capture "1920x1080_at_150pct_nominal_logical" 1280 720
+          # Stress the current MinWidth/MinHeight hypothesis directly.
+          capture "min_hypothesis_980x600" 980 600
+
+          # Capture-only probes below the current 980x600 hypothesis. These do not change normal startup constraints.
+          # 560 DIP is intentionally close to the usable vertical budget expected after OS chrome/taskbar deductions
+          # on a 1366x768 display at 125%, and the narrower probes expose the first structural failure point.
+          capture_unclamped "working_budget_1093x560" 1093 560
+          capture_unclamped "stress_980x560" 980 560
+          capture_unclamped "stress_900x560" 900 560
+          capture_unclamped "stress_900x520" 900 520
+
+          cat > TestResults/UI-Spike/README.txt <<'EOF'
+          These frames are Linux/Xvfb Avalonia layout probes at logical viewport budgets.
+          They are useful for finding clipping, column starvation, and minimum-size failures.
+          The *_unclamped-style stress cases are generated only through capture-time MinWidth/MinHeight overrides;
+          normal NodeKit startup still uses the spike's XAML minimum-size hypothesis.
+          JSON siblings record client size, RenderScaling, and Avalonia Screen Bounds/WorkingArea metrics.
+          These probes do NOT prove Windows font rasterization, native working-area size, or real per-monitor DPI behavior.
+          Native Windows evidence at 1366x768@125% and 1920x1080@150% remains required before R1/MinWidth/MinHeight are finalized.
+          EOF
+
+      - name: Upload layout probes
+        uses: actions/upload-artifact@v7
+        with:
+          name: v16-avalonia-layout-probes
+          path: TestResults/UI-Spike/*
+          if-no-files-found: error
