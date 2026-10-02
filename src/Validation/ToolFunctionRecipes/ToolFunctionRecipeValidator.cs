@@ -37,11 +37,13 @@ namespace NodeKit.Validation.ToolFunctionRecipes
         private static readonly Regex _wholeElementReferencePattern =
             new(@"\A\{(param|input|output)\.(" + ReferenceNamePattern + @")\}\z", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
-        // 참조처럼 보이는 요소: '{' 바로 뒤에 namespace 후보 + '.'가 오는 부분이 있으면
-        // 참조 시도로 본다. `{}`, `{foo}`, `{ param.t }` 같은 경계는 설계상 OPEN(#115)이라
-        // 여기서 새로 판정하지 않고 literal로 둔다.
+        // 참조처럼 보이는 요소: '{' 바로 뒤에 namespace 후보 word token(영문자/'_'로 시작,
+        // 영문자/숫자/'_') + '.'가 오는 부분이 있으면 참조 시도로 본다. 따라서 `{params2.x}`,
+        // `{foo_bar.x}`도 잘못된 namespace 참조로 실패한다. `{}`, `{foo}`, `{ param.t }`,
+        // 숫자로 시작하는 `{1.5}` 같은 경계는 설계상 OPEN(#115)이라 여기서 새로 판정하지
+        // 않고 literal로 둔다.
         private static readonly Regex _referenceLikePattern =
-            new(@"\{[A-Za-z]+\.", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+            new(@"\{[A-Za-z_][A-Za-z0-9_]*\.", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
         public static ValidationResult Validate(ToolFunctionRecipe recipe)
         {

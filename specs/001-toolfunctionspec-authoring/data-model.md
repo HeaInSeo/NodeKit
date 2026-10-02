@@ -135,13 +135,13 @@ Ready ──(향후 제출 API, 이번 범위 밖)──▶ Submitted ──▶ 
 | `L1-TFR-005` | `EnforcedResources` | `*Limit < *Request` 시 실패 |
 | `L1-TFR-006` | 전체 | 필수 필드(functionId/command executable/fixture 최소 1개/enforced resource) 누락 시 실패. 포트 개수는 필수 조건이 아니다 |
 | `L1-TFR-007` | `ExpectedResults` | `OutputPortName`이 현재 `OutputPorts` 이름 중 하나가 아니면 실패(출력 포트가 없으면 `ExpectedResults`도 비어 있어야 함) |
-| `L1-TFR-008` | `Command.Arguments[i]` | 참조처럼 보이는 요소(`{<word>.` 포함)가 whole-element `{param\|input\|output.<name>}`이 아니면 실패 — embedded(`--t={param.t}`), 다른 namespace(`{params.x}`, `{Param.x}`), 이름 형식(`[A-Za-z][A-Za-z0-9._-]*`) 위반 |
+| `L1-TFR-008` | `Command.Arguments[i]` | 참조처럼 보이는 요소(`{<word>.` 포함, `<word>` = `[A-Za-z_][A-Za-z0-9_]*`)가 whole-element `{param\|input\|output.<name>}`이 아니면 실패 — embedded(`--t={param.t}`), 다른 namespace(`{params.x}`, `{Param.x}`, `{params2.x}`, `{foo_bar.x}`), 이름 형식(`[A-Za-z][A-Za-z0-9._-]*`) 위반 |
 | `L1-TFR-009` | `Command.Arguments[i]` | 참조 대상이 해당 namespace(`Parameters`/`InputPorts`/`OutputPorts`, Ordinal)에 없으면 실패 |
 | `L1-TFR-010` | `Command.Arguments[i]` | `{input.*}`/`{output.*}` 직접 참조 — 승인된 runtime finalization(B) profile 전에는 Ready 불가(Draft는 값을 보존) |
 | `L1-TFR-011` | `Parameters[j].Name` | parameter 이름이 참조 문법에 맞지 않거나 중복(Ordinal)이면 실패 |
 | `L1-TFR-012` | `Parameters[j]` | 선언된 parameter가 어떤 argument 요소에서도 `{param.<name>}`으로 참조되지 않으면 실패(consume-all; `CliArgumentMapping`/`Environment`/script는 참조 위치가 아님) |
 
-`L1-TFR-008`~`012`는 architecture §Authoring binding bridge(O-1, CLOSED MINIMUM)의 client-side 검증이다. 같은 참조의 반복은 허용한다. `{}`, `{foo}`, `{ param.t }` 같은 reference-like 경계와 `Executable` 안의 참조는 설계상 OPEN이라 여기서 판정하지 않는다. client 검증은 NodeVault 서버 검증(#115)을 대신하지 않는다.
+`L1-TFR-008`~`012`는 architecture §Authoring binding bridge(O-1, CLOSED MINIMUM)의 client-side 검증이다. 같은 참조의 반복은 허용한다. `{}`, `{foo}`, `{ param.t }`, 숫자로 시작하는 `{1.5}` 같은 reference-like 경계와 `Executable` 안의 참조는 설계상 OPEN이라 여기서 판정하지 않는다. client 검증은 NodeVault 서버 검증(#115)을 대신하지 않는다.
 
 ## Renderer 산출물 — `ToolFunctionBuildRequestPreview`
 

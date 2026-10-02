@@ -175,12 +175,24 @@ namespace NodeKit.Tests.ToolFunctionRecipes
         [InlineData("{foo.x}")]
         [InlineData("{params.x}")]
         [InlineData("{Param.x}")]
+        [InlineData("{params2.x}")]
+        [InlineData("{foo_bar.x}")]
+        [InlineData("{_param.x}")]
+        [InlineData("--t={param2.x}")]
         public void I5_WrongNamespace_Draft(string element)
         {
             var violations = AssertDraft(Recipe(new[] { element }, Param("x")));
 
             Assert.Contains(violations, v => v.RuleId == "L1-TFR-008" && v.Field == "Command.Arguments[0]");
             Assert.Contains(violations, v => v.RuleId == "L1-TFR-012" && v.Field == "Parameters[0]");
+        }
+
+        // A namespace token starting with a digit is not word-like; that boundary stays OPEN
+        // (#115) and the element is still a literal.
+        [Fact]
+        public void Open_DigitLeadingBraceToken_StaysLiteral()
+        {
+            AssertReady(Recipe(new[] { "sort", "{1.5}" }));
         }
 
         [Fact]
