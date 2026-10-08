@@ -26,7 +26,10 @@ GUARD_TARGET = "NodeKitVerifyProtoProvenance"
 
 
 def run(args):
+    # No MSBuild node/build-server reuse: lingering background nodes would keep
+    # loading the machine after this script exits.
     env = dict(os.environ)
+    env["MSBUILDDISABLENODEREUSE"] = "1"
     # Keep the decision under the test's control: the guard also treats the
     # CI environment variable as "official", which would hide the Debug case.
     env.pop("CI", None)
@@ -95,7 +98,7 @@ class ProtoOverrideGuardTests(unittest.TestCase):
         self.tamper_override()
         code, output = run([
             "build", PROJECTS[1], "--no-restore", "--configuration", "Release", "-nologo",
-            "-p:ApiProtosRoot=" + self.override])
+            "--disable-build-servers", "-p:ApiProtosRoot=" + self.override])
         self.assertNotEqual(code, 0, output)
         self.assertIn("NKPROTO002", output)
         self.assertNotIn("error CS", output)
