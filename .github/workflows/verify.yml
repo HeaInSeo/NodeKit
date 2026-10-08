@@ -38,6 +38,14 @@ jobs:
       - name: Restore
         run: dotnet restore NodeKit.sln --locked-mode
 
+      # Consumer bytes == protos/provenance.json == producer bytes at the
+      # pinned NodeVault commit. Never consults NodeVault's moving main.
+      - name: Proto provenance (pinned producer)
+        run: python3 scripts/verify-proto-provenance.py --fetch-producer
+
+      - name: Proto provenance script self-test
+        run: python3 scripts/test_verify_proto_provenance.py -v
+
       - name: NuGet package audit
         run: ./scripts/ci-audit-packages.sh
 
@@ -62,6 +70,11 @@ jobs:
 
       - name: Coverage gate script self-test
         run: python3 scripts/test_ci_check_coverage.py -v
+
+      # Runs after the tests: it starts deliberately failing Release builds
+      # with an undeclared /p:ApiProtosRoot= override (stopped before compile).
+      - name: Proto override guard self-test
+        run: python3 scripts/test_proto_override_guard.py -v
 
       - name: Upload coverage artifacts
         uses: actions/upload-artifact@v7

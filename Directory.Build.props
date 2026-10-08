@@ -4,7 +4,8 @@
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
   <!-- 저장소에 벤더링된 proto를 쓴다. 외부 경로 fallback은 없다.
-       /p:ApiProtosRoot= 로 명시 override는 계속 가능하다. 출처는 protos/SOURCE.md 참조. -->
+       /p:ApiProtosRoot= override는 로컬 Debug 빌드에서만 자유롭다. 공식(CI/Release) 빌드에서는
+       Directory.Build.targets가 protos/provenance.json에 선언된 바이트만 허용한다. 출처는 protos/SOURCE.md 참조. -->
   <!-- MSBuildThisFileDirectory: Directory.Build.props 파일 위치 = 항상 저장소 루트 -->
   <PropertyGroup Condition="'$(ApiProtosRoot)' == '' and Exists('$(MSBuildThisFileDirectory)protos')">
     <ApiProtosRoot>$(MSBuildThisFileDirectory)protos</ApiProtosRoot>
