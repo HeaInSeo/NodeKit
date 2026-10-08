@@ -173,6 +173,50 @@ class VerifyProtoProvenanceTests(unittest.TestCase):
         self.write_manifest(manifest)
         self.assertFails("must be byte-identical")
 
+    # A digest outside the verified sources[] must not become proof for the
+    # MSBuild guard (independent review P2-1: extra-key guard bypass).
+    UNVERIFIED_DIGEST = "d" * 64
+
+    def test_t2_top_level_extra_key_with_consumer_digest_fails(self):
+        manifest = self.load_manifest()
+        manifest["note"] = {"consumerSha256": self.UNVERIFIED_DIGEST}
+        self.write_manifest(manifest)
+        self.assertFails("manifest has unknown keys ['note']")
+
+    def test_t2_nested_extra_key_with_consumer_digest_fails(self):
+        manifest = self.load_manifest()
+        manifest["sources"][0]["generator"]["extra"] = {"consumerSha256": self.UNVERIFIED_DIGEST}
+        self.write_manifest(manifest)
+        self.assertFails("sources[0].generator has unknown keys ['extra']")
+
+    def test_t2_unknown_source_and_producer_keys_fail(self):
+        manifest = self.load_manifest()
+        manifest["sources"][0]["comment"] = "x"
+        manifest["sources"][0]["producer"]["branch"] = "main"
+        self.write_manifest(manifest)
+        code, output = self.run_script()
+        self.assertEqual(code, 1, output)
+        self.assertIn("sources[0] has unknown keys ['comment']", output)
+        self.assertIn("sources[0].producer has unknown keys ['branch']", output)
+
+    def test_t2_duplicate_consumer_digest_key_fails(self):
+        # JSON keeps the last duplicate key, so the parsed source is still
+        # valid, but the raw text the guard matches now has a second digest.
+        manifest = self.load_manifest()
+        real = '"consumerSha256": "%s"' % manifest["sources"][0]["consumerSha256"]
+        self.replace_in(
+            "protos/provenance.json", real,
+            '"consumerSha256": "%s",\n      %s' % (self.UNVERIFIED_DIGEST, real))
+        self.assertEqual(self.load_manifest(), manifest)
+        self.assertFails("the MSBuild official-build guard must accept only verified digests")
+
+    def test_escaped_digest_text_in_description_is_not_guard_matchable(self):
+        self.replace_in(
+            "protos/provenance.json", '"description": "',
+            '"description": "\\"consumerSha256\\": \\"%s\\" ' % self.UNVERIFIED_DIGEST)
+        code, output = self.run_script()
+        self.assertEqual(code, 0, output)
+
     def test_missing_manifest_fails(self):
         os.remove(self.path("protos/provenance.json"))
         self.assertFails("cannot read")

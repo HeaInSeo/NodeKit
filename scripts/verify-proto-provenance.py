@@ -42,6 +42,16 @@ API_PROTOS_ROOT_TOKEN = "$(ApiProtosRoot)"
 VENDORED_PROTOS_DIR = "protos"
 SKIPPED_DIRS = set([".git", "bin", "obj", "publish", "NodeKit_POC", "TestResults", "node_modules"])
 
+# Closed schema: an unknown key could carry text the MSBuild guard matches.
+MANIFEST_KEYS = set(["schemaVersion", "description", "sources"])
+SOURCE_KEYS = set(["consumerPath", "consumerSha256", "producer", "generator"])
+PRODUCER_KEYS = set(["repository", "path", "revision", "gitBlobSha1", "sha256"])
+GENERATOR_KEYS = set(["tool", "version", "runtime", "runtimeVersion", "projects"])
+# Directory.Build.targets accepts a compiled proto when this exact text,
+# followed by its lowercase SHA-256 and a closing quote, appears in the manifest.
+GUARD_KEY_TEXT = '"consumerSha256"'
+GUARD_ENTRY_TEXT = '"consumerSha256": "%s"'
+
 FULL_SHA1 = re.compile(r"^[0-9a-f]{40}$")
 FULL_SHA256 = re.compile(r"^[0-9a-f]{64}$")
 GITHUB_REPOSITORY = re.compile(r"^https://github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)$")
@@ -104,12 +114,52 @@ def producer_url(repository, revision, path):
     return "https://raw.githubusercontent.com/%s/%s/%s/%s" % (match.group(1), match.group(2), revision, path)
 
 
+def check_keys(label, value, allowed, errors):
+    if not isinstance(value, dict):
+        errors.append("%s must be an object" % label)
+        return False
+    unknown = sorted(set(value) - allowed)
+    if unknown:
+        errors.append("%s has unknown keys %s (allowed: %s)" % (label, unknown, sorted(allowed)))
+    return True
+
+
+def check_guard_entries(manifest_text, sources, errors):
+    """Every guard-matchable digest in the manifest text must be a verified source digest.
+
+    The MSBuild guard matches raw text, not parsed JSON. Each occurrence of
+    the consumerSha256 key text must therefore be exactly one verified
+    source's entry, so the guard accepts nothing the verifier did not prove.
+    """
+    expected = sorted(source["consumerSha256"] for source in sources)
+    found = []
+    start = manifest_text.find(GUARD_KEY_TEXT)
+    while start != -1:
+        match = re.match(r'"consumerSha256": "([0-9a-f]{64})"', manifest_text[start:])
+        found.append(match.group(1) if match else None)
+        start = manifest_text.find(GUARD_KEY_TEXT, start + 1)
+    if None in found:
+        errors.append(
+            "write every consumerSha256 as '\"consumerSha256\": \"<hex>\"' "
+            "so the MSBuild official-build guard can match it")
+    elif sorted(found) != expected:
+        errors.append(
+            "%s text has %d consumerSha256 entries %s but the verified sources declare %s; "
+            "the MSBuild official-build guard must accept only verified digests"
+            % (MANIFEST_RELATIVE_PATH, len(found), sorted(found), expected))
+
+
 def check_source(index, source, root, errors):
     label = "sources[%d]" % index
+    check_keys(label, source, SOURCE_KEYS, errors)
     consumer_path = source.get("consumerPath")
     consumer_sha256 = source.get("consumerSha256")
-    producer = source.get("producer") or {}
-    generator = source.get("generator") or {}
+    producer = source.get("producer")
+    generator = source.get("generator")
+    if not check_keys(label + ".producer", producer, PRODUCER_KEYS, errors):
+        producer = {}
+    if not check_keys(label + ".generator", generator, GENERATOR_KEYS, errors):
+        generator = {}
 
     if not isinstance(consumer_path, str) or not is_safe_relative_path(consumer_path):
         errors.append("%s.consumerPath must be a safe repository-relative path: %r" % (label, consumer_path))
@@ -260,6 +310,7 @@ def main(argv):
     if not isinstance(manifest, dict):
         print("FAIL: %s must be a JSON object" % MANIFEST_RELATIVE_PATH)
         return 1
+    check_keys("manifest", manifest, MANIFEST_KEYS, errors)
     if manifest.get("schemaVersion") != 1:
         errors.append("schemaVersion must be 1, got %r" % manifest.get("schemaVersion"))
     sources = manifest.get("sources")
@@ -278,13 +329,11 @@ def main(argv):
             continue
         if result["consumerPath"] in seen:
             errors.append("sources[%d]: duplicate consumerPath %s" % (index, result["consumerPath"]))
-        # Directory.Build.targets matches this exact text before Protobuf compilation.
-        if ('"consumerSha256": "%s"' % result.get("consumerSha256")) not in manifest_text:
-            errors.append(
-                "sources[%d]: write consumerSha256 as '\"consumerSha256\": \"<hex>\"' "
-                "so the MSBuild official-build guard can match it" % index)
         seen.add(result["consumerPath"])
         checked.append(result)
+
+    if not errors:
+        check_guard_entries(manifest_text, checked, errors)
 
     if errors:
         for error in errors:

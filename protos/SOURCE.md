@@ -45,4 +45,7 @@ W4 `ToolFunctionPresentation` projection이 이 읽기를 대체하면 두 억�
 - **공식 빌드 가드** (`Directory.Build.targets`): CI 환경·`ContinuousIntegrationBuild=true`·Release 구성에서는
   컴파일되는 proto의 SHA-256이 manifest의 `consumerSha256`과 같아야 한다. `/p:ApiProtosRoot=`로
   선언되지 않은 바이트를 넣으면 Protobuf 컴파일 전에 `NKPROTO002`로 실패한다. 로컬 Debug 빌드는 막지 않는다.
+  manifest 경로는 `/p:`로 바꿀 수 없다. `sources[]` 밖에 `consumerSha256`이 더 있으면 `NKPROTO003`으로 실패한다.
+- manifest 스키마는 닫혀 있다. 알 수 없는 키, 중복 `consumerSha256`, 검증된 source에 속하지 않은
+  `"consumerSha256": "<hex>"` 텍스트는 필수 CI에서 실패한다. 가드는 이 텍스트만 보므로 검증된 digest만 증명이 된다.
 - 최신 NodeVault `main`과의 호환성 관찰은 필수 판정이 아니다(필요하면 별도 비필수 작업으로 둔다).
