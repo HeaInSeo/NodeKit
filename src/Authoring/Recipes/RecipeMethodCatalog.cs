@@ -56,7 +56,7 @@ namespace NodeKit.Authoring.Recipes
                 Warning: null),
             new RecipeMethodInfo(
                 RecipeMethodId.SourceStructured,
-                Text("소스코드로 직접 빌드하기 (구조화, 고급)", "Build directly from source (structured, advanced)"),
+                Text("소스코드로 직접 빌드하기 (구조화: 빌드/런타임 분리)", "Build directly from source (structured: separate build/runtime)"),
                 Text(
                     "빌드 환경과 런타임 환경을 분리해서 최종 이미지에 빌드 도구가 남지 않게 합니다.",
                     "Separates the build environment from the runtime environment so build tools don't leak into the final image."),

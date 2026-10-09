@@ -37,6 +37,11 @@ namespace NodeKit.Cli
         private const string QuitCommand = "/quit";
         private const string ExitCommand = "/exit";
 
+        // S1-03-C07: 조회 실패는 입력한 pin을 바꾸지 않는다. submit은 ResolveRecipe를
+        // 호출하지 않고 서버가 pin을 다시 고르지도 않으므로 그런 안내를 하지 않는다.
+        private const string PinKeptMessage =
+            "   입력한 패키지 pin을 그대로 저장합니다. nodekit submit은 빌드 문자열을 다시 조회하지 않습니다 — 완전한 pin이 필요하면 직접 입력하세요.";
+
         // 마법사는 동기/블로킹 콘솔 루프라 네트워크 보조 호출(ResolveRecipe, base
         // image digest 조회) 도중에는 사용자가 /cancel을 입력할 방법이 없다 —
         // 유일한 탈출구는 타임아웃뿐이다.
@@ -138,7 +143,7 @@ namespace NodeKit.Cli
                 {
                     console.WriteLine();
                     console.WriteLine($"⚠  패키지 빌드 문자열을 조회하지 못했습니다: {NodeKit.Grpc.BuildErrorMessages.Describe(rpc)}");
-                    console.WriteLine("   저장 후 nodekit submit 시점에 다시 해소를 시도할 수 있습니다.");
+                    console.WriteLine(PinKeptMessage);
                     console.WriteLine();
                     resolveResult = ResolveRecipeResult.Unsupported();
                 }
@@ -152,7 +157,7 @@ namespace NodeKit.Cli
                 {
                     console.WriteLine();
                     console.WriteLine("⚠  패키지 빌드 문자열 조회가 시간 초과되었습니다.");
-                    console.WriteLine("   저장 후 nodekit submit 시점에 다시 해소를 시도할 수 있습니다.");
+                    console.WriteLine(PinKeptMessage);
                     console.WriteLine();
                     resolveResult = ResolveRecipeResult.Unsupported();
                 }
@@ -187,6 +192,17 @@ namespace NodeKit.Cli
 
             // 단계 8: 포트 설정
             PromptPortSelection(document, console, cancellation);
+
+            // 단계 6의 검증 뒤 단계 7(빌드 문자열 후보 적용)과 단계 8이 document를
+            // 바꿨다. 저장 직전에 같은 전체 L1 gate를 다시 통과해야 저장한다
+            // (S1-03-C06) — 후보 값은 서버 응답이라 그대로 믿지 않는다.
+            var finalResult = RecipeValidationPipeline.ValidateRecipe(document);
+            if (!finalResult.IsValid)
+            {
+                stderr.WriteLine("선택한 값을 적용한 뒤 최종 검증을 통과하지 못해 저장하지 않습니다.");
+                CliApp.PrintViolations(finalResult.Violations, stderr);
+                return RecipeCreateFlowResult.ValidationFailed;
+            }
 
             // 단계 9: 저장 경로 확정 + 저장
             RecipeCreateScreen.ClearForNewStep(console);
@@ -629,6 +645,22 @@ namespace NodeKit.Cli
                     return;
                 }
 
+                // DockerfilePath는 지금 파일을 읽어 DockerfileContent로 동결한다(S1-05).
+                if (string.Equals(field.Name, "DockerfilePath", StringComparison.Ordinal))
+                {
+                    if (TryImportDockerfile(session, line.Trim(), console))
+                    {
+                        return;
+                    }
+
+                    if (rawLine is null)
+                    {
+                        throw new RecipeCreateCancelledException();
+                    }
+
+                    continue;
+                }
+
                 // [0] 직접 입력으로 BaseImage 필드까지 온 경우, digest 없는 값을 그냥
                 // 받아 적기 전에 BeginnerGuideFlow의 컨테이너 clue와 동일한 자동 조회를
                 // 시도한다 — 지금까지는 이 경로만 "@sha256:..."을 사용자가 직접 계산해
@@ -675,6 +707,26 @@ namespace NodeKit.Cli
 
                 PrintViolations(violations, console);
             }
+        }
+
+        private static bool TryImportDockerfile(RecipeAuthoringSession session, string path, IRecipeConsole console)
+        {
+            if (!DockerfileContentImporter.TryRead(path, out var content, out var error))
+            {
+                console.WriteLine(error);
+                return false;
+            }
+
+            var violations = session.SetImportedDockerfile(path, content);
+            if (violations.Count > 0)
+            {
+                PrintViolations(violations, console);
+                return false;
+            }
+
+            console.WriteLine($"Dockerfile 내용을 읽어 Recipe에 저장합니다: {path}");
+            console.WriteLine("   이후 원본 파일이 바뀌어도 저장된 Recipe는 바뀌지 않습니다.");
+            return true;
         }
 
         // Dockerfile 같은 값은 각 instruction이 별도 줄에 있어야 하는데, 일반

@@ -186,7 +186,7 @@ namespace NodeKit.Cli.Tests
                 "0.7.17", // ToolVersion
                 "run.sh", // Script
                 ImageRefWithDigest, // ImageRef
-                "./Dockerfile", // DockerfilePath
+                "", // DockerfilePath — optional, skip and type DockerfileContent instead
                 $"FROM {ImageRefWithDigest}", // DockerfileContent line 1
                 "USER 1000", // DockerfileContent line 2
                 "", // DockerfileContent: blank line ends multi-line input
@@ -224,7 +224,6 @@ namespace NodeKit.Cli.Tests
                     "--field", "Script=run.sh",
                     "--field", $"BaseImage={ImageRefWithDigest}",
                     "--field", $"DockerfileContent=FROM {ImageRefWithDigest}\nUSER 1000\n",
-                    "--field", "DockerfilePath=./Dockerfile",
                 },
                 stdout,
                 stderr);
@@ -249,7 +248,7 @@ namespace NodeKit.Cli.Tests
                 "2", "n", "n", "n", "n", "n", "y", "", "y",
                 "bwa-mem", "0.7.17", "run.sh",
                 ImageRefWithDigest,
-                "./Dockerfile",
+                "", // DockerfilePath skipped
                 $"FROM {ImageRefWithDigest}",
                 "USER 1000",
                 // stdin ends here — no blank line to terminate DockerfileContent

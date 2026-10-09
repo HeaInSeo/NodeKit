@@ -25,7 +25,8 @@ namespace NodeKit.Cli
             }
 
             return "BuildDependencies는 현재 자동으로 설치되지 않습니다 — BaseImage에 이미 포함되어 " +
-                "있는지 직접 확인하세요. (" + string.Join(", ", buildDependencies) + ")";
+                "있는지 직접 확인하세요. (" + string.Join(", ", buildDependencies) + ") " +
+                "로컬 검증은 실제 빌드 서버가 이 Recipe를 수용하는지 확인하지 않습니다.";
         }
     }
 }

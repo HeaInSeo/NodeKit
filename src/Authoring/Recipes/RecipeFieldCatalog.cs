@@ -227,12 +227,10 @@ namespace NodeKit.Authoring.Recipes
                         ClearList: recipe => recipe.BuildDependencies.Clear()),
                 },
 
-                // §13 R22-B. Advanced/opt-in — not offered by the interactive
-                // wizard (RecipeMethodRecommender/MethodRecommendationPresenter/
-                // BeginnerGuideFlow are unaware of this method by design; see
-                // RecipeMethodId.SourceStructured's doc comment). Reachable via
-                // `nodekit recipe create --non-interactive --method
-                // source-structured`. SourceUri/SourceChecksum/
+                // §13 R22-B. The default source path (Guided source clue and
+                // Quick-setup recommendation; see RecipeMethodId.SourceStructured's
+                // doc comment). Only the "advanced" profile choice is opt-in.
+                // SourceUri/SourceChecksum/
                 // SourceBuildCommands/BuildDependencies fields are identical to
                 // [RecipeMethodId.Source] above — same reproducibility contract,
                 // just a different base-image model (BuildProfile/RuntimeProfile
@@ -352,15 +350,21 @@ namespace NodeKit.Authoring.Recipes
                 [RecipeMethodId.Dockerfile] = new[]
                 {
                     BaseImageField(),
+                    // DockerfilePath와 DockerfileContent는 one-of 입력이다(S1-05).
+                    // Path를 주면 그 파일 bytes를 읽어 DockerfileContent에 동결하고
+                    // (RecipeAuthoringSession.SetImportedDockerfile), Path는
+                    // provenance로만 남는다. 저장된 Recipe는 Content만으로 render되므로
+                    // 원본 파일이 바뀌거나 없어도 결과가 같다. 그래서 Content는 항상
+                    // Required이고 Path는 Optional이다.
                     new RecipeFieldDescriptor(
                         Name: "DockerfilePath",
                         Type: RecipeFieldType.Scalar,
-                        Requirement: RecipeFieldRequirement.Required,
+                        Requirement: RecipeFieldRequirement.Optional,
                         DefaultValue: null,
                         Label: Text("Dockerfile 경로", "Dockerfile path"),
                         Help: Text(
-                            "Dockerfile 위치입니다. DockerfileContent 대신 사용할 수 있습니다.",
-                            "The Dockerfile location. Usable instead of DockerfileContent."),
+                            "기존 Dockerfile 위치입니다. 입력하면 파일 내용을 지금 읽어 Recipe의 DockerfileContent로 저장합니다 — 이후 원본 파일이 바뀌어도 저장된 Recipe는 바뀌지 않습니다. 비워두면 DockerfileContent를 직접 입력합니다.",
+                            "An existing Dockerfile location. When given, its content is read now and stored as the Recipe's DockerfileContent — later changes to the original file do not change the saved Recipe. Leave empty to type DockerfileContent directly."),
                         Examples: new[] { "./Dockerfile" },
                         Choices: Array.Empty<RecipeChoice>(),
                         Apply: (recipe, value) => recipe.DockerfilePath = (string)value),
@@ -371,8 +375,8 @@ namespace NodeKit.Authoring.Recipes
                         DefaultValue: null,
                         Label: Text("Dockerfile 내용", "Dockerfile content"),
                         Help: Text(
-                            "Dockerfile 내용입니다. DockerfilePath 대신 사용할 수 있습니다.",
-                            "The Dockerfile content. Usable instead of DockerfilePath."),
+                            "Dockerfile 내용입니다. DockerfilePath를 입력했다면 그 파일 내용이 자동으로 들어가며, 둘을 함께 입력할 수는 없습니다.",
+                            "The Dockerfile content. When DockerfilePath was given, its file content is used here; the two cannot both be given."),
                         Examples: Array.Empty<string>(),
                         Choices: Array.Empty<RecipeChoice>(),
                         Apply: (recipe, value) => recipe.DockerfileContent = (string)value,
@@ -384,8 +388,8 @@ namespace NodeKit.Authoring.Recipes
                         DefaultValue: ".",
                         Label: Text("빌드 컨텍스트", "Build context"),
                         Help: Text(
-                            "Docker build context입니다. 값이 없으면 현재 디렉터리가 적용됩니다.",
-                            "The Docker build context. Defaults to the current directory when absent."),
+                            "Docker build context입니다. 기본값 '.'만 허용합니다. NodeKit은 로컬 build context 파일을 빌드 서버로 전송하지 않으므로, 기본값 '.'도 로컬 파일이 빌드에 전달된다는 뜻이 아닙니다 — Dockerfile의 COPY/ADD는 로컬 파일에 의존하지 않게 작성하세요.",
+                            "The Docker build context. Only the default '.' is accepted. NodeKit does not transfer local build-context files to the build server, so even '.' does not mean local files reach the build — write COPY/ADD so they do not depend on local files."),
                         Examples: Array.Empty<string>(),
                         Choices: Array.Empty<RecipeChoice>(),
                         Apply: (recipe, value) => recipe.BuildContext = (string)value),

@@ -449,7 +449,6 @@ namespace NodeKit.Cli.Tests
             "--field", "Script=run.sh",
             "--field", $"BaseImage={ImageRefWithDigest}",
             "--field", $"DockerfileContent=FROM {ImageRefWithDigest}\nRUN echo ok\nUSER 1000\n",
-            "--field", "DockerfilePath=./Dockerfile",
         };
 
         private static string[] SourceArgs(bool includeBuildDependencies)
