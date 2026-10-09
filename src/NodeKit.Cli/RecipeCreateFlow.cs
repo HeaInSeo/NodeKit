@@ -49,7 +49,7 @@ namespace NodeKit.Cli
         internal const string CommandPortGuidance =
             "포트/명령은 ToolSpec 빌드가 확정된 뒤 nodekit function-recipe create --tool-spec-digest <ToolSpec digest> --base-tool-image-digest <빌드된 image digest>로 작성하세요. " +
             "두 값은 nodekit submit 출력에서 복사합니다: ToolSpec digest는 'ToolSpec digest:' 뒤의 값" +
-            "(--format jsonl은 이 문구가 든 state 레코드의 message), image digest는 마지막 '이미지 digest:' 줄의 digest" +
+            "(--format jsonl은 completed 레코드의 tool_spec_digest), image digest는 마지막 '이미지 digest:' 줄의 digest" +
             "(ref@ 뒤 부분, --format jsonl은 completed 레코드의 image_digest)입니다. " +
             "Recipe의 Command/Inputs/Outputs는 ToolSpec raw_spec에 포함되지 않습니다.";
 

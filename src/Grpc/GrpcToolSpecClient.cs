@@ -102,10 +102,12 @@ namespace NodeKit.Grpc
             // S1-07-C05: function-recipe create --tool-spec-digest에 그대로 복사할 수
             // 있도록 서버가 확정한 ToolSpec digest를 자르지 않고 남긴다. 빌드된
             // image digest와 다른 값이므로 "ToolSpec digest:" 라벨로 구분한다.
+            // 자동화는 문구가 아니라 ToolSpecDigest 필드(jsonl의 tool_spec_digest)를 읽는다.
             yield return new BuildEvent
             {
                 Kind = BuildEventKind.Log,
                 Message = $"{ToolSpecDigestLogPrefix}{resolveResp!.ToolSpecDigest}",
+                ToolSpecDigest = resolveResp.ToolSpecDigest,
             };
 
             // Step 2: SubmitToolBuild — 비동기 빌드를 큐에 넣는다.

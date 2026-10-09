@@ -852,9 +852,9 @@ nodekit submit recipe.json
 보여주지 않는다), 마지막 `이미지 digest:` 줄은 빌드된 image의 digest다 — 서로
 다른 값이다. `nodekit function-recipe create`의 `--tool-spec-digest`에는 앞의 값을,
 `--base-tool-image-digest`에는 뒤 줄의 digest(`ref@` 뒤 부분)를 그대로 복사한다.
-`--format jsonl`에서는 ToolSpec digest가 같은 문구(`spec 해결 완료 — ToolSpec digest: …`)를
-`message`로 가진 첫 `state` 레코드에, image digest는 `completed` 레코드의
-`image_digest` 필드에 있다.
+`--format jsonl`에서는 두 값 모두 구조화된 필드로 나온다 — 성공 `completed`
+레코드의 `tool_spec_digest`(ToolSpec digest)와 `image_digest`(빌드된 image
+digest)를 그대로 쓴다. `message` 문구를 파싱하지 않는다.
 
 | 옵션 | 의미 |
 |---|---|
@@ -879,6 +879,8 @@ stdout에는 진행/안내 문구가 전혀 섞이지 않고 JSON 레코드만 �
   생략되고 `completed`에 `build_id`가 바로 담긴다 — `build_id` 자체는 항상
   보존되지만 "`submitted` 다음에 `completed`" 순서가 매번 보장되지는 않는다.
 - `state` — 그 이후 진행 상황(빌드 상태, 이미지 참조/digest, integrity health 등).
+  ToolSpec을 해결한 직후(build ID를 받기 전)의 `state` 레코드에는 서버가 확정한
+  전체 ToolSpec digest가 `tool_spec_digest` 필드로 실린다.
 - `completed` — **스트림의 마지막 레코드, 항상 정확히 한 번**. 성공/실패/
   `--connect-timeout`/`--watch-timeout`/Ctrl-C 취소/terminal 이벤트 없는 스트림
   종료 전부 `type: "completed"`로 통일된다(별도 `"error"` type 없음) — 소비하는
@@ -888,7 +890,9 @@ stdout에는 진행/안내 문구가 전혀 섞이지 않고 JSON 레코드만 �
 모든 레코드는 `schema_version: "nodekit.submit.v1"`을 포함한다. `build_id`는
 모든 레코드에서 optional이다 — `--connect-timeout`처럼 build ID를 받기 전에
 끝나는 실패도 있기 때문. `status`/`error_code`는 `completed`에만 있고,
-`error_code`는 실패(`status != "Succeeded"`)일 때만 붙는다. 종료 코드 계약은
+`error_code`는 실패(`status != "Succeeded"`)일 때만 붙는다. `tool_spec_digest`는
+spec 해결 `state` 레코드와 성공(`Succeeded`) `completed` 레코드에만 있고,
+`image_digest`와 다른 값이다. 종료 코드 계약은
 `--format human`과 동일하다(0/1/2/124/125/130). 제출 이전(로컬)에 확정 실패하는
 경우 — 주소 누락, recipe 읽기/파싱 실패, buildKind 누락, L1 검증 실패,
 잘못된 `--url` 등 — 도 `completed` 레코드를 정확히 한 번 내보낸다(exit 1 또는
@@ -911,10 +915,11 @@ stdout에는 진행/안내 문구가 전혀 섞이지 않고 JSON 레코드만 �
 
 ```bash
 $ nodekit submit recipe.json --format jsonl
+{"schema_version":"nodekit.submit.v1","type":"state","state":"Log","message":"spec 해결 완료 — ToolSpec digest: 8f3a1c2d...","tool_spec_digest":"8f3a1c2d..."}
 {"schema_version":"nodekit.submit.v1","type":"submitted","build_id":"abc-123"}
 {"schema_version":"nodekit.submit.v1","type":"state","build_id":"abc-123","state":"Building"}
 {"schema_version":"nodekit.submit.v1","type":"state","build_id":"abc-123","state":"Pushing"}
-{"schema_version":"nodekit.submit.v1","type":"completed","build_id":"abc-123","status":"Succeeded","image_digest":"sha256:...","recovery":"none"}
+{"schema_version":"nodekit.submit.v1","type":"completed","build_id":"abc-123","status":"Succeeded","tool_spec_digest":"8f3a1c2d...","image_digest":"sha256:...","recovery":"none"}
 $ echo $?
 0
 ```

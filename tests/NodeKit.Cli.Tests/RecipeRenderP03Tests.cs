@@ -438,18 +438,63 @@ namespace NodeKit.Cli.Tests
                 .Split('\n', StringSplitOptions.RemoveEmptyEntries)
                 .Select(l => JsonDocument.Parse(l).RootElement.Clone())
                 .ToList();
-            var message = records
-                .Where(r => r.GetProperty("type").GetString() == "state" && r.TryGetProperty("message", out _))
-                .Select(r => r.GetProperty("message").GetString()!)
-                .Single(m => m.Contains("ToolSpec digest: ", StringComparison.Ordinal));
-            var toolSpecDigest = message[(message.IndexOf("ToolSpec digest: ", StringComparison.Ordinal) + "ToolSpec digest: ".Length)..];
+            // Both values come from structured fields, never from the unstable message text.
             var completed = records.Last();
             Assert.Equal("completed", completed.GetProperty("type").GetString());
+            Assert.Equal("Succeeded", completed.GetProperty("status").GetString());
+            var toolSpecDigest = completed.GetProperty("tool_spec_digest").GetString()!;
             var imageDigest = completed.GetProperty("image_digest").GetString()!;
 
             Assert.Equal(ResolvedToolSpecDigest, toolSpecDigest);
             Assert.Equal(BuiltImageDigest, imageDigest);
+            Assert.NotEqual(toolSpecDigest, imageDigest);
             AssertFunctionRecipeAccepts(toolSpecDigest, imageDigest);
+        }
+
+        [Fact]
+        public void S1_07_C05_JsonlSubmitOutput_ReportsToolSpecDigestOnResolutionStateRecord()
+        {
+            using var server = DigestServer();
+            using var client = new GrpcToolSpecClient(server.Channel);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = SubmitCommand.Run(new[] { "submit", WriteRecipe(PackageRecipe()), "--format", "jsonl" }, stdout, stderr, client);
+
+            Assert.Equal(0, exitCode);
+            var records = stdout.ToString()
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                .Select(l => JsonDocument.Parse(l).RootElement.Clone())
+                .ToList();
+            var withField = records.Where(r => r.TryGetProperty("tool_spec_digest", out _)).ToList();
+
+            // The resolution is reported once as a state record before any build ID exists,
+            // and the completed record repeats the same value.
+            var state = Assert.Single(withField, r => r.GetProperty("type").GetString() == "state");
+            Assert.False(state.TryGetProperty("build_id", out _));
+            Assert.Equal(ResolvedToolSpecDigest, state.GetProperty("tool_spec_digest").GetString());
+            Assert.False(state.TryGetProperty("image_digest", out _));
+            Assert.Equal(2, withField.Count);
+            Assert.Equal("completed", withField[^1].GetProperty("type").GetString());
+            Assert.Equal(ResolvedToolSpecDigest, withField[^1].GetProperty("tool_spec_digest").GetString());
+            Assert.All(records, r => Assert.Equal("nodekit.submit.v1", r.GetProperty("schema_version").GetString()));
+        }
+
+        [Fact]
+        public void S1_07_C05_JsonlSubmitOutput_PreWatchFailureHasNoToolSpecDigest()
+        {
+            using var server = new GrpcTestServer();
+            server.Fake.OnResolveToolSpec = _ => throw new global::Grpc.Core.RpcException(new global::Grpc.Core.Status(global::Grpc.Core.StatusCode.InvalidArgument, "bad spec"));
+            using var client = new GrpcToolSpecClient(server.Channel);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = SubmitCommand.Run(new[] { "submit", WriteRecipe(PackageRecipe()), "--format", "jsonl" }, stdout, stderr, client);
+
+            Assert.Equal(1, exitCode);
+            var completed = JsonDocument.Parse(Assert.Single(stdout.ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries))).RootElement;
+            Assert.Equal("PRE_WATCH_FAILED", completed.GetProperty("error_code").GetString());
+            Assert.False(completed.TryGetProperty("tool_spec_digest", out _));
         }
 
         // ── fixtures ──────────────────────────────────────────────────────────

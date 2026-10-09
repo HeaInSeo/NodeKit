@@ -211,6 +211,7 @@ namespace NodeKit.Cli
             string? lastImageDigest = null;
             string? lastImageRef = null;
             string? lastIntegrityHealth = null;
+            string? resolvedToolSpecDigest = null;
             DateTimeOffset? lastEventReceivedAt = null;
             ConsoleCancelEventHandler onCancelKeyPress = (_, e) =>
             {
@@ -244,7 +245,8 @@ namespace NodeKit.Cli
                                         ev.Message,
                                         ev.ImageRef,
                                         ev.ImageDigest,
-                                        ev.IntegrityHealth));
+                                        ev.IntegrityHealth,
+                                        ev.ToolSpecDigest));
                         }
                     }
                     else
@@ -310,6 +312,11 @@ namespace NodeKit.Cli
                         lastIntegrityHealth = ev.IntegrityHealth;
                     }
 
+                    if (!string.IsNullOrEmpty(ev.ToolSpecDigest))
+                    {
+                        resolvedToolSpecDigest = ev.ToolSpecDigest;
+                    }
+
                     if (ev.Kind == BuildEventKind.Succeeded)
                     {
                         if (jsonl)
@@ -328,7 +335,8 @@ namespace NodeKit.Cli
                                     imageRef: lastImageRef,
                                     imageDigest: lastImageDigest,
                                     integrityHealth: lastIntegrityHealth,
-                                    recovery: RecoveryDisposition.None));
+                                    recovery: RecoveryDisposition.None,
+                                    toolSpecDigest: resolvedToolSpecDigest));
                             return 0;
                         }
 
