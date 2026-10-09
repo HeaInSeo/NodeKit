@@ -42,6 +42,14 @@ namespace NodeKit.Cli
         private const string PinKeptMessage =
             "   입력한 패키지 pin을 그대로 저장합니다. nodekit submit은 빌드 문자열을 다시 조회하지 않습니다 — 완전한 pin이 필요하면 직접 입력하세요.";
 
+        // S1-07-C05: Recipe의 Command/Inputs/Outputs는 ToolSpec raw_spec에 담기지
+        // 않는다. 명령/포트는 확정된 ToolSpec digest를 참조하는 function-recipe에서 쓴다.
+        internal const string CommandPortReplacedMessage = "이 단계는 nodekit function-recipe create로 대체되었습니다.";
+
+        internal const string CommandPortGuidance =
+            "포트/명령은 ToolSpec 빌드가 확정된 뒤 그 digest를 --tool-spec-digest로 지정해 nodekit function-recipe create에서 작성하세요. " +
+            "Recipe의 Command/Inputs/Outputs는 ToolSpec raw_spec에 포함되지 않습니다.";
+
         // 마법사는 동기/블로킹 콘솔 루프라 네트워크 보조 호출(ResolveRecipe, base
         // image digest 조회) 도중에는 사용자가 /cancel을 입력할 방법이 없다 —
         // 유일한 탈출구는 타임아웃뿐이다.
@@ -522,8 +530,8 @@ namespace NodeKit.Cli
                     if (field.Name == "Command")
                     {
                         console.WriteLine();
-                        console.WriteLine("이 단계는 nodekit function-recipe create로 대체되었습니다.");
-                        console.WriteLine("포트/명령 설정은 확정된 ToolSpec image를 기반으로 그 명령에서 진행하세요.");
+                        console.WriteLine(CommandPortReplacedMessage);
+                        console.WriteLine(CommandPortGuidance);
                         console.WriteLine();
                         session.CompleteListField(field.Name);
                     }
@@ -1201,8 +1209,8 @@ namespace NodeKit.Cli
 
             RecipeCreateScreen.ClearForNewStep(console);
             console.WriteLine("── 포트/명령 설정 ──────────────────────────────────────────");
-            console.WriteLine("이 단계는 nodekit function-recipe create로 대체되었습니다.");
-            console.WriteLine("확정된 ToolSpec image digest를 참조해 그 명령에서 포트/명령을 작성하세요.");
+            console.WriteLine(CommandPortReplacedMessage);
+            console.WriteLine(CommandPortGuidance);
             console.WriteLine();
         }
 

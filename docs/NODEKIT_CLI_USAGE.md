@@ -1026,6 +1026,15 @@ $ echo $?
   **`raw_spec` 필드 값만**(나머지 세 필드는 포함하지 않음) 동일한
   `ToolSpecRawSpecFactory` 함수로 만들어 미리보기로 찍는다 — 네트워크 호출
   없이 실제 submit이 raw_spec으로 뭘 보내는지 확인하고 싶을 때 쓴다.
+  키는 정확히 `tool_name`, `version`, `kind`(항상 `1`), `image_uri`,
+  `dockerfile_content`, `script`, `environment_spec` 7개다.
+
+Recipe의 `Command`/`Inputs`/`Outputs`/`Display*` 필드는 `build-request`
+미리보기에만 나오고 `raw_spec`에는 들어가지 않는다 — NodeVault가 ToolSpec
+스키마에서 뺀 필드다. 포트와 실행 명령은 ToolSpec 빌드가 확정된 뒤 그 digest를
+`--tool-spec-digest`로 지정해 `nodekit function-recipe create`에서 작성한다.
+`recipe create`의 대화형 흐름은 이 단계를 안내만 하고 건너뛰며,
+`--non-interactive --field Command=...`는 값을 저장하되 같은 안내를 경고로 출력한다.
 
 `--format` 값은 대소문자와 `_`/`-`를 구분하지 않는다(`RAW-SPEC`, `raw_spec`
 모두 `raw-spec`으로 인식) — 그래도 안 맞으면 종료 코드 2로 명시적으로
@@ -1058,10 +1067,12 @@ $ cat build-request.json
   "ToolName": "bwa",
   "Version": "0.7.17",
   "ImageUri": "registry.example.com/bwa:0.7.17@sha256:...",
-  "DockerfileContent": "FROM registry.example.com/bwa:0.7.17@sha256:...\nRUN echo ok\n",
+  "DockerfileContent": "FROM registry.example.com/bwa:0.7.17@sha256:...\nRUN echo ok\nUSER 1000\n",
   "Script": "bwa mem",
   "Command": [],
   "EnvironmentSpec": "",
+  "Inputs": [],
+  "Outputs": [],
   "DisplayLabel": "",
   "DisplayDescription": "",
   "DisplayCategory": "",
@@ -1084,7 +1095,7 @@ ls: cannot access 'build-request.json': No such file or directory
 
 ```bash
 $ nodekit render recipe.json --out - --format raw-spec
-{"tool_name":"bwa","version":"0.7.17","kind":1,"image_uri":"registry.example.com/bwa:0.7.17@sha256:...","dockerfile_content":"FROM registry.example.com/bwa:0.7.17@sha256:...\nRUN echo ok\n","script":"bwa mem","environment_spec":""}
+{"tool_name":"bwa","version":"0.7.17","kind":1,"image_uri":"registry.example.com/bwa:0.7.17@sha256:...","dockerfile_content":"FROM registry.example.com/bwa:0.7.17@sha256:...\nRUN echo ok\nUSER 1000\n","script":"bwa mem","environment_spec":""}
 ```
 
 `--pretty`를 같이 쓰면 같은 내용을 들여쓰기해서 찍는다(긴 Dockerfile 내용이
@@ -1097,7 +1108,7 @@ $ nodekit render recipe.json --out - --format raw-spec --pretty
   "version": "0.7.17",
   "kind": 1,
   "image_uri": "registry.example.com/bwa:0.7.17@sha256:...",
-  "dockerfile_content": "FROM registry.example.com/bwa:0.7.17@sha256:...\nRUN echo ok\n",
+  "dockerfile_content": "FROM registry.example.com/bwa:0.7.17@sha256:...\nRUN echo ok\nUSER 1000\n",
   "script": "bwa mem",
   "environment_spec": ""
 }
