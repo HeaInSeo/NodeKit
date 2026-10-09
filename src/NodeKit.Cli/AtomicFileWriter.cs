@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace NodeKit.Cli
@@ -199,7 +200,14 @@ namespace NodeKit.Cli
                 return info.LinkTarget is null ? null : "저장 대상이 깨진 심볼릭 링크입니다";
             }
 
-            return info.LinkTarget is null ? null : "저장 대상이 심볼릭 링크입니다";
+            if (info.LinkTarget is not null)
+            {
+                return "저장 대상이 심볼릭 링크입니다";
+            }
+
+            // FIFO/소켓/장치는 FileInfo로 구별되지 않는다(Exists=true, LinkTarget=null).
+            // rename은 그 항목을 일반 파일로 바꿔 버리므로 교체 전에 거부한다.
+            return LinuxFileType.IsNonRegular(fullPath) ? "저장 대상이 일반 파일이 아닙니다(FIFO/소켓/장치 등)" : null;
         }
 
         // FileShare.None은 Unix에서 flock(LOCK_EX|LOCK_NB)로 구현된다. 잠금 파일은
@@ -261,17 +269,22 @@ namespace NodeKit.Cli
             File.SetUnixFileMode(temp.SafeFileHandle, File.GetUnixFileMode(fullPath));
         }
 
-        private static void TryDelete(string path)
+        // 정리 실패는 저장 결과를 바꾸지 않는다 — 남은 임시 파일은 다음 writer가
+        // 잠금을 잡은 뒤 RemoveStaleTempFiles로 다시 지운다.
+        private static bool TryDelete(string path)
         {
             try
             {
                 File.Delete(path);
+                return true;
             }
             catch (IOException)
             {
+                return false;
             }
             catch (UnauthorizedAccessException)
             {
+                return false;
             }
         }
 
@@ -280,5 +293,60 @@ namespace NodeKit.Cli
 
         private static AtomicWriteResult Cancelled(string path) =>
             new(AtomicWriteOutcome.Cancelled, CancelledCode, $"저장이 취소되었습니다: {path}. 기존 파일은 바뀌지 않았습니다.");
+    }
+
+    /// <summary>
+    /// 지원 profile(Ubuntu/glibc, linux-x64)에서 파일 종류를 확인한다. .NET은
+    /// FIFO/소켓/장치를 FileAttributes로 구별하지 않으므로 statx(2)를 쓴다.
+    /// statx 구조체는 아키텍처와 무관하게 고정 배치다(stx_mode: offset 28, u16).
+    /// 지원 profile 밖(Linux 아님, statx 없음)에서는 검사하지 않는다.
+    /// </summary>
+    internal static class LinuxFileType
+    {
+        private const int AtFdCwd = -100;
+        private const int AtSymlinkNoFollow = 0x100;
+        private const uint StatxType = 0x1;
+        private const int StatxSize = 256;
+        private const int StatxModeOffset = 28;
+        private const int TypeMask = 0xF000;
+        private const int RegularFile = 0x8000;
+
+        public static bool IsNonRegular(string path)
+        {
+            if (!OperatingSystem.IsLinux())
+            {
+                return false;
+            }
+
+            var buffer = new byte[StatxSize];
+            try
+            {
+                if (Statx(AtFdCwd, path, AtSymlinkNoFollow, StatxType, buffer) != 0)
+                {
+                    // 경로가 사라졌거나 확인할 수 없다 — 존재 확인은 호출자가 이미 했다.
+                    return false;
+                }
+            }
+            catch (EntryPointNotFoundException)
+            {
+                return false;
+            }
+            catch (DllNotFoundException)
+            {
+                return false;
+            }
+
+            var mode = BitConverter.ToUInt16(buffer, StatxModeOffset);
+            return (mode & TypeMask) != RegularFile;
+        }
+
+        [DllImport("libc", EntryPoint = "statx", SetLastError = true)]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
+        private static extern int Statx(
+            int dirfd,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string pathname,
+            int flags,
+            uint mask,
+            [Out] byte[] statxbuf);
     }
 }

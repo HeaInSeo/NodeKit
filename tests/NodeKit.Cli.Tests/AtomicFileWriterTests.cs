@@ -285,6 +285,42 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(_oldBytes, File.ReadAllBytes(pointee));
         }
 
+        // FIFO는 FileInfo로 일반 파일과 구별되지 않는다. rename으로 덮어쓰면 FIFO가
+        // 일반 파일로 바뀌므로 교체 전에 거부해야 한다.
+        [Fact]
+        public void Write_TargetIsFifo_Exit2_FifoUntouched()
+        {
+            if (!OperatingSystem.IsLinux() || !File.Exists("/usr/bin/mkfifo"))
+            {
+                Assert.Skip("Linux mkfifo(1) 전용");
+            }
+
+            var fifo = Target("pipe.json");
+            using (var mkfifo = Process.Start("/usr/bin/mkfifo", fifo)!)
+            {
+                mkfifo.WaitForExit();
+                Assert.Equal(0, mkfifo.ExitCode);
+            }
+
+            Assert.True(LinuxFileType.IsNonRegular(fifo));
+
+            var result = AtomicFileWriter.Write(fifo, _newBytes, TestContext.Current.CancellationToken);
+
+            Assert.Equal(2, result.ExitCode);
+            Assert.Equal(AtomicFileWriter.TargetUnsupportedCode, result.Code);
+            Assert.True(LinuxFileType.IsNonRegular(fifo));
+            Assert.Empty(TempFiles());
+        }
+
+        [Fact]
+        public void LinuxFileType_RegularFile_IsNotNonRegular()
+        {
+            var target = Target();
+            File.WriteAllBytes(target, _oldBytes);
+
+            Assert.False(LinuxFileType.IsNonRegular(target));
+        }
+
         [Fact]
         public void Write_DirectoryNotWritable_Exit2_PreservesOldBytes()
         {
