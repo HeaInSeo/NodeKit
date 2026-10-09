@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using NodeKit.Cli;
 using Xunit;
 
@@ -253,6 +254,27 @@ namespace NodeKit.Cli.Tests
             Assert.Contains("파일은 저장되지 않았습니다.", stdout.ToString());
         }
 
+        // 쓰는 도중 들어온 Ctrl-C: 저장 직전 검사는 이미 지났고(IsCancellationRequested
+        // false) token만 취소된 상태 — writer가 교체 전에 보고 130으로 끝나야 한다.
+        [Fact]
+        public void InteractiveRecipeCreate_CtrlCDuringWrite_TokenReachesWriter_Exit130_KeepsExistingBytes()
+        {
+            var outPath = Path.Join(_workDir, "interactive.json");
+            File.WriteAllText(outPath, Marker);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+
+            var exit = RunInteractive(outPath, stdout, stderr, new TokenOnlyCancellationSource(cts.Token));
+
+            Assert.Equal(130, exit);
+            Assert.Equal(Marker, File.ReadAllText(outPath));
+            Assert.DoesNotContain("저장되었습니다", stdout.ToString());
+            Assert.Contains($"[{AtomicFileWriter.CancelledCode}]", stderr.ToString());
+            Assert.Empty(Directory.GetFiles(_workDir, "*" + AtomicFileWriter.TempSuffix));
+        }
+
         [Fact]
         public void InteractiveRecipeCreate_Success_PrintsSavedOnlyAfterCommit()
         {
@@ -408,6 +430,15 @@ namespace NodeKit.Cli.Tests
             public FixedCancellationSource(bool cancelled) => IsCancellationRequested = cancelled;
 
             public bool IsCancellationRequested { get; }
+        }
+
+        private sealed class TokenOnlyCancellationSource : IRecipeCreateCancellationSource
+        {
+            public TokenOnlyCancellationSource(CancellationToken token) => Token = token;
+
+            public bool IsCancellationRequested => false;
+
+            public CancellationToken Token { get; }
         }
 
         // 지정한 prompt가 출력되는 순간 Ctrl-C가 들어온 것처럼 취소 상태가 된다.

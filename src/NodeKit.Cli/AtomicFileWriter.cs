@@ -251,10 +251,15 @@ namespace NodeKit.Cli
         private const int WindowsSharingViolation = unchecked((int)0x80070020);
         private const int WindowsLockViolation = unchecked((int)0x80070021);
 
-        internal static bool IsLockContention(IOException ex) =>
-            ex.HResult is WindowsSharingViolation or WindowsLockViolation
-            || (OperatingSystem.IsLinux() && ex.HResult == LinuxEWouldBlock)
-            || ((OperatingSystem.IsMacOS() || OperatingSystem.IsFreeBSD()) && ex.HResult == BsdEWouldBlock);
+        internal static bool IsLockContention(IOException ex)
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                return ex.HResult is WindowsSharingViolation or WindowsLockViolation;
+            }
+
+            return ex.HResult == (OperatingSystem.IsLinux() ? LinuxEWouldBlock : BsdEWouldBlock);
+        }
 
         // 잠금을 잡은 상태이므로 같은 대상의 임시 파일은 강제 종료된 이전 writer의
         // 잔여물이다. 최종 경로는 rename 전이므로 영향이 없다.

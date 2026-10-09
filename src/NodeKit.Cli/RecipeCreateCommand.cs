@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading;
 using NodeKit.Authoring;
 using NodeKit.Authoring.Recipes;
 using NodeKit.Validation;
@@ -82,9 +83,14 @@ namespace NodeKit.Cli
         /// 원자 저장. 실패(2)/취소(130)면 진단을 stderr에 쓰고 성공 안내를 출력하지
         /// 않는다 — 기존 파일은 byte 단위로 그대로다.
         /// </summary>
-        internal static int SaveDocument(RecipeDocument document, string outPath, IRecipeConsole console, TextWriter stderr)
+        internal static int SaveDocument(
+            RecipeDocument document,
+            string outPath,
+            IRecipeConsole console,
+            TextWriter stderr,
+            CancellationToken cancellationToken = default)
         {
-            var exitCode = AtomicFileWriter.WriteForCli(outPath, JsonSerializer.Serialize(document, JsonOptions), stderr);
+            var exitCode = AtomicFileWriter.WriteForCli(outPath, JsonSerializer.Serialize(document, JsonOptions), stderr, cancellationToken);
             if (exitCode == 0)
             {
                 console.WriteLine($"저장되었습니다: {outPath}");

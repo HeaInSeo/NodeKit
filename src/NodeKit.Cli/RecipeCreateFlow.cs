@@ -230,9 +230,13 @@ namespace NodeKit.Cli
                 throw new RecipeCreateCancelledException();
             }
 
-            return RecipeCreateCommand.SaveDocument(document, finalPath, console, stderr) == 0
-                ? RecipeCreateFlowResult.Saved
-                : RecipeCreateFlowResult.SaveFailed;
+            // 쓰는 도중 들어온 Ctrl-C는 token으로 writer의 교체 직전 검사에 전달된다.
+            return RecipeCreateCommand.SaveDocument(document, finalPath, console, stderr, cancellation.Token) switch
+            {
+                0 => RecipeCreateFlowResult.Saved,
+                130 => throw new RecipeCreateCancelledException(),
+                _ => RecipeCreateFlowResult.SaveFailed,
+            };
         }
 
         // ── 채널 확정 단계 ───────────────────────────────────────────────────────
