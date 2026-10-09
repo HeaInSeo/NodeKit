@@ -11,8 +11,22 @@ producer git blob/SHA-256, consumer SHA-256, 생성기(Grpc.Tools)·런타임(Go
 |------|-----|
 | 출처 저장소 | `github.com/HeaInSeo/NodeVault` |
 | 출처 경로 | `protos/nodevault/v1/nodevault.proto` |
-| 기준 커밋 | `912b23c333ca17b80f4ea3f910681209467264a6` |
-| 복사 확인일 | 2026-09-28 (해당 커밋의 파일과 바이트 일치 확인) |
+| 기준 커밋 | `b640f967522198199566bdfde7735c4ef052445d` |
+| 복사 확인일 | 2026-10-09 (해당 커밋의 파일과 바이트 일치 확인) |
+
+## 호환성 메모 (b640f96)
+
+이 기준 커밋은 912b23c 대비 두 필드만 추가한다(기존 필드 번호·타입 변경 없음).
+
+- `RegisterToolFunctionRequest.canonicalization_version` (8, string): 등록 operation이 선택한
+  canonicalizer. NodeVault는 신규 `request_id`에 `"w2-set-v1"`을 요구하고 미지정·`"legacy-order-v0"`·
+  지원하지 않는 값은 거절한다.
+- `RegisterToolFunctionResponse.canonicalization_version` (4, string): receipt에 기록된 version.
+  이 값이 비어 있는 응답은 version을 모르는 server의 응답이며 versioned write 성공으로 취급하지 않는다.
+
+두 필드는 proto3 기본값(빈 문자열)일 때 직렬화되지 않으므로, 값을 채우지 않는 기존 메시지와
+first-image `raw_spec`(kind 1, snake_case) 경로의 wire byte는 바뀌지 않는다. NodeKit은 아직
+`RegisterToolFunction`을 호출하지 않는다. 실제 submit 개방과 version 선택은 후속 기능 PR에서 한다.
 
 ## 호환성 메모 (912b23c)
 
