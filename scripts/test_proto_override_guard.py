@@ -126,6 +126,32 @@ class ProtoOverrideGuardTests(unittest.TestCase):
         self.assertNotEqual(code, 0, output)
         self.assertIn("NKPROTO002", output)
 
+    def test_p1_official_build_decision_is_not_an_overridable_property(self):
+        # Codex P1 (r4228013065): the official-build decision must not live in a
+        # property that -p: can flip. A real CI/Release build that also passes
+        # -p:_NodeKitOfficialBuild=false must still run the guard on tampered bytes.
+        self.tamper_override()
+        for official in ("ContinuousIntegrationBuild=true", "CI=true", "Configuration=Release"):
+            code, output = self.guard(
+                PROJECTS[1], official, "_NodeKitOfficialBuild=false",
+                "ApiProtosRoot=" + self.override)
+            self.assertNotEqual(code, 0, output)
+            self.assertIn("NKPROTO002", output)
+
+    def test_p1_manifest_proof_is_read_from_pinned_file_not_a_property(self):
+        # Codex P1 (r4228013070): the manifest proof text and its digest/source
+        # counts must come from the pinned file, never from -p:-overridable
+        # properties. Injecting the tampered proto's digest through those property
+        # names must not pass the official guard.
+        digest = self.tampered_digest()
+        forged = '{"consumerSha256": "%s"}' % digest  # no comma: -p: splits on ','
+        code, output = self.guard(
+            PROJECTS[1], "ContinuousIntegrationBuild=true", "ApiProtosRoot=" + self.override,
+            "_NodeKitProtoManifestText=" + forged,
+            "_NodeKitProtoDigestCount=1", "_NodeKitProtoSourceCount=1")
+        self.assertNotEqual(code, 0, output)
+        self.assertIn("NKPROTO002", output)
+
     @staticmethod
     def restore(path, data):
         with open(path, "wb") as handle:
