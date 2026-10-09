@@ -481,11 +481,10 @@ namespace NodeKit.Cli.Tests
                 dockerfilePath,                         // DockerfilePath: imported, Content not asked
             };
 
-            var exitCode = CliApp.Run(
-                new[] { "recipe", "create", outPath },
-                new StringReader(string.Join("\n", transcript)),
-                new StringWriter(),
-                new StringWriter());
+            using var stdin = new StringReader(string.Join("\n", transcript));
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, stdin, stdout, stderr);
 
             Assert.Equal(0, exitCode);
             var saved = JsonSerializer.Deserialize<RecipeDocument>(File.ReadAllText(outPath), RecipeCreateCommand.JsonOptions)!;
