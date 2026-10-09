@@ -87,7 +87,12 @@ namespace NodeKit.Cli
                 return 1;
             }
 
-            File.WriteAllText(savePath, JsonSerializer.Serialize(recipe, JsonOptions));
+            var exitCode = AtomicFileWriter.WriteForCli(savePath, JsonSerializer.Serialize(recipe, JsonOptions), stderr);
+            if (exitCode != 0)
+            {
+                return exitCode;
+            }
+
             stdout.WriteLine(savePath);
             return 0;
         }

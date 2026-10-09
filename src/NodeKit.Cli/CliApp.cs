@@ -139,7 +139,14 @@ namespace NodeKit.Cli
                 return 1;
             }
 
-            File.WriteAllText(args[2], JsonSerializer.Serialize(recipe, ToolFunctionRecipeCliIo.JsonOptions));
+            // 검증 결과(State 등)를 입력 파일에 되돌려 쓴다. 저장 실패면 "검증 통과"를
+            // 출력하지 않고 원본 파일을 그대로 둔다.
+            var exitCode = AtomicFileWriter.WriteForCli(args[2], JsonSerializer.Serialize(recipe, ToolFunctionRecipeCliIo.JsonOptions), stderr);
+            if (exitCode != 0)
+            {
+                return exitCode;
+            }
+
             stdout.WriteLine("검증 통과");
             return 0;
         }
@@ -298,28 +305,12 @@ namespace NodeKit.Cli
             if (outPath == "-")
             {
                 stdout.WriteLine(json);
-            }
-            else
-            {
-                // 리뷰 지적: TryLoadRecipe의 읽기 쪽은 IOException을 잡는데, 쓰기
-                // 쪽은 아무 보호 없이 그대로 던졌다 — --out .(디렉터리),
-                // 존재하지 않는 상위 디렉터리, 권한 없는 경로 모두 스택트레이스와
-                // 함께 크래시했다. UnauthorizedAccessException은 IOException의
-                // 하위 타입이 아니라서 둘 다 잡아야 한다(방금 열거한 세 가지
-                // 재현 케이스가 각각 IOException 계열/UnauthorizedAccessException으로
-                // 나뉜다).
-                try
-                {
-                    File.WriteAllText(outPath, json);
-                }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                {
-                    stderr.WriteLine($"출력 파일을 쓸 수 없습니다: {outPath} ({ex.Message})");
-                    return 2;
-                }
+                return 0;
             }
 
-            return 0;
+            // --out .(디렉터리), 없는 상위 디렉터리, 권한 없는 경로는 exit 2와
+            // 진단으로 끝나고 기존 출력 파일은 byte 단위로 보존된다.
+            return AtomicFileWriter.WriteForCli(outPath, json, stderr);
         }
 
         // Accepts case/underscore variants (RAW-SPEC, raw_spec, Raw-Spec, ...) so a

@@ -153,6 +153,8 @@ namespace NodeKit.Cli
                             continue;
                         case RecipeCreateFlowResult.ValidationFailed:
                             return 1;
+                        case RecipeCreateFlowResult.SaveFailed:
+                            return 2;
                         default:
                             throw new ArgumentOutOfRangeException(nameof(flowResult), flowResult, "Unsupported flow result.");
                     }

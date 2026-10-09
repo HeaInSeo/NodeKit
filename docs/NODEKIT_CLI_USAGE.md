@@ -1077,10 +1077,41 @@ $ nodekit render recipe.json --out - --format raw-spec --pretty
 |---|---|
 | 0 | 성공 (검증 통과, 또는 검증 통과 후 render/recipe create 완료) |
 | 1 | recipe-level 또는 L1 검증 위반 1개 이상, 또는 recipe create 최종 검증 실패 |
-| 2 | 사용법 오류, 인자 누락, 알 수 없는 옵션/필드, 파일을 읽을 수 없음(권한 포함), recipe JSON 파싱 실패, `SchemaVersion` 누락/미지원, `BuildKind` 누락/미지원 |
+| 2 | 사용법 오류, 인자 누락, 알 수 없는 옵션/필드, 파일을 읽을 수 없음(권한 포함), recipe JSON 파싱 실패, `SchemaVersion` 누락/미지원, `BuildKind` 누락/미지원, 결과 파일 저장 실패(아래 "파일 저장" 참고) |
 | 124 | `nodekit submit`: `--connect-timeout`이 만료됨 (build ID를 받기 전 단계에서만 적용) |
 | 125 | `nodekit submit`: `--watch-timeout`이 만료됨 (build ID를 받은 뒤 단계에서만 적용, 서버 빌드는 취소되지 않음) |
-| 130 | `nodekit submit`: Ctrl-C로 취소됨 |
+| 130 | `nodekit submit`: Ctrl-C로 취소됨. `recipe create` 대화형: `/cancel` 또는 Ctrl-C로 저장 전에 취소됨 |
+
+### 파일 저장 (create/validate/render)
+
+`recipe create`, `render --out`, `function-recipe create`/`validate`(입력 파일에
+검증 결과를 되돌려 씀)/`render --out`은 같은 방식으로 저장한다.
+
+1. 대상과 같은 디렉터리에 임시 파일 `.<파일이름>.<32자리 hex>.nodekit-tmp`를 만들어
+   전체 내용을 쓰고 디스크까지 flush한다.
+2. rename으로 대상 파일을 한 번에 교체한다. 기존 파일의 Unix 권한은 유지된다.
+
+교체 전에 실패하거나 취소되면 기존 파일은 byte 단위로 그대로이고(새 대상이면
+파일이 생기지 않는다) 저장 성공 안내(`저장되었습니다: …`, `검증 통과`, 저장 경로
+출력)는 나오지 않는다. 강제 종료(`kill -9` 등)되어도 최종 경로에는 이전의 완전한
+파일 또는 새 완전한 파일만 남는다. 정전 내구성과 지원 profile(Ubuntu 24.04,
+linux-x64, 같은 ext4 mount의 일반 파일) 밖의 filesystem은 보장하지 않는다.
+
+실패하면 표준에러에 `[코드] 메시지` 한 줄을 쓰고 종료 코드 2를 반환한다.
+
+| 코드 | 의미 |
+|---|---|
+| `WRITE_TARGET_UNSUPPORTED` | 대상이 디렉터리, 심볼릭 링크(깨진 링크 포함), FIFO/소켓/장치다. 덮어쓰지 않는다. |
+| `WRITE_PARENT_MISSING` | 저장할 디렉터리가 없다. 디렉터리를 만들지 않는다. |
+| `WRITE_LOCKED` | 다른 NodeKit 프로세스가 같은 파일을 저장하는 중이다. 잠시 뒤 다시 실행한다. |
+| `WRITE_FAILED` | 권한 없음, 공간 부족, 읽기 전용 filesystem 등으로 쓰거나 교체하지 못했다. 메시지에 원인 경로가 나온다. |
+
+**잠금 파일:** 같은 파일을 동시에 저장하지 않도록 대상 옆에 숨김 파일
+`.<파일이름>.nodekit-lock`을 만든다. 저장이 끝나도 지우지 않는다 — 지우면 동시에
+실행된 다른 NodeKit이 서로를 배제하지 못한다. 내용은 비어 있고 지워도 다음
+저장 때 다시 만들어진다(다른 NodeKit이 그 파일을 저장 중이 아닐 때만 지운다).
+강제 종료로 남은 `.nodekit-tmp` 파일은 같은 대상을 다음에 저장할 때 자동으로
+정리된다.
 
 ### 그 외
 

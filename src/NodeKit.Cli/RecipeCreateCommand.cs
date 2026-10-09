@@ -75,13 +75,22 @@ namespace NodeKit.Cli
         internal static bool IsListType(RecipeFieldDescriptor field) =>
             field.Type is RecipeFieldType.StringList;
 
-        internal static void SaveDocument(RecipeDocument document, string outPath, TextWriter stdout) =>
-            SaveDocument(document, outPath, new PlainTextRecipeConsole(TextReader.Null, stdout));
+        internal static int SaveDocument(RecipeDocument document, string outPath, TextWriter stdout, TextWriter stderr) =>
+            SaveDocument(document, outPath, new PlainTextRecipeConsole(TextReader.Null, stdout), stderr);
 
-        internal static void SaveDocument(RecipeDocument document, string outPath, IRecipeConsole console)
+        /// <summary>
+        /// 원자 저장. 실패(2)/취소(130)면 진단을 stderr에 쓰고 성공 안내를 출력하지
+        /// 않는다 — 기존 파일은 byte 단위로 그대로다.
+        /// </summary>
+        internal static int SaveDocument(RecipeDocument document, string outPath, IRecipeConsole console, TextWriter stderr)
         {
-            File.WriteAllText(outPath, JsonSerializer.Serialize(document, JsonOptions));
-            console.WriteLine($"저장되었습니다: {outPath}");
+            var exitCode = AtomicFileWriter.WriteForCli(outPath, JsonSerializer.Serialize(document, JsonOptions), stderr);
+            if (exitCode == 0)
+            {
+                console.WriteLine($"저장되었습니다: {outPath}");
+            }
+
+            return exitCode;
         }
 
         private static int RunNonInteractive(string outPath, RecipeCreateOptions parsed, TextWriter stdout, TextWriter stderr)
@@ -184,8 +193,7 @@ namespace NodeKit.Cli
                 return 1;
             }
 
-            SaveDocument(document, outPath, stdout);
-            return 0;
+            return SaveDocument(document, outPath, stdout, stderr);
         }
 
         private static RecipeCreateOptions ParseOptions(string[] options)
