@@ -894,6 +894,14 @@ namespace NodeKit.Cli
                     continue;
                 }
 
+                // 경로 단서만 기록하지 않고 지금 파일을 읽어 DockerfileContent로
+                // 동결한다(S1-05-C02). 읽지 못하면 방식 선택 전에 다시 묻는다.
+                if (!DockerfileContentImporter.TryRead(path, out var dockerfileContent, out var readError))
+                {
+                    console.WriteLine(readError);
+                    continue;
+                }
+
                 console.WriteLine();
                 console.WriteLine("Dockerfile fallback 방식을 선택했습니다.");
                 console.WriteLine();
@@ -916,7 +924,19 @@ namespace NodeKit.Cli
 
                 session.SelectMethod(RecipeMethodId.Dockerfile);
                 session.AcceptDockerfileWarning();
-                session.SetField("DockerfilePath", path);
+                var importViolations = session.SetImportedDockerfile(path, dockerfileContent);
+                if (importViolations.Count == 0)
+                {
+                    console.WriteLine($"Dockerfile 내용을 읽어 Recipe에 저장합니다: {path}");
+                    console.WriteLine("   이후 원본 파일이 바뀌어도 저장된 Recipe는 바뀌지 않습니다.");
+                }
+
+                // 위반이 있으면 Path가 채워지지 않은 채 field 단계에서 다시 묻는다.
+                foreach (var violation in importViolations)
+                {
+                    console.WriteLine($"{violation.RuleId}: {violation.Message}");
+                }
+
                 return RecipeMethodId.Dockerfile;
             }
         }

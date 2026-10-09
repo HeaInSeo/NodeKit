@@ -583,28 +583,22 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void DockerfileClue_AcceptWarning_SavesValidRecipe()
         {
-            // Issue #20 (DockGuard DSF001 parity for dockerfile fallback) made
-            // USER a final-validation requirement, which briefly made this
-            // scenario unreachable interactively — Dockerfile syntax needs
-            // each instruction on its own line, but PromptScalarField only
-            // ever read a single line per field. Fixed by adding multi-line
-            // support (PromptMultilineScalarField) for DockerfileContent
-            // specifically. This transcript exercises that: two separate
-            // lines (FROM, USER) for the one DockerfileContent prompt.
+            // S1-05-C02: the Guided Dockerfile clue reads the given file now
+            // and freezes its bytes into DockerfileContent — the path is not
+            // just recorded, and DockerfileContent is not asked again.
             var outPath = Path.Join(_workDir, "recipe.json");
+            var dockerfilePath = Path.Join(_workDir, "Dockerfile");
+            File.WriteAllText(dockerfilePath, $"FROM {BaseImageWithDigest}\nUSER 1000\n");
             var transcript = new[]
             {
                 "1",           // GuidedBeginner
                 "5",           // Dockerfile
-                "./Dockerfile",
+                dockerfilePath,
                 "y",           // confirm warning
-                // RunFieldLoop (DockerfilePath pre-filled by BeginnerGuideFlow):
+                // RunFieldLoop (DockerfilePath/DockerfileContent filled by BeginnerGuideFlow):
                 "bwa-mem", "0.7.17", "run.sh",
                 BaseImageWithDigest,           // ImageRef (BaseImage for Dockerfile method)
-                // DockerfilePath: pre-filled → skipped
-                $"FROM {BaseImageWithDigest}", // DockerfileContent line 1
-                "USER 1000",                   // DockerfileContent line 2
-                "",                            // DockerfileContent: blank line ends multi-line input
+                // DockerfilePath + DockerfileContent: imported → skipped
                 // BuildContext (Defaulted → skipped)
                 "reads", "1", "",
                 "bam", "1", "",
@@ -615,20 +609,42 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(0, exitCode);
             Assert.True(File.Exists(outPath));
             Assert.Contains("Dockerfile fallback", stdout);
+            Assert.Contains("Dockerfile 내용을 읽어 Recipe에 저장합니다", stdout);
             var json = File.ReadAllText(outPath);
             Assert.Contains("\"BuildKind\": \"DockerfileFallback\"", json);
             Assert.Contains("USER 1000", json);
         }
 
         [Fact]
-        public void DockerfileClue_RejectWarning_GoesBackToCluePicker()
+        public void DockerfileClue_MissingFile_AsksForThePathAgain()
         {
             var outPath = Path.Join(_workDir, "recipe.json");
             var transcript = new[]
             {
                 "1",           // GuidedBeginner
                 "5",           // Dockerfile
-                "./Dockerfile",
+                Path.Join(_workDir, "no-such-Dockerfile"),
+                // stdin ends: the path prompt is shown again, then EOF cancels
+            };
+
+            var exitCode = RunCli(outPath, transcript, out var stdout, out _);
+
+            Assert.Equal(130, exitCode);
+            Assert.Contains("[DOCKERFILE_READ_FAILED] Dockerfile을 찾을 수 없습니다", stdout);
+            Assert.False(File.Exists(outPath));
+        }
+
+        [Fact]
+        public void DockerfileClue_RejectWarning_GoesBackToCluePicker()
+        {
+            var outPath = Path.Join(_workDir, "recipe.json");
+            var dockerfilePath = Path.Join(_workDir, "Dockerfile");
+            File.WriteAllText(dockerfilePath, $"FROM {BaseImageWithDigest}\nUSER 1000\n");
+            var transcript = new[]
+            {
+                "1",           // GuidedBeginner
+                "5",           // Dockerfile
+                dockerfilePath,
                 "N",           // reject warning → back to clue picker
                 "7",           // 잘 모르겠다 → NoClue flow
                 "6",           // exit

@@ -537,8 +537,31 @@ dry-run profile의 `runnerScriptDigest`/observed I/O 기록으로 더 명확히 
 | 필드 | 필수 여부 | 설명 |
 |---|---|---|
 | `BaseImage` | 필수 | 기반 이미지 — Dockerfile의 첫 `FROM`과 정확히 같아야 함, digest 포함 필요 |
-| `DockerfilePath` 또는 `DockerfileContent` | 필수 (둘 중 하나) | Dockerfile 경로 또는 내용 |
-| `BuildContext` | 비워두면 자동 | 비어 있으면 현재 디렉터리(`.`) |
+| `DockerfilePath` 또는 `DockerfileContent` | 필수 (둘 중 하나만) | 기존 Dockerfile 경로 또는 내용 |
+| `BuildContext` | 비워두면 자동 | 기본값 `.`만 허용 |
+
+Dockerfile은 **경로 또는 내용 중 하나만** 입력한다.
+
+- `DockerfilePath`를 주면 NodeKit이 그 파일을 **지금 읽어** 내용을 `DockerfileContent`로
+  recipe.json에 저장한다(UTF-8만 허용, 앞의 BOM은 제거). 경로는 출처 기록으로만 남고,
+  render/submit은 저장된 `DockerfileContent`만 쓴다. 저장 뒤 원본 파일이 바뀌거나
+  없어져도, recipe.json을 다른 곳으로 옮겨도 결과는 같다.
+- 대화형에서는 경로 질문에 Enter를 치면 내용을 직접 입력하는 단계로 넘어간다.
+- `--non-interactive`에서 두 필드를 같이 주면 `[DOCKERFILE_INPUT_CONFLICT]`로 종료 코드 2.
+  어느 쪽이 우선인지 정하지 않고 저장하지 않는다.
+- 경로의 파일이 없거나, 디렉터리이거나, 읽을 수 없거나, 비어 있거나, UTF-8이 아니면
+  `[DOCKERFILE_READ_FAILED]`로 종료 코드 2(대화형은 경로를 다시 묻는다).
+- 어느 방법이든 저장 전에 같은 L1 검증(`USER` 필수, `FROM` digest 등)을 통과해야 한다.
+  Dockerfile 방식의 사용자 책임 안내가 이 검증을 대신하지 않는다.
+
+**BuildContext:** NodeKit은 로컬 build context 파일을 빌드 서버로 **전송하지 않는다**.
+그래서 기본값 `.`만 허용하고, 다른 값(예: `./app`)은 `[BUILD_CONTEXT_UNSUPPORTED]`로
+종료 코드 2다. 손으로 쓴 recipe.json의 `BuildContext`도 같은 이유로 `validate`/`render`/
+`submit`에서 `L1-RCP-020`(종료 코드 1)으로 막는다(값 없음과 `.`은 허용). 기본값 `.`도 로컬
+파일이 빌드에 전달된다는 뜻이 아니다 — `COPY`/`ADD`가 로컬 파일에 기대지 않게 작성한다.
+
+대화형에서 파일에서 읽은 Dockerfile이 최종 검증에 실패하면, recovery는 읽어 온 경로와 내용을
+함께 지우고 새 경로를 묻는다(Enter를 치면 내용을 직접 입력).
 
 ### 2-6. 패키지 빌드 문자열 선택 (ResolveRecipe)
 
@@ -567,7 +590,16 @@ bwa=0.7.17 에 대한 빌드 문자열 후보입니다.
 bwa → bwa=0.7.17=h5bf99c6_8
 ```
 
-Enter만 치면 1번(첫 번째 후보)이 선택된다. 선택된 full pin이 recipe.json에 저장된다.
+Enter만 치면 1번(첫 번째 후보)이 선택된다. 선택된 full pin이 recipe.json에 저장되고,
+render의 `conda install` 줄에도 같은 값이 들어간다.
+
+후보 값은 서버 응답이므로 그대로 믿지 않는다. 후보(와 포트 설정)를 적용한 뒤 저장 직전에
+전체 L1 검증을 **다시** 실행하고, 통과하지 못하면 "선택한 값을 적용한 뒤 최종 검증을
+통과하지 못해 저장하지 않습니다."와 위반 목록을 출력하고 종료 코드 1로 끝난다(파일 없음).
+
+**조회에 실패한 경우**(연결 실패/시간 초과) — 입력한 pin을 그대로 저장한다.
+`nodekit submit`은 빌드 문자열을 다시 조회하지 않고 서버가 pin을 대신 고르지도 않는다.
+완전한 pin(`bwa=0.7.17=h5bf99c6_8`)이 필요하면 직접 입력한다.
 
 **패키지를 찾지 못한 경우(`NotFound`)** — 폐쇄망 Harbor에 미리 등록이 필요하다는
 안내가 나온다.
@@ -1112,6 +1144,17 @@ linux-x64, 같은 ext4 mount의 일반 파일) 밖의 filesystem은 보장하지
 저장 때 다시 만들어진다(다른 NodeKit이 그 파일을 저장 중이 아닐 때만 지운다).
 강제 종료로 남은 `.nodekit-tmp` 파일은 같은 대상을 다음에 저장할 때 자동으로
 정리된다.
+
+### Dockerfile 입력 (recipe create)
+
+`--method dockerfile`의 입력 오류는 표준에러에 `[코드] 메시지` 한 줄을 쓰고 종료 코드 2를
+반환한다. recipe 파일은 만들지 않는다(§2-5 참고).
+
+| 코드 | 의미 |
+|---|---|
+| `DOCKERFILE_INPUT_CONFLICT` | `DockerfilePath`와 `DockerfileContent`를 함께 줬다. 하나만 준다. |
+| `DOCKERFILE_READ_FAILED` | `DockerfilePath`가 비어 있거나 경로로 쓸 수 없음, 파일이 없음/디렉터리/읽기 권한 없음/비어 있음/UTF-8 아님. |
+| `BUILD_CONTEXT_UNSUPPORTED` | `BuildContext`가 기본값 `.`이 아니다. 로컬 context 전송은 지원하지 않는다. |
 
 ### 그 외
 

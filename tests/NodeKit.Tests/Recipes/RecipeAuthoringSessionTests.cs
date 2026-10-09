@@ -591,8 +591,7 @@ namespace NodeKit.Tests.Recipes
             Assert.False(session.IsComplete);
 
             session.SetField("BaseImage", "condaforge/miniforge3:24.3.0-0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
-            session.SetField("DockerfilePath", "./Dockerfile");
-            session.SetField("DockerfileContent", "FROM scratch");
+            session.SetImportedDockerfile("./Dockerfile", "FROM scratch");
 
             Assert.True(session.IsComplete);
         }

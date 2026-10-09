@@ -123,12 +123,46 @@ namespace NodeKit.Cli
             var catalogFields = RecipeFieldCatalog.FieldsFor(method);
             var fieldByName = catalogFields.ToDictionary(f => f.Name, f => f, StringComparer.Ordinal);
 
+            // Dockerfile 입력은 Path 또는 Content 하나다(S1-05-C03). 숨은 우선순위로
+            // 한쪽을 고르지 않고 저장 전에 입력 오류로 끝낸다.
+            if (method == RecipeMethodId.Dockerfile
+                && parsed.Fields.Any(f => f.Name == "DockerfilePath")
+                && parsed.Fields.Any(f => f.Name == "DockerfileContent"))
+            {
+                stderr.WriteLine(DockerfileContentImporter.InputConflictMessage);
+                return 2;
+            }
+
             foreach (var (name, value) in parsed.Fields)
             {
                 if (!fieldByName.TryGetValue(name, out var field))
                 {
                     stderr.WriteLine($"{method} method에서 알 수 없는 필드입니다: {name}");
                     return 2;
+                }
+
+                if (name == "BuildContext" && value != DockerfileContentImporter.DefaultBuildContext)
+                {
+                    stderr.WriteLine(DockerfileContentImporter.BuildContextUnsupportedMessage(value));
+                    return 2;
+                }
+
+                if (name == "DockerfilePath")
+                {
+                    if (!DockerfileContentImporter.TryRead(value, out var content, out var readError))
+                    {
+                        stderr.WriteLine(readError);
+                        return 2;
+                    }
+
+                    var importViolations = session.SetImportedDockerfile(value, content);
+                    if (importViolations.Count > 0)
+                    {
+                        CliApp.PrintViolations(importViolations, stderr);
+                        return 1;
+                    }
+
+                    continue;
                 }
 
                 var violations = IsListType(field)
@@ -162,6 +196,11 @@ namespace NodeKit.Cli
             if (!session.IsComplete)
             {
                 stderr.WriteLine($"필수 필드가 누락되었습니다: {string.Join(", ", session.Snapshot().MissingRequiredFields)}");
+                if (method == RecipeMethodId.Dockerfile && session.Snapshot().MissingRequiredFields.Contains("DockerfileContent"))
+                {
+                    stderr.WriteLine("Dockerfile은 --field DockerfilePath=<파일> 또는 --field DockerfileContent=<내용> 중 하나로 입력하세요.");
+                }
+
                 return 1;
             }
 

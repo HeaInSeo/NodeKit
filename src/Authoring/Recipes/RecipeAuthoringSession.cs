@@ -13,6 +13,10 @@ namespace NodeKit.Authoring.Recipes
     /// </summary>
     internal sealed class RecipeAuthoringSession
     {
+        private const string DockerfilePathField = "DockerfilePath";
+
+        private const string DockerfileContentField = "DockerfileContent";
+
         private static readonly Dictionary<string, string[]> _renderedFieldToCatalogFields =
             new(StringComparer.Ordinal)
             {
@@ -60,9 +64,16 @@ namespace NodeKit.Authoring.Recipes
         private RecipeMethodId? _selectedMethod;
         private RecipeAuthoringSessionMetadata _metadata = new();
 
+        // DockerfileContent가 DockerfilePath 파일에서 읽혀 동결됐는지. Path를 지우면
+        // 그 파일에서 온 Content도 같이 지워 stale content가 남지 않게 한다.
+        private bool _dockerfileContentImported;
+
         public bool IsMethodSelected => _selectedMethod.HasValue;
 
         public RecipeAuthoringSessionMetadata Metadata => _metadata;
+
+        /// <summary>DockerfileContent가 DockerfilePath 파일에서 읽혀 동결된 상태인지.</summary>
+        public bool HasImportedDockerfile => _dockerfileContentImported;
 
         public bool IsComplete =>
             _selectedMethod.HasValue
@@ -108,6 +119,17 @@ namespace NodeKit.Authoring.Recipes
                 throw new InvalidOperationException($"{fieldName} is a list field — use AppendListItem.");
             }
 
+            if (fieldName == DockerfilePathField)
+            {
+                throw new InvalidOperationException(
+                    "DockerfilePath is set together with its file content — use SetImportedDockerfile.");
+            }
+
+            if (fieldName == DockerfileContentField && _filledFields.Contains(DockerfilePathField))
+            {
+                return new[] { DockerfileOneOfViolation() };
+            }
+
             var violations = QuickValidate(field, value);
             if (violations.Length > 0)
             {
@@ -118,6 +140,43 @@ namespace NodeKit.Authoring.Recipes
             _filledFields.Add(fieldName);
             _scalarValues[fieldName] = value;
             _invalidatedFields.Remove(fieldName);
+            return Array.Empty<ValidationViolation>();
+        }
+
+        /// <summary>
+        /// Dockerfile method의 Path 입력(S1-05). 호출자가 이미 읽은 파일 내용을
+        /// DockerfileContent로 동결하고 Path는 provenance로 기록한다. 이 session은
+        /// 파일 IO를 하지 않는다. Content를 직접 입력한 뒤에는 one-of 위반이다.
+        /// </summary>
+        public IReadOnlyList<ValidationViolation> SetImportedDockerfile(string path, string content)
+        {
+            EnsureMethodSelected();
+            var pathField = GetField(DockerfilePathField);
+            var contentField = GetField(DockerfileContentField);
+
+            if (_filledFields.Contains(DockerfileContentField) && !_dockerfileContentImported)
+            {
+                return new[] { DockerfileOneOfViolation() };
+            }
+
+            var violations = QuickValidate(pathField, path)
+                .Concat(QuickValidate(contentField, content))
+                .ToArray();
+            if (violations.Length > 0)
+            {
+                return violations;
+            }
+
+            foreach (var (field, value) in new[] { (pathField, path), (contentField, content) })
+            {
+                field.Apply(_document, value);
+                _filledFields.Add(field.Name);
+                _scalarValues[field.Name] = value;
+                _skippedOptionalFields.Remove(field.Name);
+                _invalidatedFields.Remove(field.Name);
+            }
+
+            _dockerfileContentImported = true;
             return Array.Empty<ValidationViolation>();
         }
 
@@ -291,6 +350,11 @@ namespace NodeKit.Authoring.Recipes
                 _invalidatedFields.Remove(fieldName);
             }
 
+            if (_dockerfileContentImported && preview.DiscardedFields.Contains(DockerfilePathField, StringComparer.Ordinal))
+            {
+                ForgetImportedDockerfile();
+            }
+
             foreach (var fieldName in preview.FieldsRequiringRevalidation.Where(
                 f => _filledFields.Contains(f) || _completedListFields.Contains(f)))
             {
@@ -319,6 +383,13 @@ namespace NodeKit.Authoring.Recipes
                 _scalarValues.Remove(fieldName);
                 _skippedOptionalFields.Remove(fieldName);
                 _invalidatedFields.Remove(fieldName);
+            }
+
+            // Path와 그 파일에서 읽은 Content는 한 입력이다 — 한쪽만 지우면 저장본에
+            // 다른 파일의 provenance나 지난 import 내용이 남는다.
+            if (_dockerfileContentImported && fieldName is DockerfilePathField or DockerfileContentField)
+            {
+                ForgetImportedDockerfile();
             }
         }
 
@@ -565,6 +636,11 @@ namespace NodeKit.Authoring.Recipes
         private static LocalizedText Text(string ko, string en) =>
             new(new Dictionary<string, string> { ["ko"] = ko, ["en"] = en });
 
+        private static ValidationViolation DockerfileOneOfViolation() => new(
+            "AUTHORING-DOCKERFILE-ONEOF-001",
+            "DockerfilePath와 DockerfileContent는 둘 중 하나만 입력할 수 있습니다.",
+            DockerfileContentField);
+
         private static RecipeValidationRecoveryAction BuildMappedFieldAction(string[] fields)
         {
             if (fields.Length == 2
@@ -676,6 +752,21 @@ namespace NodeKit.Authoring.Recipes
             }
 
             return _renderedFieldToCatalogFields.TryGetValue(violationField, out var fields) ? fields : null;
+        }
+
+        private void ForgetImportedDockerfile()
+        {
+            foreach (var name in new[] { DockerfilePathField, DockerfileContentField })
+            {
+                _filledFields.Remove(name);
+                _scalarValues.Remove(name);
+                _skippedOptionalFields.Remove(name);
+                _invalidatedFields.Remove(name);
+            }
+
+            _document.DockerfilePath = string.Empty;
+            _document.DockerfileContent = string.Empty;
+            _dockerfileContentImported = false;
         }
 
         private void EnsureMethodSelected()

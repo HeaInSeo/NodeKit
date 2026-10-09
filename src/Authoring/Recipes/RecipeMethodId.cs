@@ -15,11 +15,12 @@ namespace NodeKit.Authoring.Recipes
         Dockerfile,
 
         /// <summary>
-        /// §13 R22-B. Advanced/opt-in method resolving to
-        /// RecipeKind.SourceBuildStructured. Intentionally not wired into
-        /// RecipeMethodRecommender/MethodRecommendationPresenter/BeginnerGuideFlow
-        /// yet — reachable only via `nodekit recipe create --non-interactive
-        /// --method source-structured`, not the interactive wizard. See
+        /// §13 R22-B. Resolves to RecipeKind.SourceBuildStructured. This is the
+        /// default source path: the Guided source clue and the Quick-setup
+        /// source-archive recommendation both land here (generic/minimal
+        /// profiles), and `--method source-structured` reaches it
+        /// non-interactively. Only the custom ("advanced") build/runtime
+        /// profile is an explicit opt-in. See
         /// docs/NODEKIT_SOURCEBUILD_STRUCTURED_INTENT_DESIGN.md.
         /// </summary>
         SourceStructured,
