@@ -149,7 +149,23 @@ namespace NodeKit.Validation.Recipes
                     break;
             }
 
+            ValidateBuildContext(recipe, violations);
+
             return new ValidationResult(violations);
+        }
+
+        // NodeKit은 로컬 build context 파일을 빌드 서버로 전송하지 않는다(S1-05-C06).
+        // 그래서 기본값 '.'(또는 값 없음) 밖의 BuildContext는 손으로 쓴 recipe라도
+        // 조용히 무시하지 않고 validate/render/submit에서 막는다.
+        private static void ValidateBuildContext(RecipeDocument recipe, List<ValidationViolation> violations)
+        {
+            if (!string.IsNullOrEmpty(recipe.BuildContext) && recipe.BuildContext != ".")
+            {
+                violations.Add(new ValidationViolation(
+                    "L1-RCP-020",
+                    $"BuildContext '{recipe.BuildContext}'는 지원하지 않습니다. NodeKit은 로컬 build context 파일을 빌드 서버로 전송하지 않으므로 기본값 '.'만 허용합니다.",
+                    nameof(recipe.BuildContext)));
+            }
         }
 
         private static void ValidateBaseImagePresent(RecipeDocument recipe, List<ValidationViolation> violations)

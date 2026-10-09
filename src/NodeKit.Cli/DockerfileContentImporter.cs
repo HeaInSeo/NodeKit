@@ -33,10 +33,23 @@ namespace NodeKit.Cli
         public static bool TryRead(string path, out string content, out string error)
         {
             content = string.Empty;
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                error = $"[{ReadFailedCode}] Dockerfile 경로가 비어 있습니다.";
+                return false;
+            }
+
             byte[] bytes;
             try
             {
                 bytes = File.ReadAllBytes(path);
+            }
+            catch (ArgumentException)
+            {
+                // NUL 등 경로로 쓸 수 없는 문자. 처리하지 않으면 CLI가 unhandled
+                // exception으로 끝난다.
+                error = $"[{ReadFailedCode}] Dockerfile 경로가 올바르지 않습니다: {path}";
+                return false;
             }
             catch (FileNotFoundException)
             {

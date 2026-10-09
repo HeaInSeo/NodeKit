@@ -492,6 +492,85 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(dockerfilePath, saved.DockerfilePath);
         }
 
+        [Fact]
+        public void S1_05_ImportedDockerfileFailingL1_CanBeRepairedInRecovery()
+        {
+            // Codex P2 (PR114): the recovery step for an imported Dockerfile used
+            // to ask for DockerfileContent only, which the one-of rule then always
+            // rejected. Recovery now clears the imported pair and asks again.
+            var outPath = Path.Join(_workDir, "recipe.json");
+            var dockerfilePath = Path.Join(_workDir, "Dockerfile");
+            File.WriteAllText(dockerfilePath, "FROM " + ImageRefWithDigest + "\n");
+            var transcript = new[]
+            {
+                "2", "n", "n", "n", "n", "n", "y", "", // quick mode → dockerfile recommended
+                "y",                                    // confirm dockerfile warning
+                "bwa-mem", "0.7.17", "run.sh",
+                ImageRefWithDigest,                     // BaseImage
+                dockerfilePath,                         // imported, but has no USER → L1-RCP-009
+                "1",                                    // recovery: fix DockerfileContent
+                "",                                     // DockerfilePath: skip → type content
+                "FROM " + ImageRefWithDigest,
+                "USER 1000",
+                "",                                     // end of DockerfileContent
+                "",                                     // save confirmation (Enter)
+            };
+
+            using var stdin = new StringReader(string.Join("\n", transcript));
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var exitCode = CliApp.Run(new[] { "recipe", "create", outPath }, stdin, stdout, stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.Contains("최종 검증에 실패했습니다", stdout.ToString(), StringComparison.Ordinal);
+            Assert.Contains("파일에서 읽은 Dockerfile 내용을 지웠습니다", stdout.ToString(), StringComparison.Ordinal);
+            var saved = JsonSerializer.Deserialize<RecipeDocument>(File.ReadAllText(outPath), RecipeCreateCommand.JsonOptions)!;
+            Assert.Equal("FROM " + ImageRefWithDigest + "\nUSER 1000\n", saved.DockerfileContent);
+            Assert.Equal(string.Empty, saved.DockerfilePath);
+        }
+
+        [Theory]
+        [InlineData("")]
+        [InlineData("bad\0path")]
+        public void S1_05_C04_EmptyOrInvalidPath_IsReadFailureNotACrash(string path)
+        {
+            // Codex P2 (PR114): File.ReadAllBytes throws ArgumentException for
+            // these, which escaped as an unhandled exception.
+            var outPath = Path.Join(_workDir, "recipe.json");
+
+            var exitCode = RunDockerfileCreate(outPath, out _, out var stderr, $"DockerfilePath={path}");
+
+            Assert.Equal(2, exitCode);
+            Assert.Contains("[DOCKERFILE_READ_FAILED]", stderr, StringComparison.Ordinal);
+            Assert.False(File.Exists(outPath));
+        }
+
+        [Theory]
+        [InlineData("./app", 1)]
+        [InlineData(".", 0)]
+        [InlineData("", 0)]
+        public void S1_05_C06_HandWrittenBuildContext_IsCheckedBySharedValidation(string buildContext, int expectedExit)
+        {
+            // Codex P2 (PR114): a hand-written Recipe with a non-default
+            // BuildContext used to pass validate/render/submit silently.
+            var recipe = new RecipeDocument
+            {
+                BuildKind = RecipeKind.DockerfileFallback,
+                ToolName = "bwa-mem",
+                Version = "0.7.17",
+                Script = "run.sh",
+                BaseImage = ImageRefWithDigest,
+                DockerfileContent = DockerfileText,
+                BuildContext = buildContext,
+            };
+            var recipePath = WriteRecipe(recipe);
+
+            var exitCode = RunCli(out _, out var stderr, "validate", recipePath);
+
+            Assert.Equal(expectedExit, exitCode);
+            Assert.Equal(expectedExit == 1, stderr.Contains("L1-RCP-020", StringComparison.Ordinal));
+        }
+
         // ── session one-of contract ──────────────────────────────────────────
 
         [Fact]

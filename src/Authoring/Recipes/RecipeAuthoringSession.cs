@@ -72,6 +72,9 @@ namespace NodeKit.Authoring.Recipes
 
         public RecipeAuthoringSessionMetadata Metadata => _metadata;
 
+        /// <summary>DockerfileContent가 DockerfilePath 파일에서 읽혀 동결된 상태인지.</summary>
+        public bool HasImportedDockerfile => _dockerfileContentImported;
+
         public bool IsComplete =>
             _selectedMethod.HasValue
             && RecipeFieldCatalog.FieldsFor(_selectedMethod.Value).All(IsFieldComplete);

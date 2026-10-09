@@ -1159,6 +1159,22 @@ namespace NodeKit.Cli
                 return;
             }
 
+            // 파일에서 읽은 Dockerfile이 검증에 실패하면 Content만 다시 받을 수 없다
+            // (Path와 one-of). 둘을 함께 지우고 새 경로 또는 직접 입력을 받는다.
+            if (session.HasImportedDockerfile && fieldName is "DockerfileContent" or "DockerfilePath")
+            {
+                session.ClearField(fieldName);
+                console.WriteLine("파일에서 읽은 Dockerfile 내용을 지웠습니다. 새 경로를 입력하거나 Enter 후 내용을 직접 입력하세요.");
+                var fields = RecipeFieldCatalog.FieldsFor(session.Snapshot().SelectedMethod!.Value);
+                PromptField(session, fields.First(f => f.Name == "DockerfilePath"), console, cancellation, imageDigestResolver);
+                if (!session.HasImportedDockerfile)
+                {
+                    PromptField(session, fields.First(f => f.Name == "DockerfileContent"), console, cancellation, imageDigestResolver);
+                }
+
+                return;
+            }
+
             session.ConfirmInvalidatedField(fieldName);
             PromptField(session, field, console, cancellation, imageDigestResolver);
         }

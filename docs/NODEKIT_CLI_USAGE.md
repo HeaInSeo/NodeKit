@@ -556,8 +556,12 @@ Dockerfile은 **경로 또는 내용 중 하나만** 입력한다.
 
 **BuildContext:** NodeKit은 로컬 build context 파일을 빌드 서버로 **전송하지 않는다**.
 그래서 기본값 `.`만 허용하고, 다른 값(예: `./app`)은 `[BUILD_CONTEXT_UNSUPPORTED]`로
-종료 코드 2다. 기본값 `.`도 로컬 파일이 빌드에 전달된다는 뜻이 아니다 — `COPY`/`ADD`가
-로컬 파일에 기대지 않게 작성한다.
+종료 코드 2다. 손으로 쓴 recipe.json의 `BuildContext`도 같은 이유로 `validate`/`render`/
+`submit`에서 `L1-RCP-020`(종료 코드 1)으로 막는다(값 없음과 `.`은 허용). 기본값 `.`도 로컬
+파일이 빌드에 전달된다는 뜻이 아니다 — `COPY`/`ADD`가 로컬 파일에 기대지 않게 작성한다.
+
+대화형에서 파일에서 읽은 Dockerfile이 최종 검증에 실패하면, recovery는 읽어 온 경로와 내용을
+함께 지우고 새 경로를 묻는다(Enter를 치면 내용을 직접 입력).
 
 ### 2-6. 패키지 빌드 문자열 선택 (ResolveRecipe)
 
@@ -1149,7 +1153,7 @@ linux-x64, 같은 ext4 mount의 일반 파일) 밖의 filesystem은 보장하지
 | 코드 | 의미 |
 |---|---|
 | `DOCKERFILE_INPUT_CONFLICT` | `DockerfilePath`와 `DockerfileContent`를 함께 줬다. 하나만 준다. |
-| `DOCKERFILE_READ_FAILED` | `DockerfilePath` 파일이 없음/디렉터리/읽기 권한 없음/비어 있음/UTF-8 아님. |
+| `DOCKERFILE_READ_FAILED` | `DockerfilePath`가 비어 있거나 경로로 쓸 수 없음, 파일이 없음/디렉터리/읽기 권한 없음/비어 있음/UTF-8 아님. |
 | `BUILD_CONTEXT_UNSUPPORTED` | `BuildContext`가 기본값 `.`이 아니다. 로컬 context 전송은 지원하지 않는다. |
 
 ### 그 외
