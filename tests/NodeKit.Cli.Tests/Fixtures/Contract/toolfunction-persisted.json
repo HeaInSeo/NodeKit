@@ -1,0 +1,84 @@
+{
+  "contractId": "nodekit.toolfunction.field-map",
+  "contractRevision": "v0.9.1",
+  "stage": "P01.contract",
+  "status": "FROZEN_EXPECTATION",
+  "note": "Field map from the persisted ToolFunctionRecipe to the NodeVault b640f967 wire. Mapper, materializer and guard implementations belong to P06/P07/P08; nothing in this file is a PASS.",
+  "rawSpecV1": {
+    "schemaId": "nodevault.build.raw_spec.v1",
+    "exactKeys": [ "schema_version", "kind", "base_image_digest", "script" ],
+    "additionalProperties": false,
+    "fields": [
+      { "key": "schema_version", "value": "nodevault.build.raw_spec.v1", "source": "literal" },
+      { "key": "kind", "value": 2, "source": "literal (BUILD_KIND_TOOLFUNCTIONSPEC)" },
+      { "key": "base_image_digest", "role": "A", "source": "ToolFunctionRecipe.BaseToolImageDigest", "pattern": "^sha256:[0-9a-fA-F]{64}$" },
+      { "key": "script", "source": "ScriptPath content materialized relative to the Recipe directory (S3-03)", "rule": "non-blank source text; the ScriptPath string itself is never the wire value" }
+    ],
+    "excluded": [ "ToolName", "version", "ports", "parameters", "registration metadata", "local stage1/stage2 preview wrapper" ],
+    "owner": "P06/P07"
+  },
+  "typedRegistration": {
+    "message": "RegisterToolFunctionRequest",
+    "fields": [
+      { "number": 1, "name": "request_id", "group": "operation", "source": "client request ID, persisted before the RPC and reused on replay" },
+      { "number": 2, "name": "base_tool_spec_digest", "group": "identity", "role": "C1", "source": "ToolFunctionRecipe.ToolSpecDigest" },
+      { "number": 3, "name": "image_digest", "group": "identity", "role": "B", "source": "second build result" },
+      { "number": 4, "name": "spec", "group": "digest-in", "recipeProperties": [ "Command", "InputPorts", "OutputPorts", "Parameters", "IntermediateFilePolicies", "ExecutionEnvironment" ] },
+      { "number": 5, "name": "presentation", "group": "digest-out", "recipeProperties": [ "DisplayLabel", "DisplayDescription", "DisplayCategory", "DisplayTags" ], "portProperties": [ "DownstreamCompatibilityNote" ] },
+      { "number": 6, "name": "validation_policy", "group": "digest-out", "recipeProperties": [ "FixtureReferences", "ExpectedResults", "ValidationRequirements" ] },
+      { "number": 7, "name": "environment_hints", "group": "digest-out", "recipeProperties": [ "EnforcedResources" ] },
+      { "number": 8, "name": "canonicalization_version", "group": "version", "value": "w2-set-v1", "source": "literal for a new request_id; replay reuses the stored value" }
+    ],
+    "owner": "P06/P08"
+  },
+  "typedResponse": {
+    "message": "RegisterToolFunctionResponse",
+    "fields": [
+      { "number": 1, "name": "tool_function_digest", "role": "F" },
+      { "number": 2, "name": "presentation_revision_id", "role": "P" },
+      { "number": 3, "name": "cas_hash", "role": "H" },
+      { "number": 4, "name": "canonicalization_version", "role": "version" }
+    ],
+    "rule": "Preserve the server-returned values. The client never computes F, H or P. An empty version means the server does not know the version, and the response is not a versioned write success."
+  },
+  "recipePropertiesNotOnWire": [
+    { "property": "Id", "reason": "local authoring identifier" },
+    { "property": "SchemaVersion", "reason": "authoring schema draft-1, distinct from raw_spec and canonicalization versions" },
+    { "property": "State", "reason": "local Draft/Ready state" },
+    { "property": "FunctionId", "reason": "no field in RegisterToolFunctionRequest at b640f967" },
+    { "property": "Revision", "reason": "no field in RegisterToolFunctionRequest at b640f967" },
+    { "property": "ScriptPath", "reason": "host reference; its content becomes raw_spec.script" },
+    { "property": "BaseToolImageDigest", "reason": "role A; goes to raw_spec.base_image_digest, not to the typed request" },
+    { "property": "CreatedAt", "reason": "local timestamp" }
+  ],
+  "identityRoles": [
+    { "role": "A", "meaning": "first (base) image digest", "recipeProperty": "BaseToolImageDigest", "cliOption": "--base-tool-image-digest", "pattern": "^sha256:[0-9a-fA-F]{64}$", "wire": "raw_spec.base_image_digest", "sample": "sha256:a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1" },
+    { "role": "B", "meaning": "second (function) image digest", "recipeProperty": null, "cliOption": null, "pattern": "^sha256:[0-9a-fA-F]{64}$", "wire": "RegisterToolFunctionRequest.image_digest", "sample": "sha256:b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2" },
+    { "role": "C1", "meaning": "ToolSpecDigest of the first base ResolvedToolSpec", "recipeProperty": "ToolSpecDigest", "cliOption": "--tool-spec-digest", "pattern": "^[0-9a-f]{64}$", "wire": "RegisterToolFunctionRequest.base_tool_spec_digest", "sample": "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1" },
+    { "role": "C2", "meaning": "resolved request identifier of the second build", "recipeProperty": null, "cliOption": null, "pattern": null, "wire": null, "preservedAs": "second request basis in the receipt; never sent as C1", "sample": "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2" }
+  ],
+  "forbiddenFallbacks": [
+    "C1 derived from A by removing the sha256: prefix",
+    "C1 replaced by C2",
+    "C1 inferred from A, B or C2",
+    "B replaced by A when the second image digest is missing",
+    "one resolved digest field reused for both C1 and C2 without operation kind or phase"
+  ],
+  "linkEvidence": {
+    "states": [
+      { "id": "OBSERVED_SAME_BUILD", "requires": [ "endpoint", "request_id", "build_id", "C1", "A" ], "rule": "all five come from one complete first-build receipt" },
+      { "id": "MANUAL_UNVERIFIED", "requires": [], "rule": "manual, mixed, overridden, incomplete or moved-without-receipt input" }
+    ],
+    "neverClaims": "server-authoritative C1-A link verification",
+    "storedLabelRestoresState": false,
+    "registrationGate": "no new server-proof gate before the registration RPC; that policy is later design work and does not block the CLI"
+  },
+  "variants": [
+    { "id": "S3-02-A", "input": "A, B, C1 and C2 all different", "expected": "raw_spec.base_image_digest=A, base_tool_spec_digest=C1, image_digest=B, C2 kept as second request basis", "owner": "P06", "verification": "NOT_RUN" },
+    { "id": "S3-02-B", "input": "BaseToolImageDigest = sha256:bad", "expected": { "exit": 1, "businessRpc": 0, "wireOutput": false }, "owner": "P06/P07", "verification": "NOT_RUN" },
+    { "id": "S3-02-C", "input": "A with upper-case hex", "expected": "accepted as schema allows; client computes no identity", "owner": "P06", "verification": "NOT_RUN" },
+    { "id": "S3-02-D", "input": "registration without B", "expected": { "exit": 1, "registerToolFunctionRpc": 0, "fallback": "none" }, "owner": "P08", "verification": "NOT_RUN" },
+    { "id": "S3-02-E", "input": "C1 or C2 without A; A/B without C1", "expected": "missing A rejected for build/render; missing C1 rejected with exit 1 and RegisterToolFunction 0, pointing to --tool-spec-digest", "owner": "P06/P08", "verification": "NOT_RUN" },
+    { "id": "S3-02-F", "input": "C1 shaped sha256:<64>, 63 chars, non-hex or whitespace", "expected": { "exit": 1, "registerToolFunctionRpc": 0, "fallback": "none" }, "owner": "P08", "verification": "NOT_RUN" }
+  ]
+}

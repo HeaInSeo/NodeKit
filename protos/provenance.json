@@ -4,13 +4,13 @@
   "sources": [
     {
       "consumerPath": "protos/nodevault/v1/nodevault.proto",
-      "consumerSha256": "b73e5cb100dcfcb9ec44e42bf454171ec867df622e34544825778eb2170144ea",
+      "consumerSha256": "88b138abb9e9b93e361cc754f6e84f20e32b742aeb4a038263617e6c87d54f11",
       "producer": {
         "repository": "https://github.com/HeaInSeo/NodeVault",
         "path": "protos/nodevault/v1/nodevault.proto",
-        "revision": "912b23c333ca17b80f4ea3f910681209467264a6",
-        "gitBlobSha1": "8fe95c3976b69dcde0c02088a51069b67046f61d",
-        "sha256": "b73e5cb100dcfcb9ec44e42bf454171ec867df622e34544825778eb2170144ea"
+        "revision": "b640f967522198199566bdfde7735c4ef052445d",
+        "gitBlobSha1": "e4b99dfc21b0b9d8d1a3b817c9afec41d18a2d02",
+        "sha256": "88b138abb9e9b93e361cc754f6e84f20e32b742aeb4a038263617e6c87d54f11"
       },
       "generator": {
         "tool": "Grpc.Tools",

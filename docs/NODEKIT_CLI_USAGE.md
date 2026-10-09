@@ -1812,6 +1812,14 @@ dotnet run --project src/NodeKit.Cli -- validate /home/user/samtools-1.17.json
   완료(2026-07-02) 후 `GrpcToolSpecClient`로 구현 완료. `nodekit submit` 기본 경로.
 - **`ResolveRecipe` 클라이언트**: `GrpcResolveRecipeClient`로 구현 완료.
   UX 테스트용 stub(`NODEKIT_RESOLVE_RECIPE_STUB=1`)도 제공된다.
+- **ToolFunctionSpec 경계**: NodeKit은 CLI recipe authoring과 NodeVault API client다.
+  이미지 빌드, `tool_function_digest`/`cas_hash` 같은 canonical digest 계산과
+  canonicalizer 선택 결과의 기록은 NodeVault가 소유하며 NodeKit은 서버가 돌려준 값을
+  그대로 보존한다. 벤더 proto(`protos/SOURCE.md`)는 `RegisterToolFunction`의
+  `canonicalization_version`(request 8 / response 4)까지 포함하지만, NodeKit은 아직
+  `RegisterToolFunction`을 호출하지 않는다. `nodekit function-recipe submit`은 지금도 항상
+  차단되며 `function-recipe render`의 build request preview까지만 지원한다. Console/GUI와
+  실제 서버 연동은 후속 단계다.
 - 5개 method가 생성하는 Dockerfile은 NodeKit L1 정적 검증만 통과했을 뿐,
   실제 `docker build`로 검증된 적은 없다.
 - `recipe create`의 escape hatch는 `/help`, `/review`, `/change-method`,

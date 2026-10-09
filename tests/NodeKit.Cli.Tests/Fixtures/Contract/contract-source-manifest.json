@@ -1,0 +1,60 @@
+{
+  "contractId": "nodekit.contract.source-manifest",
+  "contractRevision": "v0.9.1",
+  "stage": "P01.contract",
+  "note": "Pinned sources the P01 contract fixtures were derived from. The proto entry must equal protos/provenance.json; NodeVault is read, never modified.",
+  "consumer": {
+    "repository": "https://github.com/HeaInSeo/NodeKit",
+    "baseRevision": "74f29b9f0ffb5e0b8225f110dcc3ece4991c1bc4"
+  },
+  "producer": {
+    "repository": "https://github.com/HeaInSeo/NodeVault",
+    "revision": "b640f967522198199566bdfde7735c4ef052445d",
+    "sources": [
+      {
+        "path": "protos/nodevault/v1/nodevault.proto",
+        "consumerPath": "protos/nodevault/v1/nodevault.proto",
+        "gitBlobSha1": "e4b99dfc21b0b9d8d1a3b817c9afec41d18a2d02",
+        "sha256": "88b138abb9e9b93e361cc754f6e84f20e32b742aeb4a038263617e6c87d54f11",
+        "usedFor": [ "typedRegistration", "typedResponse" ]
+      },
+      {
+        "path": "pkg/resolve/schemas/nodevault.build.raw_spec.v1.schema.json",
+        "consumerPath": null,
+        "gitBlobSha1": "9bcfceb465f03f7eedd5837b3cfab99c728bfa61",
+        "sha256": "f8a1b923962300842f4c58c9e078bd786bc860222caee59ac55ba4b82b96591d",
+        "usedFor": [ "rawSpecV1" ],
+        "frozenFacts": {
+          "required": [ "schema_version", "kind", "base_image_digest", "script" ],
+          "additionalProperties": false,
+          "schemaVersionConst": "nodevault.build.raw_spec.v1",
+          "kindConst": 2,
+          "baseImageDigestPattern": "^sha256:[0-9a-fA-F]{64}$"
+        }
+      }
+    ]
+  },
+  "consumerCode": [
+    "src/Authoring/Recipes/RecipeMethodCatalog.cs",
+    "src/Authoring/Recipes/RecipeKindResolver.cs",
+    "src/Authoring/Recipes/RecipeDocument.cs",
+    "src/Authoring/ToolFunctionRecipes/ToolFunctionRecipe.cs",
+    "src/NodeKit.Cli/AuthoringModeSelector.cs",
+    "src/NodeKit.Cli/RecipeCreateCommand.cs",
+    "specs/001-toolfunctionspec-authoring/spec.md",
+    "specs/001-toolfunctionspec-authoring/contracts/cli-function-recipe-commands.md"
+  ],
+  "authority": {
+    "contract": "Notion 3f086e6dd1d1813b882ce7d68542e7bc (NodeKit v0.9.1 contract supplement, user-approved 2026-10-08)",
+    "plan": "Notion 3f086e6dd1d1818e9aecdc093a08cda9",
+    "anchors": [
+      "Spec & Pipeline Anchor 3e786e6d-d1d1-81ef-aa82-c2bee883c794",
+      "Authority & Relationship Anchor 3e786e6d-d1d1-81b8-a475-e8bf45ee9fb7"
+    ]
+  },
+  "open": [
+    "global Authoring Manifest/Lock bundle and hash format (F-AUTHORING-PORTABILITY-1)",
+    "server-authoritative C1-A link proof as a registration precondition",
+    "receipt/snapshot storage schema and version (agreed before P04 coding)"
+  ]
+}

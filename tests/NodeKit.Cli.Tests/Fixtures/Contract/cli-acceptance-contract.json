@@ -1,0 +1,163 @@
+{
+  "contractId": "nodekit.cli.acceptance-contract",
+  "contractRevision": "v0.9.1",
+  "stage": "P01.contract",
+  "status": "FROZEN_EXPECTATION",
+  "note": "Frozen expectations for the NodeKit self CLI sprint (approved v0.9.1). Every expected value here is a target for a later stage; nothing in this file is a PASS. Cells and variants marked NOT_RUN are verified by the owner stage named on each entry.",
+  "authoringSchema": {
+    "property": "SchemaVersion",
+    "propertyNameMatch": "case-insensitive",
+    "valueMatch": "exact",
+    "acceptedValue": "draft-1",
+    "appliesTo": [
+      "RecipeDocument",
+      "ToolFunctionRecipe"
+    ],
+    "initializerFill": false,
+    "autoMigration": false,
+    "gateOwner": "P02.loader",
+    "gateAppliesToCallers": [
+      "recipe validate",
+      "recipe render",
+      "submit",
+      "function-recipe validate",
+      "function-recipe render",
+      "function-recipe submit"
+    ],
+    "currentCode": "NOT_ENFORCED: RecipeDocument and ToolFunctionRecipe initializers default SchemaVersion to draft-1, so a missing value is filled today. P02.loader adds the gate before deserialization.",
+    "distinctFrom": [
+      "raw_spec schema_version nodevault.build.raw_spec.v1",
+      "RegisterToolFunctionRequest.canonicalization_version",
+      "SubmitJsonlRecord.SchemaVersion nodekit.submit.v1"
+    ],
+    "variants": [
+      { "id": "schema-explicit-draft-1", "json": "\"SchemaVersion\": \"draft-1\"", "expected": { "outcome": "ACCEPTED_TO_L1", "exit": null, "businessRpc": null, "existingFilePreserved": null }, "verification": "NOT_RUN" },
+      { "id": "schema-property-lowercase", "json": "\"schemaversion\": \"draft-1\"", "expected": { "outcome": "ACCEPTED_TO_L1", "exit": null, "businessRpc": null, "existingFilePreserved": null }, "verification": "NOT_RUN" },
+      { "id": "schema-missing", "json": null, "expected": { "outcome": "REJECTED", "exit": 2, "businessRpc": 0, "existingFilePreserved": true }, "verification": "NOT_RUN" },
+      { "id": "schema-null", "json": "\"SchemaVersion\": null", "expected": { "outcome": "REJECTED", "exit": 2, "businessRpc": 0, "existingFilePreserved": true }, "verification": "NOT_RUN" },
+      { "id": "schema-empty", "json": "\"SchemaVersion\": \"\"", "expected": { "outcome": "REJECTED", "exit": 2, "businessRpc": 0, "existingFilePreserved": true }, "verification": "NOT_RUN" },
+      { "id": "schema-whitespace", "json": "\"SchemaVersion\": \"   \"", "expected": { "outcome": "REJECTED", "exit": 2, "businessRpc": 0, "existingFilePreserved": true }, "verification": "NOT_RUN" },
+      { "id": "schema-unsupported", "json": "\"SchemaVersion\": \"draft-2\"", "expected": { "outcome": "REJECTED", "exit": 2, "businessRpc": 0, "existingFilePreserved": true }, "verification": "NOT_RUN" },
+      { "id": "schema-value-case-differs", "json": "\"SchemaVersion\": \"Draft-1\"", "expected": { "outcome": "REJECTED", "exit": 2, "businessRpc": 0, "existingFilePreserved": true }, "verification": "NOT_RUN" }
+    ]
+  },
+  "inputErrorContract": {
+    "owner": "P02.loader",
+    "exit2": [
+      "malformed JSON",
+      "missing or unsupported BuildKind",
+      "read IO or permission failure",
+      "SchemaVersion missing, null, blank or unsupported"
+    ],
+    "exit1": [
+      "L1 violation in a parsed document"
+    ],
+    "forbiddenOnError": [
+      "stack trace",
+      "new render output",
+      "business RPC"
+    ],
+    "supportedKindHintIncludes": "SourceBuildStructured"
+  },
+  "supportProfile": {
+    "os": "Ubuntu 24.04",
+    "architecture": "x86_64",
+    "libc": "glibc",
+    "runtimeIdentifier": "linux-x64",
+    "deployment": "self-contained",
+    "filesystem": "regular file on the same ext4 mount",
+    "atomicWrite": "same-directory temp file, full write and flush, then atomic replace; cross-process writer exclusion",
+    "unsupportedTarget": "exit 2 before overwrite; no copy/delete overwrite fallback",
+    "beforeCommitFailure": "original bytes preserved, exit 2, no success message",
+    "handledCancel": 130,
+    "forcedTermination": "only the old complete file or the new complete file may remain",
+    "notPromised": [
+      "power-loss durability",
+      "every filesystem",
+      "every OS"
+    ],
+    "portabilityAcceptance": "independent clean installs A and B on this profile with the same release and contract"
+  },
+  "inputModes": [
+    { "id": "guided", "entry": "recipe create, mode menu [1]", "label": "쉬운 안내 모드" },
+    { "id": "quick", "entry": "recipe create, mode menu [2]", "label": "빠른 설정 모드" },
+    { "id": "non-interactive", "entry": "recipe create <path> --non-interactive --method <method>", "label": "스크립트/CI 모드" }
+  ],
+  "modeMenuUsageOnly": "Mode menu [3] prints CI usage and exits 0. It is not a separate authoring flow.",
+  "methods": [
+    { "publicName": "container", "methodId": "Container", "internalKinds": [ "BioContainer" ], "referenceKind": "BioContainer", "fixture": "F-CONTAINER" },
+    { "publicName": "package", "methodId": "Package", "internalKinds": [ "Conda", "Micromamba" ], "referenceKind": "Conda", "fixture": "F-PACKAGE" },
+    { "publicName": "mirror", "methodId": "Mirror", "internalKinds": [ "PackageMirror" ], "referenceKind": "PackageMirror", "fixture": "F-MIRROR" },
+    { "publicName": "source", "methodId": "Source", "internalKinds": [ "SourceBuild" ], "referenceKind": "SourceBuild", "fixture": "F-SOURCE" },
+    { "publicName": "source-structured", "methodId": "SourceStructured", "internalKinds": [ "SourceBuildStructured" ], "referenceKind": "SourceBuildStructured", "fixture": "F-STRUCTURED" },
+    { "publicName": "dockerfile", "methodId": "Dockerfile", "internalKinds": [ "DockerfileFallback" ], "referenceKind": "DockerfileFallback", "fixture": "F-DOCKERFILE" }
+  ],
+  "supportTable": {
+    "criterion": "S1-01-C07",
+    "verifiedBy": "P01.support",
+    "cellProcedure": "fixed fixture values and expected kind, valid pin/content and fixed local resolver: create/save -> reload -> full L1 -> render. Record stdout/stderr/exit, files and actual evidence per cell. External lookups, install commands and business RPC = 0.",
+    "cells": [
+      { "method": "container", "mode": "guided", "status": "REFERENCE", "fixture": "F-CONTAINER", "currentSource": "implemented; a value without digest needs manual input or the fixed resolver", "verification": "NOT_RUN" },
+      { "method": "container", "mode": "quick", "status": "REFERENCE", "fixture": "F-CONTAINER", "currentSource": "implemented; digest-pinned image required", "verification": "NOT_RUN" },
+      { "method": "container", "mode": "non-interactive", "status": "REFERENCE", "fixture": "F-CONTAINER", "currentSource": "implemented; required --field inputs", "verification": "NOT_RUN" },
+      { "method": "package", "mode": "guided", "status": "REFERENCE", "fixture": "F-PACKAGE", "currentSource": "implemented; conda parser representative", "verification": "NOT_RUN" },
+      { "method": "package", "mode": "quick", "status": "REFERENCE", "fixture": "F-PACKAGE", "currentSource": "implemented; package engine is a recipe branch, not multiplied by mode", "verification": "NOT_RUN" },
+      { "method": "package", "mode": "non-interactive", "status": "REFERENCE", "fixture": "F-PACKAGE", "currentSource": "implemented; default Conda, micromamba exposed in code and existing tests", "verification": "NOT_RUN" },
+      { "method": "mirror", "mode": "guided", "status": "REFERENCE", "fixture": "F-MIRROR", "currentSource": "implemented; pinned packages and BaseImage required", "verification": "NOT_RUN" },
+      { "method": "mirror", "mode": "quick", "status": "REFERENCE", "fixture": "F-MIRROR", "currentSource": "implemented; representative choice", "verification": "NOT_RUN" },
+      { "method": "mirror", "mode": "non-interactive", "status": "REFERENCE", "fixture": "F-MIRROR", "currentSource": "implemented; local field/L1/render scope", "verification": "NOT_RUN" },
+      { "method": "source", "mode": "guided", "status": "NO_DIRECT_ROUTE", "fixture": null, "redirectsTo": "source-structured", "currentSource": "no direct legacy guided route; a source clue goes to structured. Indirect reachability (for example /change-method) is a separate, unaccepted question.", "verification": "NOT_RUN" },
+      { "method": "source", "mode": "quick", "status": "REFERENCE", "fixture": "F-SOURCE", "currentSource": "public choice and legacy render implemented; free-form shell commands; BuildDependencies not auto-installed", "verification": "NOT_RUN" },
+      { "method": "source", "mode": "non-interactive", "status": "REFERENCE", "fixture": "F-SOURCE", "currentSource": "public choice, local L1 and render implemented; server acceptance unconfirmed", "verification": "NOT_RUN" },
+      { "method": "source-structured", "mode": "guided", "status": "REFERENCE", "fixture": "F-STRUCTURED", "currentSource": "current default guided source behaviour, not an opt-in method choice", "verification": "NOT_RUN" },
+      { "method": "source-structured", "mode": "quick", "status": "REFERENCE", "fixture": "F-STRUCTURED", "currentSource": "implemented; curated profile or explicit advanced profile", "verification": "NOT_RUN" },
+      { "method": "source-structured", "mode": "non-interactive", "status": "REFERENCE", "fixture": "F-STRUCTURED", "currentSource": "implemented; advanced custom profile needs a digest-pinned image", "verification": "NOT_RUN" },
+      { "method": "dockerfile", "mode": "guided", "status": "REFERENCE", "fixture": "F-DOCKERFILE", "currentSource": "a path clue alone does not import content; Content is also Required today", "dependsOn": "Dockerfile path/content one-of import delta", "verification": "NOT_RUN" },
+      { "method": "dockerfile", "mode": "quick", "status": "REFERENCE", "fixture": "F-DOCKERFILE", "currentSource": "Path and Content both Required; one-of/import delta needed", "dependsOn": "Dockerfile path/content one-of import delta", "verification": "NOT_RUN" },
+      { "method": "dockerfile", "mode": "non-interactive", "status": "REFERENCE", "fixture": "F-DOCKERFILE", "currentSource": "Path and Content both Required; one-of/import delta needed; no build context transfer", "dependsOn": "Dockerfile path/content one-of import delta", "verification": "NOT_RUN" }
+    ]
+  },
+  "fixtures": [
+    { "id": "F-PIN", "meaning": "syntactically valid fixed sha256:<64 hex> base image" },
+    { "id": "F-PACKAGE", "meaning": "complete bwa pin from bioconda with conda" },
+    { "id": "F-CONTAINER", "meaning": "pinned BioContainer image URI" },
+    { "id": "F-MIRROR", "meaning": "conda mirror" },
+    { "id": "F-SOURCE", "meaning": "source URI, checksum and make" },
+    { "id": "F-STRUCTURED", "meaning": "generic/minimal profiles with /nodekit/output export" },
+    { "id": "F-DOCKERFILE", "meaning": "pinned FROM and USER 1000 content" },
+    { "id": "F-WIRE", "meaning": "local fake request digest, build_id and observed image digest" }
+  ],
+  "fixtureValueBoundary": "Fixture names and values are syntactic only. They do not claim that a registry, package or source exists or that a build succeeds.",
+  "commandGrammar": {
+    "status": "RECOMMENDED_NOT_IMPLEMENTED",
+    "entries": [
+      { "command": "nodekit submit <recipe.json> [--receipt <path>]", "owner": "P04/P05" },
+      { "command": "nodekit function-recipe submit <recipe.json> [--receipt <path>] [--registration-timeout <seconds>]", "owner": "P07/P08" },
+      { "command": "nodekit receipt watch|cancel <receipt.json>", "owner": "P04/P05" },
+      { "command": "nodekit receipt replay <receipt.json>", "owner": "P04/P05/P08" },
+      { "command": "nodekit function-recipe create ... --base-receipt <path>", "owner": "P06/P08" }
+    ],
+    "defaultReceiptPath": ".nodekit/receipts/<root-request-id>.json next to the Recipe",
+    "existingReceiptPath": "exit 2, never overwritten silently"
+  },
+  "submitBlockDisposition": {
+    "owner": "P07",
+    "rule": "The current submit-block wording stays until the P07 feature PR changes CLI contract, spec clauses and block tests together. Changing wording alone is not completion.",
+    "newContract": "render stays RPC 0. Fresh submit: Draft or failing current validation -> RPC 0; valid Ready -> fixed BuildService then typed registry client path.",
+    "p02Interim": "P02 adds explicit SchemaVersion draft-1 to the existing submit-block fixtures and keeps Draft/Ready block exit 1 and RPC 0. Missing/null/unsupported schema are separate exit 2 / RPC 0 variants.",
+    "entries": [
+      { "id": "FR-020", "file": "specs/001-toolfunctionspec-authoring/spec.md", "anchor": "- **FR-020**:", "disposition": "KEEP_UNTIL_P07", "replacement": "render stays RPC 0; valid Ready fresh submit may send the second build and typed registration" },
+      { "id": "FR-021", "file": "specs/001-toolfunctionspec-authoring/spec.md", "anchor": "- **FR-021**:", "disposition": "KEEP_UNTIL_P07", "replacement": "the gate-closed message is replaced by the real submit path for valid Ready recipes" },
+      { "id": "SC-005", "file": "specs/001-toolfunctionspec-authoring/spec.md", "anchor": "- **SC-005**:", "disposition": "KEEP_UNTIL_P07", "replacement": "every submit attempt still gets a clear outcome; Draft/invalid stay RPC 0" },
+      { "id": "KeyEntities.ToolFunctionBuildRequest.previewOnly", "file": "specs/001-toolfunctionspec-authoring/spec.md", "anchor": "이번 기능은 이 payload를 렌더링/미리보기만 하고 실제로 전송하지 않는다.", "disposition": "KEEP_UNTIL_P07", "replacement": "raw_spec.v1 payload shared by render and submit" },
+      { "id": "Assumptions.stateTransitionExcluded", "file": "specs/001-toolfunctionspec-authoring/spec.md", "anchor": "이번 기능은 이 상태들로의 실제 전이 수단(제출 API 연동)을 구현하지 않는다.", "disposition": "KEEP_UNTIL_P07", "replacement": "state follows the actual receipt/observation, not the command alone" },
+      { "id": "OutOfScope.grpcSubmit", "file": "specs/001-toolfunctionspec-authoring/spec.md", "anchor": "실제 `ToolFunctionBuildRequest` gRPC 제출 경로", "disposition": "KEEP_UNTIL_P07", "replacement": "the gRPC submit path moves into scope with P07" },
+      { "id": "CliContract.submit", "file": "specs/001-toolfunctionspec-authoring/contracts/cli-function-recipe-commands.md", "anchor": "## `nodekit function-recipe submit <path>` — 항상 차단되는 명령", "disposition": "KEEP_UNTIL_P07", "replacement": "submit section rewritten in the P07 feature PR" },
+      { "id": "Tests.ToolFunctionRecipeSubmitCommandTests", "file": "tests/NodeKit.Cli.Tests/ToolFunctionRecipeSubmitCommandTests.cs", "anchor": "class ToolFunctionRecipeSubmitCommandTests", "disposition": "KEEP_UNTIL_P07", "replacement": "P02 adds explicit draft-1; P07 replaces the Ready block expectation" }
+    ]
+  },
+  "criterionStageMap": [
+    { "unit": "S1-01", "closesWith": "P01.support:R", "criteria": [ "S1-01-C01", "S1-01-C02", "S1-01-C03", "S1-01-C04", "S1-01-C05", "S1-01-C06", "S1-01-C07" ] },
+    { "unit": "S3-01", "closesWith": "P01.contract:R", "criteria": [ "S3-01-A", "S3-01-B", "S3-01-C" ] }
+  ]
+}
