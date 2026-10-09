@@ -234,18 +234,23 @@ namespace NodeKit.Cli.Tests
             AssertNoStackTrace(result.Stderr);
         }
 
+        // Ctrl-C가 저장 확인 화면이 나온 뒤(필드 입력 단계의 취소 검사를 모두
+        // 지난 뒤) 들어와도 쓰기 전이면 130으로 끝나고 파일을 쓰지 않는다.
         [Fact]
-        public void InteractiveRecipeCreate_CancelledBeforeSave_Exit130_KeepsExistingBytes()
+        public void InteractiveRecipeCreate_CtrlCAtSaveConfirmation_Exit130_KeepsExistingBytes()
         {
             var outPath = Path.Join(_workDir, "interactive.json");
             File.WriteAllText(outPath, Marker);
+            using var stdout = new CancelOnPromptWriter("[Enter / y] 저장");
+            using var stderr = new StringWriter();
 
-            var (exit, stdout, _) = RunInteractive(outPath, cancelled: true);
+            var exit = RunInteractive(outPath, stdout, stderr, stdout);
 
+            Assert.True(stdout.IsCancellationRequested);
             Assert.Equal(130, exit);
             Assert.Equal(Marker, File.ReadAllText(outPath));
-            Assert.DoesNotContain("저장되었습니다", stdout);
-            Assert.Contains("파일은 저장되지 않았습니다.", stdout);
+            Assert.DoesNotContain("저장되었습니다", stdout.ToString());
+            Assert.Contains("파일은 저장되지 않았습니다.", stdout.ToString());
         }
 
         [Fact]
@@ -360,6 +365,15 @@ namespace NodeKit.Cli.Tests
 
         private (int Exit, string Stdout, string Stderr) RunInteractive(string outPath, bool cancelled)
         {
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var exit = RunInteractive(outPath, stdout, stderr, new FixedCancellationSource(cancelled));
+            return (exit, stdout.ToString(), stderr.ToString());
+        }
+
+        private static int RunInteractive(
+            string outPath, StringWriter stdout, StringWriter stderr, IRecipeCreateCancellationSource cancellation)
+        {
             var transcript = new[]
             {
                 "2", // 빠른 설정 모드
@@ -370,19 +384,15 @@ namespace NodeKit.Cli.Tests
                 "bwa-mem", "0.7.17", "run.sh", ImageRefWithDigest,
                 "bwa=0.7.17=h5bf99c6_8", "",
             };
-            using var stdout = new StringWriter();
-            using var stderr = new StringWriter();
 
-            var exit = RecipeCreateInteractiveRunner.Run(
+            return RecipeCreateInteractiveRunner.Run(
                 outPath,
                 new RecipeCreateOptions(null, null, false, false, Array.Empty<(string, string)>(), null),
                 new PlainTextRecipeConsole(new StringReader(string.Join("\n", transcript)), stdout),
                 stderr,
-                new FixedCancellationSource(cancelled),
+                cancellation,
                 resolveClient: NullResolveRecipeClient.Instance,
                 imageDigestResolver: NullImageDigestResolver.Instance);
-
-            return (exit, stdout.ToString(), stderr.ToString());
         }
 
         private static (int Exit, string Stdout, string Stderr) Run(params string[] args)
@@ -398,6 +408,28 @@ namespace NodeKit.Cli.Tests
             public FixedCancellationSource(bool cancelled) => IsCancellationRequested = cancelled;
 
             public bool IsCancellationRequested { get; }
+        }
+
+        // 지정한 prompt가 출력되는 순간 Ctrl-C가 들어온 것처럼 취소 상태가 된다.
+        private sealed class CancelOnPromptWriter : StringWriter, IRecipeCreateCancellationSource
+        {
+            private readonly string _prompt;
+
+            public CancelOnPromptWriter(string prompt) => _prompt = prompt;
+
+            public bool IsCancellationRequested { get; private set; }
+
+            public override void Write(string? value)
+            {
+                base.Write(value);
+                IsCancellationRequested |= value?.Contains(_prompt, StringComparison.Ordinal) == true;
+            }
+
+            public override void WriteLine(string? value)
+            {
+                base.WriteLine(value);
+                IsCancellationRequested |= value?.Contains(_prompt, StringComparison.Ordinal) == true;
+            }
         }
     }
 }
