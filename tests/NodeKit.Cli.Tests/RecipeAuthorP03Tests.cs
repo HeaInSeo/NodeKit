@@ -549,7 +549,6 @@ namespace NodeKit.Cli.Tests
             session.SetField("ToolVersion", "0.7.17");
             session.SetField("Script", "run.sh");
             session.SetField("BaseImage", ImageRefWithDigest);
-            session.CompleteListField("Command");
             return session;
         }
 

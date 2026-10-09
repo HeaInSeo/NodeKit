@@ -350,6 +350,7 @@ namespace NodeKit.Authoring.Recipes
                 [RecipeMethodId.Dockerfile] = new[]
                 {
                     BaseImageField(),
+
                     // DockerfilePath와 DockerfileContent는 one-of 입력이다(S1-05).
                     // Path를 주면 그 파일 bytes를 읽어 DockerfileContent에 동결하고
                     // (RecipeAuthoringSession.SetImportedDockerfile), Path는
