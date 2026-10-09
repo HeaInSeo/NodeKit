@@ -936,10 +936,12 @@ $ echo $?
 제출 이전(로컬) 확정 실패에 쓰이는 값 — 전부 `recovery: "terminal"`:
 
 - `URL_REQUIRED` — NodeVault 주소가 없다(`--url`/`NODEKIT_NODEVAULT_URL` 미설정). exit 2.
-- `RECIPE_READ_FAILED` — recipe 파일을 읽을 수 없다(I/O 오류). exit 2.
-- `RECIPE_PARSE_FAILED` — recipe JSON 파싱 실패. exit 2.
-- `RECIPE_EMPTY` — recipe 파일이 비어 있다. exit 2.
+- `RECIPE_READ_FAILED` — recipe 파일을 읽을 수 없다(I/O 오류 또는 읽기 권한 없음). exit 2.
+- `RECIPE_PARSE_FAILED` — recipe JSON 파싱 실패(최상위 값이 객체가 아닌 경우 포함). exit 2.
+- `RECIPE_EMPTY` — recipe 파일이 비어 있다(literal `null`). exit 2.
+- `UNSUPPORTED_SCHEMA_VERSION` — `SchemaVersion`이 없거나 null/빈 값/공백이거나 `draft-1`과 정확히 같지 않다. property 이름은 대소문자를 무시하고 값은 정확히 비교한다. 자동 보완/변환은 하지 않는다. exit 2.
 - `MISSING_BUILD_KIND` — recipe에 `buildKind`가 없다. exit 2.
+- `UNSUPPORTED_BUILD_KIND` — `buildKind`가 정의되지 않은 값이다(예: 숫자 `999`). exit 2.
 - `L1_VALIDATION_FAILED` — L1 정적 검증 실패(상세 위반 내역은 stderr에 출력). exit 1.
 - `INVALID_URL` — `--url` 주소 형식이 올바르지 않다. exit 2.
 
@@ -1075,7 +1077,7 @@ $ nodekit render recipe.json --out - --format raw-spec --pretty
 |---|---|
 | 0 | 성공 (검증 통과, 또는 검증 통과 후 render/recipe create 완료) |
 | 1 | recipe-level 또는 L1 검증 위반 1개 이상, 또는 recipe create 최종 검증 실패 |
-| 2 | 사용법 오류, 인자 누락, 알 수 없는 옵션/필드, 파일을 읽을 수 없음, recipe JSON 파싱 실패 |
+| 2 | 사용법 오류, 인자 누락, 알 수 없는 옵션/필드, 파일을 읽을 수 없음(권한 포함), recipe JSON 파싱 실패, `SchemaVersion` 누락/미지원, `BuildKind` 누락/미지원 |
 | 124 | `nodekit submit`: `--connect-timeout`이 만료됨 (build ID를 받기 전 단계에서만 적용) |
 | 125 | `nodekit submit`: `--watch-timeout`이 만료됨 (build ID를 받은 뒤 단계에서만 적용, 서버 빌드는 취소되지 않음) |
 | 130 | `nodekit submit`: Ctrl-C로 취소됨 |
@@ -1098,7 +1100,8 @@ $ nodekit render recipe.json --out - --format raw-spec --pretty
 
 | 필드 | 타입 | 필수 여부 |
 |---|---|---|
-| `BuildKind` | string (enum) | 필수 — `Conda`/`Micromamba`/`BioContainer`/`SourceBuild`/`PackageMirror`/`DockerfileFallback` |
+| `SchemaVersion` | string | 필수 — 정확히 `"draft-1"`. 없거나 null/빈 값/다른 값(`"Draft-1"` 포함)이면 validate/render/submit 모두 exit 2, 자동 보완 없음 |
+| `BuildKind` | string (enum) | 필수 — `Conda`/`Micromamba`/`BioContainer`/`SourceBuild`/`PackageMirror`/`DockerfileFallback`/`SourceBuildStructured` |
 | `ToolName` | string | 필수 |
 | `Version` | string | 필수 |
 | `Script` | string | 필수 |
@@ -1132,6 +1135,7 @@ $ nodekit render recipe.json --out - --format raw-spec --pretty
 
 ```json
 {
+  "SchemaVersion": "draft-1",
   "BuildKind": "DockerfileFallback",
   "ToolName": "bwa",
   "Version": "0.7.17",

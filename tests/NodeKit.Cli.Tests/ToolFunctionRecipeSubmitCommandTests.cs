@@ -19,11 +19,33 @@ namespace NodeKit.Cli.Tests
 
         public void Dispose() => Directory.Delete(_workDir, recursive: true);
 
+        // P02 interim(cli-acceptance-contract.json submitBlockDisposition):
+        // 차단 fixture에는 SchemaVersion draft-1을 명시한다. 누락/미지원
+        // schema는 아래 별도 exit 2 변형이다.
         private string WriteRecipeFile(string state)
         {
             var path = Path.Join(_workDir, "recipe.json");
-            File.WriteAllText(path, JsonSerializer.Serialize(new { State = state, FunctionId = "samtools.sort" }));
+            File.WriteAllText(path, JsonSerializer.Serialize(new { SchemaVersion = "draft-1", State = state, FunctionId = "samtools.sort" }));
             return path;
+        }
+
+        [Theory]
+        [InlineData("""{ "State": "Ready", "FunctionId": "samtools.sort" }""")]
+        [InlineData("""{ "SchemaVersion": null, "State": "Ready", "FunctionId": "samtools.sort" }""")]
+        [InlineData("""{ "SchemaVersion": "draft-2", "State": "Ready", "FunctionId": "samtools.sort" }""")]
+        public void SchemaVersionMissingOrUnsupported_ReturnsExit2WithoutGateMessage(string json)
+        {
+            var path = Path.Join(_workDir, "recipe.json");
+            File.WriteAllText(path, json);
+
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var exitCode = CliApp.Run(new[] { "function-recipe", "submit", path }, new StringReader(string.Empty), stdout, stderr);
+
+            Assert.Equal(2, exitCode);
+            Assert.DoesNotContain("게이트가 아직 열려 있지 않습니다", stdout.ToString());
+            Assert.Contains("SchemaVersion", stderr.ToString());
+            Assert.Equal(json, File.ReadAllText(path));
         }
 
         [Fact]

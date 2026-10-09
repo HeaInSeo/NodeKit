@@ -24,6 +24,7 @@ namespace NodeKit.Cli.Tests
 
         private const string ValidRecipeJson = """
         {
+            "SchemaVersion": "draft-1",
             "BuildKind": "DockerfileFallback",
             "ToolName": "bwa",
             "Version": "0.7.17",
@@ -37,6 +38,7 @@ namespace NodeKit.Cli.Tests
 
         private const string InvalidRecipeJson = """
         {
+            "SchemaVersion": "draft-1",
             "BuildKind": "SourceBuild",
             "ToolName": "bwa",
             "Version": "0.7.17",
@@ -57,6 +59,7 @@ namespace NodeKit.Cli.Tests
         // crashed with a raw stack trace instead of a clean error + exit code.
         private const string MissingBuildKindRecipeJson = """
         {
+            "SchemaVersion": "draft-1",
             "ToolName": "bwa",
             "Version": "0.7.17",
             "BaseImage": "registry.example.com/bwa:0.7.17@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
@@ -103,6 +106,7 @@ namespace NodeKit.Cli.Tests
 
         private const string NullCommandRecipeJson = """
         {
+            "SchemaVersion": "draft-1",
             "BuildKind": "DockerfileFallback",
             "ToolName": "bwa",
             "Version": "0.7.17",
@@ -129,6 +133,7 @@ namespace NodeKit.Cli.Tests
 
         private const string NullSourceChecksumRecipeJson = """
         {
+            "SchemaVersion": "draft-1",
             "BuildKind": "SourceBuild",
             "ToolName": "bwa",
             "Version": "0.7.17",
@@ -420,6 +425,7 @@ namespace NodeKit.Cli.Tests
 
         private const string VersionOnlyPinRecipeJson = """
         {
+            "SchemaVersion": "draft-1",
             "BuildKind": "Conda",
             "ToolName": "bwa",
             "Version": "0.7.17",

@@ -16,6 +16,13 @@ namespace NodeKit.Validation.ToolFunctionRecipes
     {
         public static ValidationResult Validate(ToolFunctionRecipe recipe)
         {
+            // 목록 원소 null(S4-03-C)은 validator 접근 전에 L1 위반으로 돌려준다.
+            var nullElements = NullCollectionElementValidator.Validate(recipe, "L1-TFR-013");
+            if (!nullElements.IsValid)
+            {
+                return nullElements;
+            }
+
             var result = ToolFunctionRecipeValidator.Validate(recipe);
             if (result.IsValid)
             {

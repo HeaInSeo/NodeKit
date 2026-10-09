@@ -20,35 +20,13 @@ namespace NodeKit.Cli
 
         public static bool TryLoad(string path, TextWriter stderr, out ToolFunctionRecipe? recipe)
         {
-            recipe = null;
-            string content;
-            try
+            if (!AuthoringFileLoader.TryLoad(path, JsonOptions, out recipe, out var error))
             {
-                content = File.ReadAllText(path);
-            }
-            catch (IOException ex)
-            {
-                stderr.WriteLine($"recipe 파일을 읽을 수 없습니다: {path} ({ex.Message})");
+                stderr.WriteLine(error!.Message);
                 return false;
             }
 
-            try
-            {
-                recipe = JsonSerializer.Deserialize<ToolFunctionRecipe>(content, JsonOptions);
-            }
-            catch (JsonException ex)
-            {
-                stderr.WriteLine($"recipe JSON 파싱에 실패했습니다: {path} ({ex.Message})");
-                return false;
-            }
-
-            if (recipe is null)
-            {
-                stderr.WriteLine($"recipe 파일이 비어있습니다: {path}");
-                return false;
-            }
-
-            recipe.Normalize();
+            recipe!.Normalize();
             return true;
         }
     }

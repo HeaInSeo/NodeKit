@@ -22,6 +22,14 @@ namespace NodeKit.Validation.Recipes
                     "ValidateRecipe() 호출 전에 RecipeKindResolver.Resolve()를 먼저 호출하세요.");
             }
 
+            // 목록 원소 null은 아래 validator/renderer를 NullReferenceException으로
+            // 깨뜨리므로 먼저 L1 위반으로 돌려준다(S1-02-C05).
+            var nullElements = NullCollectionElementValidator.Validate(recipe, "L1-RCP-019");
+            if (!nullElements.IsValid)
+            {
+                return nullElements;
+            }
+
             var recipeResult = RecipeValidator.Validate(recipe, strictReproducible);
             var definition = RecipeRenderer.Render(recipe);
 

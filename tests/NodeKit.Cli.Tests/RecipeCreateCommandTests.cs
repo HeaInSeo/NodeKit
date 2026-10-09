@@ -551,6 +551,7 @@ namespace NodeKit.Cli.Tests
             var legacyPath = Path.Join(_workDir, "legacy-recipe.json");
             File.WriteAllText(legacyPath, """
                 {
+                  "SchemaVersion": "draft-1",
                   "BuildKind": "BioContainer",
                   "ToolName": "bwa-mem",
                   "Version": "0.7.17",

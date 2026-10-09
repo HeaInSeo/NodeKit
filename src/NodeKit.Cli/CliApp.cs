@@ -349,46 +349,13 @@ namespace NodeKit.Cli
 
         private static bool TryLoadRecipe(string path, TextWriter stderr, out RecipeDocument? recipe)
         {
-            recipe = null;
-            string content;
-            try
+            if (AuthoringFileLoader.TryLoadRecipe(path, _jsonOptions, out recipe, out var error))
             {
-                content = File.ReadAllText(path);
-            }
-            catch (IOException ex)
-            {
-                stderr.WriteLine($"recipe 파일을 읽을 수 없습니다: {path} ({ex.Message})");
-                return false;
+                return true;
             }
 
-            try
-            {
-                recipe = JsonSerializer.Deserialize<RecipeDocument>(content, _jsonOptions);
-            }
-            catch (JsonException ex)
-            {
-                stderr.WriteLine($"recipe JSON 파싱에 실패했습니다: {path} ({ex.Message})");
-                return false;
-            }
-
-            if (recipe is null)
-            {
-                stderr.WriteLine($"recipe 파일이 비어있습니다: {path}");
-                return false;
-            }
-
-            recipe.Normalize();
-
-            if (recipe.BuildKind is null)
-            {
-                stderr.WriteLine(
-                    $"recipe 파일에 buildKind가 없습니다: {path} " +
-                    "(Conda | Micromamba | BioContainer | SourceBuild | PackageMirror | DockerfileFallback 중 하나를 지정하세요.)");
-                recipe = null;
-                return false;
-            }
-
-            return true;
+            stderr.WriteLine(error!.Message);
+            return false;
         }
 
         internal static void PrintViolations(System.Collections.Generic.IReadOnlyList<ValidationViolation> violations, TextWriter stderr)
