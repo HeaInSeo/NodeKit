@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "description": "Machine-readable provenance for every NodeVault proto file the NodeKit build compiles. Verified by scripts/verify-proto-provenance.py (CI) and by the NodeKitVerifyProtoProvenance MSBuild target (official builds). See protos/SOURCE.md.",
+  "sources": [
+    {
+      "consumerPath": "protos/nodevault/v1/nodevault.proto",
+      "consumerSha256": "b73e5cb100dcfcb9ec44e42bf454171ec867df622e34544825778eb2170144ea",
+      "producer": {
+        "repository": "https://github.com/HeaInSeo/NodeVault",
+        "path": "protos/nodevault/v1/nodevault.proto",
+        "revision": "912b23c333ca17b80f4ea3f910681209467264a6",
+        "gitBlobSha1": "8fe95c3976b69dcde0c02088a51069b67046f61d",
+        "sha256": "b73e5cb100dcfcb9ec44e42bf454171ec867df622e34544825778eb2170144ea"
+      },
+      "generator": {
+        "tool": "Grpc.Tools",
+        "version": "2.80.0",
+        "runtime": "Google.Protobuf",
+        "runtimeVersion": "3.34.1",
+        "projects": [
+          "NodeKit.csproj",
+          "src/NodeKit.Cli/NodeKit.Cli.csproj"
+        ]
+      }
+    }
+  ]
+}

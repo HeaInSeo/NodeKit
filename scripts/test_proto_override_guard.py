@@ -1,0 +1,179 @@
+#!/usr/bin/env python3
+"""
+Tests for the NodeKitVerifyProtoProvenance MSBuild target
+(Directory.Build.targets): an official build must refuse proto bytes that
+protos/provenance.json does not declare, including bytes injected through
+/p:ApiProtosRoot=<dir>.
+
+Needs the dotnet SDK and a restored solution (CI runs it after Restore/Build).
+Run directly: python3 scripts/test_proto_override_guard.py
+"""
+
+import hashlib
+import json
+import os
+import shutil
+import subprocess
+import tempfile
+import unittest
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.dirname(SCRIPT_DIR)
+PROTO = os.path.join("nodevault", "v1", "nodevault.proto")
+MANIFEST = os.path.join("protos", "provenance.json")
+PROJECTS = (
+    os.path.join(REPO_ROOT, "NodeKit.csproj"),
+    os.path.join(REPO_ROOT, "src", "NodeKit.Cli", "NodeKit.Cli.csproj"),
+)
+GUARD_TARGET = "NodeKitVerifyProtoProvenance"
+
+
+def run(args):
+    # No MSBuild node/build-server reuse: lingering background nodes would keep
+    # loading the machine after this script exits.
+    env = dict(os.environ)
+    env["MSBUILDDISABLENODEREUSE"] = "1"
+    # Keep the decision under the test's control: the guard also treats the
+    # CI environment variable as "official", which would hide the Debug case.
+    env.pop("CI", None)
+    env["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1"
+    env["DOTNET_NOLOGO"] = "1"
+    process = subprocess.Popen(
+        ["dotnet"] + args, cwd=REPO_ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
+    output = process.communicate()[0].decode("utf-8", "replace")
+    return process.returncode, output
+
+
+class ProtoOverrideGuardTests(unittest.TestCase):
+    def setUp(self):
+        self.override = tempfile.mkdtemp(prefix="nk-proto-override-")
+        os.makedirs(os.path.join(self.override, "nodevault", "v1"))
+        shutil.copyfile(os.path.join(REPO_ROOT, "protos", PROTO), os.path.join(self.override, PROTO))
+
+    def tearDown(self):
+        shutil.rmtree(self.override)
+
+    def tamper_override(self):
+        with open(os.path.join(self.override, PROTO), "ab") as handle:
+            handle.write(b"\n// undeclared byte\n")
+
+    def guard(self, project, *properties):
+        return run(["msbuild", project, "-nologo", "-t:" + GUARD_TARGET] + ["-p:" + p for p in properties])
+
+    def test_vendored_proto_passes_official_guard(self):
+        for project in PROJECTS:
+            code, output = self.guard(project, "ContinuousIntegrationBuild=true")
+            self.assertEqual(code, 0, output)
+            self.assertNotIn("NKPROTO", output)
+
+    def test_t3_undeclared_override_fails_in_ci_build(self):
+        self.tamper_override()
+        for project in PROJECTS:
+            code, output = self.guard(project, "ContinuousIntegrationBuild=true", "ApiProtosRoot=" + self.override)
+            self.assertNotEqual(code, 0, output)
+            self.assertIn("NKPROTO002", output)
+
+    def test_t3_undeclared_override_fails_in_release_build(self):
+        self.tamper_override()
+        code, output = self.guard(PROJECTS[1], "Configuration=Release", "ApiProtosRoot=" + self.override)
+        self.assertNotEqual(code, 0, output)
+        self.assertIn("NKPROTO002", output)
+
+    def test_t3_undeclared_override_fails_under_ci_environment(self):
+        self.tamper_override()
+        code, output = self.guard(PROJECTS[1], "CI=true", "ApiProtosRoot=" + self.override)
+        self.assertNotEqual(code, 0, output)
+        self.assertIn("NKPROTO002", output)
+
+    def test_t3_override_with_declared_bytes_is_proven_and_passes(self):
+        code, output = self.guard(PROJECTS[1], "ContinuousIntegrationBuild=true", "ApiProtosRoot=" + self.override)
+        self.assertEqual(code, 0, output)
+
+    def tampered_digest(self):
+        self.tamper_override()
+        with open(os.path.join(self.override, PROTO), "rb") as handle:
+            return hashlib.sha256(handle.read()).hexdigest()
+
+    def test_t2_extra_key_digest_in_manifest_is_not_proof(self):
+        # Independent review P2-1: a consumerSha256 outside sources[] must not
+        # make the tampered override pass the official guard.
+        digest = self.tampered_digest()
+        manifest_path = os.path.join(REPO_ROOT, MANIFEST)
+        with open(manifest_path, "rb") as handle:
+            original = handle.read()
+        self.addCleanup(self.restore, manifest_path, original)
+        manifest = json.loads(original.decode("utf-8"))
+        manifest["note"] = {"consumerSha256": digest}
+        with open(manifest_path, "w") as handle:
+            json.dump(manifest, handle, indent=2)
+            handle.write("\n")
+        code, output = self.guard(PROJECTS[1], "ContinuousIntegrationBuild=true", "ApiProtosRoot=" + self.override)
+        self.assertNotEqual(code, 0, output)
+        self.assertIn("NKPROTO003", output)
+
+    def test_t3_manifest_path_override_is_ignored(self):
+        # A second manifest passed by property must not replace protos/provenance.json.
+        digest = self.tampered_digest()
+        other = os.path.join(self.override, "provenance.json")
+        with open(os.path.join(REPO_ROOT, MANIFEST)) as handle:
+            manifest = json.load(handle)
+        manifest["sources"][0]["consumerSha256"] = digest
+        with open(other, "w") as handle:
+            json.dump(manifest, handle, indent=2)
+        code, output = self.guard(
+            PROJECTS[1], "ContinuousIntegrationBuild=true", "ApiProtosRoot=" + self.override,
+            "NodeKitProtoProvenanceManifest=" + other)
+        self.assertNotEqual(code, 0, output)
+        self.assertIn("NKPROTO002", output)
+
+    def test_p1_official_build_decision_is_not_an_overridable_property(self):
+        # Codex P1 (r4228013065): the official-build decision must not live in a
+        # property that -p: can flip. A real CI/Release build that also passes
+        # -p:_NodeKitOfficialBuild=false must still run the guard on tampered bytes.
+        self.tamper_override()
+        for official in ("ContinuousIntegrationBuild=true", "CI=true", "Configuration=Release"):
+            code, output = self.guard(
+                PROJECTS[1], official, "_NodeKitOfficialBuild=false",
+                "ApiProtosRoot=" + self.override)
+            self.assertNotEqual(code, 0, output)
+            self.assertIn("NKPROTO002", output)
+
+    def test_p1_manifest_proof_is_read_from_pinned_file_not_a_property(self):
+        # Codex P1 (r4228013070): the manifest proof text and its digest/source
+        # counts must come from the pinned file, never from -p:-overridable
+        # properties. Injecting the tampered proto's digest through those property
+        # names must not pass the official guard.
+        digest = self.tampered_digest()
+        forged = '{"consumerSha256": "%s"}' % digest  # no comma: -p: splits on ','
+        code, output = self.guard(
+            PROJECTS[1], "ContinuousIntegrationBuild=true", "ApiProtosRoot=" + self.override,
+            "_NodeKitProtoManifestText=" + forged,
+            "_NodeKitProtoDigestCount=1", "_NodeKitProtoSourceCount=1")
+        self.assertNotEqual(code, 0, output)
+        self.assertIn("NKPROTO002", output)
+
+    @staticmethod
+    def restore(path, data):
+        with open(path, "wb") as handle:
+            handle.write(data)
+
+    def test_local_debug_override_is_not_blocked(self):
+        self.tamper_override()
+        code, output = self.guard(PROJECTS[1], "Configuration=Debug", "ApiProtosRoot=" + self.override)
+        self.assertEqual(code, 0, output)
+        self.assertNotIn("NKPROTO", output)
+
+    def test_t3_guard_runs_before_proto_compilation_in_real_build(self):
+        # A real Release build of the CLI must stop at the guard before
+        # Grpc.Tools compiles the undeclared proto.
+        self.tamper_override()
+        code, output = run([
+            "build", PROJECTS[1], "--no-restore", "--configuration", "Release", "-nologo",
+            "--disable-build-servers", "-p:ApiProtosRoot=" + self.override])
+        self.assertNotEqual(code, 0, output)
+        self.assertIn("NKPROTO002", output)
+        self.assertNotIn("error CS", output)
+
+
+if __name__ == "__main__":
+    unittest.main()

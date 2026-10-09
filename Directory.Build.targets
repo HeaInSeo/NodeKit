@@ -1,0 +1,32 @@
+<Project>
+  <!-- 공식(CI/Release) 빌드에서 컴파일되는 모든 proto 바이트를 protos/provenance.json으로 증명한다.
+       /p:ApiProtosRoot= override가 선언되지 않은 바이트를 넣으면 Protobuf 컴파일 전에 실패한다.
+       로컬 Debug 빌드는 막지 않는다. 출처 정책은 protos/SOURCE.md 참조.
+
+       증명에 쓰는 값은 명령행 전역 속성(/p:)으로 바꿀 수 없어야 한다.
+       - 공식 빌드 판정은 Target Condition에서 CI/Release 신호를 직접 평가한다. 끄는 스위치가 될
+         별도 속성(_NodeKitOfficialBuild 등)을 두지 않는다. 전역 속성은 프로젝트 파일 수준
+         PropertyGroup 할당을 덮으므로, 판정을 담는 속성이 있으면 /p:로 꺼서 target을 건너뛸 수 있다.
+       - manifest 텍스트와 digest/source 개수는 예약 속성 $(MSBuildThisFileDirectory) 경로에서
+         매번 새로 읽어 Error Condition 안에서 인라인으로 계산한다. 증명 자료를 중간 속성에 담지 않으므로
+         /p:로 넣은 값이 읽히지 않는다.
+       텍스트 매칭이 받아들이는 consumerSha256 항목이 검증된 sources[]뿐이라는 것은
+       scripts/verify-proto-provenance.py(required CI)가 보장한다. 여기서는 consumerSha256 항목 수가
+       consumerPath 수와 같은지도 확인해 sources[] 밖의 추가 digest를 거부한다. -->
+  <Target Name="NodeKitVerifyProtoProvenance"
+          BeforeTargets="PrepareForBuild"
+          Condition="('$(CI)' == 'true' or '$(ContinuousIntegrationBuild)' == 'true' or '$(Configuration)' == 'Release') and '@(Protobuf)' != ''">
+    <Error Condition="!Exists('$(MSBuildThisFileDirectory)protos/provenance.json')"
+           Code="NKPROTO001"
+           Text="Official build compiles proto files but the provenance manifest '$(MSBuildThisFileDirectory)protos/provenance.json' is missing." />
+    <GetFileHash Files="@(Protobuf)" Algorithm="SHA256" HashEncoding="hex">
+      <Output TaskParameter="Items" ItemName="_NodeKitProtoHash" />
+    </GetFileHash>
+    <Error Condition="$([System.Text.RegularExpressions.Regex]::Matches($([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)protos/provenance.json')), '&quot;consumerSha256&quot;').Count) != $([System.Text.RegularExpressions.Regex]::Matches($([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)protos/provenance.json')), '&quot;consumerPath&quot;').Count)"
+           Code="NKPROTO003"
+           Text="Official build refuses protos/provenance.json: its consumerSha256 entry count differs from its declared consumerPath count. A digest outside sources[] is not provenance (run scripts/verify-proto-provenance.py)." />
+    <Error Condition="!$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)protos/provenance.json').Contains('&quot;consumerSha256&quot;: &quot;$([System.String]::Copy('%(_NodeKitProtoHash.FileHash)').ToLowerInvariant())&quot;'))"
+           Code="NKPROTO002"
+           Text="Official build refuses undeclared proto bytes: '%(_NodeKitProtoHash.FullPath)' (SHA-256 %(_NodeKitProtoHash.FileHash), ApiProtosRoot='$(ApiProtosRoot)') is not a consumerSha256 in protos/provenance.json. Use the vendored protos/ copy, or update the vendored file and manifest together (see protos/SOURCE.md)." />
+  </Target>
+</Project>
