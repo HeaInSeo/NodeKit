@@ -841,11 +841,20 @@ nodekit submit recipe.json
 
 ```
 [빌드 시작] 신규 경로 (ToolSpec)
-spec 해결 완료 (digest: 8f3a1c2d...)
-빌드 제출됨 (build ID: abc-123)
+[로그] spec 해결 완료 — ToolSpec digest: 8f3a1c2d…(서버가 준 전체 값)
+[빌드 시작] 빌드 제출됨 (build ID: abc-123)
 ...
 [성공] 빌드가 완료되었습니다.
+이미지 digest: harbor.example/tools/bwa@sha256:…
 ```
+
+`ToolSpec digest:` 뒤의 값은 서버가 확정한 전체 ToolSpec digest이고(잘라서
+보여주지 않는다), 마지막 `이미지 digest:` 줄은 빌드된 image의 digest다 — 서로
+다른 값이다. `nodekit function-recipe create`의 `--tool-spec-digest`에는 앞의 값을,
+`--base-tool-image-digest`에는 뒤 줄의 digest(`ref@` 뒤 부분)를 그대로 복사한다.
+`--format jsonl`에서는 ToolSpec digest가 같은 문구(`spec 해결 완료 — ToolSpec digest: …`)를
+`message`로 가진 첫 `state` 레코드에, image digest는 `completed` 레코드의
+`image_digest` 필드에 있다.
 
 | 옵션 | 의미 |
 |---|---|
@@ -1033,7 +1042,8 @@ Recipe의 `Command`/`Inputs`/`Outputs`/`Display*` 필드는 `build-request`
 미리보기에만 나오고 `raw_spec`에는 들어가지 않는다 — NodeVault가 ToolSpec
 스키마에서 뺀 필드다. 포트와 실행 명령은 ToolSpec 빌드가 확정된 뒤
 `nodekit function-recipe create --tool-spec-digest <ToolSpec digest> --base-tool-image-digest <빌드된 image digest>`로
-작성한다(두 digest 모두 필수).
+작성한다(두 digest 모두 필수). 두 값을 `nodekit submit` 출력의 어디서 복사하는지는
+위 `nodekit submit` 절을 본다.
 `recipe create`의 대화형 흐름은 이 단계를 안내만 하고 건너뛰며,
 `--non-interactive --field Command=...`는 값을 저장하되 같은 안내를 경고로 출력한다.
 

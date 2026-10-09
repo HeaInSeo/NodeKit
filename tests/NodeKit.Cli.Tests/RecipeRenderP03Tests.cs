@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using NodeKit.Authoring;
 using NodeKit.Authoring.Recipes;
 using NodeKit.Cli;
+using NodeKit.Cli.Tests.Fakes;
 using NodeKit.Grpc;
 using Xunit;
 
@@ -397,7 +398,105 @@ namespace NodeKit.Cli.Tests
             Assert.Contains("nodekit function-recipe create", stdout);
         }
 
+        // The guidance above sends the user to function-recipe create with two
+        // digests. Both must be copyable from real submit output: the full
+        // server-resolved ToolSpec digest and the (different) built image digest.
+        [Fact]
+        public void S1_07_C05_HumanSubmitOutput_GivesBothDigestsForFunctionRecipe()
+        {
+            using var server = DigestServer();
+            using var client = new GrpcToolSpecClient(server.Channel);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = SubmitCommand.Run(new[] { "submit", WriteRecipe(PackageRecipe()) }, stdout, stderr, client);
+
+            Assert.Equal(0, exitCode);
+            var lines = stdout.ToString().Split('\n').Select(l => l.TrimEnd('\r')).ToList();
+            var toolSpecLine = Assert.Single(lines, l => l.Contains("ToolSpec digest: ", StringComparison.Ordinal));
+            var toolSpecDigest = toolSpecLine[(toolSpecLine.IndexOf("ToolSpec digest: ", StringComparison.Ordinal) + "ToolSpec digest: ".Length)..];
+            var imageLine = lines.Last(l => l.StartsWith("이미지 digest: ", StringComparison.Ordinal));
+            var imageDigest = imageLine[(imageLine.LastIndexOf('@') + 1)..];
+
+            Assert.Equal(ResolvedToolSpecDigest, toolSpecDigest);
+            Assert.Equal(BuiltImageDigest, imageDigest);
+            AssertFunctionRecipeAccepts(toolSpecDigest, imageDigest);
+        }
+
+        [Fact]
+        public void S1_07_C05_JsonlSubmitOutput_GivesBothDigestsForFunctionRecipe()
+        {
+            using var server = DigestServer();
+            using var client = new GrpcToolSpecClient(server.Channel);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = SubmitCommand.Run(new[] { "submit", WriteRecipe(PackageRecipe()), "--format", "jsonl" }, stdout, stderr, client);
+
+            Assert.Equal(0, exitCode);
+            var records = stdout.ToString()
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                .Select(l => JsonDocument.Parse(l).RootElement.Clone())
+                .ToList();
+            var message = records
+                .Where(r => r.GetProperty("type").GetString() == "state" && r.TryGetProperty("message", out _))
+                .Select(r => r.GetProperty("message").GetString()!)
+                .Single(m => m.Contains("ToolSpec digest: ", StringComparison.Ordinal));
+            var toolSpecDigest = message[(message.IndexOf("ToolSpec digest: ", StringComparison.Ordinal) + "ToolSpec digest: ".Length)..];
+            var completed = records.Last();
+            Assert.Equal("completed", completed.GetProperty("type").GetString());
+            var imageDigest = completed.GetProperty("image_digest").GetString()!;
+
+            Assert.Equal(ResolvedToolSpecDigest, toolSpecDigest);
+            Assert.Equal(BuiltImageDigest, imageDigest);
+            AssertFunctionRecipeAccepts(toolSpecDigest, imageDigest);
+        }
+
         // ── fixtures ──────────────────────────────────────────────────────────
+
+        // Two distinct full digests, each well over 16 characters.
+        private const string ResolvedToolSpecDigest = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08";
+        private const string BuiltImageDigest = "sha256:60303ae22b998861bce3b28f33eec1be758a213c86c93c076dbe9f558c11c752";
+
+        private static GrpcTestServer DigestServer()
+        {
+            var server = new GrpcTestServer();
+            server.Fake.OnResolveToolSpec = _ => new Nodevault.V1.ResolvedToolSpecResponse { ToolSpecDigest = ResolvedToolSpecDigest };
+            server.Fake.WatchEvents = new List<Nodevault.V1.BuildEvent>
+            {
+                new()
+                {
+                    Kind = Nodevault.V1.BuildEventKind.Log,
+                    Status = "Succeeded",
+                    BuildId = "fake-build-id",
+                    ImageRef = "harbor.example/tools/bwa-mem",
+                    ImageDigest = BuiltImageDigest,
+                },
+            };
+            return server;
+        }
+
+        private void AssertFunctionRecipeAccepts(string toolSpecDigest, string imageDigest)
+        {
+            var outPath = Path.Join(_workDir, "function-" + Guid.NewGuid() + ".json");
+            var exitCode = RunCli(
+                out _,
+                out var stderr,
+                "function-recipe", "create", outPath,
+                "--tool-spec-digest", toolSpecDigest,
+                "--base-tool-image-digest", imageDigest,
+                "--non-interactive",
+                "--field", "FunctionId=bwa.mem",
+                "--field", "Revision=v1",
+                "--field", "ScriptPath=./run.sh",
+                "--field", "Command.Executable=bwa");
+
+            Assert.Equal(0, exitCode);
+            Assert.Empty(stderr);
+            using var saved = JsonDocument.Parse(File.ReadAllText(outPath));
+            Assert.Equal(toolSpecDigest, saved.RootElement.GetProperty("ToolSpecDigest").GetString());
+            Assert.Equal(imageDigest, saved.RootElement.GetProperty("BaseToolImageDigest").GetString());
+        }
 
         // F-PACKAGE: complete bwa pin from bioconda with conda.
         private static RecipeDocument PackageRecipe() => new()
