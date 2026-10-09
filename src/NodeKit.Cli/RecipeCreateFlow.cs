@@ -47,7 +47,7 @@ namespace NodeKit.Cli
         internal const string CommandPortReplacedMessage = "이 단계는 nodekit function-recipe create로 대체되었습니다.";
 
         internal const string CommandPortGuidance =
-            "포트/명령은 ToolSpec 빌드가 확정된 뒤 그 digest를 --tool-spec-digest로 지정해 nodekit function-recipe create에서 작성하세요. " +
+            "포트/명령은 ToolSpec 빌드가 확정된 뒤 nodekit function-recipe create --tool-spec-digest <ToolSpec digest> --base-tool-image-digest <빌드된 image digest>로 작성하세요. " +
             "Recipe의 Command/Inputs/Outputs는 ToolSpec raw_spec에 포함되지 않습니다.";
 
         // 마법사는 동기/블로킹 콘솔 루프라 네트워크 보조 호출(ResolveRecipe, base

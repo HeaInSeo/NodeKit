@@ -338,6 +338,7 @@ namespace NodeKit.Cli.Tests
             var text = stdout.ToString();
             Assert.Contains(RecipeCreateFlow.CommandPortReplacedMessage, text);
             Assert.Contains("--tool-spec-digest", text);
+            Assert.Contains("--base-tool-image-digest", text);
             Assert.Contains("nodekit function-recipe create", text);
             Assert.Contains("ToolSpec raw_spec에 포함되지 않습니다", text);
 

@@ -1031,8 +1031,9 @@ $ echo $?
 
 Recipe의 `Command`/`Inputs`/`Outputs`/`Display*` 필드는 `build-request`
 미리보기에만 나오고 `raw_spec`에는 들어가지 않는다 — NodeVault가 ToolSpec
-스키마에서 뺀 필드다. 포트와 실행 명령은 ToolSpec 빌드가 확정된 뒤 그 digest를
-`--tool-spec-digest`로 지정해 `nodekit function-recipe create`에서 작성한다.
+스키마에서 뺀 필드다. 포트와 실행 명령은 ToolSpec 빌드가 확정된 뒤
+`nodekit function-recipe create --tool-spec-digest <ToolSpec digest> --base-tool-image-digest <빌드된 image digest>`로
+작성한다(두 digest 모두 필수).
 `recipe create`의 대화형 흐름은 이 단계를 안내만 하고 건너뛰며,
 `--non-interactive --field Command=...`는 값을 저장하되 같은 안내를 경고로 출력한다.
 
