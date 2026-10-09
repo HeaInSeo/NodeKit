@@ -1,0 +1,57 @@
+{
+  "contractId": "nodekit.portable-authoring-transfer",
+  "contractRevision": "v0.9.1",
+  "stage": "P01.contract",
+  "status": "FROZEN_EXPECTATION",
+  "note": "How a saved Recipe written on install A is reused on an independent install B. Path handling belongs to P06, source binding to P04, and acceptance to S4-04-G. Nothing in this file is a PASS.",
+  "profile": "supportProfile in cli-acceptance-contract.json; independent clean installs A and B, not just a different CWD on one host",
+  "artifacts": [
+    { "artifact": "ToolSpec Recipe JSON", "condition": "script and DockerfileContent are stored in the file; a DockerfilePath authoring input is frozen into Content, and the original A file is not required" },
+    { "artifact": "ToolFunctionRecipe JSON plus relative companion files", "condition": "ScriptPath and FixtureReference.LocalPath are host references relative to the Recipe directory; companions travel in the same relative layout" },
+    { "artifact": "immutable source and resolved snapshots (optional)", "condition": "exact authoring/companion bytes and the actual Resolve result; past snapshots are never rewritten; current edits show as divergence" },
+    { "artifact": "new request records on B", "condition": "endpoint, install path, credentials and A's journal are not transfer inputs; importing a Recipe never resumes or replays A's remote work" }
+  ],
+  "hostRelativeProperties": [
+    { "type": "ToolFunctionRecipe", "property": "ScriptPath" },
+    { "type": "FixtureReference", "property": "LocalPath" }
+  ],
+  "imageInternalProperties": [
+    { "type": "CommandContract", "property": "Executable" },
+    { "type": "CommandContract", "property": "WorkingDirectory" },
+    { "type": "PortContract", "property": "PathOrGlob" }
+  ],
+  "rules": {
+    "relativeBase": "directory that contains the Recipe file",
+    "absoluteHostPath": "rejected with exit 2 and RPC 0; no automatic rewrite and no fallback to A",
+    "imageInternalPaths": "kept verbatim; never resolved as host paths",
+    "digestOnlyFixture": "ContentDigest declaration and meaning are kept; no local file is created, uploaded or dry-run",
+    "declaredLocalPathFixture": "placement and absence are checked; data acceptance and execution success are not claimed"
+  },
+  "sourceBinding": {
+    "owner": "P04 (path key/API from P06)",
+    "key": [ "logical path relative to the Recipe", "exact bytes sha256" ],
+    "excludedFromKey": [ "absolute install path on B", "user path", "current working directory" ],
+    "digestOnly": "bound to the original declaration; file bytes are never guessed",
+    "notGlobalIdentity": "a local binding hash, not a ToolSpec digest or a global Manifest/Lock format"
+  },
+  "exampleLayout": {
+    "recipe": "function-recipe.json",
+    "companions": [
+      { "property": "ScriptPath", "value": "./scripts/sort.sh" },
+      { "property": "FixtureReference.LocalPath", "value": "./fixtures/reads.fastq" }
+    ],
+    "imageInternal": [
+      { "property": "CommandContract.Executable", "value": "/usr/local/bin/sort-tool" },
+      { "property": "CommandContract.WorkingDirectory", "value": "/work" }
+    ]
+  },
+  "variants": [
+    { "id": "transfer-relative-layout", "input": "Recipe and companions copied to B in the same relative layout; B runs from another CWD", "expected": "validate/render read B's companions; A is not accessed", "owner": "P06", "criterion": "S4-04-G", "verification": "NOT_RUN" },
+    { "id": "transfer-companion-missing", "input": "ScriptPath companion absent on B", "expected": { "exit": 2, "businessRpc": 0 }, "owner": "P06", "criterion": "S4-04-G", "verification": "NOT_RUN" },
+    { "id": "transfer-script-blank", "input": "companion script is whitespace only", "expected": { "exit": 1, "businessRpc": 0 }, "owner": "P06", "criterion": "S3-03-D", "verification": "NOT_RUN" },
+    { "id": "transfer-absolute-host-path", "input": "ScriptPath is an absolute path from A", "expected": { "exit": 2, "businessRpc": 0, "rewrite": false }, "owner": "P06", "criterion": "S4-04-G", "verification": "NOT_RUN" },
+    { "id": "transfer-digest-only-fixture", "input": "FixtureReference with ContentDigest and no LocalPath", "expected": "declaration preserved; no file created", "owner": "P06", "criterion": "S3-06-A", "verification": "NOT_RUN" },
+    { "id": "transfer-image-internal-path", "input": "Command.Executable and WorkingDirectory are image paths that do not exist on B", "expected": "kept verbatim; not checked against B's filesystem", "owner": "P06", "criterion": "S4-04-G", "verification": "NOT_RUN" }
+  ],
+  "decisionBoundary": "Decision 44-46: mutable Authoring Manifest and immutable Resolved Lock with exact source linkage may be packaged together. The existing Recipe JSON is the CLI storage adapter; the global bundle/hash format stays OPEN."
+}
