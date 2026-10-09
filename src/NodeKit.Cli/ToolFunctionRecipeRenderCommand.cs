@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.Json;
 using NodeKit.Authoring.ToolFunctionRecipes;
 using NodeKit.Grpc;
+using NodeKit.Validation;
 
 namespace NodeKit.Cli
 {
@@ -53,6 +54,16 @@ namespace NodeKit.Cli
             if (!ToolFunctionRecipeCliIo.TryLoad(args[2], stderr, out var recipe))
             {
                 return 2;
+            }
+
+            // 파일의 State=Ready만 믿고 렌더링하면 목록 원소 null에서
+            // NullReferenceException이 난다 — 출력 파일을 쓰기 전에 L1 위반으로
+            // 돌려준다(S4-03-C).
+            var nullElements = NullCollectionElementValidator.Validate(recipe!, "L1-TFR-013");
+            if (!nullElements.IsValid)
+            {
+                CliApp.PrintViolations(nullElements.Violations, stderr);
+                return 1;
             }
 
             if (recipe!.State != ToolFunctionRecipeState.Ready)

@@ -66,7 +66,8 @@ namespace NodeKit.Authoring.ToolFunctionRecipes
         /// non-nullable 어노테이션을 런타임에 강제하지 않으므로, 외부에서 작성된
         /// JSON에 "command": null 같은 값이 있으면 그대로 null로 역직렬화된다.
         /// 외부에서 읽은 ToolFunctionRecipe는 검증/렌더링 전에 반드시 이 메서드를
-        /// 호출해야 한다.
+        /// 호출해야 한다. 목록 원소 자체가 null이면 건너뛴다 — 그 원소는
+        /// NullCollectionElementValidator가 L1 위반으로 보고한다(S4-03-C).
         /// </summary>
         public void Normalize()
         {
@@ -84,37 +85,37 @@ namespace NodeKit.Authoring.ToolFunctionRecipes
             InputPorts ??= new List<PortContract>();
             foreach (var port in InputPorts)
             {
-                port.Normalize();
+                port?.Normalize();
             }
 
             OutputPorts ??= new List<PortContract>();
             foreach (var port in OutputPorts)
             {
-                port.Normalize();
+                port?.Normalize();
             }
 
             FixtureReferences ??= new List<FixtureReference>();
             foreach (var fixture in FixtureReferences)
             {
-                fixture.Normalize();
+                fixture?.Normalize();
             }
 
             ExpectedResults ??= new List<ExpectedResult>();
             foreach (var expected in ExpectedResults)
             {
-                expected.Normalize();
+                expected?.Normalize();
             }
 
             IntermediateFilePolicies ??= new List<IntermediateFilePolicyEntry>();
             foreach (var policy in IntermediateFilePolicies)
             {
-                policy.Normalize();
+                policy?.Normalize();
             }
 
             Parameters ??= new List<ParameterContract>();
             foreach (var parameter in Parameters)
             {
-                parameter.Normalize();
+                parameter?.Normalize();
             }
 
             EnforcedResources ??= new ResourceContract();

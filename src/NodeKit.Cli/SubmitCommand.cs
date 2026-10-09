@@ -86,65 +86,21 @@ namespace NodeKit.Cli
                 return 2;
             }
 
-            RecipeDocument recipe;
-            try
-            {
-                var content = File.ReadAllText(recipePath);
-                recipe = JsonSerializer.Deserialize<RecipeDocument>(content, _recipeReadOptions)
-                    ?? throw new InvalidOperationException("recipe 파일이 비어있습니다.");
-            }
-            catch (IOException ex)
-            {
-                var message = $"recipe 파일을 읽을 수 없습니다: {recipePath} ({ex.Message})";
-                if (jsonl)
-                {
-                    WriteJsonl(stdout, SubmitJsonlRecord.Completed("Failed", errorCode: "RECIPE_READ_FAILED", message: message, recovery: RecoveryDisposition.Terminal));
-                    return 2;
-                }
-
-                stderr.WriteLine(message);
-                return 2;
-            }
-            catch (JsonException ex)
-            {
-                var message = $"recipe JSON 파싱에 실패했습니다: {recipePath} ({ex.Message})";
-                if (jsonl)
-                {
-                    WriteJsonl(stdout, SubmitJsonlRecord.Completed("Failed", errorCode: "RECIPE_PARSE_FAILED", message: message, recovery: RecoveryDisposition.Terminal));
-                    return 2;
-                }
-
-                stderr.WriteLine(message);
-                return 2;
-            }
-            catch (InvalidOperationException ex)
+            // validate/render와 같은 loader — 읽기/파싱/SchemaVersion/BuildKind
+            // 오류는 모두 업무 RPC 전에 exit 2로 끝난다.
+            if (!AuthoringFileLoader.TryLoadRecipe(recipePath, _recipeReadOptions, out var loaded, out var loadError))
             {
                 if (jsonl)
                 {
-                    WriteJsonl(stdout, SubmitJsonlRecord.Completed("Failed", errorCode: "RECIPE_EMPTY", message: ex.Message, recovery: RecoveryDisposition.Terminal));
+                    WriteJsonl(stdout, SubmitJsonlRecord.Completed("Failed", errorCode: loadError!.Code, message: loadError.Message, recovery: RecoveryDisposition.Terminal));
                     return 2;
                 }
 
-                stderr.WriteLine(ex.Message);
+                stderr.WriteLine(loadError!.Message);
                 return 2;
             }
 
-            recipe.Normalize();
-
-            if (recipe.BuildKind is null)
-            {
-                var message =
-                    $"recipe 파일에 buildKind가 없습니다: {recipePath} " +
-                    "(Conda | Micromamba | BioContainer | SourceBuild | PackageMirror | DockerfileFallback 중 하나를 지정하세요.)";
-                if (jsonl)
-                {
-                    WriteJsonl(stdout, SubmitJsonlRecord.Completed("Failed", errorCode: "MISSING_BUILD_KIND", message: message, recovery: RecoveryDisposition.Terminal));
-                    return 2;
-                }
-
-                stderr.WriteLine(message);
-                return 2;
-            }
+            var recipe = loaded!;
 
             var validation = RecipeValidationPipeline.ValidateRecipe(recipe, strictReproducible);
             if (!validation.IsValid)
