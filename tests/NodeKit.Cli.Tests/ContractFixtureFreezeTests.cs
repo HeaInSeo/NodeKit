@@ -35,11 +35,10 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void AllFixtures_Parse_AndDeclareP01ContractRevision()
         {
-            foreach (var file in _fixtureFiles)
+            foreach (var root in _fixtureFiles.Select(LoadRoot))
             {
-                using var doc = Load(file);
-                Assert.Equal("v0.9.1", doc.RootElement.GetProperty("contractRevision").GetString());
-                Assert.Equal("P01.contract", doc.RootElement.GetProperty("stage").GetString());
+                Assert.Equal("v0.9.1", root.GetProperty("contractRevision").GetString());
+                Assert.Equal("P01.contract", root.GetProperty("stage").GetString());
             }
         }
 
@@ -355,10 +354,16 @@ namespace NodeKit.Cli.Tests
         private static void AssertFieldsMatch(JsonElement fixtureFields, IList<Google.Protobuf.Reflection.FieldDescriptor> descriptorFields)
         {
             var fixture = fixtureFields.EnumerateArray()
-                .Select(f => (Number: f.GetProperty("number").GetInt32(), Name: f.GetProperty("name").GetString()))
+                .Select(f => (Number: f.GetProperty("number").GetInt32(), Name: f.GetProperty("name").GetString()!))
                 .ToArray();
-            var descriptor = descriptorFields.Select(f => (Number: f.FieldNumber, Name: (string?)f.Name)).ToArray();
+            var descriptor = descriptorFields.Select(f => (Number: f.FieldNumber, f.Name)).ToArray();
             Assert.Equal(descriptor, fixture);
+        }
+
+        private static JsonElement LoadRoot(string fileName)
+        {
+            using var doc = Load(fileName);
+            return doc.RootElement.Clone();
         }
 
         private static JsonDocument Load(string fileName)
