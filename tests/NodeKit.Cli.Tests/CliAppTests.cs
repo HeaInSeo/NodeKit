@@ -219,7 +219,8 @@ namespace NodeKit.Cli.Tests
             var exitCode = CliApp.Run(new[] { "render", recipePath, "--out", _workDir }, stdout, stderr);
 
             Assert.Equal(2, exitCode);
-            Assert.Contains("출력 파일을 쓸 수 없습니다", stderr.ToString());
+            Assert.Contains("[WRITE_TARGET_UNSUPPORTED]", stderr.ToString());
+            Assert.True(Directory.Exists(_workDir));
         }
 
         [Fact]
@@ -233,7 +234,8 @@ namespace NodeKit.Cli.Tests
             var exitCode = CliApp.Run(new[] { "render", recipePath, "--out", outPath }, stdout, stderr);
 
             Assert.Equal(2, exitCode);
-            Assert.Contains("출력 파일을 쓸 수 없습니다", stderr.ToString());
+            Assert.Contains("[WRITE_PARENT_MISSING]", stderr.ToString());
+            Assert.False(Directory.Exists(Path.Join(_workDir, "no-such-subdir")));
         }
 
         [Fact]

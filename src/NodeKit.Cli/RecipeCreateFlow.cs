@@ -14,6 +14,9 @@ namespace NodeKit.Cli
         Saved,
         RestartWizard,
         ValidationFailed,
+
+        // 원자 저장 실패. 진단은 이미 stderr에 출력됐고 기존 파일은 그대로다.
+        SaveFailed,
     }
 
     /// <summary>
@@ -221,8 +224,19 @@ namespace NodeKit.Cli
                 finalPath = prompted;
             }
 
-            RecipeCreateCommand.SaveDocument(document, finalPath, console);
-            return RecipeCreateFlowResult.Saved;
+            // 저장 확인 뒤 들어온 Ctrl-C도 쓰기 전이면 취소(130)로 처리한다.
+            if (cancellation.IsCancellationRequested)
+            {
+                throw new RecipeCreateCancelledException();
+            }
+
+            // 쓰는 도중 들어온 Ctrl-C는 token으로 writer의 교체 직전 검사에 전달된다.
+            return RecipeCreateCommand.SaveDocument(document, finalPath, console, stderr, cancellation.Token) switch
+            {
+                0 => RecipeCreateFlowResult.Saved,
+                130 => throw new RecipeCreateCancelledException(),
+                _ => RecipeCreateFlowResult.SaveFailed,
+            };
         }
 
         // ── 채널 확정 단계 ───────────────────────────────────────────────────────

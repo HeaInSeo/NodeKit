@@ -37,9 +37,9 @@ namespace NodeKit.Cli
     }
 
     /// <summary>
-    /// create/validate/render 저장 경로가 공유할 원자 파일 저장 foundation
-    /// (Fixtures/Contract/cli-acceptance-contract.json supportProfile, owner
-    /// P02.writer_foundation). caller 전환은 P02.writer_caller에서 한다.
+    /// create/validate/render 저장 경로가 공유하는 원자 파일 저장
+    /// (Fixtures/Contract/cli-acceptance-contract.json supportProfile).
+    /// caller: recipe create, render --out, function-recipe create/validate/render.
     ///
     /// 순서: 대상 확인 → writer 잠금 → 같은 디렉터리 임시 파일에 전체 쓰기 →
     /// flush(디스크까지) → rename으로 원자 교체. rename 전 실패/취소는 기존
@@ -67,6 +67,23 @@ namespace NodeKit.Cli
 
         public static AtomicWriteResult Write(string path, byte[] content, CancellationToken cancellationToken = default) =>
             Write(path, content, cancellationToken, beforeStage: null);
+
+        /// <summary>
+        /// CLI 저장 경로 공통 처리: 저장하고, 실패/취소면 "[CODE] 메시지"를 stderr에
+        /// 쓴 뒤 종료 코드(0/2/130)를 돌려준다. 성공 안내는 0일 때만 호출자가 출력한다.
+        /// </summary>
+        public static int WriteForCli(string path, string content, TextWriter stderr, CancellationToken cancellationToken = default) =>
+            Report(Write(path, content, cancellationToken), stderr);
+
+        internal static int Report(AtomicWriteResult result, TextWriter stderr)
+        {
+            if (result.Outcome != AtomicWriteOutcome.Committed)
+            {
+                stderr.WriteLine($"[{result.Code}] {result.Message}");
+            }
+
+            return result.ExitCode;
+        }
 
         /// <summary>
         /// beforeStage: 테스트 전용 장애 주입 지점. 각 단계 직전에 호출되며
@@ -105,18 +122,27 @@ namespace NodeKit.Cli
                 return Cancelled(path);
             }
 
+            var lockPath = LockPath(directory, fileName);
             FileStream lockStream;
             try
             {
-                lockStream = AcquireWriterLock(directory, fileName);
+                lockStream = AcquireWriterLock(lockPath);
             }
             catch (UnauthorizedAccessException ex)
             {
-                return Fail(FailedCode, $"저장할 디렉터리에 쓸 권한이 없습니다: {directory} ({ex.Message})");
+                // .NET은 디렉터리를 파일로 열 때도 UnauthorizedAccessException을 던진다.
+                return Directory.Exists(lockPath)
+                    ? Fail(FailedCode, $"잠금 파일 경로가 디렉터리입니다: {lockPath}. 기존 파일은 바뀌지 않았습니다.")
+                    : Fail(FailedCode, $"잠금 파일을 만들 권한이 없습니다: {lockPath} ({ex.Message}). 기존 파일은 바뀌지 않았습니다.");
+            }
+            catch (IOException ex) when (IsLockContention(ex))
+            {
+                return Fail(LockedCode, $"다른 NodeKit 프로세스가 같은 파일을 저장하는 중입니다: {path} ({ex.Message})");
             }
             catch (IOException ex)
             {
-                return Fail(LockedCode, $"다른 NodeKit 프로세스가 같은 파일을 저장하는 중입니다: {path} ({ex.Message})");
+                // 읽기 전용 filesystem, 공간 부족 등은 경합이 아니다.
+                return Fail(FailedCode, $"잠금 파일을 열 수 없습니다: {lockPath} ({ex.Message}). 기존 파일은 바뀌지 않았습니다.");
             }
 
             using (lockStream)
@@ -213,8 +239,27 @@ namespace NodeKit.Cli
         // FileShare.None은 Unix에서 flock(LOCK_EX|LOCK_NB)로 구현된다. 잠금 파일은
         // 지우지 않는다 — 지우면 이미 열어 둔 다른 writer가 unlink된 inode를
         // 잠그는 동안 새 writer가 새 파일을 잠가 배제가 깨진다.
-        private static FileStream AcquireWriterLock(string directory, string fileName) =>
-            new(LockPath(directory, fileName), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+        private static FileStream AcquireWriterLock(string lockPath) =>
+            new(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+
+        // 잠금 경합만 WRITE_LOCKED로 분류한다. Unix에서 flock(LOCK_NB) 경합은
+        // errno EWOULDBLOCK(Linux 11, macOS/BSD 35)을 HResult로 가진 IOException이고,
+        // Windows는 sharing/lock violation이다. 그 외 IOException(EROFS, ENOSPC 등)은
+        // 경합이 아니라 실패다.
+        private const int LinuxEWouldBlock = 11;
+        private const int BsdEWouldBlock = 35;
+        private const int WindowsSharingViolation = unchecked((int)0x80070020);
+        private const int WindowsLockViolation = unchecked((int)0x80070021);
+
+        internal static bool IsLockContention(IOException ex)
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                return ex.HResult is WindowsSharingViolation or WindowsLockViolation;
+            }
+
+            return ex.HResult == (OperatingSystem.IsLinux() ? LinuxEWouldBlock : BsdEWouldBlock);
+        }
 
         // 잠금을 잡은 상태이므로 같은 대상의 임시 파일은 강제 종료된 이전 writer의
         // 잔여물이다. 최종 경로는 rename 전이므로 영향이 없다.

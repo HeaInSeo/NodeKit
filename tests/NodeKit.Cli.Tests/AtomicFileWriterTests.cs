@@ -12,7 +12,7 @@ namespace NodeKit.Cli.Tests
     /// <summary>
     /// P02.writer_foundation — AtomicFileWriter 단독 검수 (S4-03-G의 공통 저장
     /// 경계, cli-acceptance-contract.json supportProfile). caller별 exit 전달은
-    /// P02.writer_caller에서 검수한다.
+    /// AtomicWriterCallerTests가 검수한다.
     /// </summary>
     public class AtomicFileWriterTests : IDisposable
     {
@@ -367,6 +367,47 @@ namespace NodeKit.Cli.Tests
             var after = AtomicFileWriter.Write(target, _newBytes, TestContext.Current.CancellationToken);
             Assert.Equal(0, after.ExitCode);
             Assert.Equal(_newBytes, File.ReadAllBytes(target));
+        }
+
+        // 잠금 경로를 열 수 없는 원인이 경합이 아니면 WRITE_LOCKED("다른 NodeKit
+        // 프로세스가…")로 보고하지 않는다(foundation 리뷰 P3-1).
+        [Fact]
+        public void Write_LockPathIsDirectory_Exit2_Failed_NamesLockPath()
+        {
+            var target = Target();
+            File.WriteAllBytes(target, _oldBytes);
+            var lockPath = AtomicFileWriter.LockPath(_workDir, "recipe.json");
+            Directory.CreateDirectory(lockPath);
+
+            var result = AtomicFileWriter.Write(target, _newBytes, TestContext.Current.CancellationToken);
+
+            Assert.Equal(2, result.ExitCode);
+            Assert.Equal(AtomicFileWriter.FailedCode, result.Code);
+            Assert.Contains("잠금 파일 경로가 디렉터리입니다", result.Message);
+            Assert.Contains(lockPath, result.Message);
+            Assert.DoesNotContain("권한", result.Message);
+            Assert.Equal(_oldBytes, File.ReadAllBytes(target));
+        }
+
+        [Theory]
+        [InlineData(30)] // EROFS
+        [InlineData(28)] // ENOSPC
+        [InlineData(5)] // EIO
+        public void IsLockContention_NonContentionErrno_IsFalse(int errno)
+        {
+            Assert.False(AtomicFileWriter.IsLockContention(new IOException("x", errno)));
+        }
+
+        [Fact]
+        public void IsLockContention_ActualHeldLock_IsTrue()
+        {
+            var lockPath = AtomicFileWriter.LockPath(_workDir, "recipe.json");
+            using var held = new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+
+            var ex = Assert.ThrowsAny<IOException>(
+                () => new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None));
+
+            Assert.True(AtomicFileWriter.IsLockContention(ex), $"HResult={ex.HResult}");
         }
 
         // 다른 OS 프로세스(flock(1))가 잡은 잠금도 배제되는지 실제 프로세스로 확인.

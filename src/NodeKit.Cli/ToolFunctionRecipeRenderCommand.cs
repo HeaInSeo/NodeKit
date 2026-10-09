@@ -79,8 +79,7 @@ namespace NodeKit.Cli
                 json = JsonSerializer.Serialize(document.RootElement, new JsonSerializerOptions { WriteIndented = true });
             }
 
-            File.WriteAllText(outPath, json);
-            return 0;
+            return AtomicFileWriter.WriteForCli(outPath, json, stderr);
         }
     }
 }
