@@ -34,6 +34,54 @@ namespace NodeKit.Cli.Operations
 
             return new SourceSnapshot { SchemaVersion = CurrentSchemaVersion, Files = entries };
         }
+
+        /// <summary>
+        /// 모든 entry가 디코드 가능한 base64이고 그 bytes가 선언된 소문자 SHA-256과 같은지 확인한다.
+        /// 바깥 JSON hash만으로는 entry별 digest를 믿을 수 없다. 문제가 없으면 null, 있으면 이유.
+        /// </summary>
+        public string? FindInvalidEntry()
+        {
+            if (Files is null)
+            {
+                return "files 누락";
+            }
+
+            for (var i = 0; i < Files.Count; i++)
+            {
+                var file = Files[i];
+                if (file is null || string.IsNullOrEmpty(file.LogicalPath))
+                {
+                    return $"files[{i}]의 logical_path 누락";
+                }
+
+                if (!OperationHashing.IsSha256Hex(file.Sha256))
+                {
+                    return $"{file.LogicalPath}의 sha256이 소문자 SHA-256 hex가 아님";
+                }
+
+                if (file.ContentBase64 is null)
+                {
+                    return $"{file.LogicalPath}의 content_base64 누락";
+                }
+
+                byte[] content;
+                try
+                {
+                    content = Convert.FromBase64String(file.ContentBase64);
+                }
+                catch (FormatException)
+                {
+                    return $"{file.LogicalPath}의 content_base64를 디코드할 수 없음";
+                }
+
+                if (OperationHashing.Sha256Hex(content) != file.Sha256)
+                {
+                    return $"{file.LogicalPath}의 content bytes가 선언된 sha256과 다름";
+                }
+            }
+
+            return null;
+        }
     }
 
     internal sealed record SourceSnapshotFile

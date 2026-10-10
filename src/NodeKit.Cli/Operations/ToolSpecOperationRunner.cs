@@ -248,6 +248,7 @@ namespace NodeKit.Cli.Operations
                 ImageRef = NullIfEmpty(ev.ImageRef) ?? previous?.ImageRef,
                 ImageDigest = NullIfEmpty(ev.ImageDigest) ?? previous?.ImageDigest,
                 IntegrityHealth = NullIfEmpty(ev.IntegrityHealth) ?? previous?.IntegrityHealth,
+                SpecReferrerDigest = NullIfEmpty(ev.SpecReferrerDigest) ?? previous?.SpecReferrerDigest,
                 ObservedAt = clock.GetUtcNow().ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture),
             };
 

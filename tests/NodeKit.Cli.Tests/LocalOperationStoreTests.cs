@@ -932,6 +932,91 @@ namespace NodeKit.Cli.Tests
             }
         }
 
+        public static TheoryData<string> MalformedSourceEntries => new()
+        {
+            "undecodable_base64",
+            "content_digest_mismatch",
+            "uppercase_digest",
+        };
+
+        [Theory]
+        [MemberData(nameof(MalformedSourceEntries))]
+        public void S2_02_C01_MalformedSourceEntry_IsRefusedBeforePersist_ExitTwo_NoRpc(string corruption)
+        {
+            using var server = NewServer();
+            var store = NewStore();
+
+            var error = store.TryCreateToolSpecOperation(FixedRequestId, Endpoint, _envelope, CorruptSource(corruption), null, out var handle);
+
+            Assert.Null(handle);
+            Assert.Equal(LocalOperationStore.InvalidCode, error!.Code);
+            Assert.Equal(2, error.ExitCode);
+            Assert.False(File.Exists(store.DefaultReceiptPath(FixedRequestId)));
+            Assert.False(Directory.Exists(Path.Join(store.RootDirectory, "snapshots", "source")));
+            Assert.Empty(server.Fake.CallOrder);
+        }
+
+        [Theory]
+        [MemberData(nameof(MalformedSourceEntries))]
+        public void S2_02_C07_ReopenWithMalformedSourceEntry_IsIntegrityErrorExitTwo_NoRpc(string corruption)
+        {
+            using var server = NewServer();
+            var store = NewStore();
+            string path;
+            string sourceSha;
+            using (var handle = CreatePrepared(store, FixedRequestId))
+            {
+                path = handle.ReceiptPath;
+                sourceSha = handle.Receipt.SourceSnapshotSha256;
+            }
+
+            // The outer file hash is correct for these bytes; only the entry inside is wrong.
+            var corruptBytes = JsonSerializer.SerializeToUtf8Bytes(CorruptSource(corruption));
+            var corruptSha = OperationHashing.Sha256Hex(corruptBytes);
+            File.WriteAllBytes(store.SourceSnapshotPath(corruptSha), corruptBytes);
+            File.WriteAllText(path, File.ReadAllText(path).Replace(sourceSha, corruptSha, StringComparison.Ordinal));
+
+            var readError = store.TryReadSourceSnapshot(corruptSha, out var snapshot);
+            var openError = NewStore().TryOpen(path, out var reopened);
+
+            Assert.Null(snapshot);
+            Assert.Equal(LocalOperationStore.InvalidCode, readError!.Code);
+            Assert.Null(reopened);
+            Assert.Equal(LocalOperationStore.InvalidCode, openError!.Code);
+            Assert.Equal(2, openError.ExitCode);
+            Assert.Empty(server.Fake.CallOrder);
+        }
+
+        [Fact]
+        public async Task S2_02_C02_SpecReferrerDigest_IsPreservedInTheTerminalReceipt()
+        {
+            const string specReferrerDigest =
+                "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+            using var server = NewServer();
+            server.Fake.WatchEvents = new List<ProtoBuildEvent>
+            {
+                new() { Kind = ProtoBuildEventKind.Log, Status = "Pushing", BuildId = FixtureBuildId, SpecReferrerDigest = specReferrerDigest },
+                new() { Kind = ProtoBuildEventKind.Log, Status = "Succeeded", BuildId = FixtureBuildId, ImageDigest = ImageDigest },
+            };
+            var store = NewStore();
+
+            using (var handle = CreatePrepared(store, FixedRequestId))
+            {
+                var result = await RunAsync(server, handle);
+                Assert.Equal(0, result.ExitCode);
+                Assert.Equal(specReferrerDigest, result.ObservedResult!.SpecReferrerDigest);
+            }
+
+            Assert.Contains("\"spec_referrer_digest\"", File.ReadAllText(store.DefaultReceiptPath(FixedRequestId)), StringComparison.Ordinal);
+            Assert.Null(NewStore().TryOpen(store.DefaultReceiptPath(FixedRequestId), out var reopened));
+            using (reopened)
+            {
+                Assert.Equal(OperationPhase.Terminal, reopened!.Receipt.Phase);
+                Assert.Equal(specReferrerDigest, reopened.Receipt.LastObservation!.SpecReferrerDigest);
+                Assert.Equal(ImageDigest, reopened.Receipt.LastObservation.ImageDigest);
+            }
+        }
+
         [Fact]
         public async Task S2_02_C07_InFlightRecordWithoutBuildId_IsNotBlindlyResubmitted()
         {
@@ -1027,6 +1112,21 @@ namespace NodeKit.Cli.Tests
 
         private static SourceSnapshot Source(byte[] recipe) =>
             SourceSnapshot.FromFiles(new[] { ("run.sh", _companion), ("recipe.json", recipe) });
+
+        // A snapshot whose first entry no longer matches its declared digest.
+        private static SourceSnapshot CorruptSource(string corruption)
+        {
+            var valid = Source(_recipeV1);
+            var first = valid.Files[0];
+            var broken = corruption switch
+            {
+                "undecodable_base64" => first with { ContentBase64 = "!!not-base64!!" },
+                "content_digest_mismatch" => first with { ContentBase64 = Convert.ToBase64String(_recipeV2) },
+                "uppercase_digest" => first with { Sha256 = first.Sha256.ToUpperInvariant() },
+                _ => throw new ArgumentOutOfRangeException(nameof(corruption), corruption, null),
+            };
+            return valid with { Files = new[] { broken, valid.Files[1] } };
+        }
 
         private static OperationReceipt ReadReceiptFromDisk(string path) =>
             JsonSerializer.Deserialize<OperationReceipt>(File.ReadAllBytes(path))!;

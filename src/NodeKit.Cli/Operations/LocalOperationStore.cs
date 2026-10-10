@@ -126,6 +126,17 @@ namespace NodeKit.Cli.Operations
                 return rootError;
             }
 
+            // 손상된 source를 durable basis로 남기지 않는다 — receipt/snapshot을 쓰기 전에 멈춘다.
+            if (source.SchemaVersion != SourceSnapshot.CurrentSchemaVersion)
+            {
+                return Invalid(path, $"지원하지 않는 source snapshot schema '{source.SchemaVersion}'");
+            }
+
+            if (source.FindInvalidEntry() is { } sourceEntryError)
+            {
+                return Invalid(path, $"source snapshot: {sourceEntryError}");
+            }
+
             if (receiptPath is null && TryEnsureDirectory(Path.GetDirectoryName(path)!) is { } dirError)
             {
                 return dirError;
@@ -216,9 +227,25 @@ namespace NodeKit.Cli.Operations
         public OperationStoreError? TryReadSourceSnapshot(string sha256, out SourceSnapshot? snapshot)
         {
             snapshot = null;
-            return OperationHashing.IsSha256Hex(sha256)
-                ? TryReadImmutable(SourceSnapshotPath(sha256), sha256, SourceSnapshot.CurrentSchemaVersion, s => s.SchemaVersion, out snapshot)
-                : Invalid(RootDirectory, "source snapshot ID가 소문자 SHA-256 hex가 아님");
+            if (!OperationHashing.IsSha256Hex(sha256))
+            {
+                return Invalid(RootDirectory, "source snapshot ID가 소문자 SHA-256 hex가 아님");
+            }
+
+            var path = SourceSnapshotPath(sha256);
+            if (TryReadImmutable(path, sha256, SourceSnapshot.CurrentSchemaVersion, s => s.SchemaVersion, out snapshot) is { } readError)
+            {
+                return readError;
+            }
+
+            // 바깥 hash가 맞아도 entry별 digest/content는 따로 확인해야 신뢰할 수 있다.
+            if (snapshot!.FindInvalidEntry() is { } entryError)
+            {
+                snapshot = null;
+                return Invalid(path, entryError);
+            }
+
+            return null;
         }
 
         public OperationStoreError? TryReadResolvedSnapshot(string sha256, out ResolvedSnapshot? snapshot)

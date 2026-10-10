@@ -96,6 +96,10 @@ namespace NodeKit.Cli.Operations
         [JsonPropertyName("integrity_health")]
         public string? IntegrityHealth { get; init; }
 
+        /// <summary>NodeVault가 보고한 ToolSpec referrer artifact digest.</summary>
+        [JsonPropertyName("spec_referrer_digest")]
+        public string? SpecReferrerDigest { get; init; }
+
         [JsonPropertyName("observed_at")]
         public required string ObservedAt { get; init; }
     }
