@@ -49,13 +49,38 @@ namespace NodeKit.Grpc
             _disposed = true;
         }
 
-        public async IAsyncEnumerable<BuildEvent> ResolveAndBuildAsync(
+        public IAsyncEnumerable<BuildEvent> ResolveAndBuildAsync(
             string toolName,
             string version,
             string rawSpec,
-            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default) =>
+            ResolveAndBuildAsync(toolName, version, rawSpec, new ToolSpecBuildOptions(), cancellationToken);
+
+        public IAsyncEnumerable<BuildEvent> ResolveAndBuildAsync(
+            string toolName,
+            string version,
+            string rawSpec,
+            ToolSpecBuildOptions options,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(options);
+            if (options.RequestId is not null && string.IsNullOrWhiteSpace(options.RequestId))
+            {
+                throw new ArgumentException("request ID는 비어 있을 수 없습니다.", nameof(options));
+            }
+
+            return ResolveAndBuildCoreAsync(toolName, version, rawSpec, options, cancellationToken);
+        }
+
+        private async IAsyncEnumerable<BuildEvent> ResolveAndBuildCoreAsync(
+            string toolName,
+            string version,
+            string rawSpec,
+            ToolSpecBuildOptions options,
+            [EnumeratorCancellation] CancellationToken cancellationToken)
         {
             // Step 1: ResolveToolSpec — spec digest를 계산하고 index에 저장한다.
+            var requestedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             ResolvedToolSpecResponse? resolveResp = null;
             Exception? resolveEx = null;
             try
@@ -66,7 +91,7 @@ namespace NodeKit.Grpc
                         ToolName = toolName,
                         Version = version,
                         RawSpec = rawSpec,
-                        RequestedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                        RequestedAt = requestedAt,
                     },
                     cancellationToken: cancellationToken);
             }
@@ -103,12 +128,53 @@ namespace NodeKit.Grpc
             // 있도록 서버가 확정한 ToolSpec digest를 자르지 않고 남긴다. 빌드된
             // image digest와 다른 값이므로 "ToolSpec digest:" 라벨로 구분한다.
             // 자동화는 문구가 아니라 ToolSpecDigest 필드(jsonl의 tool_spec_digest)를 읽는다.
+            var basis = new ToolSpecSubmitBasis
+            {
+                RequestId = options.RequestId ?? Guid.NewGuid().ToString(),
+                RequestedToolName = toolName,
+                RequestedVersion = version,
+                RequestedAtUnixMilliseconds = requestedAt,
+                ToolSpecDigest = resolveResp!.ToolSpecDigest,
+                ResolvedToolName = resolveResp.ToolName,
+                ResolvedVersion = resolveResp.Version,
+                ResolvedAt = resolveResp.ResolvedAt,
+            };
+
             yield return new BuildEvent
             {
                 Kind = BuildEventKind.Log,
-                Message = $"{ToolSpecDigestLogPrefix}{resolveResp!.ToolSpecDigest}",
+                Message = $"{ToolSpecDigestLogPrefix}{resolveResp.ToolSpecDigest}",
                 ToolSpecDigest = resolveResp.ToolSpecDigest,
+                SubmitBasis = basis,
             };
+
+            // Step 1.5: 호출자의 durable 저장 seam — 저장에 실패한 제출은 서버에
+            // 보내지 않는다(SubmitToolBuild/WatchToolBuild 호출 0). 취소는 Step 1과
+            // 같은 이유로 잡지 않고 전파한다.
+            if (options.BeforeSubmitAsync is { } beforeSubmit)
+            {
+                Exception? storeEx = null;
+                try
+                {
+                    await beforeSubmit(basis, cancellationToken);
+                }
+#pragma warning disable CA1031 // a failed durable store must surface as a Failed event before any Submit, not crash the caller
+                catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+#pragma warning restore CA1031
+                {
+                    storeEx = ex;
+                }
+
+                if (storeEx != null)
+                {
+                    yield return new BuildEvent
+                    {
+                        Kind = BuildEventKind.Failed,
+                        Message = $"제출 전 저장에 실패해 빌드를 제출하지 않았습니다 (request ID: {basis.RequestId}): {storeEx.Message}",
+                    };
+                    yield break;
+                }
+            }
 
             // Step 2: SubmitToolBuild — 비동기 빌드를 큐에 넣는다.
             SubmitToolBuildResponse? submitResp = null;
@@ -118,8 +184,8 @@ namespace NodeKit.Grpc
                 submitResp = await _client.SubmitToolBuildAsync(
                     new SubmitToolBuildRequest
                     {
-                        RequestId = Guid.NewGuid().ToString(),
-                        ToolSpecDigest = resolveResp.ToolSpecDigest,
+                        RequestId = basis.RequestId,
+                        ToolSpecDigest = basis.ToolSpecDigest,
                     },
                     cancellationToken: cancellationToken);
             }
@@ -149,6 +215,7 @@ namespace NodeKit.Grpc
                 Message = $"빌드 제출됨 (build ID: {submitResp!.BuildId})",
                 BuildId = submitResp.BuildId,
                 Status = submitResp.Status,
+                RequestId = basis.RequestId,
             };
 
             // Step 3: WatchToolBuild — 빌드 상태 변화를 스트리밍한다.

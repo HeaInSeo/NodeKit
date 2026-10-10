@@ -34,9 +34,26 @@ namespace NodeKit.Cli.Tests.Fakes
 
         public List<string> CancelledBuildIds { get; } = new();
 
+        // S2-01 wire capture: 실제 generated gRPC로 역직렬화된 요청과 RPC 순서를
+        // 그대로 남긴다. fake는 raw_spec parse/DisallowUnknownFields/full pin/
+        // server dedup/registry 존재 여부를 검증하지 않는다 — 전송 계약만 본다.
+        public List<ToolSpecRequest> ResolveRequests { get; } = new();
+
+        public List<SubmitToolBuildRequest> SubmitRequests { get; } = new();
+
+        public List<WatchToolBuildRequest> WatchRequests { get; } = new();
+
+        public List<string> CallOrder { get; } = new();
+
         public override async Task<ResolvedToolSpecResponse> ResolveToolSpec(
             ToolSpecRequest request, ServerCallContext context)
         {
+            lock (CallOrder)
+            {
+                ResolveRequests.Add(request);
+                CallOrder.Add("Resolve");
+            }
+
             if (HangOnResolveToolSpec)
             {
                 await Task.Delay(System.Threading.Timeout.Infinite, context.CancellationToken);
@@ -46,14 +63,28 @@ namespace NodeKit.Cli.Tests.Fakes
         }
 
         public override Task<SubmitToolBuildResponse> SubmitToolBuild(
-            SubmitToolBuildRequest request, ServerCallContext context) =>
-            Task.FromResult(OnSubmitToolBuild(request));
+            SubmitToolBuildRequest request, ServerCallContext context)
+        {
+            lock (CallOrder)
+            {
+                SubmitRequests.Add(request);
+                CallOrder.Add("Submit");
+            }
+
+            return Task.FromResult(OnSubmitToolBuild(request));
+        }
 
         public override async Task WatchToolBuild(
             WatchToolBuildRequest request,
             IServerStreamWriter<BuildEvent> responseStream,
             ServerCallContext context)
         {
+            lock (CallOrder)
+            {
+                WatchRequests.Add(request);
+                CallOrder.Add("Watch");
+            }
+
             foreach (var ev in WatchEvents)
             {
                 await responseStream.WriteAsync(ev);

@@ -23,6 +23,12 @@ namespace NodeKit.Grpc
         /// <summary>ResolveToolSpec이 확정한 전체 ToolSpec digest. spec 해결 이벤트에만 채워진다 — 빌드된 ImageDigest와 다른 값.</summary>
         public string ToolSpecDigest { get; set; } = string.Empty;
 
+        /// <summary>SubmitToolBuild에 보낸 request ID. JobCreated 이벤트에만 채워진다.</summary>
+        public string RequestId { get; set; } = string.Empty;
+
+        /// <summary>spec 해결 이벤트에만 채워지는 전체 resolved basis — 축약 로그 문구를 parse하지 않고 이 값을 쓴다.</summary>
+        public ToolSpecSubmitBasis? SubmitBasis { get; set; }
+
         // WatchToolBuild(ToolSpec 경로) 전용 필드. 이 경로는 Kind가 항상 LOG이고
         // 위 Digest/DIGEST_ACQUIRED는 절대 채워지지 않는다 — NodeVault Sprint 7
         // P1a(commit 03f5025)가 buildstate.Record를 매 이벤트마다 그대로 실어
