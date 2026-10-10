@@ -18,5 +18,15 @@ namespace NodeKit.Cli.Operations
         /// <summary>ResolveToolSpec raw_spec으로 보내는 정확한 문자열.</summary>
         [JsonPropertyName("raw_spec")]
         public required string RawSpec { get; init; }
+
+        /// <summary>
+        /// 비어 있거나 공백뿐인 고정 요청 필드의 JSON 이름, 모두 채워졌으면 null.
+        /// hash는 자기 자신과만 맞으므로 빈 값을 막지 못한다 — 생성과 재진입에서 따로 확인한다.
+        /// </summary>
+        public string? FindBlankField() =>
+            string.IsNullOrWhiteSpace(ToolName) ? "tool_name"
+            : string.IsNullOrWhiteSpace(Version) ? "version"
+            : string.IsNullOrWhiteSpace(RawSpec) ? "raw_spec"
+            : null;
     }
 }

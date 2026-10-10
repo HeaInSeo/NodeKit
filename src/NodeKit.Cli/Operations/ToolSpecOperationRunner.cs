@@ -175,9 +175,13 @@ namespace NodeKit.Cli.Operations
 
                 // status 없이 terminal kind로만 끝을 알린 이벤트도 결과를 남긴다 — 이전 관측의
                 // Running 같은 값을 그대로 두면 다시 열었을 때 성공/실패를 구분할 수 없다.
+                var outcome = ev.Kind == BuildEventKind.Succeeded
+                    ? OperationObservation.SucceededOutcome
+                    : OperationObservation.FailedOutcome;
                 var terminal = Observe(ev, observed, clock) with
                 {
-                    Status = NullIfEmpty(ev.Status) ?? (ev.Kind == BuildEventKind.Succeeded ? "Succeeded" : "Failed"),
+                    Status = NullIfEmpty(ev.Status) ?? outcome,
+                    Outcome = outcome,
                 };
                 var terminalError = handle.Advance(handle.Receipt with
                 {

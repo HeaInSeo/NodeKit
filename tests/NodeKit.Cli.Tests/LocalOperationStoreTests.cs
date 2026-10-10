@@ -804,9 +804,10 @@ namespace NodeKit.Cli.Tests
             var inFlight = prepared with { Phase = OperationPhase.SubmitInFlight, ResolvedSnapshotSha256 = resolvedSha };
             var acknowledged = inFlight with { Phase = OperationPhase.Acknowledged, BuildId = FixtureBuildId };
             var observation = new OperationObservation { Status = "Running", ObservedAt = "2026-10-10T00:00:00.000Z" };
+            var terminalObservation = new OperationObservation { Status = "Succeeded", Outcome = OperationObservation.SucceededOutcome, ObservedAt = "2026-10-10T00:00:00.000Z" };
 
             // Control: each phase with exactly its own fields reopens.
-            foreach (var valid in new[] { prepared, inFlight, acknowledged, acknowledged with { Phase = OperationPhase.Terminal, LastObservation = observation } })
+            foreach (var valid in new[] { prepared, inFlight, acknowledged, acknowledged with { Phase = OperationPhase.Terminal, LastObservation = terminalObservation } })
             {
                 File.WriteAllText(path, JsonSerializer.Serialize(valid));
                 Assert.Null(NewStore().TryOpen(path, out var control));
@@ -911,7 +912,168 @@ namespace NodeKit.Cli.Tests
             {
                 Assert.Equal(OperationPhase.Terminal, reopened!.Receipt.Phase);
                 Assert.Equal(status, reopened.Receipt.LastObservation!.Status);
+                Assert.Equal(status, reopened.Receipt.LastObservation.Outcome);
             }
+        }
+
+        // A server terminal status other than Succeeded/Failed (Interrupted maps to Failed) keeps the
+        // reported status and records the outcome from the event kind.
+        [Fact]
+        public async Task S2_02_C02_InterruptedStatus_PersistsFailedOutcome()
+        {
+            using var server = NewServer();
+            server.Fake.WatchEvents = new List<ProtoBuildEvent>
+            {
+                new() { Kind = ProtoBuildEventKind.Log, Status = "Interrupted", BuildId = FixtureBuildId },
+            };
+            var store = NewStore();
+
+            using (var handle = CreatePrepared(store, FixedRequestId))
+            {
+                var result = await RunAsync(server, handle);
+                Assert.Equal(1, result.ExitCode);
+            }
+
+            Assert.Null(NewStore().TryOpen(store.DefaultReceiptPath(FixedRequestId), out var reopened));
+            using (reopened)
+            {
+                Assert.Equal(OperationPhase.Terminal, reopened!.Receipt.Phase);
+                Assert.Equal("Interrupted", reopened.Receipt.LastObservation!.Status);
+                Assert.Equal(OperationObservation.FailedOutcome, reopened.Receipt.LastObservation.Outcome);
+            }
+        }
+
+        public static TheoryData<string> TerminalObservationsWithoutOutcome => new()
+        {
+            "empty_status_no_outcome",
+            "running_status_no_outcome",
+            "running_outcome",
+            "empty_outcome",
+        };
+
+        // S2-02-C07: a terminal record must say whether the build succeeded or failed. An observation
+        // with only an empty or Running result would be treated as finished but reports nothing.
+        [Theory]
+        [MemberData(nameof(TerminalObservationsWithoutOutcome))]
+        public void S2_02_C07_TerminalRecordWithoutOutcome_IsIntegrityErrorExitTwo_NoRpc(string corruption)
+        {
+            using var server = NewServer();
+            var store = NewStore();
+            string path;
+            using (var handle = CreatePrepared(store, FixedRequestId))
+            {
+                path = handle.ReceiptPath;
+                AdvanceToInFlight(store, handle);
+                Assert.Null(handle.Advance(handle.Receipt with { Phase = OperationPhase.Acknowledged, BuildId = FixtureBuildId }));
+            }
+
+            var acknowledged = ReadReceiptFromDisk(path);
+            const string observedAt = "2026-10-10T00:00:00.000Z";
+
+            // Control: the same terminal record with a Succeeded or Failed outcome reopens.
+            foreach (var outcome in new[] { OperationObservation.SucceededOutcome, OperationObservation.FailedOutcome })
+            {
+                var valid = acknowledged with { Phase = OperationPhase.Terminal, LastObservation = new OperationObservation { Status = outcome, Outcome = outcome, ObservedAt = observedAt } };
+                File.WriteAllText(path, JsonSerializer.Serialize(valid));
+                Assert.Null(NewStore().TryOpen(path, out var control));
+                control!.Dispose();
+            }
+
+            var observation = corruption switch
+            {
+                "empty_status_no_outcome" => new OperationObservation { Status = string.Empty, ObservedAt = observedAt },
+                "running_status_no_outcome" => new OperationObservation { Status = "Running", ObservedAt = observedAt },
+                "running_outcome" => new OperationObservation { Status = "Running", Outcome = "Running", ObservedAt = observedAt },
+                _ => new OperationObservation { Status = "Succeeded", Outcome = string.Empty, ObservedAt = observedAt },
+            };
+            File.WriteAllText(path, JsonSerializer.Serialize(acknowledged with { Phase = OperationPhase.Terminal, LastObservation = observation }));
+
+            var error = NewStore().TryOpen(path, out var reopened);
+
+            Assert.Null(reopened);
+            Assert.Equal(LocalOperationStore.InvalidCode, error!.Code);
+            Assert.Equal(2, error.ExitCode);
+            Assert.Empty(server.Fake.CallOrder);
+        }
+
+        [Fact]
+        public void Advance_TerminalWithoutOutcome_IsNotWritten()
+        {
+            var store = NewStore();
+            using var handle = CreatePrepared(store, FixedRequestId);
+            AdvanceToInFlight(store, handle);
+            Assert.Null(handle.Advance(handle.Receipt with { Phase = OperationPhase.Acknowledged, BuildId = FixtureBuildId }));
+            var before = File.ReadAllBytes(handle.ReceiptPath);
+
+            var error = handle.Advance(handle.Receipt with
+            {
+                Phase = OperationPhase.Terminal,
+                LastObservation = new OperationObservation { Status = "Running", ObservedAt = "2026-10-10T00:00:00.000Z" },
+            });
+
+            AssertRefusedUnchanged(error, handle, before, LocalOperationStore.InvalidCode);
+            Assert.Equal(OperationPhase.Acknowledged, handle.Receipt.Phase);
+        }
+
+        public static TheoryData<string> BlankEnvelopeFields => new()
+        {
+            "tool_name",
+            "version",
+            "raw_spec",
+        };
+
+        private static OperationEnvelope BlankEnvelope(string field) => field switch
+        {
+            "tool_name" => _envelope with { ToolName = " " },
+            "version" => _envelope with { Version = string.Empty },
+            _ => _envelope with { RawSpec = "\n" },
+        };
+
+        // S2-02-C01: the envelope hash only matches itself, so a blank fixed request field must be
+        // refused before anything is written; otherwise Resolve would be sent with an empty field.
+        [Theory]
+        [MemberData(nameof(BlankEnvelopeFields))]
+        public void S2_02_C01_BlankEnvelopeField_IsRefusedBeforePersist_ExitTwo_NoRpc(string field)
+        {
+            using var server = NewServer();
+            var store = NewStore();
+
+            var error = store.TryCreateToolSpecOperation(FixedRequestId, Endpoint, BlankEnvelope(field), Source(_recipeV1), null, out var handle);
+
+            Assert.Null(handle);
+            Assert.Equal(LocalOperationStore.InvalidCode, error!.Code);
+            Assert.Equal(2, error.ExitCode);
+            Assert.Contains(field, error.Message, StringComparison.Ordinal);
+            Assert.False(File.Exists(store.DefaultReceiptPath(FixedRequestId)));
+            Assert.False(Directory.Exists(Path.Join(store.RootDirectory, "snapshots", "source")));
+            Assert.Empty(server.Fake.CallOrder);
+        }
+
+        // S2-02-C07: a self-consistent receipt (envelope_sha256 recomputed over the blank value) still
+        // must not reopen, or RunAsync would send ResolveToolSpec with the blank field.
+        [Theory]
+        [MemberData(nameof(BlankEnvelopeFields))]
+        public void S2_02_C07_ReopenWithBlankEnvelopeField_IsIntegrityErrorExitTwo_NoRpc(string field)
+        {
+            using var server = NewServer();
+            var store = NewStore();
+            string path;
+            using (var handle = CreatePrepared(store, FixedRequestId))
+            {
+                path = handle.ReceiptPath;
+            }
+
+            var prepared = ReadReceiptFromDisk(path);
+            var blank = BlankEnvelope(field);
+            File.WriteAllText(path, JsonSerializer.Serialize(prepared with { Envelope = blank, EnvelopeSha256 = LocalOperationStore.EnvelopeSha256(blank) }));
+
+            var error = NewStore().TryOpen(path, out var reopened);
+
+            Assert.Null(reopened);
+            Assert.Equal(LocalOperationStore.InvalidCode, error!.Code);
+            Assert.Equal(2, error.ExitCode);
+            Assert.Contains(field, error.Message, StringComparison.Ordinal);
+            Assert.Empty(server.Fake.CallOrder);
         }
 
         [Fact]

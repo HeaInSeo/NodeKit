@@ -126,7 +126,12 @@ namespace NodeKit.Cli.Operations
                 return rootError;
             }
 
-            // 손상된 source를 durable basis로 남기지 않는다 — receipt/snapshot을 쓰기 전에 멈춘다.
+            // 빈 요청 필드나 손상된 source를 durable basis로 남기지 않는다 — receipt/snapshot을 쓰기 전에 멈춘다.
+            if (envelope.FindBlankField() is { } blankField)
+            {
+                return Invalid(path, $"envelope {blankField}가 비어 있음");
+            }
+
             if (source.SchemaVersion != SourceSnapshot.CurrentSchemaVersion)
             {
                 return Invalid(path, $"지원하지 않는 source snapshot schema '{source.SchemaVersion}'");
@@ -365,6 +370,11 @@ namespace NodeKit.Cli.Operations
                 return Invalid(path, "request_id 또는 envelope 누락");
             }
 
+            if (receipt.Envelope.FindBlankField() is { } blankField)
+            {
+                return Invalid(path, $"envelope {blankField}가 비어 있음");
+            }
+
             if (EnvelopeSha256(receipt.Envelope) != receipt.EnvelopeSha256)
             {
                 return Invalid(path, "envelope_sha256 불일치");
@@ -401,6 +411,13 @@ namespace NodeKit.Cli.Operations
             if (CheckPhaseField(path, receipt.Phase, "last_observation", hasObservation, hasObservation, rank >= OperationPhase.Rank(OperationPhase.Terminal)) is { } observationError)
             {
                 return observationError;
+            }
+
+            // 관측 객체만 있고 성공/실패가 없으면(빈 status나 Running만 남은 경우) 다시 연 쪽이 결과를
+            // 판단할 수 없다. terminal은 terminal 이벤트 종류에서 저장한 outcome을 요구한다.
+            if (hasObservation && !OperationObservation.IsTerminalOutcome(receipt.LastObservation!.Outcome))
+            {
+                return Invalid(path, $"{receipt.Phase}인데 last_observation.outcome이 Succeeded/Failed가 아님");
             }
 
             return null;

@@ -81,8 +81,22 @@ namespace NodeKit.Cli.Operations
     /// </summary>
     internal sealed record OperationObservation
     {
+        public const string SucceededOutcome = "Succeeded";
+
+        public const string FailedOutcome = "Failed";
+
+        public static bool IsTerminalOutcome(string? outcome) =>
+            outcome is SucceededOutcome or FailedOutcome;
+
         [JsonPropertyName("status")]
         public string? Status { get; init; }
+
+        /// <summary>
+        /// terminal watch 이벤트 종류에서 정한 결과(Succeeded/Failed). 서버 status는 Interrupted처럼
+        /// 다른 terminal 값일 수 있으므로 따로 저장한다. terminal 관측에만 있다.
+        /// </summary>
+        [JsonPropertyName("outcome")]
+        public string? Outcome { get; init; }
 
         [JsonPropertyName("message")]
         public string? Message { get; init; }
