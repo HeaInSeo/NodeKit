@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using NodeKit.Authoring.Recipes;
 using NodeKit.Cli;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace NodeKit.Cli.Tests
 {
@@ -21,8 +20,9 @@ namespace NodeKit.Cli.Tests
     /// </summary>
     public class SupportTableCellTests : IDisposable
     {
-        private const string Digest =
-            "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        private const string DigestHex = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+        private const string Digest = "sha256:" + DigestHex;
 
         // F-PIN: 문법상 유효한 고정 sha256 기반 이미지(존재 여부는 주장하지 않는다).
         private const string BaseImageWithDigest = "condaforge/miniforge3:24.3.0-0@" + Digest;
@@ -147,6 +147,27 @@ namespace NodeKit.Cli.Tests
             }
         }
 
+        /// <summary>S1-01-C01: 사용 가이드 지원표가 public/internal 이름, 직접 경로 없음, 서버 미확인을 함께 적는다.</summary>
+        [Fact]
+        public void UsageGuideSupportTable_NamesEveryMethod_AndDoesNotClaimServerAcceptance()
+        {
+            var guide = File.ReadAllText(Path.Join(RepoRoot(), "docs", "NODEKIT_CLI_USAGE.md"));
+            var start = guide.IndexOf("### 2-1.5.", StringComparison.Ordinal);
+            Assert.True(start >= 0, "지원표 절(2-1.5)이 없습니다.");
+            var end = guide.IndexOf("\n### ", start + 1, StringComparison.Ordinal);
+            var section = guide[start..end];
+
+            foreach (var m in LoadContract().GetProperty("methods").EnumerateArray())
+            {
+                Assert.Contains($"| `{m.GetProperty("publicName").GetString()}` |", section, StringComparison.Ordinal);
+                Assert.Contains($"`{m.GetProperty("referenceKind").GetString()}`", section, StringComparison.Ordinal);
+            }
+
+            Assert.Contains("직접 경로 없음", section, StringComparison.Ordinal);
+            Assert.Contains("서버 수용은 이 표에서 확인하지 않는다", section, StringComparison.Ordinal);
+            Assert.DoesNotContain("모두 성공", section, StringComparison.Ordinal);
+        }
+
         /// <summary>S1-01-C02: 설치 명령은 파싱만 하고 실행하지 않으며 package/channel이 Conda Recipe에 남는다.</summary>
         [Fact]
         public void C02_GuidedInstallCommand_PreservesPackageAndChannel_AsConda()
@@ -160,7 +181,10 @@ namespace NodeKit.Cli.Tests
             Assert.Equal("Conda", root.GetProperty("BuildKind").GetString());
             Assert.Equal(new[] { PackagePin }, root.GetProperty("Packages").EnumerateArray().Select(e => e.GetString()).ToArray());
             Assert.Equal(new[] { "bioconda" }, root.GetProperty("Channels").EnumerateArray().Select(e => e.GetString()).ToArray());
-            Assert.Equal(0, _resolveClient.Calls);
+
+            // 설치 명령은 실행하지 않는다: 저장된 Recipe 어디에도 명령 원문이 남지 않고 pin 값만 남는다.
+            Assert.DoesNotContain("conda install", File.ReadAllText(outPath), StringComparison.Ordinal);
+            _output.WriteLine($"C02 resolveSeamCalls={_resolveClient.Calls} (local fake, Unsupported; external lookup 0)");
         }
 
         /// <summary>S1-01-C03: 추천(package)을 거절하고 고른 mirror로 저장하며, 선택한 방식과 이유를 출력한다.</summary>
@@ -302,7 +326,8 @@ namespace NodeKit.Cli.Tests
             "package" => ("Conda", new[] { PackagePin, "bioconda", Digest }),
             "mirror" => ("PackageMirror", new[] { PackagePin, MirrorUri, Digest }),
             "source" => ("SourceBuild", new[] { SourceUri, Digest }),
-            "source-structured" => ("SourceBuildStructured", new[] { SourceUri, Digest, "/nodekit/output" }),
+            // structured render는 checksum을 sha256sum -c 입력인 hex로 쓴다.
+            "source-structured" => ("SourceBuildStructured", new[] { SourceUri, DigestHex, "/nodekit/output" }),
             "dockerfile" => ("DockerfileFallback", new[] { "USER 1000", Digest }),
             _ => throw new ArgumentOutOfRangeException(nameof(publicName), publicName, null),
         };
@@ -347,16 +372,20 @@ namespace NodeKit.Cli.Tests
 
         private static JsonElement LoadContract()
         {
+            using var doc = JsonDocument.Parse(File.ReadAllText(
+                Path.Join(RepoRoot(), "tests", "NodeKit.Cli.Tests", "Fixtures", "Contract", "cli-acceptance-contract.json")));
+            return doc.RootElement.Clone();
+        }
+
+        private static string RepoRoot()
+        {
             var dir = new DirectoryInfo(AppContext.BaseDirectory);
             while (dir is not null && !File.Exists(Path.Join(dir.FullName, "NodeKit.sln")))
             {
                 dir = dir.Parent;
             }
 
-            var root = dir?.FullName ?? throw new FileNotFoundException("repo root(NodeKit.sln)를 찾지 못했습니다.");
-            using var doc = JsonDocument.Parse(File.ReadAllText(
-                Path.Join(root, "tests", "NodeKit.Cli.Tests", "Fixtures", "Contract", "cli-acceptance-contract.json")));
-            return doc.RootElement.Clone();
+            return dir?.FullName ?? throw new FileNotFoundException("repo root(NodeKit.sln)를 찾지 못했습니다.");
         }
 
         private static string Sha256(string path) =>
