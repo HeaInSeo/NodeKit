@@ -26,6 +26,8 @@ namespace NodeKit.Cli.Tests
 
         private const string FixtureBuildId = "build-fixture-001";
 
+        private const string ForeignBuildId = "build-foreign-999";
+
         private const string Digest =
             "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
@@ -178,6 +180,66 @@ namespace NodeKit.Cli.Tests
         }
 
         [Fact]
+        public void Submit_ForeignBuildEvent_ReportsRunnerMessage_NotStreamEnded_Jsonl()
+        {
+            var recipePath = WriteRecipe();
+            using var server = NewServer();
+            server.Fake.WatchEvents = ForeignBuildEvents();
+
+            var exitCode = Submit(server, recipePath, out var stdout, out _, "--format", "jsonl");
+
+            Assert.Equal(1, exitCode);
+            var lines = stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            Assert.Single(lines, l => l.Contains("\"type\":\"completed\"", StringComparison.Ordinal));
+            using var last = JsonDocument.Parse(lines[^1]);
+            var completed = last.RootElement;
+            Assert.Equal("UNEXPECTED_ERROR", completed.GetProperty("error_code").GetString());
+            Assert.Equal(FixtureBuildId, completed.GetProperty("build_id").GetString());
+            Assert.Equal("uncertain", completed.GetProperty("recovery").GetString());
+            Assert.Contains(ForeignBuildId, completed.GetProperty("message").GetString(), StringComparison.Ordinal);
+
+            // the foreign event is not stored; the receipt stays acknowledged for a later re-watch
+            var receipt = ReadReceipt(DefaultReceiptPath());
+            Assert.Equal(OperationPhase.Acknowledged, receipt.Phase);
+            Assert.Equal(FixtureBuildId, receipt.BuildId);
+        }
+
+        [Fact]
+        public void Submit_ForeignBuildEvent_ReportsRunnerMessage_NotStreamEnded_Human()
+        {
+            var recipePath = WriteRecipe();
+            using var server = NewServer();
+            server.Fake.WatchEvents = ForeignBuildEvents();
+
+            var exitCode = Submit(server, recipePath, out _, out var stderr);
+
+            Assert.Equal(1, exitCode);
+            Assert.Contains(ForeignBuildId, stderr, StringComparison.Ordinal);
+            Assert.Contains(FixtureBuildId, stderr, StringComparison.Ordinal);
+            Assert.DoesNotContain("서버 스트림이 종료되었습니다", stderr, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public void Submit_StreamEndsWithoutTerminal_StaysStreamEnded_Jsonl()
+        {
+            var recipePath = WriteRecipe();
+            using var server = NewServer();
+            server.Fake.WatchEvents = new List<ProtoBuildEvent>
+            {
+                new() { Kind = ProtoBuildEventKind.Log, Status = "Running", BuildId = FixtureBuildId },
+            };
+
+            var exitCode = Submit(server, recipePath, out var stdout, out _, "--format", "jsonl");
+
+            Assert.Equal(1, exitCode);
+            var lines = stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            using var last = JsonDocument.Parse(lines[^1]);
+            Assert.Equal("STREAM_ENDED_WITHOUT_RESULT", last.RootElement.GetProperty("error_code").GetString());
+            Assert.Equal("uncertain", last.RootElement.GetProperty("recovery").GetString());
+            Assert.Equal(OperationPhase.Acknowledged, ReadReceipt(DefaultReceiptPath()).Phase);
+        }
+
+        [Fact]
         public void Submit_InjectedClientWithoutReceiptOption_WritesNoRecord()
         {
             var recipePath = WriteRecipe();
@@ -203,6 +265,13 @@ namespace NodeKit.Cli.Tests
             };
             return server;
         }
+
+        private static List<ProtoBuildEvent> ForeignBuildEvents() => new()
+        {
+            new() { Kind = ProtoBuildEventKind.Log, Status = "Running", BuildId = FixtureBuildId },
+            new() { Kind = ProtoBuildEventKind.Log, Status = "Running", BuildId = ForeignBuildId },
+            new() { Kind = ProtoBuildEventKind.Log, Status = "Succeeded", BuildId = ForeignBuildId },
+        };
 
         private static int Submit(GrpcTestServer server, string recipePath, out string stdout, out string stderr, params string[] extraArgs) =>
             Submit(server, recipePath, () => FixedRequestId, out stdout, out stderr, extraArgs);

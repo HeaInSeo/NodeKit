@@ -269,6 +269,32 @@ namespace NodeKit.Cli
             return exitCode;
         }
 
+        // runner가 기록 문제가 아닌 이유로 관찰을 멈췄다(예: 서버가 다른 빌드의 이벤트를
+        // 보냄). 원격 빌드 결과는 확인하지 못했으므로 recovery는 uncertain이고, 문서화된
+        // error_code 집합 안에서 UNEXPECTED_ERROR로 보고하되 runner 진단 메시지를 보존한다.
+        private static int ReportRunnerStop(
+            TextWriter stdout, TextWriter stderr, ToolSpecOperationResult stopped, string? buildId, bool jsonl)
+        {
+            var message = stopped.Message ?? "receipt runner가 최종 상태 없이 관찰을 멈췄습니다.";
+            if (jsonl)
+            {
+                WriteJsonl(
+                    stdout,
+                    SubmitJsonlRecord.Completed(
+                        "Failed",
+                        buildId,
+                        "UNEXPECTED_ERROR",
+                        message,
+                        recovery: RecoveryDisposition.Uncertain));
+                return stopped.ExitCode;
+            }
+
+            stderr.WriteLine(string.IsNullOrEmpty(buildId)
+                ? message
+                : $"{message} NodeVault에서 빌드 상태를 직접 확인하세요 (build ID: {buildId}).");
+            return stopped.ExitCode;
+        }
+
         /// <summary>
         /// ToolSpecOperationRunner를 돌리며 저장이 끝난 이벤트만 submit 출력 루프로 흘려보낸다.
         /// runner가 저장 실패로 멈추면 이벤트 없이 끝나고 run.Result에 그 결과가 남는다.
@@ -574,6 +600,13 @@ namespace NodeKit.Cli
                 if (run?.Result is { Code: { } storeCode } stopped)
                 {
                     return ReportStoreFailure(stdout, stderr, storeCode, stopped.Message, stopped.ExitCode, stopped.ObservedBuildId ?? buildId, jsonl);
+                }
+
+                // receipt runner가 기록 문제가 아닌 이유(예: 다른 빌드의 이벤트)로 스스로 멈췄다 —
+                // 스트림이 끝난 게 아니므로 STREAM_ENDED로 뭉개지 않고 runner 진단을 그대로 보고한다.
+                if (run?.Result is { Code: null, StreamEnded: false, ExitCode: not 0 } runnerStop)
+                {
+                    return ReportRunnerStop(stdout, stderr, runnerStop, runnerStop.ObservedBuildId ?? buildId, jsonl);
                 }
 
                 // 스트림이 Succeeded/Failed 등 최종 상태 이벤트 없이 그냥 끝났다(서버

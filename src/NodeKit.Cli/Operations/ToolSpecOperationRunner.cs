@@ -25,6 +25,13 @@ namespace NodeKit.Cli.Operations
         /// <summary>ResolveToolSpec이 성공 응답을 돌려줬는가 — 저장 실패가 Resolve 전인지 후인지 구분한다.</summary>
         public bool ResolveCompleted { get; init; }
 
+        /// <summary>
+        /// 서버 스트림이 terminal 이벤트 없이 그냥 끝났을 때만 true다. 다른 이유(예: 다른 빌드의
+        /// 이벤트)로 runner가 스스로 멈춘 경우와 구분해, 호출자가 그 진단을 스트림 종료로
+        /// 뭉개지 않게 한다.
+        /// </summary>
+        public bool StreamEnded { get; init; }
+
         /// <summary>실행이 끝난 시점에 durable하게 저장된 receipt.</summary>
         public required OperationReceipt Receipt { get; init; }
     }
@@ -224,6 +231,7 @@ namespace NodeKit.Cli.Operations
                 ObservedBuildId = buildId,
                 ObservedResult = observed,
                 ResolveCompleted = resolveCompleted,
+                StreamEnded = true,
                 Receipt = handle.Receipt,
             };
         }
