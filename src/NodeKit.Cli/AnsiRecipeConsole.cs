@@ -17,20 +17,27 @@ namespace NodeKit.Cli
         // 보여주고 있었다. 리스트에 쌓아뒀다가 ReadLine에서 한 번에 렌더링한다.
         private readonly List<string> _pendingHints = new();
 
+        // WriteCarriedLine으로 쓴 줄 — 다음 BeginStep이 화면을 실제로 지웠을 때 다시 그린다.
+        private readonly List<string> _carriedLines = new();
+        private readonly Action _clearScreen;
+
         public AnsiRecipeConsole() : this(AnsiConsole.Console) { }
 
-        internal AnsiRecipeConsole(IAnsiConsole ansi, TextReader? inputOverride = null)
+        internal AnsiRecipeConsole(IAnsiConsole ansi, TextReader? inputOverride = null, Action? clearScreen = null)
         {
             _ansi = ansi;
             _inputOverride = inputOverride;
+            _clearScreen = clearScreen ?? Console.Clear;
         }
 
         public void BeginStep()
         {
             _pendingHints.Clear();
+            var cleared = false;
             try
             {
-                Console.Clear();
+                _clearScreen();
+                cleared = true;
             }
             catch (IOException)
             {
@@ -44,9 +51,25 @@ namespace NodeKit.Cli
 
             _ansi.Write(new Rule().RuleStyle("grey dim"));
             _ansi.WriteLine();
+
+            if (cleared)
+            {
+                foreach (var line in _carriedLines)
+                {
+                    _ansi.WriteLine(line);
+                }
+            }
+
+            _carriedLines.Clear();
         }
 
         public void WriteLine(string text = "") => _ansi.WriteLine(text);
+
+        public void WriteCarriedLine(string text = "")
+        {
+            _ansi.WriteLine(text);
+            _carriedLines.Add(text);
+        }
 
         public void Write(string text) => _ansi.Write(text);
 

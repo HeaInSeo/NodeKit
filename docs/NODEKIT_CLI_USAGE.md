@@ -202,6 +202,27 @@ NodeKit recipe create
 
 이 화면에서도 `/cancel`, `/quit`, `/exit`로 바로 종료할 수 있다.
 
+### 2-1.5. 작성 방식 × 진행 방식 지원표
+
+public 작성 방식 6개 × 진행 방식 3개 = 18칸이다. 로컬 경로 17칸과 직접 경로가 없는 1칸으로 나뉜다.
+각 칸은 `tests/NodeKit.Cli.Tests/SupportTableCellTests.cs`가 같은 순서로 확인한다. 사용자 경로로
+저장한 뒤 파일을 다시 읽고, `nodekit validate`(전체 L1)와 `nodekit render`를 실행한다.
+기대 목록은 `tests/NodeKit.Cli.Tests/Fixtures/Contract/cli-acceptance-contract.json`에 있다.
+
+| public 이름 (`--method`) | 내부 BuildKind | 쉬운 안내 `[1]` | 빠른 설정 `[2]` | 스크립트/CI (`--non-interactive`) |
+|---|---|---|---|---|
+| `container` | `BioContainer` | `[3] 컨테이너 이미지 주소를 알고 있다` | 추천 또는 직접 선택 | 지원 |
+| `package` | `Conda` (`--engine micromamba`이면 `Micromamba`) | `[2] 설치 명령을 알고 있다` | 추천 또는 직접 선택 | 지원 |
+| `mirror` | `PackageMirror` | `[6] 회사/학교 내부 저장소를 써야 한다` | 추천 또는 직접 선택 | 지원 |
+| `source` | `SourceBuild` | **직접 경로 없음**. `[4]` source 단서는 `source-structured`로 간다 | 직접 선택만 (추천하지 않음) | 지원 |
+| `source-structured` | `SourceBuildStructured` | `[4] GitHub 또는 소스코드 주소를 알고 있다` | 추천 또는 직접 선택 | 지원 |
+| `dockerfile` | `DockerfileFallback` | `[5] Dockerfile을 가지고 있다` (파일 내용을 읽어 저장) | 추천 또는 직접 선택 | 지원 (`--accept-dockerfile-warning` 필요) |
+
+- `--method`에는 public 이름만 받는다. `source-build-structured` 같은 내부 이름은 exit 2이고, public 이름을 안내한다.
+- 메뉴 `[3]`은 사용법만 출력하고 exit 0으로 끝난다. 실제 비대화형 작성은 `--non-interactive --method ...`로만 한다.
+- Dockerfile은 `DockerfilePath` 또는 `DockerfileContent` 하나만 받는다. build context는 `.`만 받으며 전송은 지원하지 않는다.
+- 이 표는 로컬 작성·검증·render만 다룬다. 실제 이미지 빌드와 NodeVault 서버 수용은 이 표에서 확인하지 않는다.
+
 ### 2-2. 쉬운 안내 모드
 
 처음 사용하거나, 어떤 method를 써야 할지 모를 때 선택한다. 무엇을 알고
