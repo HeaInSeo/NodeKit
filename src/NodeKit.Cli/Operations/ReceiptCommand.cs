@@ -158,7 +158,7 @@ namespace NodeKit.Cli.Operations
             catch (Exception) when (userCts.IsCancellationRequested)
 #pragma warning restore CA1031
             {
-                stderr.WriteLine($"관찰을 멈췄습니다 (build ID: {buildId}). 서버 빌드는 취소하지 않았습니다 — 취소하려면 nodekit receipt cancel {handle.ReceiptPath}");
+                stderr.WriteLine($"관찰을 멈췄습니다 (build ID: {buildId}). 서버 빌드는 취소하지 않았습니다 — 취소하려면 nodekit receipt cancel {QuoteArgument(handle.ReceiptPath)}");
                 return 130;
             }
 #pragma warning disable CA1031 // a failed watch must end with a diagnostic, not a stack trace; the receipt stays re-watchable
@@ -201,8 +201,25 @@ namespace NodeKit.Cli.Operations
                 return 1;
             }
 
-            stdout.WriteLine($"취소 요청을 보냈습니다 (build ID: {buildId}). 서버가 실제로 멈췄는지는 아직 확인하지 않았습니다 — nodekit receipt watch {receiptPath} 로 확인하세요.");
+            stdout.WriteLine($"취소 요청을 보냈습니다 (build ID: {buildId}). 서버가 실제로 멈췄는지는 아직 확인하지 않았습니다 — nodekit receipt watch {QuoteArgument(receiptPath)} 로 확인하세요.");
             return 0;
+        }
+
+        /// <summary>
+        /// 안내 명령을 그대로 복사해 실행할 수 있도록 receipt 경로를 셸 인자 하나로 감싼다.
+        /// 안전한 문자만 있으면 그대로 두고, 아니면 POSIX는 작은따옴표(내부 ' → '\''),
+        /// Windows는 큰따옴표로 감싼다(Windows 경로에는 큰따옴표가 들어갈 수 없다).
+        /// </summary>
+        internal static string QuoteArgument(string value)
+        {
+            if (value.Length > 0 && value.All(c => char.IsAsciiLetterOrDigit(c) || "_-./:@%+=,".Contains(c, StringComparison.Ordinal)))
+            {
+                return value;
+            }
+
+            return OperatingSystem.IsWindows()
+                ? "\"" + value + "\""
+                : "'" + value.Replace("'", "'\\''", StringComparison.Ordinal) + "'";
         }
 
         private static void PrintEvent(BuildEvent ev, TextWriter stdout)

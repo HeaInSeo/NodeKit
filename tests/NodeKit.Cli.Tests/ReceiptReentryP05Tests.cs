@@ -4,6 +4,7 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
+using System.Threading.Tasks;
 using Grpc.Core;
 using NodeKit.Authoring.Recipes;
 using NodeKit.Cli.Operations;
@@ -358,6 +359,114 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(OperationPhase.Acknowledged, ReadReceipt(receiptPath).Phase);
         }
 
+        // Codex r4239326246: a recorded Failed must not be reported as this watch's observation
+        [Theory]
+        [InlineData("no-events")]
+        [InlineData("foreign-first")]
+        public void Watch_FailedTerminalReceipt_RewatchWithoutTerminal_DoesNotClaimRecorded_ReceiptUnchanged(string replay)
+        {
+            var receiptPath = CreateAcknowledgedReceipt();
+            using (var first = new GrpcTestServer())
+            {
+                first.Fake.WatchEvents = new List<ProtoBuildEvent>
+                {
+                    new() { Kind = ProtoBuildEventKind.Log, Status = "Failed", BuildId = FixtureBuildId, Message = "fixture: build broke" },
+                };
+                Assert.Equal(1, Reenter(first, "watch", receiptPath, out _, out _));
+            }
+
+            var before = File.ReadAllBytes(receiptPath);
+            using var server = new GrpcTestServer();
+            server.Fake.WatchEvents = replay == "no-events"
+                ? new List<ProtoBuildEvent>()
+                : new List<ProtoBuildEvent> { new() { Kind = ProtoBuildEventKind.Log, Status = "Failed", BuildId = ForeignBuildId } };
+
+            var exitCode = Reenter(server, "watch", receiptPath, out var stdout, out var stderr);
+
+            Assert.Equal(1, exitCode);
+            Assert.Equal(_watchOnly, server.Fake.CallOrder);
+            Assert.DoesNotContain("기록했습니다", stdout + stderr, StringComparison.Ordinal);
+            Assert.DoesNotContain("빌드 실패", stderr, StringComparison.Ordinal);
+            Assert.Contains("원격 빌드 결과를 확인하지 못했습니다", stderr, StringComparison.Ordinal);
+            Assert.Contains(replay == "no-events" ? "최종 상태 이벤트 없이 종료" : ForeignBuildId, stderr, StringComparison.Ordinal);
+            Assert.Equal(before, File.ReadAllBytes(receiptPath));
+        }
+
+        // Codex r4239326246 (runner level): ObservedResult carries only what this watch received
+        [Fact]
+        public async Task WatchKnownBuild_FailedTerminalReceipt_StreamEndsEmpty_ObservedResultIsNotTheRecordedOne()
+        {
+            var receiptPath = CreateAcknowledgedReceipt();
+            using (var first = new GrpcTestServer())
+            {
+                first.Fake.WatchEvents = new List<ProtoBuildEvent>
+                {
+                    new() { Kind = ProtoBuildEventKind.Log, Status = "Failed", BuildId = FixtureBuildId },
+                };
+                Assert.Equal(1, Reenter(first, "watch", receiptPath, out _, out _));
+            }
+
+            using var server = new GrpcTestServer();
+            server.Fake.WatchEvents = new List<ProtoBuildEvent>();
+            using var client = new GrpcToolSpecClient(server.Channel);
+            Assert.Null(LocalOperationStore.ForReceipt(receiptPath).TryOpen(receiptPath, out var handle));
+            using (handle)
+            {
+                var result = await ToolSpecOperationRunner.WatchKnownBuildAsync(
+                    handle!, client, cancellationToken: TestContext.Current.CancellationToken);
+
+                Assert.True(result.StreamEnded);
+                Assert.Null(result.ObservedResult);
+                Assert.Equal(OperationObservation.FailedOutcome, result.Receipt.LastObservation!.Outcome);
+            }
+        }
+
+        // Codex r4239326251: follow-up hints must be runnable as printed for a path with spaces/quotes
+        [Fact]
+        public void Hints_ReceiptPathWithSpaceAndQuote_AreQuotedAsOneShellArgument()
+        {
+            var oddDir = Path.Join(_workDir, "my receipts $x 'q'");
+            Directory.CreateDirectory(oddDir);
+            var receiptPath = CreateAcknowledgedReceipt(oddDir);
+
+            using (var server = new GrpcTestServer())
+            {
+                Assert.Equal(0, Reenter(server, "cancel", receiptPath, out var stdout, out _));
+                Assert.Contains("nodekit receipt watch " + ReceiptCommand.QuoteArgument(receiptPath) + " ", stdout, StringComparison.Ordinal);
+            }
+
+            using (var server = new GrpcTestServer())
+            {
+                server.Fake.WatchEvents = new List<ProtoBuildEvent>
+                {
+                    new() { Kind = ProtoBuildEventKind.Log, Status = "Running", BuildId = FixtureBuildId },
+                };
+                server.Fake.HangAfterEvents = true;
+                using var userCancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+                userCancel.CancelAfter(TimeSpan.FromMilliseconds(500));
+                Assert.Equal(130, ReenterUntil(server, "watch", receiptPath, userCancel.Token, out _, out var stderr));
+                Assert.EndsWith("nodekit receipt cancel " + ReceiptCommand.QuoteArgument(receiptPath), stderr.TrimEnd(), StringComparison.Ordinal);
+            }
+
+            Assert.NotEqual(receiptPath, ReceiptCommand.QuoteArgument(receiptPath));
+            if (!OperatingSystem.IsWindows())
+            {
+                Assert.Equal(receiptPath, ShellEcho(ReceiptCommand.QuoteArgument(receiptPath)));
+            }
+        }
+
+        [Theory]
+        [InlineData("/tmp/r/2222.json", "/tmp/r/2222.json")]
+        [InlineData("/tmp/my receipt.json", "'/tmp/my receipt.json'")]
+        [InlineData("/tmp/it's.json", "'/tmp/it'\\''s.json'")]
+        [InlineData("/tmp/a;rm -rf x.json", "'/tmp/a;rm -rf x.json'")]
+        [InlineData("", "''")]
+        public void QuoteArgument_Posix(string path, string expected)
+        {
+            Assert.SkipWhen(OperatingSystem.IsWindows(), "POSIX quoting");
+            Assert.Equal(expected, ReceiptCommand.QuoteArgument(path));
+        }
+
         [Fact]
         public void Watch_UserCancel_Exits130_DoesNotCancelServerBuild_ReceiptStaysAcknowledged()
         {
@@ -418,6 +527,23 @@ namespace NodeKit.Cli.Tests
             return exitCode;
         }
 
+        // /bin/sh parses the quoted argument exactly as a user's shell would
+        private static string ShellEcho(string quotedArgument)
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo("/bin/sh")
+            {
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+            };
+            psi.ArgumentList.Add("-c");
+            psi.ArgumentList.Add("printf '%s' " + quotedArgument);
+            using var process = System.Diagnostics.Process.Start(psi)!;
+            var output = process.StandardOutput.ReadToEnd();
+            process.WaitForExit();
+            Assert.Equal(0, process.ExitCode);
+            return output;
+        }
+
         private static OperationReceipt ReadReceipt(string receiptPath)
         {
             var store = LocalOperationStore.ForReceipt(receiptPath);
@@ -429,7 +555,7 @@ namespace NodeKit.Cli.Tests
         }
 
         // submit whose watch stream ends without a terminal event → acknowledged receipt with build_id
-        private string CreateAcknowledgedReceipt()
+        private string CreateAcknowledgedReceipt(string? workDir = null)
         {
             using var server = new GrpcTestServer();
             server.Fake.OnSubmitToolBuild = _ => new Nodevault.V1.SubmitToolBuildResponse { BuildId = FixtureBuildId, Status = "Requested" };
@@ -437,8 +563,8 @@ namespace NodeKit.Cli.Tests
             {
                 new() { Kind = ProtoBuildEventKind.Log, Status = "Running", BuildId = FixtureBuildId },
             };
-            Assert.Equal(1, Submit(server));
-            var receiptPath = DefaultReceiptPath();
+            Assert.Equal(1, Submit(server, workDir));
+            var receiptPath = DefaultReceiptPath(workDir);
             Assert.Equal(OperationPhase.Acknowledged, ReadReceipt(receiptPath).Phase);
             return receiptPath;
         }
@@ -467,17 +593,18 @@ namespace NodeKit.Cli.Tests
             return receiptPath;
         }
 
-        private int Submit(GrpcTestServer server)
+        private int Submit(GrpcTestServer server, string? workDir = null)
         {
             using var client = new GrpcToolSpecClient(server.Channel);
             using var stdout = new StringWriter();
             using var stderr = new StringWriter();
-            return SubmitCommand.Run(new[] { "submit", WriteRecipe() }, stdout, stderr, client, () => FixedRequestId);
+            return SubmitCommand.Run(new[] { "submit", WriteRecipe(workDir) }, stdout, stderr, client, () => FixedRequestId);
         }
 
-        private string DefaultReceiptPath() => Path.Join(_workDir, ".nodekit", "receipts", FixedRequestId + ".json");
+        private string DefaultReceiptPath(string? workDir = null) =>
+            Path.Join(workDir ?? _workDir, ".nodekit", "receipts", FixedRequestId + ".json");
 
-        private string WriteRecipe()
+        private string WriteRecipe(string? workDir = null)
         {
             var recipe = new RecipeDocument
             {
@@ -490,7 +617,7 @@ namespace NodeKit.Cli.Tests
                 Channels = new List<string> { "bioconda" },
                 Packages = new List<string> { "bwa=0.7.17=h5bf99c6_8" },
             };
-            var path = Path.Join(_workDir, "input-" + Guid.NewGuid() + ".json");
+            var path = Path.Join(workDir ?? _workDir, "input-" + Guid.NewGuid() + ".json");
             File.WriteAllText(path, JsonSerializer.Serialize(recipe, RecipeCreateCommand.JsonOptions));
             return path;
         }

@@ -285,9 +285,12 @@ namespace NodeKit.Cli.Operations
 
             var buildId = handle.Receipt.BuildId!;
 
-            // terminal receipt를 다시 관찰할 때 저장된 결과에서 시작한다 — 재전송된 terminal 이벤트에
-            // image digest 같은 선택 필드가 빠져도 이미 기록한 값을 지우지 않는다.
-            var observed = handle.Receipt.LastObservation;
+            // terminal receipt를 다시 관찰할 때 저장된 결과는 병합 기준으로만 쓴다 — 재전송된 terminal
+            // 이벤트에 image digest 같은 선택 필드가 빠져도 이미 기록한 값을 지우지 않는다. 하지만 이번
+            // 관찰이 받은 결과(ObservedResult)로는 돌려주지 않는다: 이벤트 없이 끝나거나 다른 빌드
+            // 이벤트로 멈춘 관찰이 예전 Failed를 이번 관측처럼 보이게 하면 안 된다.
+            var recorded = handle.Receipt.LastObservation;
+            OperationObservation? observed = null;
             await foreach (var ev in client.WatchBuildAsync(buildId, cancellationToken).ConfigureAwait(false))
             {
                 if (!string.IsNullOrEmpty(ev.BuildId) && !string.Equals(ev.BuildId, buildId, StringComparison.Ordinal))
@@ -304,7 +307,7 @@ namespace NodeKit.Cli.Operations
 
                 if (!string.IsNullOrEmpty(ev.BuildId) || !string.IsNullOrEmpty(ev.Status))
                 {
-                    observed = Observe(ev, observed, clock);
+                    observed = Observe(ev, observed ?? recorded, clock);
                 }
 
                 if (ev.Kind is not (BuildEventKind.Succeeded or BuildEventKind.Failed))
@@ -316,7 +319,7 @@ namespace NodeKit.Cli.Operations
                 var outcome = ev.Kind == BuildEventKind.Succeeded
                     ? OperationObservation.SucceededOutcome
                     : OperationObservation.FailedOutcome;
-                var terminal = Observe(ev, observed, clock) with
+                var terminal = Observe(ev, observed ?? recorded, clock) with
                 {
                     Status = NullIfEmpty(ev.Status) ?? outcome,
                     Outcome = outcome,
