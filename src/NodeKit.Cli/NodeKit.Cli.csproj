@@ -135,6 +135,8 @@
     <Compile Include="..\Grpc\BuildErrorMessages.cs" Link="Grpc\BuildErrorMessages.cs" />
     <Compile Include="..\Grpc\IToolSpecBuildClient.cs" Link="Grpc\IToolSpecBuildClient.cs" />
     <Compile Include="..\Grpc\GrpcToolSpecClient.cs" Link="Grpc\GrpcToolSpecClient.cs" />
+    <Compile Include="..\Grpc\ToolSpecBuildOptions.cs" Link="Grpc\ToolSpecBuildOptions.cs" />
+    <Compile Include="..\Grpc\ToolSpecSubmitBasis.cs" Link="Grpc\ToolSpecSubmitBasis.cs" />
     <Compile Include="..\Grpc\ToolSpecRawSpecFactory.cs" Link="Grpc\ToolSpecRawSpecFactory.cs" />
     <Compile Include="..\Grpc\ToolFunctionBuildRequestPreviewFactory.cs" Link="Grpc\ToolFunctionBuildRequestPreviewFactory.cs" />
   </ItemGroup>
