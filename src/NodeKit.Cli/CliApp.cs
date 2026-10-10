@@ -30,6 +30,7 @@ namespace NodeKit.Cli
             "  nodekit function-recipe validate <path>\n" +
             "  nodekit function-recipe render <path> --out <out.json> [--pretty]\n" +
             "  nodekit function-recipe submit <path>\n" +
+            "  nodekit receipt watch|cancel <receipt.json>\n" +
             "\n" +
             "각 명령의 자세한 옵션은 `nodekit <명령> --help`로 확인하세요 (예: nodekit submit --help).";
 
@@ -81,6 +82,7 @@ namespace NodeKit.Cli
                 "submit" => SubmitCommand.Run(args, stdout, stderr),
                 "recipe" => RunRecipe(args, stdin, stdout, stderr),
                 "function-recipe" => RunFunctionRecipe(args, stdin, stdout, stderr),
+                "receipt" => Operations.ReceiptCommand.Run(args, stdout, stderr),
                 _ => Unknown(args[0], stderr),
             };
         }
@@ -195,7 +197,7 @@ namespace NodeKit.Cli
 
         private static int Unknown(string command, TextWriter stderr)
         {
-            stderr.WriteLine($"알 수 없는 명령입니다: {command} (validate | render | submit | recipe | function-recipe 만 지원합니다)");
+            stderr.WriteLine($"알 수 없는 명령입니다: {command} (validate | render | submit | recipe | function-recipe | receipt 만 지원합니다)");
             return 2;
         }
 

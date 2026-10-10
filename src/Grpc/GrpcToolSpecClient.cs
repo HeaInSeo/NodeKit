@@ -79,6 +79,12 @@ namespace NodeKit.Grpc
                 cancellationToken: cancellationToken);
         }
 
+        public IAsyncEnumerable<BuildEvent> WatchBuildAsync(string buildId, CancellationToken cancellationToken = default)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(buildId);
+            return WatchBuildCoreAsync(buildId, cancellationToken);
+        }
+
         internal static BuildEvent MapWatchEvent(Nodevault.V1.BuildEvent ev)
         {
             // WatchToolBuild은 모든 이벤트를 LOG 종류로 보낸다.
@@ -288,6 +294,24 @@ namespace NodeKit.Grpc
             // Step 3: WatchToolBuild — 빌드 상태 변화를 스트리밍한다.
             using var watchCall = _client.WatchToolBuild(
                 new WatchToolBuildRequest { BuildId = submitResp.BuildId },
+                cancellationToken: cancellationToken);
+
+#pragma warning disable CA2007 // IAsyncEnumerable does not support ConfigureAwait directly
+            while (await watchCall.ResponseStream.MoveNext(cancellationToken))
+#pragma warning restore CA2007
+            {
+                yield return MapWatchEvent(watchCall.ResponseStream.Current);
+            }
+        }
+
+        // 재진입 관찰: 저장된 build ID로 WatchToolBuild만 연다. 스트림 오류와 취소는 잡지 않고
+        // 호출자에게 전파한다 — 관찰 실패를 Failed 이벤트로 바꾸면 원격 빌드 실패로 오인된다.
+        private async IAsyncEnumerable<BuildEvent> WatchBuildCoreAsync(
+            string buildId,
+            [EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            using var watchCall = _client.WatchToolBuild(
+                new WatchToolBuildRequest { BuildId = buildId },
                 cancellationToken: cancellationToken);
 
 #pragma warning disable CA2007 // IAsyncEnumerable does not support ConfigureAwait directly

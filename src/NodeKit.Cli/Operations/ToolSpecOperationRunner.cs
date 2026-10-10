@@ -236,6 +236,122 @@ namespace NodeKit.Cli.Operations
             };
         }
 
+        /// <summary>
+        /// build ID가 없는 receipt는 watch/cancel로 재진입할 수 없다(S2-03-C02). 그 경우 어떤 RPC도
+        /// 보내지 않는 결과를, 재진입할 수 있으면 null을 돌려준다. submit_in_flight는 원격 생성 여부를
+        /// 알 수 없다 — 이 BuildService에는 request ID 조회 RPC가 없으므로 다시 제출하지 않고
+        /// 수동 확인 근거(request ID·endpoint)만 남긴다.
+        /// </summary>
+        public static ToolSpecOperationResult? RefuseWithoutBuildId(OperationReceipt receipt)
+        {
+            ArgumentNullException.ThrowIfNull(receipt);
+            if (!string.IsNullOrEmpty(receipt.BuildId))
+            {
+                return null;
+            }
+
+            return new ToolSpecOperationResult
+            {
+                ExitCode = 2,
+                Code = NotResumableCode,
+                Message = receipt.Phase == OperationPhase.SubmitInFlight
+                    ? $"이전 제출의 원격 결과를 알 수 없습니다 (request ID: {receipt.RequestId}, endpoint: {receipt.Endpoint}). 저장된 build ID가 없어 관찰하거나 취소할 대상이 없고, 자동으로 다시 제출하지 않습니다 — 이 request ID로 NodeVault에서 직접 확인하세요. 아무 요청도 보내지 않았습니다."
+                    : $"아직 제출되지 않은 operation입니다 (phase: {receipt.Phase}, request ID: {receipt.RequestId}). 관찰하거나 취소할 build ID가 없습니다. 아무 요청도 보내지 않았습니다.",
+                Receipt = receipt,
+            };
+        }
+
+        /// <summary>
+        /// 저장된 build ID로 WatchToolBuild만 열어 관측을 receipt에 기록한다(S2-03-C01/C03).
+        /// ResolveToolSpec/SubmitToolBuild는 보내지 않는다. terminal 관측은 저장한 뒤에만 넘기고,
+        /// 다른 빌드의 이벤트는 저장하지 않는다. 스트림 오류와 취소는 잡지 않고 전파한다 —
+        /// 관찰을 끝내지 못한 receipt는 그대로 남아 다시 관찰할 수 있다.
+        /// </summary>
+        public static async Task<ToolSpecOperationResult> WatchKnownBuildAsync(
+            OperationHandle handle,
+            IToolSpecBuildClient client,
+            TimeProvider? timeProvider = null,
+            Action<BuildEvent>? onEvent = null,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(handle);
+            ArgumentNullException.ThrowIfNull(client);
+            var clock = timeProvider ?? TimeProvider.System;
+
+            if (RefuseWithoutBuildId(handle.Receipt) is { } refusal)
+            {
+                return refusal;
+            }
+
+            var buildId = handle.Receipt.BuildId!;
+            OperationObservation? observed = null;
+            await foreach (var ev in client.WatchBuildAsync(buildId, cancellationToken).ConfigureAwait(false))
+            {
+                if (!string.IsNullOrEmpty(ev.BuildId) && !string.Equals(ev.BuildId, buildId, StringComparison.Ordinal))
+                {
+                    return new ToolSpecOperationResult
+                    {
+                        ExitCode = 1,
+                        Message = $"서버 스트림이 다른 빌드의 이벤트를 보냈습니다 (receipt build ID: {buildId}, 이벤트 build ID: {ev.BuildId}). 이 이벤트는 저장하지 않았습니다.",
+                        ObservedBuildId = buildId,
+                        ObservedResult = observed,
+                        Receipt = handle.Receipt,
+                    };
+                }
+
+                if (!string.IsNullOrEmpty(ev.BuildId) || !string.IsNullOrEmpty(ev.Status))
+                {
+                    observed = Observe(ev, observed, clock);
+                }
+
+                if (ev.Kind is not (BuildEventKind.Succeeded or BuildEventKind.Failed))
+                {
+                    onEvent?.Invoke(ev);
+                    continue;
+                }
+
+                var outcome = ev.Kind == BuildEventKind.Succeeded
+                    ? OperationObservation.SucceededOutcome
+                    : OperationObservation.FailedOutcome;
+                var terminal = Observe(ev, observed, clock) with
+                {
+                    Status = NullIfEmpty(ev.Status) ?? outcome,
+                    Outcome = outcome,
+                };
+                var terminalError = handle.Advance(handle.Receipt with
+                {
+                    Phase = OperationPhase.Terminal,
+                    LastObservation = terminal,
+                });
+                if (terminalError is not null)
+                {
+                    return StoreFailure(handle, terminalError, resolveCompleted: true, buildId, terminal);
+                }
+
+                onEvent?.Invoke(ev);
+                return new ToolSpecOperationResult
+                {
+                    ExitCode = ev.Kind == BuildEventKind.Succeeded ? 0 : 1,
+                    Message = ev.Message,
+                    ObservedBuildId = buildId,
+                    ObservedResult = terminal,
+                    ResolveCompleted = true,
+                    Receipt = handle.Receipt,
+                };
+            }
+
+            return new ToolSpecOperationResult
+            {
+                ExitCode = 1,
+                Message = "서버 스트림이 최종 상태 이벤트 없이 종료되었습니다.",
+                ObservedBuildId = buildId,
+                ObservedResult = observed,
+                ResolveCompleted = true,
+                StreamEnded = true,
+                Receipt = handle.Receipt,
+            };
+        }
+
         private static OperationStoreError? RecordResolved(OperationHandle handle, ToolSpecSubmitBasis basis)
         {
             var receipt = handle.Receipt;
