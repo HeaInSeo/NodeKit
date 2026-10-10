@@ -352,6 +352,31 @@ namespace NodeKit.Cli.Tests
         }
 
         [Fact]
+        public async Task Staged_BeforeSubmitCancelledByOwnToken_PropagatesWhileOuterTokenActive()
+        {
+            // Codex P2 r4236516591: the durable store can time out on its own token
+            // while the build token is still live. That is cancellation, not a store
+            // failure, so it must propagate and nothing may be submitted.
+            using var server = NewServer();
+            using var client = new GrpcToolSpecClient(server.Channel);
+            using var storeTimeout = new CancellationTokenSource();
+            await storeTimeout.CancelAsync();
+            var options = new ToolSpecBuildOptions
+            {
+                BeforeSubmitAsync = (_, _) => throw new OperationCanceledException(storeTimeout.Token),
+            };
+            var outer = TestContext.Current.CancellationToken;
+
+            var thrown = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => CollectAsync(client.ResolveAndBuildAsync("bwa", "0.7.17", "{}", options, outer)));
+
+            Assert.False(outer.IsCancellationRequested);
+            Assert.Equal(storeTimeout.Token, thrown.CancellationToken);
+            Assert.Equal(_resolveOnly, server.Fake.CallOrder);
+            Assert.Empty(server.Fake.SubmitRequests);
+        }
+
+        [Fact]
         public async Task Staged_DefaultOverload_GeneratesAFreshGuidRequestIdPerSubmit()
         {
             using var server = NewServer();

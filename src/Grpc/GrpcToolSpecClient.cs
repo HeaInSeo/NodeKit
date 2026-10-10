@@ -216,7 +216,8 @@ namespace NodeKit.Grpc
 
             // Step 1.5: 호출자의 durable 저장 seam — 저장에 실패한 제출은 서버에
             // 보내지 않는다(SubmitToolBuild/WatchToolBuild 호출 0). 취소는 Step 1과
-            // 같은 이유로 잡지 않고 전파한다.
+            // 같은 이유로 잡지 않고 전파한다. 저장소가 자기 timeout 토큰으로 취소한
+            // OperationCanceledException도 내 토큰 상태와 무관하게 취소로 전파한다.
             if (options.BeforeSubmitAsync is { } beforeSubmit)
             {
                 Exception? storeEx = null;
@@ -225,7 +226,7 @@ namespace NodeKit.Grpc
                     await beforeSubmit(basis, cancellationToken).ConfigureAwait(false);
                 }
 #pragma warning disable CA1031 // a failed durable store must surface as a Failed event before any Submit, not crash the caller
-                catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+                catch (Exception ex) when (ex is not OperationCanceledException && !cancellationToken.IsCancellationRequested)
 #pragma warning restore CA1031
                 {
                     storeEx = ex;
