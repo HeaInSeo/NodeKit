@@ -145,20 +145,22 @@ namespace NodeKit.Cli
         }
 
         // 추천과 다르게 직접 고른 경우에도 어떤 방식이 왜/어떻게 선택됐는지 남긴다(S1-01-C03).
+        // 이 요약 뒤에는 입력 없이 바로 다음 화면(BeginStep → Clear)이 오므로 carried line으로
+        // 써서 다음 화면 맨 위에도 다시 보이게 한다.
         private static void PrintManualChoiceSummary(RecipeMethodId method, RecipeMethodId? recommended, IRecipeConsole console)
         {
-            console.WriteLine();
-            console.WriteLine($"선택한 작성 방식: {RecipeMethodCatalog.For(method).Label.Get("ko")}");
-            console.WriteLine(recommended is { } r && r != method
+            console.WriteCarriedLine();
+            console.WriteCarriedLine($"선택한 작성 방식: {RecipeMethodCatalog.For(method).Label.Get("ko")}");
+            console.WriteCarriedLine(recommended is { } r && r != method
                 ? $"선택 이유: 추천({RecipeMethodCatalog.For(r).Label.Get("ko")})을 사용하지 않고 목록에서 직접 선택했습니다."
                 : "선택 이유: 목록에서 직접 선택했습니다.");
-            console.WriteLine("이 방식으로 만들면:");
+            console.WriteCarriedLine("이 방식으로 만들면:");
             foreach (var effect in _effects[method])
             {
-                console.WriteLine($"  - {effect}");
+                console.WriteCarriedLine($"  - {effect}");
             }
 
-            console.WriteLine();
+            console.WriteCarriedLine();
         }
 
         /// <summary>

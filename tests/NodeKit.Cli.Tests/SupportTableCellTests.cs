@@ -40,6 +40,14 @@ namespace NodeKit.Cli.Tests
         // F-SOURCE / F-STRUCTURED
         private const string SourceUri = "https://github.com/lh3/bwa/archive/refs/tags/v0.7.17.tar.gz";
 
+        // 기반 이미지 digest와 다른 값이어야 render 결과에서 checksum 보존을 따로 확인할 수 있다.
+        private const string SourceChecksumHex = "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210";
+        private const string SourceChecksum = "sha256:" + SourceChecksumHex;
+
+        // 두 source 계열 render의 `echo "<hex>  source.tar.gz" | sha256sum -c -` 입력 부분.
+        // sha256sum -c는 접두사 없는 hex를 받고, 따옴표는 JSON에서 escape되므로 그 안쪽만 비교한다.
+        private const string SourceChecksumCommand = SourceChecksumHex + "  source.tar.gz";
+
         // Quick 모드 Q&A — package를 추천받는 답(IsRestrictedNetwork..HasExistingDockerfile).
         private static readonly string[] _quickAnswersRecommendPackage = { "n", "n", "n", "y", "n", "n" };
 
@@ -283,14 +291,14 @@ namespace NodeKit.Cli.Tests
                 ["mirror/non-interactive"] = (t, p) => t.NonInteractive(p, "mirror",
                     "ToolName=bwa-mem", "ToolVersion=0.7.17", "Script=run.sh", "BaseImage=" + BaseImageWithDigest, "MirrorUri=" + MirrorUri, "Packages=" + PackagePin),
                 ["source/guided"] = GuidedSource,
-                ["source/quick"] = (t, p) => t.Interactive(p, Quick(reject: "4", "0", "bwa-mem", "0.7.17", "run.sh", BaseImageWithDigest, SourceUri, Digest, "make", "", "")),
+                ["source/quick"] = (t, p) => t.Interactive(p, Quick(reject: "4", "0", "bwa-mem", "0.7.17", "run.sh", BaseImageWithDigest, SourceUri, SourceChecksum, "make", "", "")),
                 ["source/non-interactive"] = (t, p) => t.NonInteractive(p, "source",
-                    "ToolName=bwa-mem", "ToolVersion=0.7.17", "Script=run.sh", "BaseImage=" + BaseImageWithDigest, "SourceUri=" + SourceUri, "SourceChecksum=" + Digest, "SourceBuildCommands=make"),
+                    "ToolName=bwa-mem", "ToolVersion=0.7.17", "Script=run.sh", "BaseImage=" + BaseImageWithDigest, "SourceUri=" + SourceUri, "SourceChecksum=" + SourceChecksum, "SourceBuildCommands=make"),
                 ["source-structured/guided"] = GuidedSource,
                 ["source-structured/quick"] = (t, p) => t.Interactive(p, "2", "n", "n", "n", "n", "y", "n", "",
-                    "bwa-mem", "0.7.17", "run.sh", "1", "", SourceUri, Digest, "make install DESTDIR=/nodekit/output", "", "", "1", "", ""),
+                    "bwa-mem", "0.7.17", "run.sh", "1", "", SourceUri, SourceChecksum, "make install DESTDIR=/nodekit/output", "", "", "1", "", ""),
                 ["source-structured/non-interactive"] = (t, p) => t.NonInteractive(p, "source-structured",
-                    "ToolName=bwa-mem", "ToolVersion=0.7.17", "Script=run.sh", "BuildProfile=generic", "SourceUri=" + SourceUri, "SourceChecksum=" + Digest,
+                    "ToolName=bwa-mem", "ToolVersion=0.7.17", "Script=run.sh", "BuildProfile=generic", "SourceUri=" + SourceUri, "SourceChecksum=" + SourceChecksum,
                     "SourceBuildCommands=make install DESTDIR=/nodekit/output", "RuntimeProfile=minimal"),
                 ["dockerfile/guided"] = (t, p) => t.Interactive(p, "1", "5", t.WriteDockerfile(), "y", "bwa-mem", "0.7.17", "run.sh", BaseImageWithDigest, "reads", "1", "", "bam", "1", ""),
                 ["dockerfile/quick"] = (t, p) => t.Interactive(p, "2", "n", "n", "n", "n", "n", "y", "", "y", "bwa-mem", "0.7.17", "run.sh", BaseImageWithDigest,
@@ -303,7 +311,7 @@ namespace NodeKit.Cli.Tests
             t.Interactive(outPath, "1", "2", InstallCommand, "1", "", "0", "bwa-mem", "0.7.17", "run.sh", BaseImageWithDigest, "reads", "1", "", "bam", "1", "");
 
         private static CliRun GuidedSource(SupportTableCellTests t, string outPath) =>
-            t.Interactive(outPath, "1", "4", SourceUri, Digest, "bwa-mem", "0.7.17", "run.sh", "", "make install DESTDIR=/nodekit/output", "", "", "", "", "reads", "1", "", "bam", "1", "");
+            t.Interactive(outPath, "1", "4", SourceUri, SourceChecksum, "bwa-mem", "0.7.17", "run.sh", "", "make install DESTDIR=/nodekit/output", "", "", "", "", "reads", "1", "", "bam", "1", "");
 
         private static CliRun QuickMirror(SupportTableCellTests t, string outPath) =>
             t.Interactive(outPath, Quick(reject: "3", "0", "bwa-mem", "0.7.17", "run.sh", BaseImageWithDigest, MirrorUri, PackagePin, "", ""));
@@ -332,9 +340,8 @@ namespace NodeKit.Cli.Tests
             "container" => ("BioContainer", new[] { Digest }),
             "package" => ("Conda", new[] { PackagePin, "bioconda", Digest }),
             "mirror" => ("PackageMirror", new[] { PackagePin, MirrorUri, Digest }),
-            "source" => ("SourceBuild", new[] { SourceUri, Digest }),
-            // structured render는 checksum을 sha256sum -c 입력인 hex로 쓴다.
-            "source-structured" => ("SourceBuildStructured", new[] { SourceUri, DigestHex, "/nodekit/output" }),
+            "source" => ("SourceBuild", new[] { SourceUri, SourceChecksumCommand, BaseImageWithDigest }),
+            "source-structured" => ("SourceBuildStructured", new[] { SourceUri, SourceChecksumCommand, "/nodekit/output" }),
             "dockerfile" => ("DockerfileFallback", new[] { "USER 1000", Digest }),
             _ => throw new ArgumentOutOfRangeException(nameof(publicName), publicName, null),
         };
