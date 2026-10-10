@@ -737,7 +737,10 @@ namespace NodeKit.Cli
                 console.WriteLine("  https://example.org/tool-1.0.0.tar.gz");
                 console.WriteLine();
                 console.WriteLine("이 값을 사용하면:");
-                console.WriteLine("  - source 방식 recipe를 만듭니다.");
+                // S1-01-C07 NO_DIRECT_ROUTE: 이 단서는 legacy source가 아니라 source-structured로 간다.
+                // 선택될 방식을 화면에 그대로 밝히고, legacy source의 경로를 함께 안내한다.
+                console.WriteLine($"  - {RecipeMethodCatalog.For(RecipeMethodId.SourceStructured).Label.Get("ko")} 방식(source-structured) recipe를 만듭니다.");
+                console.WriteLine("  - 기존 source 방식(단일 단계)은 이 안내에서 직접 고를 수 없습니다. quick 모드 또는 --non-interactive --method source로만 만들 수 있습니다.");
                 console.WriteLine("  - 이후 SourceUri, SourceChecksum, SourceBuildCommands를 입력하게 됩니다.");
                 console.WriteLine("  - checksum이 없으면 같은 소스인지 확인할 수 없어 validate에서 실패합니다.");
                 console.WriteLine();
@@ -775,7 +778,7 @@ namespace NodeKit.Cli
                 }
 
                 RecipeCreateScreen.ClearForNewStep(console);
-                console.WriteLine("SourceChecksum이 없으면 source 방식 recipe를 완성할 수 없습니다.");
+                console.WriteLine("SourceChecksum이 없으면 source-structured 방식 recipe를 완성할 수 없습니다.");
                 console.WriteLine();
                 console.WriteLine("선택:");
                 console.WriteLine("[1] 계산 방법을 본다");

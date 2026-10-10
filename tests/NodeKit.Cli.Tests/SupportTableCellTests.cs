@@ -103,6 +103,13 @@ namespace NodeKit.Cli.Tests
                 var redirect = ReferenceFor("source-structured");
                 Assert.Equal(redirect.Kind, savedKind);
                 Assert.NotEqual(reference.Kind, savedKind);
+
+                // 미지원·structured 안내: 화면이 선택될 structured 방식을 밝히고 legacy source 경로를 알려 준다.
+                var structuredLabel = RecipeMethodCatalog.For(RecipeMethodId.SourceStructured).Label.Get("ko");
+                Assert.Contains($"{structuredLabel} 방식(source-structured) recipe를 만듭니다.", run.Stdout, StringComparison.Ordinal);
+                Assert.Contains("기존 source 방식(단일 단계)은 이 안내에서 직접 고를 수 없습니다.", run.Stdout, StringComparison.Ordinal);
+                Assert.Contains("--non-interactive --method source로만", run.Stdout, StringComparison.Ordinal);
+                Assert.DoesNotContain("- source 방식 recipe를 만듭니다.", run.Stdout, StringComparison.Ordinal);
                 reference = redirect;
             }
             else
