@@ -141,10 +141,16 @@ namespace NodeKit.Cli.Tests
 
             Assert.Equal(2, exitCode);
             Assert.Equal(_resolveOnly, server.Fake.CallOrder);
-            var completed = SingleJsonl(stdout);
+
+            // progress before Submit may print state records; the last record is the single completed one
+            var lines = stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            Assert.All(lines, l => Assert.DoesNotContain("build_id", l, StringComparison.Ordinal));
+            using var last = JsonDocument.Parse(lines[^1]);
+            var completed = last.RootElement;
+            Assert.Equal("completed", completed.GetProperty("type").GetString());
+            Assert.Single(lines, l => l.Contains("\"type\":\"completed\"", StringComparison.Ordinal));
             Assert.StartsWith("OPERATION_", completed.GetProperty("error_code").GetString(), StringComparison.Ordinal);
             Assert.Equal("terminal", completed.GetProperty("recovery").GetString());
-            Assert.False(completed.TryGetProperty("build_id", out _));
             Assert.Equal(OperationPhase.Prepared, ReadReceipt(DefaultReceiptPath()).Phase);
         }
 
