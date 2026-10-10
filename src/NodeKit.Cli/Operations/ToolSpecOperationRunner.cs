@@ -245,7 +245,7 @@ namespace NodeKit.Cli.Operations
         public static ToolSpecOperationResult? RefuseWithoutBuildId(OperationReceipt receipt)
         {
             ArgumentNullException.ThrowIfNull(receipt);
-            if (!string.IsNullOrEmpty(receipt.BuildId))
+            if (!string.IsNullOrWhiteSpace(receipt.BuildId))
             {
                 return null;
             }
@@ -284,7 +284,10 @@ namespace NodeKit.Cli.Operations
             }
 
             var buildId = handle.Receipt.BuildId!;
-            OperationObservation? observed = null;
+
+            // terminal receipt를 다시 관찰할 때 저장된 결과에서 시작한다 — 재전송된 terminal 이벤트에
+            // image digest 같은 선택 필드가 빠져도 이미 기록한 값을 지우지 않는다.
+            var observed = handle.Receipt.LastObservation;
             await foreach (var ev in client.WatchBuildAsync(buildId, cancellationToken).ConfigureAwait(false))
             {
                 if (!string.IsNullOrEmpty(ev.BuildId) && !string.Equals(ev.BuildId, buildId, StringComparison.Ordinal))

@@ -98,7 +98,7 @@ namespace NodeKit.Cli.Operations
 
                     return watch
                         ? WatchAsync(handle, client, stdout, stderr, cancellationToken).GetAwaiter().GetResult()
-                        : CancelAsync(receipt.BuildId!, client, stdout, stderr, cancellationToken).GetAwaiter().GetResult();
+                        : CancelAsync(receipt.BuildId!, handle.ReceiptPath, client, stdout, stderr, cancellationToken).GetAwaiter().GetResult();
                 }
             }
         }
@@ -175,7 +175,7 @@ namespace NodeKit.Cli.Operations
         }
 
         private static async Task<int> CancelAsync(
-            string buildId, IToolSpecBuildClient client, TextWriter stdout, TextWriter stderr, CancellationToken cancellationToken)
+            string buildId, string receiptPath, IToolSpecBuildClient client, TextWriter stdout, TextWriter stderr, CancellationToken cancellationToken)
         {
             using var timeoutCts = new CancellationTokenSource(_cancelRequestTimeout);
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
@@ -201,7 +201,7 @@ namespace NodeKit.Cli.Operations
                 return 1;
             }
 
-            stdout.WriteLine($"취소 요청을 보냈습니다 (build ID: {buildId}). 서버가 실제로 멈췄는지는 아직 확인하지 않았습니다 — nodekit receipt watch로 확인하세요.");
+            stdout.WriteLine($"취소 요청을 보냈습니다 (build ID: {buildId}). 서버가 실제로 멈췄는지는 아직 확인하지 않았습니다 — nodekit receipt watch {receiptPath} 로 확인하세요.");
             return 0;
         }
 

@@ -197,6 +197,7 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(FixtureBuildId, Assert.Single(server.Fake.CancelledBuildIds));
             Assert.Empty(server.Fake.CallOrder);
             Assert.Contains("확인하지 않았습니다", stdout, StringComparison.Ordinal);
+            Assert.Contains("nodekit receipt watch " + receiptPath, stdout, StringComparison.Ordinal);
             Assert.Equal(before, File.ReadAllBytes(receiptPath));
         }
 
@@ -239,6 +240,51 @@ namespace NodeKit.Cli.Tests
             Assert.Empty(server.Fake.CancelledBuildIds);
             Assert.Empty(server.Fake.CallOrder);
             Assert.Contains(OperationObservation.SucceededOutcome, stderr, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public void Watch_TerminalReceipt_ReplayWithoutOptionalFields_KeepsRecordedArtifact()
+        {
+            var receiptPath = CreateAcknowledgedReceipt();
+            using (var first = new GrpcTestServer())
+            {
+                first.Fake.WatchEvents = new List<ProtoBuildEvent>
+                {
+                    new() { Kind = ProtoBuildEventKind.Log, Status = "Succeeded", BuildId = FixtureBuildId, ImageRef = "harbor.local/tools/bwa-mem:0.7.17", ImageDigest = ImageDigest, IntegrityHealth = "Healthy" },
+                };
+                Assert.Equal(0, Reenter(first, "watch", receiptPath, out _, out _));
+            }
+
+            using var replay = new GrpcTestServer();
+            replay.Fake.WatchEvents = new List<ProtoBuildEvent>
+            {
+                new() { Kind = ProtoBuildEventKind.Log, Status = "Succeeded", BuildId = FixtureBuildId },
+            };
+
+            Assert.Equal(0, Reenter(replay, "watch", receiptPath, out _, out _));
+
+            var receipt = ReadReceipt(receiptPath);
+            Assert.Equal(OperationObservation.SucceededOutcome, receipt.LastObservation!.Outcome);
+            Assert.Equal(ImageDigest, receipt.LastObservation.ImageDigest);
+            Assert.Equal("harbor.local/tools/bwa-mem:0.7.17", receipt.LastObservation.ImageRef);
+            Assert.Equal("Healthy", receipt.LastObservation.IntegrityHealth);
+        }
+
+        [Theory]
+        [InlineData("watch")]
+        [InlineData("cancel")]
+        public void Reenter_WhitespaceBuildId_ExitsTwo_NoRpc(string verb)
+        {
+            var receiptPath = CreateAcknowledgedReceipt();
+            File.WriteAllText(receiptPath, File.ReadAllText(receiptPath).Replace(FixtureBuildId, "   ", StringComparison.Ordinal), new UTF8Encoding(false));
+            using var server = new GrpcTestServer();
+
+            var exitCode = Reenter(server, verb, receiptPath, out _, out var stderr);
+
+            Assert.Equal(2, exitCode);
+            Assert.Empty(server.Fake.CallOrder);
+            Assert.Empty(server.Fake.CancelledBuildIds);
+            Assert.Contains(LocalOperationStore.InvalidCode, stderr, StringComparison.Ordinal);
         }
 
         // S2-03-C05
