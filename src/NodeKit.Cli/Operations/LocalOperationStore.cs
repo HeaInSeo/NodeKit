@@ -365,6 +365,13 @@ namespace NodeKit.Cli.Operations
                 return Invalid(path, $"{receipt.Phase}인데 build_id가 없음");
             }
 
+            // terminal은 terminal watch 관측을 저장했다는 뜻이다 — 결과 없는 terminal은 이미 끝난
+            // 빌드처럼 취급되지만 보고할 durable 상태/결과가 없다.
+            if (rank >= OperationPhase.Rank(OperationPhase.Terminal) && receipt.LastObservation is null)
+            {
+                return Invalid(path, $"{receipt.Phase}인데 last_observation이 없음");
+            }
+
             return null;
         }
 
@@ -431,13 +438,16 @@ namespace NodeKit.Cli.Operations
             }
 
             // 다른 operation의 유효한 snapshot을 가리키면 그 resolved digest를 이 빌드에 잘못 연결한다.
-            if (resolved!.SourceSnapshotSha256 != receipt.SourceSnapshotSha256
+            // 같은 Recipe의 재시도는 source/envelope가 같으므로 attempt(request_id·endpoint)까지 대조한다.
+            if (resolved!.RequestId != receipt.RequestId
+                || resolved.Endpoint != receipt.Endpoint
+                || resolved.SourceSnapshotSha256 != receipt.SourceSnapshotSha256
                 || resolved.EnvelopeSha256 != receipt.EnvelopeSha256
                 || resolved.RequestedToolName != receipt.Envelope.ToolName
                 || resolved.RequestedVersion != receipt.Envelope.Version)
             {
                 receipt = null;
-                return Invalid(path, "resolved snapshot이 이 receipt의 source/envelope에 묶여 있지 않음");
+                return Invalid(path, "resolved snapshot이 이 receipt의 attempt/source/envelope에 묶여 있지 않음");
             }
 
             return null;

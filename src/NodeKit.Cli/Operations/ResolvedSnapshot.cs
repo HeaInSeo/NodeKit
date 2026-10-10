@@ -5,7 +5,8 @@ namespace NodeKit.Cli.Operations
 {
     /// <summary>
     /// 실제 ResolveToolSpec 성공 반환을 그대로 고정한 불변 snapshot(S2-02-C01).
-    /// 어떤 source snapshot과 envelope로 요청했는지 local binding을 함께 남긴다.
+    /// 어떤 attempt(request_id·endpoint)가 어떤 source snapshot과 envelope로 요청했는지
+    /// local binding을 함께 남긴다 — 같은 Recipe의 다른 attempt와 snapshot을 공유하지 않는다.
     /// 서버가 반환하지 않은 solver/runtime/provenance 값은 넣지 않는다.
     /// </summary>
     internal sealed record ResolvedSnapshot
@@ -14,6 +15,12 @@ namespace NodeKit.Cli.Operations
 
         [JsonPropertyName("schema_version")]
         public required string SchemaVersion { get; init; }
+
+        [JsonPropertyName("request_id")]
+        public required string RequestId { get; init; }
+
+        [JsonPropertyName("endpoint")]
+        public required string Endpoint { get; init; }
 
         [JsonPropertyName("source_snapshot_sha256")]
         public required string SourceSnapshotSha256 { get; init; }
@@ -50,6 +57,8 @@ namespace NodeKit.Cli.Operations
             return new ResolvedSnapshot
             {
                 SchemaVersion = CurrentSchemaVersion,
+                RequestId = receipt.RequestId,
+                Endpoint = receipt.Endpoint,
                 SourceSnapshotSha256 = receipt.SourceSnapshotSha256,
                 EnvelopeSha256 = receipt.EnvelopeSha256,
                 RequestedToolName = basis.RequestedToolName,

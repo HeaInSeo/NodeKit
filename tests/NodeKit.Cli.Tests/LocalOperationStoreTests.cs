@@ -622,6 +622,9 @@ namespace NodeKit.Cli.Tests
             "tampered_resolved_snapshot",
             "tampered_source_snapshot",
             "resolved_snapshot_of_another_operation",
+            "resolved_snapshot_of_another_attempt_same_recipe",
+            "resolved_snapshot_bound_to_another_request_id",
+            "resolved_snapshot_bound_to_another_endpoint",
             "malformed_source_snapshot_id",
             "malformed_resolved_snapshot_id",
         };
@@ -680,6 +683,34 @@ namespace NodeKit.Cli.Tests
                     Assert.Null(store.TryReadResolvedSnapshot(otherSha, out _));
                     File.WriteAllText(path, text.Replace(resolvedSha, otherSha, StringComparison.Ordinal));
                     break;
+                case "resolved_snapshot_of_another_attempt_same_recipe":
+                    // A retry of the same Recipe on another NodeVault: same source/envelope/tool/version,
+                    // different request_id and endpoint, so a different resolved digest.
+                    Assert.Null(store.TryCreateToolSpecOperation(
+                        "44444444-4444-4444-4444-444444444444", "http://other-nodevault:50051", _envelope, Source(_recipeV1), null, out var retry));
+                    string retrySha;
+                    using (retry)
+                    {
+                        Assert.Equal(sourceSha, retry!.Receipt.SourceSnapshotSha256);
+                        retrySha = AdvanceToInFlight(store, retry, ImageDigest);
+                    }
+
+                    File.WriteAllText(path, text.Replace(resolvedSha, retrySha, StringComparison.Ordinal));
+                    break;
+                case "resolved_snapshot_bound_to_another_request_id":
+                    // Differs from this attempt's snapshot only in request_id.
+                    File.WriteAllText(path, text.Replace(
+                        resolvedSha,
+                        WriteResolvedFor(store, ReadReceiptFromDisk(path) with { RequestId = "44444444-4444-4444-4444-444444444444" }),
+                        StringComparison.Ordinal));
+                    break;
+                case "resolved_snapshot_bound_to_another_endpoint":
+                    // Differs from this attempt's snapshot only in endpoint.
+                    File.WriteAllText(path, text.Replace(
+                        resolvedSha,
+                        WriteResolvedFor(store, ReadReceiptFromDisk(path) with { Endpoint = "http://other-nodevault:50051" }),
+                        StringComparison.Ordinal));
+                    break;
                 case "malformed_source_snapshot_id":
                     File.WriteAllText(path, text.Replace(sourceSha, "\\u0000", StringComparison.Ordinal));
                     break;
@@ -694,6 +725,51 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(LocalOperationStore.InvalidCode, error!.Code);
             Assert.Equal(2, error.ExitCode);
             Assert.Empty(server.Fake.CallOrder);
+        }
+
+        [Fact]
+        public void S2_02_C07_TerminalRecordWithoutObservation_IsIntegrityErrorExitTwo_NoRpc()
+        {
+            using var server = NewServer();
+            var store = NewStore();
+            string path;
+            using (var handle = CreatePrepared(store, FixedRequestId))
+            {
+                path = handle.ReceiptPath;
+                AdvanceToInFlight(store, handle);
+                Assert.Null(handle.Advance(handle.Receipt with { Phase = OperationPhase.Acknowledged, BuildId = "build-fixture-001" }));
+            }
+
+            // Control: an acknowledged record with a build_id and no observation is valid and reopens.
+            Assert.Null(ReadReceiptFromDisk(path).LastObservation);
+            Assert.Null(NewStore().TryOpen(path, out var control));
+            control!.Dispose();
+
+            var text = File.ReadAllText(path);
+            File.WriteAllText(path, text.Replace("\"phase\": \"acknowledged\"", "\"phase\": \"terminal\"", StringComparison.Ordinal));
+            Assert.Equal(OperationPhase.Terminal, ReadReceiptFromDisk(path).Phase);
+
+            var error = NewStore().TryOpen(path, out var reopened);
+
+            Assert.Null(reopened);
+            Assert.Equal(LocalOperationStore.InvalidCode, error!.Code);
+            Assert.Equal(2, error.ExitCode);
+            Assert.Empty(server.Fake.CallOrder);
+        }
+
+        [Fact]
+        public void Advance_TerminalWithoutObservation_IsNotWritten()
+        {
+            var store = NewStore();
+            using var handle = CreatePrepared(store, FixedRequestId);
+            AdvanceToInFlight(store, handle);
+            Assert.Null(handle.Advance(handle.Receipt with { Phase = OperationPhase.Acknowledged, BuildId = "build-fixture-001" }));
+            var before = File.ReadAllBytes(handle.ReceiptPath);
+
+            var error = handle.Advance(handle.Receipt with { Phase = OperationPhase.Terminal });
+
+            AssertRefusedUnchanged(error, handle, before, LocalOperationStore.InvalidCode);
+            Assert.Equal(OperationPhase.Acknowledged, handle.Receipt.Phase);
         }
 
         [Fact]
@@ -824,6 +900,14 @@ namespace NodeKit.Cli.Tests
         private static string AdvanceToInFlight(LocalOperationStore store, OperationHandle handle, string digest = WireToolSpecDigest)
         {
             var receipt = handle.Receipt;
+            var sha = WriteResolvedFor(store, receipt, digest);
+            Assert.Null(handle.Advance(receipt with { Phase = OperationPhase.SubmitInFlight, ResolvedSnapshotSha256 = sha }));
+            return sha;
+        }
+
+        // Writes a resolved snapshot built from the given receipt's attempt and envelope. Returns its ID.
+        private static string WriteResolvedFor(LocalOperationStore store, OperationReceipt receipt, string digest = WireToolSpecDigest)
+        {
             var basis = new ToolSpecSubmitBasis
             {
                 RequestId = receipt.RequestId,
@@ -834,7 +918,6 @@ namespace NodeKit.Cli.Tests
                 ResolvedVersion = receipt.Envelope.Version,
             };
             Assert.Null(store.WriteResolvedSnapshot(ResolvedSnapshot.FromBasis(basis, receipt), out var sha));
-            Assert.Null(handle.Advance(receipt with { Phase = OperationPhase.SubmitInFlight, ResolvedSnapshotSha256 = sha }));
             return sha;
         }
 
