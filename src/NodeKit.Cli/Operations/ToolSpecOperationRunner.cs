@@ -135,6 +135,21 @@ namespace NodeKit.Cli.Operations
                     }
                 }
 
+                if (!string.IsNullOrEmpty(ev.BuildId) && !string.Equals(ev.BuildId, buildId, StringComparison.Ordinal))
+                {
+                    // 다른 빌드의 이벤트다 — 그 상태/결과를 이 receipt의 관측으로 저장하지 않는다.
+                    // receipt는 acknowledged로 남아 build ID로 다시 관찰할 수 있다.
+                    return new ToolSpecOperationResult
+                    {
+                        ExitCode = 1,
+                        Message = $"서버 스트림이 다른 빌드의 이벤트를 보냈습니다 (receipt build ID: {buildId}, 이벤트 build ID: {ev.BuildId}). 이 이벤트는 저장하지 않았습니다.",
+                        ObservedBuildId = buildId,
+                        ObservedResult = observed,
+                        ResolveCompleted = resolveCompleted,
+                        Receipt = handle.Receipt,
+                    };
+                }
+
                 if (!string.IsNullOrEmpty(ev.BuildId) || !string.IsNullOrEmpty(ev.Status))
                 {
                     observed = Observe(ev, observed, clock);
@@ -158,7 +173,12 @@ namespace NodeKit.Cli.Operations
                     };
                 }
 
-                var terminal = Observe(ev, observed, clock);
+                // status 없이 terminal kind로만 끝을 알린 이벤트도 결과를 남긴다 — 이전 관측의
+                // Running 같은 값을 그대로 두면 다시 열었을 때 성공/실패를 구분할 수 없다.
+                var terminal = Observe(ev, observed, clock) with
+                {
+                    Status = NullIfEmpty(ev.Status) ?? (ev.Kind == BuildEventKind.Succeeded ? "Succeeded" : "Failed"),
+                };
                 var terminalError = handle.Advance(handle.Receipt with
                 {
                     Phase = OperationPhase.Terminal,

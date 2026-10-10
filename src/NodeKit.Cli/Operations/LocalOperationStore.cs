@@ -355,21 +355,40 @@ namespace NodeKit.Cli.Operations
                 return Invalid(path, $"알 수 없는 phase '{receipt.Phase}'");
             }
 
-            if (rank >= OperationPhase.Rank(OperationPhase.SubmitInFlight) && string.IsNullOrEmpty(receipt.ResolvedSnapshotSha256))
+            // 각 phase의 필드 집합은 정확히 정해져 있다: 요구 필드가 없거나 뒤 phase에서만 쓰는 필드가
+            // 있으면 손상이다. 예를 들어 build_id나 관측이 남은 prepared를 받아들이면 이미 제출된
+            // 요청을 새 prepared로 보고 Resolve/Submit을 다시 보내게 된다.
+            if (CheckPhaseField(path, receipt.Phase, "resolved snapshot 참조", receipt.ResolvedSnapshotSha256 is not null, !string.IsNullOrEmpty(receipt.ResolvedSnapshotSha256), rank >= OperationPhase.Rank(OperationPhase.SubmitInFlight)) is { } resolvedError)
             {
-                return Invalid(path, $"{receipt.Phase}인데 resolved snapshot 참조가 없음");
+                return resolvedError;
             }
 
-            if (rank >= OperationPhase.Rank(OperationPhase.Acknowledged) && string.IsNullOrEmpty(receipt.BuildId))
+            if (CheckPhaseField(path, receipt.Phase, "build_id", receipt.BuildId is not null, !string.IsNullOrEmpty(receipt.BuildId), rank >= OperationPhase.Rank(OperationPhase.Acknowledged)) is { } buildIdError)
             {
-                return Invalid(path, $"{receipt.Phase}인데 build_id가 없음");
+                return buildIdError;
             }
 
             // terminal은 terminal watch 관측을 저장했다는 뜻이다 — 결과 없는 terminal은 이미 끝난
             // 빌드처럼 취급되지만 보고할 durable 상태/결과가 없다.
-            if (rank >= OperationPhase.Rank(OperationPhase.Terminal) && receipt.LastObservation is null)
+            var hasObservation = receipt.LastObservation is not null;
+            if (CheckPhaseField(path, receipt.Phase, "last_observation", hasObservation, hasObservation, rank >= OperationPhase.Rank(OperationPhase.Terminal)) is { } observationError)
             {
-                return Invalid(path, $"{receipt.Phase}인데 last_observation이 없음");
+                return observationError;
+            }
+
+            return null;
+        }
+
+        private static OperationStoreError? CheckPhaseField(string path, string phase, string field, bool present, bool complete, bool required)
+        {
+            if (required && !complete)
+            {
+                return Invalid(path, $"{phase}인데 {field}가 없음");
+            }
+
+            if (!required && present)
+            {
+                return Invalid(path, $"{phase}에는 {field}가 있을 수 없음");
             }
 
             return null;

@@ -28,6 +28,8 @@ namespace NodeKit.Cli.Tests
 
         private const string Endpoint = "http://127.0.0.1:50051";
 
+        private const string FixtureBuildId = "build-fixture-001";
+
         private const string WireToolSpecDigest =
             "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
@@ -772,6 +774,146 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(OperationPhase.Acknowledged, handle.Receipt.Phase);
         }
 
+        public static TheoryData<string> RecordsWithLaterPhaseFields => new()
+        {
+            "prepared_with_build_id",
+            "prepared_with_last_observation",
+            "prepared_with_resolved_snapshot",
+            "in_flight_with_build_id",
+            "in_flight_with_last_observation",
+            "acknowledged_with_last_observation",
+        };
+
+        // A record carrying fields of a later phase is evidence of an earlier submission. Reopening a
+        // prepared one as fresh would send Resolve/Submit again, so it is an integrity error.
+        [Theory]
+        [MemberData(nameof(RecordsWithLaterPhaseFields))]
+        public void S2_02_C07_RecordWithLaterPhaseFields_IsIntegrityErrorExitTwo_NoRpc(string corruption)
+        {
+            using var server = NewServer();
+            var store = NewStore();
+            string path;
+            string resolvedSha;
+            using (var handle = CreatePrepared(store, FixedRequestId))
+            {
+                path = handle.ReceiptPath;
+                resolvedSha = WriteResolvedFor(store, handle.Receipt);
+            }
+
+            var prepared = ReadReceiptFromDisk(path);
+            var inFlight = prepared with { Phase = OperationPhase.SubmitInFlight, ResolvedSnapshotSha256 = resolvedSha };
+            var acknowledged = inFlight with { Phase = OperationPhase.Acknowledged, BuildId = FixtureBuildId };
+            var observation = new OperationObservation { Status = "Running", ObservedAt = "2026-10-10T00:00:00.000Z" };
+
+            // Control: each phase with exactly its own fields reopens.
+            foreach (var valid in new[] { prepared, inFlight, acknowledged, acknowledged with { Phase = OperationPhase.Terminal, LastObservation = observation } })
+            {
+                File.WriteAllText(path, JsonSerializer.Serialize(valid));
+                Assert.Null(NewStore().TryOpen(path, out var control));
+                control!.Dispose();
+            }
+
+            var corrupted = corruption switch
+            {
+                "prepared_with_build_id" => prepared with { BuildId = FixtureBuildId },
+                "prepared_with_last_observation" => prepared with { LastObservation = observation },
+                "prepared_with_resolved_snapshot" => prepared with { ResolvedSnapshotSha256 = resolvedSha },
+                "in_flight_with_build_id" => inFlight with { BuildId = FixtureBuildId },
+                "in_flight_with_last_observation" => inFlight with { LastObservation = observation },
+                _ => acknowledged with { LastObservation = observation },
+            };
+            File.WriteAllText(path, JsonSerializer.Serialize(corrupted));
+
+            var error = NewStore().TryOpen(path, out var reopened);
+
+            Assert.Null(reopened);
+            Assert.Equal(LocalOperationStore.InvalidCode, error!.Code);
+            Assert.Equal(2, error.ExitCode);
+            Assert.Empty(server.Fake.CallOrder);
+        }
+
+        [Theory]
+        [InlineData("build_id")]
+        [InlineData("last_observation")]
+        [InlineData("resolved_snapshot")]
+        public void Advance_PreparedWithLaterPhaseField_IsNotWritten(string field)
+        {
+            var store = NewStore();
+            using var handle = CreatePrepared(store, FixedRequestId);
+            var resolvedSha = WriteResolvedFor(store, handle.Receipt);
+            var before = File.ReadAllBytes(handle.ReceiptPath);
+
+            var error = handle.Advance(field switch
+            {
+                "build_id" => handle.Receipt with { BuildId = FixtureBuildId },
+                "last_observation" => handle.Receipt with { LastObservation = new OperationObservation { Status = "Running", ObservedAt = "2026-10-10T00:00:00.000Z" } },
+                _ => handle.Receipt with { ResolvedSnapshotSha256 = resolvedSha },
+            });
+
+            AssertRefusedUnchanged(error, handle, before, LocalOperationStore.InvalidCode);
+            Assert.Equal(OperationPhase.Prepared, handle.Receipt.Phase);
+            Assert.Null(handle.Receipt.BuildId);
+        }
+
+        // ── S2-02-C02 · only this build's watch events become its observation ──
+
+        [Fact]
+        public async Task S2_02_C02_WatchEventOfAnotherBuild_IsRejected_AndNotPersisted()
+        {
+            using var server = NewServer();
+            server.Fake.WatchEvents = new List<ProtoBuildEvent>
+            {
+                new() { Kind = ProtoBuildEventKind.Log, Status = "Running", BuildId = FixtureBuildId },
+                new() { Kind = ProtoBuildEventKind.Log, Status = "Succeeded", BuildId = "build-fixture-999", ImageDigest = ImageDigest },
+            };
+            var store = NewStore();
+            using var handle = CreatePrepared(store, FixedRequestId);
+
+            var result = await RunAsync(server, handle);
+
+            Assert.Equal(1, result.ExitCode);
+            Assert.Null(result.Code);
+            Assert.Equal(FixtureBuildId, result.ObservedBuildId);
+            Assert.Contains("build-fixture-999", result.Message, StringComparison.Ordinal);
+            Assert.Equal("Running", result.ObservedResult!.Status);
+            Assert.Null(result.ObservedResult.ImageDigest);
+            Assert.Single(server.Fake.SubmitRequests);
+            Assert.Empty(server.Fake.CancelledBuildIds);
+
+            var durable = ReadReceiptFromDisk(handle.ReceiptPath);
+            Assert.Equal(OperationPhase.Acknowledged, durable.Phase);
+            Assert.Equal(FixtureBuildId, durable.BuildId);
+            Assert.Null(durable.LastObservation);
+        }
+
+        [Theory]
+        [InlineData("Succeeded", 0)]
+        [InlineData("Failed", 1)]
+        public async Task S2_02_C02_TerminalKindWithoutStatus_PersistsTheOutcome(string status, int exitCode)
+        {
+            using var server = NewServer();
+            server.Fake.WatchEvents = new List<ProtoBuildEvent>
+            {
+                new() { Kind = ProtoBuildEventKind.Log, Status = "Running", BuildId = FixtureBuildId },
+                new() { Kind = status == "Succeeded" ? ProtoBuildEventKind.Succeeded : ProtoBuildEventKind.Failed, BuildId = FixtureBuildId },
+            };
+            var store = NewStore();
+
+            using (var handle = CreatePrepared(store, FixedRequestId))
+            {
+                var result = await RunAsync(server, handle);
+                Assert.Equal(exitCode, result.ExitCode);
+                Assert.Equal(status, result.ObservedResult!.Status);
+            }
+
+            Assert.Null(NewStore().TryOpen(store.DefaultReceiptPath(FixedRequestId), out var reopened));
+            using (reopened)
+            {
+                Assert.Equal(OperationPhase.Terminal, reopened!.Receipt.Phase);
+                Assert.Equal(status, reopened.Receipt.LastObservation!.Status);
+            }
+        }
+
         [Fact]
         public void SnapshotRead_WithMalformedId_IsIntegrityError_NotAnException()
         {
@@ -931,11 +1073,13 @@ namespace NodeKit.Cli.Tests
 
         private static GrpcTestServer NewServer()
         {
+            // Submit and watch report the same build, as a real server does for one attempt.
             var server = new GrpcTestServer();
+            server.Fake.OnSubmitToolBuild = _ => new SubmitToolBuildResponse { BuildId = FixtureBuildId, Status = "Requested" };
             server.Fake.WatchEvents = new List<ProtoBuildEvent>
             {
-                new() { Kind = ProtoBuildEventKind.Log, Status = "Running", BuildId = "fake-build-id" },
-                new() { Kind = ProtoBuildEventKind.Log, Status = "Succeeded", BuildId = "fake-build-id" },
+                new() { Kind = ProtoBuildEventKind.Log, Status = "Running", BuildId = FixtureBuildId },
+                new() { Kind = ProtoBuildEventKind.Log, Status = "Succeeded", BuildId = FixtureBuildId },
             };
             return server;
         }
