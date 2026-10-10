@@ -120,6 +120,15 @@ namespace NodeKit.Cli.Operations
             ArgumentNullException.ThrowIfNull(source);
             handle = null;
 
+            // request ID는 기본 receipt 파일 이름이 된다 — 경로 구분자나 `..`가 섞인 값이
+            // receipts/ 밖에 기록을 만들지 않도록 소문자 하이픈 GUID 형식만 받는다.
+            if (!IsCanonicalRequestId(requestId))
+            {
+                return new OperationStoreError(
+                    InvalidCode,
+                    $"request ID '{requestId}'가 소문자 GUID(xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx) 형식이 아닙니다. 아무것도 기록하거나 보내지 않았습니다.");
+            }
+
             var path = Path.GetFullPath(receiptPath ?? DefaultReceiptPath(requestId));
             if (RootMismatch(path) is { } rootError)
             {
@@ -279,6 +288,10 @@ namespace NodeKit.Cli.Operations
             var bytes = JsonSerializer.SerializeToUtf8Bytes(receipt, _writeOptions);
             return AtomicWrite(path, bytes, new OperationWriteContext(OperationWriteKind.Receipt, receipt.Phase, AtomicWriteStage.TempCreate));
         }
+
+        internal static bool IsCanonicalRequestId(string requestId) =>
+            Guid.TryParseExact(requestId, "D", out var parsed)
+            && string.Equals(parsed.ToString("D"), requestId, StringComparison.Ordinal);
 
         private static OperationStoreError Invalid(string path, string reason) =>
             new(InvalidCode, $"operation 기록을 신뢰할 수 없습니다: {path} ({reason}). 아무 요청도 보내지 않았습니다.");

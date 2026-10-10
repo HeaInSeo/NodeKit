@@ -1,13 +1,18 @@
 using System;
 using System.IO;
+using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using Grpc.Core;
 using NodeKit.Authoring;
 using NodeKit.Authoring.Recipes;
+using NodeKit.Cli.Operations;
 using NodeKit.Grpc;
 using NodeKit.Validation.Recipes;
 
@@ -29,7 +34,10 @@ namespace NodeKit.Cli
     internal static class SubmitCommand
     {
         private const string UsageLine =
-            "사용법: nodekit submit <recipe.json> [--url <nodevault-url>] [--connect-timeout <seconds>] [--watch-timeout <duration>] [--format human|jsonl] [--strict-reproducible]";
+            "사용법: nodekit submit <recipe.json> [--url <nodevault-url>] [--receipt <path>] [--connect-timeout <seconds>] [--watch-timeout <duration>] [--format human|jsonl] [--strict-reproducible]";
+
+        // 주입된 test client에는 실제 주소가 없다 — receipt endpoint에는 이 표식을 남긴다.
+        private const string InjectedClientEndpoint = "injected-client";
 
         private static readonly JsonSerializerOptions _recipeReadOptions = new()
         {
@@ -46,11 +54,19 @@ namespace NodeKit.Cli
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         };
 
+        /// <param name="requestIdProvider">테스트 전용 고정 request ID. 주면 receipt 기록도 켠다.</param>
+        /// <remarks>
+        /// 실제 CLI(주입 client 없음)는 항상 durable receipt를 남긴다(S2-02): 기본 위치는 Recipe 옆
+        /// `.nodekit/receipts/&lt;request-id&gt;.json`, `--receipt`로 바꿀 수 있다. 주입된 client로
+        /// 도는 기존 테스트는 `--receipt`나 requestIdProvider를 줄 때만 기록한다 — legacy-only
+        /// fake는 caller request ID/저장 seam을 지원하지 않기 때문이다.
+        /// </remarks>
         public static int Run(
             string[] args,
             TextWriter stdout,
             TextWriter stderr,
-            IToolSpecBuildClient? toolSpecClient = null)
+            IToolSpecBuildClient? toolSpecClient = null,
+            Func<string>? requestIdProvider = null)
         {
             if (args.Any(a => a is "--help" or "-h"))
             {
@@ -65,10 +81,12 @@ namespace NodeKit.Cli
             }
 
             var recipePath = args[1];
-            if (!TryParseOptions(args, stderr, out var urlOption, out var connectTimeout, out var watchTimeout, out var strictReproducible, out var jsonl))
+            if (!TryParseOptions(args, stderr, out var urlOption, out var receiptOption, out var connectTimeout, out var watchTimeout, out var strictReproducible, out var jsonl))
             {
                 return 2;
             }
+
+            var journal = toolSpecClient is null || receiptOption is not null || requestIdProvider is not null;
 
             var url = urlOption ?? Environment.GetEnvironmentVariable("NODEKIT_NODEVAULT_URL");
 
@@ -88,7 +106,7 @@ namespace NodeKit.Cli
 
             // validate/render와 같은 loader — 읽기/파싱/SchemaVersion/BuildKind
             // 오류는 모두 업무 RPC 전에 exit 2로 끝난다.
-            if (!AuthoringFileLoader.TryLoadRecipe(recipePath, _recipeReadOptions, out var loaded, out var loadError))
+            if (!AuthoringFileLoader.TryLoadRecipe(recipePath, _recipeReadOptions, out var loaded, out var loadError, out var recipeBytes))
             {
                 if (jsonl)
                 {
@@ -151,34 +169,170 @@ namespace NodeKit.Cli
                 }
             }
 
+            using (grpc)
+            {
+                IToolSpecBuildClient client = toolSpecClient ?? grpc!;
+                if (!journal)
+                {
+                    PrintBanner(stdout, url, definition.Name, definition.Version, receiptPath: null, requestId: null, jsonl);
+                    return SubmitAsync(
+                            ct => client.ResolveAndBuildAsync(definition.Name, definition.Version, rawSpec, ct),
+                            client,
+                            run: null,
+                            stdout,
+                            stderr,
+                            connectTimeout,
+                            watchTimeout,
+                            jsonl)
+                        .GetAwaiter().GetResult();
+                }
+
+                // S2-02: 검증·렌더한 바로 그 Recipe bytes와 요청 envelope를 prepared로 먼저 저장한다.
+                // 저장하지 못하면 어떤 RPC도 보내지 않는다(exit 2).
+                var endpoint = url ?? InjectedClientEndpoint;
+                var store = receiptOption is null
+                    ? LocalOperationStore.ForRecipe(recipePath)
+                    : LocalOperationStore.ForReceipt(receiptOption);
+                var requestId = (requestIdProvider ?? NewRequestId)();
+                var envelope = new OperationEnvelope
+                {
+                    ToolName = definition.Name,
+                    Version = definition.Version,
+                    RawSpec = rawSpec,
+                };
+                var source = SourceSnapshot.FromFiles(new[] { (Path.GetFileName(recipePath), recipeBytes!) });
+                var createError = store.TryCreateToolSpecOperation(requestId, endpoint, envelope, source, receiptOption, out var handle);
+                if (createError is not null)
+                {
+                    return ReportStoreFailure(stdout, stderr, createError.Code, createError.Message, createError.ExitCode, buildId: null, jsonl);
+                }
+
+                using (handle)
+                {
+                    PrintBanner(stdout, url, definition.Name, definition.Version, handle!.ReceiptPath, requestId, jsonl);
+                    var run = new ReceiptRun();
+                    return SubmitAsync(
+                            ct => RunWithReceiptAsync(handle, client, endpoint, run, ct),
+                            client,
+                            run,
+                            stdout,
+                            stderr,
+                            connectTimeout,
+                            watchTimeout,
+                            jsonl)
+                        .GetAwaiter().GetResult();
+                }
+            }
+        }
+
+        private static string NewRequestId() => Guid.NewGuid().ToString("D");
+
+        private static void PrintBanner(TextWriter stdout, string? url, string toolName, string version, string? receiptPath, string? requestId, bool jsonl)
+        {
             // --format jsonl에서는 stdout에 JSON 레코드만 나가야 한다(Issue #82) —
             // 이 안내 문구도 사람이 읽는 프리텍스트라 jsonl 모드에서는 생략한다.
             // 그 대신 첫 "submitted" 레코드가 이 역할을 대신한다.
-            if (!jsonl)
+            if (jsonl)
             {
-                stdout.WriteLine($"NodeVault에 빌드 요청을 시작합니다: {url ?? "(주입된 클라이언트)"}");
-                stdout.WriteLine($"  도구: {definition.Name} {definition.Version}");
-                stdout.WriteLine();
+                return;
             }
 
-            if (toolSpecClient is not null)
+            stdout.WriteLine($"NodeVault에 빌드 요청을 시작합니다: {url ?? "(주입된 클라이언트)"}");
+            stdout.WriteLine($"  도구: {toolName} {version}");
+            if (receiptPath is not null)
             {
-                return SubmitAsync(definition.Name, definition.Version, rawSpec, toolSpecClient, stdout, stderr, connectTimeout, watchTimeout, jsonl)
-                    .GetAwaiter().GetResult();
+                stdout.WriteLine($"  기록: {receiptPath} (request ID: {requestId})");
             }
 
-            using (grpc)
+            stdout.WriteLine();
+        }
+
+        // 로컬 기록(receipt/snapshot) 실패·불일치는 exit 2다. build ID를 이미 받았다면 원격
+        // 빌드는 계속될 수 있으므로 recovery를 확정하지 않는다(S2-02-C08).
+        private static int ReportStoreFailure(
+            TextWriter stdout, TextWriter stderr, string code, string? message, int exitCode, string? buildId, bool jsonl)
+        {
+            if (jsonl)
             {
-                return SubmitAsync(definition.Name, definition.Version, rawSpec, grpc!, stdout, stderr, connectTimeout, watchTimeout, jsonl)
-                    .GetAwaiter().GetResult();
+                WriteJsonl(
+                    stdout,
+                    SubmitJsonlRecord.Completed(
+                        "Failed",
+                        buildId,
+                        code,
+                        message,
+                        recovery: buildId is null ? RecoveryDisposition.Terminal : RecoveryDisposition.Uncertain));
+                return exitCode;
+            }
+
+            stderr.WriteLine($"로컬 기록 실패 ({code}): {message}");
+            return exitCode;
+        }
+
+        /// <summary>
+        /// ToolSpecOperationRunner를 돌리며 저장이 끝난 이벤트만 submit 출력 루프로 흘려보낸다.
+        /// runner가 저장 실패로 멈추면 이벤트 없이 끝나고 run.Result에 그 결과가 남는다.
+        /// 취소/예외는 그대로 다시 던져 기존 timeout·Ctrl-C 처리를 따른다.
+        /// </summary>
+        private static async IAsyncEnumerable<BuildEvent> RunWithReceiptAsync(
+            OperationHandle handle,
+            IToolSpecBuildClient client,
+            string endpoint,
+            ReceiptRun run,
+            [EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            var events = Channel.CreateUnbounded<BuildEvent>(new UnboundedChannelOptions { SingleReader = true, SingleWriter = true });
+            Exception? failure = null;
+            var runner = Task.Run(
+                async () =>
+                {
+                    try
+                    {
+                        run.Result = await ToolSpecOperationRunner.RunAsync(
+                                handle,
+                                client,
+                                endpoint,
+                                onEvent: ev => events.Writer.TryWrite(ev),
+                                cancellationToken: cancellationToken)
+                            .ConfigureAwait(false);
+                    }
+#pragma warning disable CA1031 // rethrown on the consumer side below with the original stack
+                    catch (Exception ex)
+#pragma warning restore CA1031
+                    {
+                        failure = ex;
+                    }
+                    finally
+                    {
+                        events.Writer.TryComplete();
+                    }
+                },
+                CancellationToken.None);
+
+            try
+            {
+                await foreach (var ev in events.Reader.ReadAllAsync(CancellationToken.None).ConfigureAwait(false))
+                {
+                    yield return ev;
+                }
+
+                await runner.ConfigureAwait(false);
+                if (failure is not null)
+                {
+                    ExceptionDispatchInfo.Throw(failure);
+                }
+            }
+            finally
+            {
+                // 출력 루프가 terminal에서 일찍 끝나도 runner가 끝난 뒤에야 receipt 잠금을 놓는다.
+                await runner.ConfigureAwait(false);
             }
         }
 
         private static async Task<int> SubmitAsync(
-            string toolName,
-            string version,
-            string rawSpec,
+            Func<CancellationToken, IAsyncEnumerable<BuildEvent>> events,
             IToolSpecBuildClient client,
+            ReceiptRun? run,
             TextWriter stdout,
             TextWriter stderr,
             TimeSpan? connectTimeout = null,
@@ -222,7 +376,7 @@ namespace NodeKit.Cli
 
             try
             {
-                await foreach (var ev in client.ResolveAndBuildAsync(toolName, version, rawSpec, linkedCts.Token))
+                await foreach (var ev in events(linkedCts.Token))
                 {
                     var isFirstBuildIdEvent = buildId is null && !string.IsNullOrEmpty(ev.BuildId);
 
@@ -414,6 +568,12 @@ namespace NodeKit.Cli
                         stderr.WriteLine($"빌드 실패: {ev.Message}");
                         return 1;
                     }
+                }
+
+                // receipt runner가 로컬 기록 실패로 멈췄다 — 그 뒤 RPC/관찰은 하지 않았다.
+                if (run?.Result is { Code: { } storeCode } stopped)
+                {
+                    return ReportStoreFailure(stdout, stderr, storeCode, stopped.Message, stopped.ExitCode, stopped.ObservedBuildId ?? buildId, jsonl);
                 }
 
                 // 스트림이 Succeeded/Failed 등 최종 상태 이벤트 없이 그냥 끝났다(서버
@@ -668,12 +828,14 @@ namespace NodeKit.Cli
             string[] args,
             TextWriter stderr,
             out string? url,
+            out string? receiptPath,
             out TimeSpan? connectTimeout,
             out TimeSpan? watchTimeout,
             out bool strictReproducible,
             out bool jsonl)
         {
             url = null;
+            receiptPath = null;
             connectTimeout = null;
             watchTimeout = null;
             strictReproducible = false;
@@ -683,7 +845,7 @@ namespace NodeKit.Cli
                 args,
                 startIndex: 2,
                 stderr,
-                valueOptions: new[] { "--url", "--connect-timeout", "--watch-timeout", "--format" },
+                valueOptions: new[] { "--url", "--receipt", "--connect-timeout", "--watch-timeout", "--format" },
                 flagOptions: new[] { "--strict-reproducible" },
                 out var values,
                 out var flags))
@@ -696,6 +858,17 @@ namespace NodeKit.Cli
             if (values.TryGetValue("--url", out var urlValue))
             {
                 url = urlValue;
+            }
+
+            if (values.TryGetValue("--receipt", out var receiptValue))
+            {
+                if (string.IsNullOrWhiteSpace(receiptValue))
+                {
+                    stderr.WriteLine("--receipt 값이 비어 있습니다 (receipt JSON 파일 경로).");
+                    return false;
+                }
+
+                receiptPath = receiptValue;
             }
 
             if (values.TryGetValue("--connect-timeout", out var timeoutValue))
@@ -786,6 +959,11 @@ namespace NodeKit.Cli
             }
 
             return duration > TimeSpan.Zero;
+        }
+
+        private sealed class ReceiptRun
+        {
+            public ToolSpecOperationResult? Result { get; set; }
         }
     }
 }
