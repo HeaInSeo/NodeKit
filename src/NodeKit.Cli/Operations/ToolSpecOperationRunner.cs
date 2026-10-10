@@ -25,6 +25,13 @@ namespace NodeKit.Cli.Operations
         /// <summary>ResolveToolSpec이 성공 응답을 돌려줬는가 — 저장 실패가 Resolve 전인지 후인지 구분한다.</summary>
         public bool ResolveCompleted { get; init; }
 
+        /// <summary>
+        /// 서버 스트림이 terminal 이벤트 없이 그냥 끝났을 때만 true다. 다른 이유(예: 다른 빌드의
+        /// 이벤트)로 runner가 스스로 멈춘 경우와 구분해, 호출자가 그 진단을 스트림 종료로
+        /// 뭉개지 않게 한다.
+        /// </summary>
+        public bool StreamEnded { get; init; }
+
         /// <summary>실행이 끝난 시점에 durable하게 저장된 receipt.</summary>
         public required OperationReceipt Receipt { get; init; }
     }
@@ -46,11 +53,15 @@ namespace NodeKit.Cli.Operations
 
         /// <param name="endpoint">client가 실제로 연결된 endpoint. receipt에 저장된 endpoint와
         /// 다르면 어떤 RPC도 보내기 전에 OPERATION_RECORD_MISMATCH(2)로 멈춘다(S2-02-C05).</param>
+        /// <param name="onEvent">이 receipt의 이벤트를 호출자(예: submit 출력)에 넘긴다. build_id가
+        /// 있는 이벤트는 acknowledged 저장 뒤에, terminal 이벤트는 terminal 저장 뒤에만 넘긴다 —
+        /// 저장에 실패한 이벤트와 다른 빌드의 이벤트는 넘기지 않는다.</param>
         public static async Task<ToolSpecOperationResult> RunAsync(
             OperationHandle handle,
             IToolSpecBuildClient client,
             string endpoint,
             TimeProvider? timeProvider = null,
+            Action<BuildEvent>? onEvent = null,
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(handle);
@@ -157,6 +168,7 @@ namespace NodeKit.Cli.Operations
 
                 if (ev.Kind is not (BuildEventKind.Succeeded or BuildEventKind.Failed))
                 {
+                    onEvent?.Invoke(ev);
                     continue;
                 }
 
@@ -164,6 +176,7 @@ namespace NodeKit.Cli.Operations
                 {
                     // build_id 전 Failed: Resolve 실패면 prepared, Submit 실패면 submit_in_flight(원격
                     // unknown)가 그대로 남는다. 관측한 적 없는 원격 상태를 기록하지 않는다.
+                    onEvent?.Invoke(ev);
                     return new ToolSpecOperationResult
                     {
                         ExitCode = 1,
@@ -193,6 +206,7 @@ namespace NodeKit.Cli.Operations
                     return StoreFailure(handle, terminalError, resolveCompleted, buildId, terminal);
                 }
 
+                onEvent?.Invoke(ev);
                 return new ToolSpecOperationResult
                 {
                     ExitCode = ev.Kind == BuildEventKind.Succeeded ? 0 : 1,
@@ -217,6 +231,7 @@ namespace NodeKit.Cli.Operations
                 ObservedBuildId = buildId,
                 ObservedResult = observed,
                 ResolveCompleted = resolveCompleted,
+                StreamEnded = true,
                 Receipt = handle.Receipt,
             };
         }

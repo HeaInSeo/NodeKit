@@ -996,7 +996,9 @@ $ echo $?
 
 `error_code`로 쓰이는 값: `BUILD_FAILED`, `PRE_WATCH_FAILED`,
 `STREAM_ENDED_WITHOUT_RESULT`, `CONNECT_TIMEOUT`, `WATCH_TIMEOUT`,
-`USER_CANCELLED`, `UNEXPECTED_ERROR`. 자동화는 `message`가 아니라
+`USER_CANCELLED`, `UNEXPECTED_ERROR`. 서버 스트림이 다른 빌드의 이벤트를 보내
+관찰을 멈춘 경우는 스트림 종료가 아니므로 `STREAM_ENDED_WITHOUT_RESULT`가 아니라
+`UNEXPECTED_ERROR`(`recovery: "uncertain"`, 받은 `build_id` 유지)로 보고한다. 자동화는 `message`가 아니라
 `type`/`status`/`error_code`로 판단해야 한다 — `message`는 사람이 읽는
 설명 텍스트일 뿐 안정적인 값 집합이 아니다.
 

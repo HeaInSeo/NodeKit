@@ -38,15 +38,28 @@ namespace NodeKit.Cli
         private const string SchemaVersionProperty = "SchemaVersion";
 
         public static bool TryLoad<T>(string path, JsonSerializerOptions options, out T? document, out AuthoringLoadError? error)
+            where T : class =>
+            TryLoad(path, options, out document, out error, out _);
+
+        /// <summary>
+        /// 위와 같지만 파싱한 바로 그 파일 bytes도 돌려준다 — source snapshot이 다시 읽은
+        /// 다른 내용이 아니라 실제로 검증·렌더한 입력과 같은 bytes를 고정하게 한다.
+        /// </summary>
+        public static bool TryLoad<T>(string path, JsonSerializerOptions options, out T? document, out AuthoringLoadError? error, out byte[]? rawBytes)
             where T : class
         {
             document = null;
             error = null;
+            rawBytes = null;
 
             string content;
             try
             {
-                content = File.ReadAllText(path);
+                rawBytes = File.ReadAllBytes(path);
+
+                // File.ReadAllText와 같은 해석(BOM 감지, 기본 UTF-8)을 같은 bytes에 적용한다.
+                using var reader = new StreamReader(new MemoryStream(rawBytes), detectEncodingFromByteOrderMarks: true);
+                content = reader.ReadToEnd();
             }
             catch (UnauthorizedAccessException ex)
             {
@@ -105,9 +118,13 @@ namespace NodeKit.Cli
         /// RecipeDocument 전용: 공통 loader + Normalize + BuildKind 확인.
         /// validate/render/submit이 같은 분류를 쓰도록 여기 한 곳에 둔다.
         /// </summary>
-        public static bool TryLoadRecipe(string path, JsonSerializerOptions options, out RecipeDocument? recipe, out AuthoringLoadError? error)
+        public static bool TryLoadRecipe(string path, JsonSerializerOptions options, out RecipeDocument? recipe, out AuthoringLoadError? error) =>
+            TryLoadRecipe(path, options, out recipe, out error, out _);
+
+        /// <summary>위와 같지만 파싱한 파일 bytes도 돌려준다(submit의 source snapshot용).</summary>
+        public static bool TryLoadRecipe(string path, JsonSerializerOptions options, out RecipeDocument? recipe, out AuthoringLoadError? error, out byte[]? rawBytes)
         {
-            if (!TryLoad(path, options, out recipe, out error))
+            if (!TryLoad(path, options, out recipe, out error, out rawBytes))
             {
                 return false;
             }

@@ -24,7 +24,7 @@ namespace NodeKit.Cli
             "사용법:\n" +
             "  nodekit validate <recipe.json> [--strict-reproducible]\n" +
             "  nodekit render <recipe.json> --out <build-request.json> [--format build-request|raw-spec] [--pretty] [--strict-reproducible]\n" +
-            "  nodekit submit <recipe.json> [--url <url>] [--connect-timeout <seconds>] [--watch-timeout <duration>] [--format human|jsonl] [--strict-reproducible]\n" +
+            "  nodekit submit <recipe.json> [--url <url>] [--receipt <path>] [--connect-timeout <seconds>] [--watch-timeout <duration>] [--format human|jsonl] [--strict-reproducible]\n" +
             "  nodekit recipe create [<recipe.json>] [--method ...] [--non-interactive ...]\n" +
             "  nodekit function-recipe create [<path>] --tool-spec-digest <digest> --base-tool-image-digest <digest> [--non-interactive --field Name=Value ...]\n" +
             "  nodekit function-recipe validate <path>\n" +
