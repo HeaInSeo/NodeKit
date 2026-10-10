@@ -72,6 +72,72 @@ namespace NodeKit.Grpc
             return ResolveAndBuildCoreAsync(toolName, version, rawSpec, options, cancellationToken);
         }
 
+        public async Task CancelBuildAsync(string buildId, CancellationToken cancellationToken = default)
+        {
+            await _client.CancelToolBuildAsync(
+                new CancelToolBuildRequest { BuildId = buildId, Reason = "user cancelled (Ctrl-C)" },
+                cancellationToken: cancellationToken);
+        }
+
+        internal static BuildEvent MapWatchEvent(Nodevault.V1.BuildEvent ev)
+        {
+            // WatchToolBuild은 모든 이벤트를 LOG 종류로 보낸다.
+            // status 필드(buildstate.Status 그대로, PascalCase)로 terminal 상태를
+            // 판별해 적절한 Kind로 변환한다.
+            var kind = ev.Status switch
+            {
+                "Succeeded" => BuildEventKind.Succeeded,
+                "Failed" => BuildEventKind.Failed,
+                "Interrupted" => BuildEventKind.Failed,
+                _ => MapProtoKind(ev.Kind),
+            };
+
+            return new BuildEvent
+            {
+                Kind = kind,
+                Message = ev.Message,
+                Timestamp = SafeFromUnixTimeMilliseconds(ev.Timestamp),
+                Digest = ev.Digest,
+                BuildId = ev.BuildId,
+                Status = ev.Status,
+                ImageRef = ev.ImageRef,
+                ImageDigest = ev.ImageDigest,
+                SpecReferrerDigest = ev.SpecReferrerDigest,
+                IntegrityHealth = ev.IntegrityHealth,
+            };
+        }
+
+        // 리뷰 지적: ev.Timestamp는 서버가 보내는 자유 형식 int64라 형식 계약이
+        // 없다 — 오늘은 NodeVault가 항상 now.UnixMilli()를 보내서 안전하지만,
+        // 값이 DateTimeOffset이 표현 가능한 범위(대략 서기 1~9999년)를 벗어나면
+        // FromUnixTimeMilliseconds가 ArgumentOutOfRangeException을 던져서 이
+        // 이벤트 하나 때문에 WatchToolBuild 스트림 전체(진행 중인 빌드 관찰)가
+        // 중단됐다. Timestamp는 진단/표시용이라 정확성이 필수는 아니므로,
+        // 파싱 실패 시 "지금"으로 안전하게 대체한다.
+        private static DateTime SafeFromUnixTimeMilliseconds(long unixMilliseconds)
+        {
+            try
+            {
+                return DateTimeOffset.FromUnixTimeMilliseconds(unixMilliseconds).UtcDateTime;
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                return DateTime.UtcNow;
+            }
+        }
+
+        private static BuildEventKind MapProtoKind(Nodevault.V1.BuildEventKind kind) => kind switch
+        {
+            Nodevault.V1.BuildEventKind.Log => BuildEventKind.Log,
+            Nodevault.V1.BuildEventKind.JobCreated => BuildEventKind.JobCreated,
+            Nodevault.V1.BuildEventKind.JobRunning => BuildEventKind.JobRunning,
+            Nodevault.V1.BuildEventKind.PushSucceeded => BuildEventKind.RegistryPushSucceeded,
+            Nodevault.V1.BuildEventKind.DigestAcquired => BuildEventKind.DigestAcquired,
+            Nodevault.V1.BuildEventKind.Succeeded => BuildEventKind.Succeeded,
+            Nodevault.V1.BuildEventKind.Failed => BuildEventKind.Failed,
+            _ => BuildEventKind.Log,
+        };
+
         private async IAsyncEnumerable<BuildEvent> ResolveAndBuildCoreAsync(
             string toolName,
             string version,
@@ -156,7 +222,7 @@ namespace NodeKit.Grpc
                 Exception? storeEx = null;
                 try
                 {
-                    await beforeSubmit(basis, cancellationToken);
+                    await beforeSubmit(basis, cancellationToken).ConfigureAwait(false);
                 }
 #pragma warning disable CA1031 // a failed durable store must surface as a Failed event before any Submit, not crash the caller
                 catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
@@ -230,71 +296,5 @@ namespace NodeKit.Grpc
                 yield return MapWatchEvent(watchCall.ResponseStream.Current);
             }
         }
-
-        public async Task CancelBuildAsync(string buildId, CancellationToken cancellationToken = default)
-        {
-            await _client.CancelToolBuildAsync(
-                new CancelToolBuildRequest { BuildId = buildId, Reason = "user cancelled (Ctrl-C)" },
-                cancellationToken: cancellationToken);
-        }
-
-        internal static BuildEvent MapWatchEvent(Nodevault.V1.BuildEvent ev)
-        {
-            // WatchToolBuild은 모든 이벤트를 LOG 종류로 보낸다.
-            // status 필드(buildstate.Status 그대로, PascalCase)로 terminal 상태를
-            // 판별해 적절한 Kind로 변환한다.
-            var kind = ev.Status switch
-            {
-                "Succeeded" => BuildEventKind.Succeeded,
-                "Failed" => BuildEventKind.Failed,
-                "Interrupted" => BuildEventKind.Failed,
-                _ => MapProtoKind(ev.Kind),
-            };
-
-            return new BuildEvent
-            {
-                Kind = kind,
-                Message = ev.Message,
-                Timestamp = SafeFromUnixTimeMilliseconds(ev.Timestamp),
-                Digest = ev.Digest,
-                BuildId = ev.BuildId,
-                Status = ev.Status,
-                ImageRef = ev.ImageRef,
-                ImageDigest = ev.ImageDigest,
-                SpecReferrerDigest = ev.SpecReferrerDigest,
-                IntegrityHealth = ev.IntegrityHealth,
-            };
-        }
-
-        // 리뷰 지적: ev.Timestamp는 서버가 보내는 자유 형식 int64라 형식 계약이
-        // 없다 — 오늘은 NodeVault가 항상 now.UnixMilli()를 보내서 안전하지만,
-        // 값이 DateTimeOffset이 표현 가능한 범위(대략 서기 1~9999년)를 벗어나면
-        // FromUnixTimeMilliseconds가 ArgumentOutOfRangeException을 던져서 이
-        // 이벤트 하나 때문에 WatchToolBuild 스트림 전체(진행 중인 빌드 관찰)가
-        // 중단됐다. Timestamp는 진단/표시용이라 정확성이 필수는 아니므로,
-        // 파싱 실패 시 "지금"으로 안전하게 대체한다.
-        private static DateTime SafeFromUnixTimeMilliseconds(long unixMilliseconds)
-        {
-            try
-            {
-                return DateTimeOffset.FromUnixTimeMilliseconds(unixMilliseconds).UtcDateTime;
-            }
-            catch (ArgumentOutOfRangeException)
-            {
-                return DateTime.UtcNow;
-            }
-        }
-
-        private static BuildEventKind MapProtoKind(Nodevault.V1.BuildEventKind kind) => kind switch
-        {
-            Nodevault.V1.BuildEventKind.Log => BuildEventKind.Log,
-            Nodevault.V1.BuildEventKind.JobCreated => BuildEventKind.JobCreated,
-            Nodevault.V1.BuildEventKind.JobRunning => BuildEventKind.JobRunning,
-            Nodevault.V1.BuildEventKind.PushSucceeded => BuildEventKind.RegistryPushSucceeded,
-            Nodevault.V1.BuildEventKind.DigestAcquired => BuildEventKind.DigestAcquired,
-            Nodevault.V1.BuildEventKind.Succeeded => BuildEventKind.Succeeded,
-            Nodevault.V1.BuildEventKind.Failed => BuildEventKind.Failed,
-            _ => BuildEventKind.Log,
-        };
     }
 }
