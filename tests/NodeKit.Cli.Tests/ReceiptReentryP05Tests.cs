@@ -176,9 +176,9 @@ namespace NodeKit.Cli.Tests
             Assert.Contains("step 1", secondStdout, StringComparison.Ordinal);
             Assert.Equal(OperationPhase.Terminal, ReadReceipt(receiptPath).Phase);
 
-            Assert.Equal(0, CliApp.Run(new[] { "receipt", "--help" }, new StringWriter(), new StringWriter()));
             using var help = new StringWriter();
-            CliApp.Run(new[] { "receipt", "--help" }, help, new StringWriter());
+            using var helpErr = new StringWriter();
+            Assert.Equal(0, CliApp.Run(new[] { "receipt", "--help" }, help, helpErr));
             Assert.Contains("이전 관찰 위치를 이어받거나 이벤트를 한 번만 보여 준다고 보장하지 않습니다", help.ToString(), StringComparison.Ordinal);
         }
 
@@ -337,13 +337,14 @@ namespace NodeKit.Cli.Tests
         public void CliApp_RoutesReceipt_UsageErrorsExitTwo()
         {
             var receiptPath = CreateSubmitInFlightReceipt();
+            using var stdout = new StringWriter();
             using var stderr = new StringWriter();
 
-            Assert.Equal(2, CliApp.Run(new[] { "receipt", "watch", receiptPath }, new StringWriter(), stderr));
+            Assert.Equal(2, CliApp.Run(new[] { "receipt", "watch", receiptPath }, stdout, stderr));
             Assert.Contains(ToolSpecOperationRunner.NotResumableCode, stderr.ToString(), StringComparison.Ordinal);
-            Assert.Equal(2, CliApp.Run(new[] { "receipt", "replay-later", receiptPath }, new StringWriter(), new StringWriter()));
-            Assert.Equal(2, CliApp.Run(new[] { "receipt", "watch" }, new StringWriter(), new StringWriter()));
-            Assert.Equal(2, CliApp.Run(new[] { "receipt", "watch", receiptPath, "--url", "http://x" }, new StringWriter(), new StringWriter()));
+            Assert.Equal(2, CliApp.Run(new[] { "receipt", "replay-later", receiptPath }, stdout, stderr));
+            Assert.Equal(2, CliApp.Run(new[] { "receipt", "watch" }, stdout, stderr));
+            Assert.Equal(2, CliApp.Run(new[] { "receipt", "watch", receiptPath, "--url", "http://x" }, stdout, stderr));
         }
 
         [Fact]
@@ -423,7 +424,9 @@ namespace NodeKit.Cli.Tests
         private int Submit(GrpcTestServer server)
         {
             using var client = new GrpcToolSpecClient(server.Channel);
-            return SubmitCommand.Run(new[] { "submit", WriteRecipe() }, new StringWriter(), new StringWriter(), client, () => FixedRequestId);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            return SubmitCommand.Run(new[] { "submit", WriteRecipe() }, stdout, stderr, client, () => FixedRequestId);
         }
 
         private string DefaultReceiptPath() => Path.Join(_workDir, ".nodekit", "receipts", FixedRequestId + ".json");

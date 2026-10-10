@@ -25,6 +25,7 @@ namespace NodeKit.Cli.Operations
         // 사용자가 기다리는 명시적 취소라도 서버/네트워크가 응답하지 않으면 제어를 돌려줘야 한다.
         private static readonly TimeSpan _cancelRequestTimeout = TimeSpan.FromSeconds(5);
 
+        /// <summary>receipt 하위 명령을 실행하고 CLI 종료 코드를 돌려준다.</summary>
         /// <param name="toolSpecClient">테스트 전용 client. 없으면 receipt endpoint로 연결한다.</param>
         /// <param name="cancellationToken">테스트 전용 사용자 취소 신호(Ctrl-C와 같은 경로).</param>
         public static int Run(
