@@ -138,9 +138,27 @@ namespace NodeKit.Cli
                 var method = PromptManualMethodChoice(console);
                 if (method is not null)
                 {
+                    PrintManualChoiceSummary(method.Value, recommendation.RecommendedMethod, console);
                     return method.Value;
                 }
             }
+        }
+
+        // 추천과 다르게 직접 고른 경우에도 어떤 방식이 왜/어떻게 선택됐는지 남긴다(S1-01-C03).
+        private static void PrintManualChoiceSummary(RecipeMethodId method, RecipeMethodId? recommended, IRecipeConsole console)
+        {
+            console.WriteLine();
+            console.WriteLine($"선택한 작성 방식: {RecipeMethodCatalog.For(method).Label.Get("ko")}");
+            console.WriteLine(recommended is { } r && r != method
+                ? $"선택 이유: 추천({RecipeMethodCatalog.For(r).Label.Get("ko")})을 사용하지 않고 목록에서 직접 선택했습니다."
+                : "선택 이유: 목록에서 직접 선택했습니다.");
+            console.WriteLine("이 방식으로 만들면:");
+            foreach (var effect in _effects[method])
+            {
+                console.WriteLine($"  - {effect}");
+            }
+
+            console.WriteLine();
         }
 
         /// <summary>
