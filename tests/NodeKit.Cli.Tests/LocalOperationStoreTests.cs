@@ -179,15 +179,20 @@ namespace NodeKit.Cli.Tests
         }
 
         [Theory]
-        [InlineData(OperationWriteKind.Receipt, AtomicWriteStage.Replace)]
-        [InlineData(OperationWriteKind.Receipt, AtomicWriteStage.Write)]
-        [InlineData(OperationWriteKind.ResolvedSnapshot, AtomicWriteStage.Flush)]
-        public async Task S2_02_C03_InFlightWriteFails_AfterResolve_ExitTwo_SubmitZero(OperationWriteKind kind, AtomicWriteStage stage)
+        [InlineData("receipt_replace")]
+        [InlineData("receipt_write")]
+        [InlineData("resolved_snapshot_flush")]
+        public async Task S2_02_C03_InFlightWriteFails_AfterResolve_ExitTwo_SubmitZero(string fault)
         {
             using var server = NewServer();
             var store = NewStore();
             using var handle = CreatePrepared(store, FixedRequestId);
-            store.BeforeWriteStage = FailOn(kind, kind == OperationWriteKind.Receipt ? OperationPhase.SubmitInFlight : null, stage);
+            store.BeforeWriteStage = fault switch
+            {
+                "receipt_replace" => FailOn(OperationWriteKind.Receipt, OperationPhase.SubmitInFlight, AtomicWriteStage.Replace),
+                "receipt_write" => FailOn(OperationWriteKind.Receipt, OperationPhase.SubmitInFlight, AtomicWriteStage.Write),
+                _ => FailOn(OperationWriteKind.ResolvedSnapshot, null, AtomicWriteStage.Flush),
+            };
 
             var result = await RunAsync(server, handle);
 
