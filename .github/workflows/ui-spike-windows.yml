@@ -1,0 +1,107 @@
+name: UI Spike Windows Renderer Probe
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "App.axaml.cs"
+      - "UI/Spikes/**"
+      - "docs/console-ui/**"
+      - ".github/workflows/ui-spike-windows.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  windows-render-probe:
+    if: startsWith(github.head_ref, 'ux/console-avalonia-v16-spike')
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore NodeKit.sln --locked-mode
+
+      - name: Build spike
+        run: dotnet build NodeKit.csproj --no-restore --configuration Release /p:TreatWarningsAsErrors=true /p:EnforceCodeStyleInBuild=true
+
+      - name: Capture Windows renderer probes
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path 'TestResults/UI-Spike-Windows' | Out-Null
+
+          function Invoke-Capture([string]$Name) {
+            dotnet run --project NodeKit.csproj --no-build --configuration Release
+            if ($LASTEXITCODE -ne 0) {
+              throw "Capture $Name failed with exit code $LASTEXITCODE"
+            }
+          }
+
+          function Set-BaseCapture([string]$Name, [int]$Width, [int]$Height) {
+            $env:NODEKIT_UI_SPIKE = 'v16'
+            $env:NODEKIT_UI_CAPTURE = "TestResults/UI-Spike-Windows/$Name.png"
+            $env:NODEKIT_UI_CAPTURE_WIDTH = "$Width"
+            $env:NODEKIT_UI_CAPTURE_HEIGHT = "$Height"
+            Remove-Item Env:NODEKIT_UI_CAPTURE_FOCUS -ErrorAction SilentlyContinue
+          }
+
+          function Capture-Frame([string]$Name, [int]$Width, [int]$Height) {
+            Set-BaseCapture $Name $Width $Height
+            Remove-Item Env:NODEKIT_UI_CAPTURE_MIN_WIDTH -ErrorAction SilentlyContinue
+            Remove-Item Env:NODEKIT_UI_CAPTURE_MIN_HEIGHT -ErrorAction SilentlyContinue
+            Invoke-Capture $Name
+          }
+
+          function Capture-Unclamped([string]$Name, [int]$Width, [int]$Height) {
+            Set-BaseCapture $Name $Width $Height
+            $env:NODEKIT_UI_CAPTURE_MIN_WIDTH = '0'
+            $env:NODEKIT_UI_CAPTURE_MIN_HEIGHT = '0'
+            Invoke-Capture $Name
+          }
+
+          function Capture-Focus([string]$Name, [string]$FocusTarget) {
+            Set-BaseCapture $Name 980 600
+            Remove-Item Env:NODEKIT_UI_CAPTURE_MIN_WIDTH -ErrorAction SilentlyContinue
+            Remove-Item Env:NODEKIT_UI_CAPTURE_MIN_HEIGHT -ErrorAction SilentlyContinue
+            $env:NODEKIT_UI_CAPTURE_FOCUS = $FocusTarget
+            Invoke-Capture $Name
+          }
+
+          Capture-Frame 'windows_runner_1093x614' 1093 614
+          Capture-Frame 'windows_runner_1280x720' 1280 720
+          Capture-Frame 'windows_runner_980x600' 980 600
+
+          # Capture-only stress sizes below the current 980x600 hypothesis.
+          Capture-Unclamped 'windows_stress_980x560' 980 560
+          Capture-Unclamped 'windows_stress_900x560' 900 560
+          Capture-Unclamped 'windows_stress_900x520' 900 520
+
+          # Native-render focus probes for the protocol's keyboard evidence.
+          Capture-Focus 'windows_focus_center_980x600' 'center-input'
+          Capture-Focus 'windows_focus_activity_980x600' 'activity'
+
+          @'
+          These captures are produced by Avalonia on the GitHub-hosted Windows runner.
+          JSON siblings record the runner's actual Avalonia Screen Bounds, WorkingArea, Scaling, and requested focus target.
+          They are useful for Windows font fallback/rendering, keyboard-focus visibility, and platform-layout comparison.
+          RenderTargetBitmap captures the Avalonia client visual; it is not a screenshot of native title-bar chrome.
+          The *_stress_* frames use capture-only MinWidth/MinHeight overrides and do not change normal startup behavior.
+          The hosted runner's scaling is not assumed to equal 125% or 150%, so these frames do NOT replace
+          the required native Windows device evidence at 1366x768@125% and 1920x1080@150%.
+          '@ | Set-Content -Path 'TestResults/UI-Spike-Windows/README.txt' -Encoding utf8
+
+      - name: Upload Windows renderer probes
+        uses: actions/upload-artifact@v7
+        with:
+          name: v16-avalonia-windows-renderer-probes
+          path: TestResults/UI-Spike-Windows/*
+          if-no-files-found: error
