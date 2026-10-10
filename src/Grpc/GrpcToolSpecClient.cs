@@ -17,6 +17,9 @@ namespace NodeKit.Grpc
     /// </summary>
     internal sealed class GrpcToolSpecClient : IToolSpecBuildClient, IDisposable
     {
+        /// <summary>ResolveToolSpec 성공 로그의 고정 앞부분 — 뒤에 전체 ToolSpec digest가 붙는다.</summary>
+        internal const string ToolSpecDigestLogPrefix = "spec 해결 완료 — ToolSpec digest: ";
+
         private readonly GrpcChannel? _channel;
         private readonly BuildService.BuildServiceClient _client;
         private bool _disposed;
@@ -96,10 +99,15 @@ namespace NodeKit.Grpc
                 yield break;
             }
 
+            // S1-07-C05: function-recipe create --tool-spec-digest에 그대로 복사할 수
+            // 있도록 서버가 확정한 ToolSpec digest를 자르지 않고 남긴다. 빌드된
+            // image digest와 다른 값이므로 "ToolSpec digest:" 라벨로 구분한다.
+            // 자동화는 문구가 아니라 ToolSpecDigest 필드(jsonl의 tool_spec_digest)를 읽는다.
             yield return new BuildEvent
             {
                 Kind = BuildEventKind.Log,
-                Message = $"spec 해결 완료 (digest: {resolveResp!.ToolSpecDigest[..Math.Min(16, resolveResp.ToolSpecDigest.Length)]}...)",
+                Message = $"{ToolSpecDigestLogPrefix}{resolveResp!.ToolSpecDigest}",
+                ToolSpecDigest = resolveResp.ToolSpecDigest,
             };
 
             // Step 2: SubmitToolBuild — 비동기 빌드를 큐에 넣는다.

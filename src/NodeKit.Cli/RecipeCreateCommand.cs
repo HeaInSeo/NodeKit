@@ -193,6 +193,13 @@ namespace NodeKit.Cli
                 stderr.WriteLine($"권장 필드가 비어 있습니다 (계속 진행합니다): {warningField}");
             }
 
+            // 대화형은 Command 단계를 안내만 하고 건너뛴다. --field Command=...는 값을
+            // 저장하지만 submit raw_spec에는 가지 않으므로 같은 안내를 경고로 남긴다(S1-07-C05).
+            if (setFieldNames.Contains("Command"))
+            {
+                stderr.WriteLine($"경고: {RecipeCreateFlow.CommandPortGuidance}");
+            }
+
             if (!session.IsComplete)
             {
                 stderr.WriteLine($"필수 필드가 누락되었습니다: {string.Join(", ", session.Snapshot().MissingRequiredFields)}");

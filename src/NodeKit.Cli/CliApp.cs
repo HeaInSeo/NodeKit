@@ -46,7 +46,7 @@ namespace NodeKit.Cli
             "사용법: nodekit render <recipe.json> --out <build-request.json> [--format build-request|raw-spec] [--pretty] [--strict-reproducible]";
 
         private const string RenderUsageLine2 =
-            "  (로컬 미리보기 전용 — 네트워크 호출 없음. --format 기본값 build-request는 submit의 입력이 아님, raw-spec은 실제 submit이 ResolveToolSpec에 보내는 ToolSpecRequest의 raw_spec 필드 값과 동일(tool_name/version/requested_at 등 나머지 필드는 포함 안 함). raw-spec은 기본적으로 실제 전송 payload와 동일한 한 줄 JSON — 사람이 읽기 편하게 보려면 --pretty. 실제 제출은 nodekit submit <recipe.json>)";
+            "  (로컬 미리보기 전용 — 네트워크 호출 없음. --format 기본값 build-request는 submit의 입력이 아님, raw-spec은 실제 submit이 ResolveToolSpec에 보내는 ToolSpecRequest의 raw_spec 필드 값과 동일(tool_name/version/requested_at 등 나머지 필드는 포함 안 함). raw-spec은 기본적으로 실제 전송 payload와 동일한 한 줄 JSON — 사람이 읽기 편하게 보려면 --pretty. Command/Inputs/Outputs/Display* 필드는 build-request 미리보기에만 있고 raw_spec에는 포함되지 않음 — 포트/명령은 nodekit function-recipe create. 실제 제출은 nodekit submit <recipe.json>)";
 
         private const string RecipeCreateUsage = "사용법: nodekit recipe create [<recipe.json>] [--method ...] [--non-interactive ...]";
 

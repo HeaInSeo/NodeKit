@@ -841,11 +841,20 @@ nodekit submit recipe.json
 
 ```
 [빌드 시작] 신규 경로 (ToolSpec)
-spec 해결 완료 (digest: 8f3a1c2d...)
-빌드 제출됨 (build ID: abc-123)
+[로그] spec 해결 완료 — ToolSpec digest: 8f3a1c2d…(서버가 준 전체 값)
+[빌드 시작] 빌드 제출됨 (build ID: abc-123)
 ...
 [성공] 빌드가 완료되었습니다.
+이미지 digest: harbor.example/tools/bwa@sha256:…
 ```
+
+`ToolSpec digest:` 뒤의 값은 서버가 확정한 전체 ToolSpec digest이고(잘라서
+보여주지 않는다), 마지막 `이미지 digest:` 줄은 빌드된 image의 digest다 — 서로
+다른 값이다. `nodekit function-recipe create`의 `--tool-spec-digest`에는 앞의 값을,
+`--base-tool-image-digest`에는 뒤 줄의 digest(`ref@` 뒤 부분)를 그대로 복사한다.
+`--format jsonl`에서는 두 값 모두 구조화된 필드로 나온다 — 성공 `completed`
+레코드의 `tool_spec_digest`(ToolSpec digest)와 `image_digest`(빌드된 image
+digest)를 그대로 쓴다. `message` 문구를 파싱하지 않는다.
 
 | 옵션 | 의미 |
 |---|---|
@@ -870,6 +879,8 @@ stdout에는 진행/안내 문구가 전혀 섞이지 않고 JSON 레코드만 �
   생략되고 `completed`에 `build_id`가 바로 담긴다 — `build_id` 자체는 항상
   보존되지만 "`submitted` 다음에 `completed`" 순서가 매번 보장되지는 않는다.
 - `state` — 그 이후 진행 상황(빌드 상태, 이미지 참조/digest, integrity health 등).
+  ToolSpec을 해결한 직후(build ID를 받기 전)의 `state` 레코드에는 서버가 확정한
+  전체 ToolSpec digest가 `tool_spec_digest` 필드로 실린다.
 - `completed` — **스트림의 마지막 레코드, 항상 정확히 한 번**. 성공/실패/
   `--connect-timeout`/`--watch-timeout`/Ctrl-C 취소/terminal 이벤트 없는 스트림
   종료 전부 `type: "completed"`로 통일된다(별도 `"error"` type 없음) — 소비하는
@@ -879,7 +890,9 @@ stdout에는 진행/안내 문구가 전혀 섞이지 않고 JSON 레코드만 �
 모든 레코드는 `schema_version: "nodekit.submit.v1"`을 포함한다. `build_id`는
 모든 레코드에서 optional이다 — `--connect-timeout`처럼 build ID를 받기 전에
 끝나는 실패도 있기 때문. `status`/`error_code`는 `completed`에만 있고,
-`error_code`는 실패(`status != "Succeeded"`)일 때만 붙는다. 종료 코드 계약은
+`error_code`는 실패(`status != "Succeeded"`)일 때만 붙는다. `tool_spec_digest`는
+spec 해결 `state` 레코드와 성공(`Succeeded`) `completed` 레코드에만 있고,
+`image_digest`와 다른 값이다. 종료 코드 계약은
 `--format human`과 동일하다(0/1/2/124/125/130). 제출 이전(로컬)에 확정 실패하는
 경우 — 주소 누락, recipe 읽기/파싱 실패, buildKind 누락, L1 검증 실패,
 잘못된 `--url` 등 — 도 `completed` 레코드를 정확히 한 번 내보낸다(exit 1 또는
@@ -902,10 +915,11 @@ stdout에는 진행/안내 문구가 전혀 섞이지 않고 JSON 레코드만 �
 
 ```bash
 $ nodekit submit recipe.json --format jsonl
+{"schema_version":"nodekit.submit.v1","type":"state","state":"Log","message":"spec 해결 완료 — ToolSpec digest: 8f3a1c2d...","tool_spec_digest":"8f3a1c2d..."}
 {"schema_version":"nodekit.submit.v1","type":"submitted","build_id":"abc-123"}
 {"schema_version":"nodekit.submit.v1","type":"state","build_id":"abc-123","state":"Building"}
 {"schema_version":"nodekit.submit.v1","type":"state","build_id":"abc-123","state":"Pushing"}
-{"schema_version":"nodekit.submit.v1","type":"completed","build_id":"abc-123","status":"Succeeded","image_digest":"sha256:...","recovery":"none"}
+{"schema_version":"nodekit.submit.v1","type":"completed","build_id":"abc-123","status":"Succeeded","tool_spec_digest":"8f3a1c2d...","image_digest":"sha256:...","recovery":"none"}
 $ echo $?
 0
 ```
@@ -1026,6 +1040,17 @@ $ echo $?
   **`raw_spec` 필드 값만**(나머지 세 필드는 포함하지 않음) 동일한
   `ToolSpecRawSpecFactory` 함수로 만들어 미리보기로 찍는다 — 네트워크 호출
   없이 실제 submit이 raw_spec으로 뭘 보내는지 확인하고 싶을 때 쓴다.
+  키는 정확히 `tool_name`, `version`, `kind`(항상 `1`), `image_uri`,
+  `dockerfile_content`, `script`, `environment_spec` 7개다.
+
+Recipe의 `Command`/`Inputs`/`Outputs`/`Display*` 필드는 `build-request`
+미리보기에만 나오고 `raw_spec`에는 들어가지 않는다 — NodeVault가 ToolSpec
+스키마에서 뺀 필드다. 포트와 실행 명령은 ToolSpec 빌드가 확정된 뒤
+`nodekit function-recipe create --tool-spec-digest <ToolSpec digest> --base-tool-image-digest <빌드된 image digest>`로
+작성한다(두 digest 모두 필수). 두 값을 `nodekit submit` 출력의 어디서 복사하는지는
+위 `nodekit submit` 절을 본다.
+`recipe create`의 대화형 흐름은 이 단계를 안내만 하고 건너뛰며,
+`--non-interactive --field Command=...`는 값을 저장하되 같은 안내를 경고로 출력한다.
 
 `--format` 값은 대소문자와 `_`/`-`를 구분하지 않는다(`RAW-SPEC`, `raw_spec`
 모두 `raw-spec`으로 인식) — 그래도 안 맞으면 종료 코드 2로 명시적으로
@@ -1058,10 +1083,12 @@ $ cat build-request.json
   "ToolName": "bwa",
   "Version": "0.7.17",
   "ImageUri": "registry.example.com/bwa:0.7.17@sha256:...",
-  "DockerfileContent": "FROM registry.example.com/bwa:0.7.17@sha256:...\nRUN echo ok\n",
+  "DockerfileContent": "FROM registry.example.com/bwa:0.7.17@sha256:...\nRUN echo ok\nUSER 1000\n",
   "Script": "bwa mem",
   "Command": [],
   "EnvironmentSpec": "",
+  "Inputs": [],
+  "Outputs": [],
   "DisplayLabel": "",
   "DisplayDescription": "",
   "DisplayCategory": "",
@@ -1084,7 +1111,7 @@ ls: cannot access 'build-request.json': No such file or directory
 
 ```bash
 $ nodekit render recipe.json --out - --format raw-spec
-{"tool_name":"bwa","version":"0.7.17","kind":1,"image_uri":"registry.example.com/bwa:0.7.17@sha256:...","dockerfile_content":"FROM registry.example.com/bwa:0.7.17@sha256:...\nRUN echo ok\n","script":"bwa mem","environment_spec":""}
+{"tool_name":"bwa","version":"0.7.17","kind":1,"image_uri":"registry.example.com/bwa:0.7.17@sha256:...","dockerfile_content":"FROM registry.example.com/bwa:0.7.17@sha256:...\nRUN echo ok\nUSER 1000\n","script":"bwa mem","environment_spec":""}
 ```
 
 `--pretty`를 같이 쓰면 같은 내용을 들여쓰기해서 찍는다(긴 Dockerfile 내용이
@@ -1097,7 +1124,7 @@ $ nodekit render recipe.json --out - --format raw-spec --pretty
   "version": "0.7.17",
   "kind": 1,
   "image_uri": "registry.example.com/bwa:0.7.17@sha256:...",
-  "dockerfile_content": "FROM registry.example.com/bwa:0.7.17@sha256:...\nRUN echo ok\n",
+  "dockerfile_content": "FROM registry.example.com/bwa:0.7.17@sha256:...\nRUN echo ok\nUSER 1000\n",
   "script": "bwa mem",
   "environment_spec": ""
 }

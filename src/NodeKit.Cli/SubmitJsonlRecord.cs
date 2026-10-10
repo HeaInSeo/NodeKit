@@ -49,6 +49,13 @@ namespace NodeKit.Cli
         [JsonPropertyName("message")]
         public string? Message { get; init; }
 
+        // ResolveToolSpec이 확정한 전체 ToolSpec digest — image_digest(빌드된
+        // image)와 다른 값이다. spec 해결 state 레코드와 성공 completed
+        // 레코드에 실린다. function-recipe create --tool-spec-digest 입력용.
+        // 추가 optional 필드(하위 호환).
+        [JsonPropertyName("tool_spec_digest")]
+        public string? ToolSpecDigest { get; init; }
+
         [JsonPropertyName("image_ref")]
         public string? ImageRef { get; init; }
 
@@ -73,13 +80,15 @@ namespace NodeKit.Cli
             string? message = null,
             string? imageRef = null,
             string? imageDigest = null,
-            string? integrityHealth = null) =>
+            string? integrityHealth = null,
+            string? toolSpecDigest = null) =>
             new()
             {
                 Type = "state",
                 BuildId = string.IsNullOrEmpty(buildId) ? null : buildId,
                 State = string.IsNullOrEmpty(state) ? null : state,
                 Message = string.IsNullOrEmpty(message) ? null : message,
+                ToolSpecDigest = string.IsNullOrEmpty(toolSpecDigest) ? null : toolSpecDigest,
                 ImageRef = string.IsNullOrEmpty(imageRef) ? null : imageRef,
                 ImageDigest = string.IsNullOrEmpty(imageDigest) ? null : imageDigest,
                 IntegrityHealth = string.IsNullOrEmpty(integrityHealth) ? null : integrityHealth,
@@ -95,7 +104,8 @@ namespace NodeKit.Cli
             string? integrityHealth = null,
             string? phase = null,
             string? remoteBuildState = null,
-            RecoveryDisposition? recovery = null) =>
+            RecoveryDisposition? recovery = null,
+            string? toolSpecDigest = null) =>
             new()
             {
                 Type = "completed",
@@ -103,6 +113,7 @@ namespace NodeKit.Cli
                 BuildId = string.IsNullOrEmpty(buildId) ? null : buildId,
                 ErrorCode = errorCode,
                 Message = string.IsNullOrEmpty(message) ? null : message,
+                ToolSpecDigest = string.IsNullOrEmpty(toolSpecDigest) ? null : toolSpecDigest,
                 ImageRef = string.IsNullOrEmpty(imageRef) ? null : imageRef,
                 ImageDigest = string.IsNullOrEmpty(imageDigest) ? null : imageDigest,
                 IntegrityHealth = string.IsNullOrEmpty(integrityHealth) ? null : integrityHealth,

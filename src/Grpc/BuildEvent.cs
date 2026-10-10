@@ -20,6 +20,9 @@ namespace NodeKit.Grpc
         /// <summary>빌드 Job의 현재 상태 문자열 (예: Running, Succeeded).</summary>
         public string Status { get; set; } = string.Empty;
 
+        /// <summary>ResolveToolSpec이 확정한 전체 ToolSpec digest. spec 해결 이벤트에만 채워진다 — 빌드된 ImageDigest와 다른 값.</summary>
+        public string ToolSpecDigest { get; set; } = string.Empty;
+
         // WatchToolBuild(ToolSpec 경로) 전용 필드. 이 경로는 Kind가 항상 LOG이고
         // 위 Digest/DIGEST_ACQUIRED는 절대 채워지지 않는다 — NodeVault Sprint 7
         // P1a(commit 03f5025)가 buildstate.Record를 매 이벤트마다 그대로 실어
