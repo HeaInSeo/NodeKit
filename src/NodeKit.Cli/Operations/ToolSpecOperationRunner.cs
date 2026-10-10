@@ -44,17 +44,34 @@ namespace NodeKit.Cli.Operations
     {
         public const string NotResumableCode = "OPERATION_NOT_RESUMABLE";
 
+        /// <param name="endpoint">client가 실제로 연결된 endpoint. receipt에 저장된 endpoint와
+        /// 다르면 어떤 RPC도 보내기 전에 OPERATION_RECORD_MISMATCH(2)로 멈춘다(S2-02-C05).</param>
         public static async Task<ToolSpecOperationResult> RunAsync(
             OperationHandle handle,
             IToolSpecBuildClient client,
+            string endpoint,
             TimeProvider? timeProvider = null,
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(handle);
             ArgumentNullException.ThrowIfNull(client);
+            ArgumentNullException.ThrowIfNull(endpoint);
             var clock = timeProvider ?? TimeProvider.System;
 
             var start = handle.Receipt;
+            if (!string.Equals(endpoint, start.Endpoint, StringComparison.Ordinal))
+            {
+                // 같은 request ID를 다른 서버로 보내면 저장된 attempt와 다른 요청이 된다.
+                return new ToolSpecOperationResult
+                {
+                    ExitCode = 2,
+                    Code = LocalOperationStore.MismatchCode,
+                    Message = $"저장된 요청(request ID: {start.RequestId})의 endpoint는 {start.Endpoint}인데 지금 연결은 {endpoint}입니다. 아무 요청도 보내지 않았습니다 — 새 요청은 새 attempt로 시작하세요.",
+                    ObservedBuildId = start.BuildId,
+                    Receipt = start,
+                };
+            }
+
             if (start.Phase != OperationPhase.Prepared)
             {
                 // submit_in_flight에서 build_id가 없으면 원격 생성 여부를 알 수 없다 — 같은

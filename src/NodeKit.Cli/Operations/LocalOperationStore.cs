@@ -81,6 +81,24 @@ namespace NodeKit.Cli.Operations
         public static string EnvelopeSha256(OperationEnvelope envelope) =>
             OperationHashing.Sha256Hex(JsonSerializer.SerializeToUtf8Bytes(envelope, _writeOptions));
 
+        /// <summary>
+        /// receipt 경로만으로 그 snapshot이 있는 record root를 정한다 — `receipt watch|cancel|replay
+        /// &lt;receipt.json&gt;`처럼 receipt 경로만 받은 프로세스가 같은 store를 다시 연다.
+        /// `receipts/` 디렉터리 안의 receipt는 그 부모가 root(기본 배치)이고, 그 외 위치의
+        /// receipt는 같은 디렉터리의 `.nodekit`이 root다.
+        /// </summary>
+        public static string RootForReceipt(string receiptPath)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(receiptPath);
+            var directory = Path.GetDirectoryName(Path.GetFullPath(receiptPath))!;
+            var parent = Path.GetDirectoryName(directory);
+            return Path.GetFileName(directory) == "receipts" && parent is not null
+                ? parent
+                : Path.Join(directory, RootDirectoryName);
+        }
+
+        public static LocalOperationStore ForReceipt(string receiptPath) => new(RootForReceipt(receiptPath));
+
         public string DefaultReceiptPath(string requestId) =>
             Path.Join(RootDirectory, "receipts", $"{requestId}.json");
 
@@ -103,6 +121,11 @@ namespace NodeKit.Cli.Operations
             handle = null;
 
             var path = Path.GetFullPath(receiptPath ?? DefaultReceiptPath(requestId));
+            if (RootMismatch(path) is { } rootError)
+            {
+                return rootError;
+            }
+
             if (receiptPath is null && TryEnsureDirectory(Path.GetDirectoryName(path)!) is { } dirError)
             {
                 return dirError;
@@ -158,6 +181,10 @@ namespace NodeKit.Cli.Operations
             ArgumentException.ThrowIfNullOrWhiteSpace(receiptPath);
             handle = null;
             var path = Path.GetFullPath(receiptPath);
+            if (RootMismatch(path) is { } rootError)
+            {
+                return rootError;
+            }
 
             if (TryAcquireLock(path, out var lockStream) is { } lockError)
             {
@@ -186,11 +213,21 @@ namespace NodeKit.Cli.Operations
             return currentSha == receipt.SourceSnapshotSha256 ? SourceBindingStatus.Matches : SourceBindingStatus.Diverged;
         }
 
-        public OperationStoreError? TryReadSourceSnapshot(string sha256, out SourceSnapshot? snapshot) =>
-            TryReadImmutable(SourceSnapshotPath(sha256), sha256, SourceSnapshot.CurrentSchemaVersion, s => s.SchemaVersion, out snapshot);
+        public OperationStoreError? TryReadSourceSnapshot(string sha256, out SourceSnapshot? snapshot)
+        {
+            snapshot = null;
+            return OperationHashing.IsSha256Hex(sha256)
+                ? TryReadImmutable(SourceSnapshotPath(sha256), sha256, SourceSnapshot.CurrentSchemaVersion, s => s.SchemaVersion, out snapshot)
+                : Invalid(RootDirectory, "source snapshot ID가 소문자 SHA-256 hex가 아님");
+        }
 
-        public OperationStoreError? TryReadResolvedSnapshot(string sha256, out ResolvedSnapshot? snapshot) =>
-            TryReadImmutable(ResolvedSnapshotPath(sha256), sha256, ResolvedSnapshot.CurrentSchemaVersion, s => s.SchemaVersion, out snapshot);
+        public OperationStoreError? TryReadResolvedSnapshot(string sha256, out ResolvedSnapshot? snapshot)
+        {
+            snapshot = null;
+            return OperationHashing.IsSha256Hex(sha256)
+                ? TryReadImmutable(ResolvedSnapshotPath(sha256), sha256, ResolvedSnapshot.CurrentSchemaVersion, s => s.SchemaVersion, out snapshot)
+                : Invalid(RootDirectory, "resolved snapshot ID가 소문자 SHA-256 hex가 아님");
+        }
 
         internal string SourceSnapshotPath(string sha256) =>
             Path.Join(RootDirectory, "snapshots", "source", $"{sha256}.json");
@@ -213,6 +250,21 @@ namespace NodeKit.Cli.Operations
 
         private static OperationStoreError Invalid(string path, string reason) =>
             new(InvalidCode, $"operation 기록을 신뢰할 수 없습니다: {path} ({reason}). 아무 요청도 보내지 않았습니다.");
+
+        // receipt 경로에서 다시 찾을 수 없는 root에 snapshot을 두지 않는다 — 나중에 receipt
+        // 경로만 받은 프로세스가 엉뚱한 곳에서 snapshot을 찾게 된다.
+        private OperationStoreError? RootMismatch(string receiptPath)
+        {
+            var expected = RootForReceipt(receiptPath);
+            return string.Equals(
+                    Path.TrimEndingDirectorySeparator(expected),
+                    Path.TrimEndingDirectorySeparator(RootDirectory),
+                    StringComparison.Ordinal)
+                ? null
+                : new OperationStoreError(
+                    MismatchCode,
+                    $"receipt {receiptPath}의 record root는 {expected}인데 이 store는 {RootDirectory}입니다. receipt 경로로 snapshot을 다시 찾을 수 없어 기록하지 않았습니다.");
+        }
 
         private static OperationStoreError? TryEnsureDirectory(string directory)
         {
@@ -269,7 +321,7 @@ namespace NodeKit.Cli.Operations
             }
         }
 
-        private static OperationStoreError? ValidateReceipt(string path, OperationReceipt receipt)
+        internal static OperationStoreError? ValidateReceipt(string path, OperationReceipt receipt)
         {
             if (receipt.SchemaVersion != OperationReceipt.CurrentSchemaVersion)
             {
@@ -289,6 +341,12 @@ namespace NodeKit.Cli.Operations
             if (EnvelopeSha256(receipt.Envelope) != receipt.EnvelopeSha256)
             {
                 return Invalid(path, "envelope_sha256 불일치");
+            }
+
+            if (!OperationHashing.IsSha256Hex(receipt.SourceSnapshotSha256)
+                || (receipt.ResolvedSnapshotSha256 is { } resolvedSha && !OperationHashing.IsSha256Hex(resolvedSha)))
+            {
+                return Invalid(path, "snapshot ID가 소문자 SHA-256 hex가 아님");
             }
 
             var rank = OperationPhase.Rank(receipt.Phase);
@@ -361,11 +419,25 @@ namespace NodeKit.Cli.Operations
                 return sourceError;
             }
 
-            if (receipt.ResolvedSnapshotSha256 is { } resolvedSha
-                && TryReadResolvedSnapshot(resolvedSha, out _) is { } resolvedError)
+            if (receipt.ResolvedSnapshotSha256 is not { } resolvedSha)
+            {
+                return null;
+            }
+
+            if (TryReadResolvedSnapshot(resolvedSha, out var resolved) is { } resolvedError)
             {
                 receipt = null;
                 return resolvedError;
+            }
+
+            // 다른 operation의 유효한 snapshot을 가리키면 그 resolved digest를 이 빌드에 잘못 연결한다.
+            if (resolved!.SourceSnapshotSha256 != receipt.SourceSnapshotSha256
+                || resolved.EnvelopeSha256 != receipt.EnvelopeSha256
+                || resolved.RequestedToolName != receipt.Envelope.ToolName
+                || resolved.RequestedVersion != receipt.Envelope.Version)
+            {
+                receipt = null;
+                return Invalid(path, "resolved snapshot이 이 receipt의 source/envelope에 묶여 있지 않음");
             }
 
             return null;
@@ -523,6 +595,12 @@ namespace NodeKit.Cli.Operations
                 return new OperationStoreError(
                     LocalOperationStore.MismatchCode,
                     $"이미 기록된 build_id({current.BuildId})를 바꿀 수 없습니다 (request ID: {current.RequestId}).");
+            }
+
+            // 다시 열 때 INVALID가 될 기록은 처음부터 쓰지 않는다.
+            if (LocalOperationStore.ValidateReceipt(ReceiptPath, next) is { } invalid)
+            {
+                return invalid;
             }
 
             if (_store.WriteReceipt(ReceiptPath, next) is { } error)

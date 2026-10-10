@@ -53,5 +53,9 @@ namespace NodeKit.Cli.Operations
     {
         public static string Sha256Hex(byte[] content) =>
             Convert.ToHexStringLower(SHA256.HashData(content));
+
+        /// <summary>정확히 소문자 hex 64자인가 — snapshot 파일 이름으로 쓰기 전에 확인한다.</summary>
+        public static bool IsSha256Hex(string? value) =>
+            value is { Length: 64 } && value.All(c => c is (>= '0' and <= '9') or (>= 'a' and <= 'f'));
     }
 }

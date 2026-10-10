@@ -313,6 +313,192 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(SourceBindingStatus.Matches, LocalOperationStore.CompareSource(fresh.Receipt, current));
         }
 
+        [Fact]
+        public async Task S2_02_C05_ReentryAgainstDifferentEndpoint_IsRefusedBeforeResolve_RecordUnchanged()
+        {
+            using var server = NewServer();
+            var store = NewStore();
+            CreatePrepared(store, FixedRequestId).Dispose();
+            var path = store.DefaultReceiptPath(FixedRequestId);
+            var before = File.ReadAllBytes(path);
+
+            Assert.Null(NewStore().TryOpen(path, out var reentry));
+            using (reentry)
+            {
+                var result = await RunAsync(server, reentry!, "http://10.0.0.9:50051");
+
+                Assert.Equal(2, result.ExitCode);
+                Assert.Equal(LocalOperationStore.MismatchCode, result.Code);
+                Assert.False(result.ResolveCompleted);
+                Assert.Contains(Endpoint, result.Message, StringComparison.Ordinal);
+                Assert.Contains("http://10.0.0.9:50051", result.Message, StringComparison.Ordinal);
+            }
+
+            Assert.Empty(server.Fake.CallOrder);
+            Assert.Equal(before, File.ReadAllBytes(path));
+
+            // Control: the same record against its stored endpoint runs normally.
+            Assert.Null(NewStore().TryOpen(path, out var matching));
+            using (matching)
+            {
+                Assert.Equal(0, (await RunAsync(server, matching!)).ExitCode);
+            }
+
+            Assert.Equal(FixedRequestId, Assert.Single(server.Fake.SubmitRequests).RequestId);
+        }
+
+        [Fact]
+        public async Task S2_02_C05_EndpointMismatch_TakesPrecedenceOverResumeState_NoRpc()
+        {
+            using var server = NewServer();
+            var store = NewStore();
+            using var handle = CreatePrepared(store, FixedRequestId);
+            AdvanceToInFlight(store, handle);
+            var before = File.ReadAllBytes(handle.ReceiptPath);
+
+            var result = await RunAsync(server, handle, "http://10.0.0.9:50051");
+
+            Assert.Equal(2, result.ExitCode);
+            Assert.Equal(LocalOperationStore.MismatchCode, result.Code);
+            Assert.Empty(server.Fake.CallOrder);
+            Assert.Equal(before, File.ReadAllBytes(handle.ReceiptPath));
+        }
+
+        // ── Advance guards: receipt only moves forward, recorded facts never change ──
+
+        [Fact]
+        public void Advance_PhaseRegression_IsRefused_RecordUnchanged()
+        {
+            var store = NewStore();
+            using var handle = CreatePrepared(store, FixedRequestId);
+            AdvanceToInFlight(store, handle);
+            Assert.Null(handle.Advance(handle.Receipt with { Phase = OperationPhase.Acknowledged, BuildId = "build-fixture-001" }));
+            var before = File.ReadAllBytes(handle.ReceiptPath);
+
+            var error = handle.Advance(handle.Receipt with { Phase = OperationPhase.SubmitInFlight });
+
+            AssertRefusedUnchanged(error, handle, before, LocalOperationStore.MismatchCode);
+            Assert.Equal(OperationPhase.Acknowledged, handle.Receipt.Phase);
+        }
+
+        [Fact]
+        public void Advance_RecordedBuildIdRewrite_IsRefused_RecordUnchanged()
+        {
+            var store = NewStore();
+            using var handle = CreatePrepared(store, FixedRequestId);
+            AdvanceToInFlight(store, handle);
+            Assert.Null(handle.Advance(handle.Receipt with { Phase = OperationPhase.Acknowledged, BuildId = "build-fixture-001" }));
+            var before = File.ReadAllBytes(handle.ReceiptPath);
+
+            var error = handle.Advance(handle.Receipt with { BuildId = "build-fixture-999" });
+
+            AssertRefusedUnchanged(error, handle, before, LocalOperationStore.MismatchCode);
+            Assert.Equal("build-fixture-001", handle.Receipt.BuildId);
+        }
+
+        [Fact]
+        public void Advance_RecordedResolvedSnapshotRewrite_IsRefused_RecordUnchanged()
+        {
+            var store = NewStore();
+            using var handle = CreatePrepared(store, FixedRequestId);
+            var original = AdvanceToInFlight(store, handle);
+            var otherBasis = new ToolSpecSubmitBasis
+            {
+                RequestId = FixedRequestId,
+                RequestedToolName = _envelope.ToolName,
+                RequestedVersion = _envelope.Version,
+                ToolSpecDigest = ImageDigest,
+            };
+            Assert.Null(store.WriteResolvedSnapshot(ResolvedSnapshot.FromBasis(otherBasis, handle.Receipt), out var other));
+            Assert.NotEqual(original, other);
+            var before = File.ReadAllBytes(handle.ReceiptPath);
+
+            var error = handle.Advance(handle.Receipt with { ResolvedSnapshotSha256 = other });
+
+            AssertRefusedUnchanged(error, handle, before, LocalOperationStore.MismatchCode);
+            Assert.Equal(original, handle.Receipt.ResolvedSnapshotSha256);
+        }
+
+        [Fact]
+        public void Advance_RecordThatWouldNotReopen_IsNotWritten()
+        {
+            var store = NewStore();
+            using var handle = CreatePrepared(store, FixedRequestId);
+            var before = File.ReadAllBytes(handle.ReceiptPath);
+
+            var error = handle.Advance(handle.Receipt with { Phase = OperationPhase.Terminal });
+
+            AssertRefusedUnchanged(error, handle, before, LocalOperationStore.InvalidCode);
+            Assert.Equal(OperationPhase.Prepared, handle.Receipt.Phase);
+        }
+
+        // ── receipt location: snapshots are found again from the receipt path alone ──
+
+        [Fact]
+        public void ReceiptLocation_DefaultReceipt_DerivesItsStoreRoot()
+        {
+            var store = NewStore();
+
+            Assert.Equal(store.RootDirectory, LocalOperationStore.RootForReceipt(store.DefaultReceiptPath(FixedRequestId)));
+            Assert.Equal(store.RootDirectory, LocalOperationStore.ForRecipe(Path.Join(_workDir, "recipe.json")).RootDirectory);
+        }
+
+        [Fact]
+        public async Task ReceiptLocation_CustomReceipt_IsReopenedFromItsPathAlone_AndRuns()
+        {
+            using var server = NewServer();
+            var receiptDir = Path.Join(_workDir, "elsewhere");
+            Directory.CreateDirectory(receiptDir);
+            var receiptPath = Path.Join(receiptDir, "my-build.json");
+            var store = LocalOperationStore.ForReceipt(receiptPath);
+
+            Assert.Null(store.TryCreateToolSpecOperation(FixedRequestId, Endpoint, _envelope, Source(_recipeV1), receiptPath, out var created));
+            created!.Dispose();
+
+            // A later process only knows the receipt path.
+            Assert.Null(LocalOperationStore.ForReceipt(receiptPath).TryOpen(receiptPath, out var reopened));
+            using (reopened)
+            {
+                Assert.Equal(0, (await RunAsync(server, reopened!)).ExitCode);
+            }
+
+            Assert.Null(LocalOperationStore.ForReceipt(receiptPath).TryOpen(receiptPath, out var after));
+            using (after)
+            {
+                Assert.Equal(OperationPhase.Terminal, after!.Receipt.Phase);
+            }
+        }
+
+        [Fact]
+        public void ReceiptLocation_CustomReceiptOutsideTheStoreRoot_IsRefused_NothingWritten()
+        {
+            var store = NewStore();
+            var receiptDir = Path.Join(_workDir, "elsewhere");
+            Directory.CreateDirectory(receiptDir);
+            var receiptPath = Path.Join(receiptDir, "my-build.json");
+
+            var error = store.TryCreateToolSpecOperation(FixedRequestId, Endpoint, _envelope, Source(_recipeV1), receiptPath, out var handle);
+
+            Assert.Null(handle);
+            Assert.Equal(LocalOperationStore.MismatchCode, error!.Code);
+            Assert.Equal(2, error.ExitCode);
+            Assert.False(File.Exists(receiptPath));
+            Assert.False(Directory.Exists(Path.Join(store.RootDirectory, "snapshots")));
+        }
+
+        [Fact]
+        public void ReceiptLocation_OpeningWithAStoreThatIsNotTheReceiptsRoot_IsRefused()
+        {
+            var store = NewStore();
+            CreatePrepared(store, FixedRequestId).Dispose();
+
+            var error = new LocalOperationStore(Path.Join(_workDir, "other-root")).TryOpen(store.DefaultReceiptPath(FixedRequestId), out var handle);
+
+            Assert.Null(handle);
+            Assert.Equal(LocalOperationStore.MismatchCode, error!.Code);
+            Assert.Equal(2, error.ExitCode);
+        }
+
         // ── S2-02-C06 · concurrent writers on the same journal ──
 
         [Fact]
@@ -428,6 +614,106 @@ namespace NodeKit.Cli.Tests
             Assert.Empty(server.Fake.CallOrder);
         }
 
+        public static TheoryData<string> CorruptInFlightRecords => new()
+        {
+            "acknowledged_without_build_id",
+            "terminal_without_build_id",
+            "missing_resolved_snapshot",
+            "tampered_resolved_snapshot",
+            "tampered_source_snapshot",
+            "resolved_snapshot_of_another_operation",
+            "malformed_source_snapshot_id",
+            "malformed_resolved_snapshot_id",
+        };
+
+        [Theory]
+        [MemberData(nameof(CorruptInFlightRecords))]
+        public async Task S2_02_C07_InconsistentInFlightRecordOrSnapshot_IsIntegrityErrorExitTwo_NoRpc(string corruption)
+        {
+            using var server = NewServer();
+            var store = NewStore();
+            string path;
+            string sourceSha;
+            string resolvedSha;
+            using (var handle = CreatePrepared(store, FixedRequestId))
+            {
+                path = handle.ReceiptPath;
+                sourceSha = handle.Receipt.SourceSnapshotSha256;
+                resolvedSha = AdvanceToInFlight(store, handle);
+            }
+
+            // Control: the untouched in-flight record reopens.
+            Assert.Null(NewStore().TryOpen(path, out var control));
+            control!.Dispose();
+
+            var text = File.ReadAllText(path);
+            switch (corruption)
+            {
+                case "acknowledged_without_build_id":
+                    File.WriteAllText(path, text.Replace("\"phase\": \"submit_in_flight\"", "\"phase\": \"acknowledged\"", StringComparison.Ordinal));
+                    break;
+                case "terminal_without_build_id":
+                    File.WriteAllText(path, text.Replace("\"phase\": \"submit_in_flight\"", "\"phase\": \"terminal\"", StringComparison.Ordinal));
+                    break;
+                case "missing_resolved_snapshot":
+                    File.Delete(store.ResolvedSnapshotPath(resolvedSha));
+                    break;
+                case "tampered_resolved_snapshot":
+                    // Still valid JSON with the right schema and binding; only the content hash differs.
+                    var resolvedPath = store.ResolvedSnapshotPath(resolvedSha);
+                    File.WriteAllText(resolvedPath, File.ReadAllText(resolvedPath).Replace(WireToolSpecDigest, ImageDigest, StringComparison.Ordinal));
+                    break;
+                case "tampered_source_snapshot":
+                    var sourcePath = store.SourceSnapshotPath(sourceSha);
+                    File.WriteAllText(sourcePath, File.ReadAllText(sourcePath).Replace("run.sh", "run.sx", StringComparison.Ordinal));
+                    break;
+                case "resolved_snapshot_of_another_operation":
+                    // A valid snapshot that belongs to a different source/envelope in the same store.
+                    Assert.Null(store.TryCreateToolSpecOperation(
+                        "44444444-4444-4444-4444-444444444444", Endpoint, _envelope with { Version = "0.7.18" }, Source(_recipeV2), null, out var other));
+                    string otherSha;
+                    using (other)
+                    {
+                        otherSha = AdvanceToInFlight(store, other!);
+                    }
+
+                    Assert.Null(store.TryReadResolvedSnapshot(otherSha, out _));
+                    File.WriteAllText(path, text.Replace(resolvedSha, otherSha, StringComparison.Ordinal));
+                    break;
+                case "malformed_source_snapshot_id":
+                    File.WriteAllText(path, text.Replace(sourceSha, "\\u0000", StringComparison.Ordinal));
+                    break;
+                case "malformed_resolved_snapshot_id":
+                    File.WriteAllText(path, text.Replace(resolvedSha, "../../" + resolvedSha[6..], StringComparison.Ordinal));
+                    break;
+            }
+
+            var error = NewStore().TryOpen(path, out var reopened);
+
+            Assert.Null(reopened);
+            Assert.Equal(LocalOperationStore.InvalidCode, error!.Code);
+            Assert.Equal(2, error.ExitCode);
+            Assert.Empty(server.Fake.CallOrder);
+        }
+
+        [Fact]
+        public void SnapshotRead_WithMalformedId_IsIntegrityError_NotAnException()
+        {
+            var store = NewStore();
+            var ids = new[] { "\0", "../escaped", new string('A', 64), new string('a', 63), string.Empty };
+
+            foreach (var id in ids)
+            {
+                var sourceError = store.TryReadSourceSnapshot(id, out var source);
+                var resolvedError = store.TryReadResolvedSnapshot(id, out var resolved);
+
+                Assert.Null(source);
+                Assert.Null(resolved);
+                Assert.Equal(LocalOperationStore.InvalidCode, sourceError!.Code);
+                Assert.Equal(LocalOperationStore.InvalidCode, resolvedError!.Code);
+            }
+        }
+
         [Fact]
         public async Task S2_02_C07_InFlightRecordWithoutBuildId_IsNotBlindlyResubmitted()
         {
@@ -527,10 +813,37 @@ namespace NodeKit.Cli.Tests
         private static OperationReceipt ReadReceiptFromDisk(string path) =>
             JsonSerializer.Deserialize<OperationReceipt>(File.ReadAllBytes(path))!;
 
-        private static async Task<ToolSpecOperationResult> RunAsync(GrpcTestServer server, OperationHandle handle)
+        private static async Task<ToolSpecOperationResult> RunAsync(GrpcTestServer server, OperationHandle handle, string endpoint = Endpoint)
         {
             using var client = new GrpcToolSpecClient(server.Channel);
-            return await ToolSpecOperationRunner.RunAsync(handle, client, cancellationToken: TestContext.Current.CancellationToken);
+            return await ToolSpecOperationRunner.RunAsync(handle, client, endpoint, cancellationToken: TestContext.Current.CancellationToken);
+        }
+
+        // Moves a prepared handle to submit_in_flight through the store API, binding a resolved
+        // snapshot built from the handle's own envelope. Returns the resolved snapshot ID.
+        private static string AdvanceToInFlight(LocalOperationStore store, OperationHandle handle, string digest = WireToolSpecDigest)
+        {
+            var receipt = handle.Receipt;
+            var basis = new ToolSpecSubmitBasis
+            {
+                RequestId = receipt.RequestId,
+                RequestedToolName = receipt.Envelope.ToolName,
+                RequestedVersion = receipt.Envelope.Version,
+                ToolSpecDigest = digest,
+                ResolvedToolName = receipt.Envelope.ToolName,
+                ResolvedVersion = receipt.Envelope.Version,
+            };
+            Assert.Null(store.WriteResolvedSnapshot(ResolvedSnapshot.FromBasis(basis, receipt), out var sha));
+            Assert.Null(handle.Advance(receipt with { Phase = OperationPhase.SubmitInFlight, ResolvedSnapshotSha256 = sha }));
+            return sha;
+        }
+
+        private static void AssertRefusedUnchanged(OperationStoreError? error, OperationHandle handle, byte[] before, string code)
+        {
+            Assert.NotNull(error);
+            Assert.Equal(code, error!.Code);
+            Assert.Equal(2, error.ExitCode);
+            Assert.Equal(before, File.ReadAllBytes(handle.ReceiptPath));
         }
 
         private static GrpcTestServer NewServer()
