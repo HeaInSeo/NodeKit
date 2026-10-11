@@ -361,6 +361,22 @@ namespace NodeKit.Cli.Tests
             Assert.Single(server.Registry.RegisterRequests);
         }
 
+        // receipt 경로 뒤에 붙인 --help/-h도 다른 하위 명령처럼 stdout 도움말·exit 0이다(RPC 0).
+        [Theory]
+        [InlineData("--help")]
+        [InlineData("-h")]
+        public void Replay_TrailingHelp_PrintsUsage_Exit0_RpcZero(string helpFlag)
+        {
+            using var server = NewServer();
+
+            var (exit, stdout, stderr) = Replay(server, RegistrationPath(), "--format", "jsonl", helpFlag);
+
+            Assert.Equal(0, exit);
+            Assert.Contains("register-replay", stdout);
+            Assert.Equal(string.Empty, stderr);
+            Assert.Empty(server.Registry.RegisterRequests);
+        }
+
         // full B가 없는 빌드 성공은 등록으로 넘어가지 않는다(등록 RPC 0, receipt 0).
         [Fact]
         public void NoFullB_NoRegistration()

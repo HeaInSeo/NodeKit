@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using Grpc.Core;
 using NodeKit.Authoring.ToolFunctionRecipes;
 using NodeKit.Cli.Operations;
@@ -97,7 +98,7 @@ namespace NodeKit.Cli
         /// </summary>
         public static int RunReplay(string[] args, TextWriter stdout, TextWriter stderr, IToolFunctionRegistryClient? client = null)
         {
-            if (args.Length >= 3 && args[2] is "--help" or "-h")
+            if (args.Any(a => a is "--help" or "-h"))
             {
                 stdout.WriteLine(ReplayUsageLine);
                 return 0;
