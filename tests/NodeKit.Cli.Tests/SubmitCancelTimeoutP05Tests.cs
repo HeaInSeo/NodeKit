@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Threading;
+using System.Threading.Tasks;
 using Grpc.Core;
 using NodeKit.Authoring.Recipes;
 using NodeKit.Cli.Operations;
@@ -223,6 +225,52 @@ namespace NodeKit.Cli.Tests
             AssertLocalAbort(receipt, OperationLocalAbort.ConnectTimeout);
         }
 
+        // S2-04-C04 boundary race (Codex P2 r4239968207): the build ID is acknowledged exactly as connect-timeout
+        // fires; the persisted build ID is reported with receipt-watch recovery and in JSONL
+        [Fact]
+        public void ConnectTimeout_RacesAcknowledgedBuildId_Jsonl_Exit124_KeepsBuildIdAndWatchRecovery()
+        {
+            using var server = NewServer();
+            server.Fake.WatchEvents = RunningEvents();
+
+            var exitCode = SubmitWithBuildIdAtConnectTimeout(server, out var stdout, out _, "--connect-timeout", "1", "--format", "jsonl");
+
+            Assert.Equal(124, exitCode);
+            Assert.Empty(server.Fake.CancelledBuildIds);
+            var completed = CompletedJsonl(stdout);
+            Assert.Equal("CONNECT_TIMEOUT", completed.GetProperty("error_code").GetString());
+            Assert.Equal("uncertain", completed.GetProperty("recovery").GetString());
+            Assert.Equal(FixtureBuildId, completed.GetProperty("build_id").GetString());
+            var message = completed.GetProperty("message").GetString();
+            Assert.Contains(ReceiptCommand.FollowUpCommand("watch", DefaultReceiptPath()), message, StringComparison.Ordinal);
+            Assert.DoesNotContain("빌드가 만들어졌는지는 알 수 없습니다", message, StringComparison.Ordinal);
+            Assert.DoesNotContain("request ID:", message, StringComparison.Ordinal);
+
+            var receipt = ReadReceipt(DefaultReceiptPath());
+            Assert.Equal(OperationPhase.Acknowledged, receipt.Phase);
+            Assert.Equal(FixtureBuildId, receipt.BuildId);
+            Assert.Null(receipt.LastObservation);
+            AssertLocalAbort(receipt, OperationLocalAbort.ConnectTimeout);
+        }
+
+        // S2-04-C04 boundary race (human)
+        [Fact]
+        public void ConnectTimeout_RacesAcknowledgedBuildId_Human_Exit124_ShowsBuildIdAndWatchHint()
+        {
+            using var server = NewServer();
+            server.Fake.WatchEvents = RunningEvents();
+
+            var exitCode = SubmitWithBuildIdAtConnectTimeout(server, out _, out var stderr, "--connect-timeout", "1");
+
+            Assert.Equal(124, exitCode);
+            Assert.Empty(server.Fake.CancelledBuildIds);
+            Assert.Contains("--connect-timeout(1초)이 발동했지만", stderr, StringComparison.Ordinal);
+            Assert.Contains($"build ID: {FixtureBuildId}", stderr, StringComparison.Ordinal);
+            Assert.Contains(ReceiptCommand.FollowUpCommand("watch", DefaultReceiptPath()), stderr, StringComparison.Ordinal);
+            Assert.DoesNotContain("빌드가 만들어졌는지는 알 수 없습니다", stderr, StringComparison.Ordinal);
+            Assert.Equal(OperationPhase.Acknowledged, ReadReceipt(DefaultReceiptPath()).Phase);
+        }
+
         // S2-04-C05: watch-timeout after build_id → 125, no cancel, build_id/last event shown, receipt re-enterable
         [Fact]
         public void WatchTimeout_AfterBuildId_Exit125_NoCancelRpc_ReceiptReentersToTerminalAndClearsLocalAbort()
@@ -405,6 +453,20 @@ namespace NodeKit.Cli.Tests
             return exitCode;
         }
 
+        private int SubmitWithBuildIdAtConnectTimeout(GrpcTestServer server, out string stdout, out string stderr, params string[] extraArgs)
+        {
+            using var grpc = new GrpcToolSpecClient(server.Channel);
+            var client = new BuildIdAtConnectTimeoutClient(grpc);
+            using var stdoutWriter = new StringWriter();
+            using var stderrWriter = new StringWriter();
+            var args = new[] { "submit", WriteRecipe() }.Concat(extraArgs).ToArray();
+            var exitCode = SubmitCommand.RunUntilUserCancel(
+                args, stdoutWriter, stderrWriter, client, () => FixedRequestId, TestContext.Current.CancellationToken);
+            stdout = stdoutWriter.ToString();
+            stderr = stderrWriter.ToString();
+            return exitCode;
+        }
+
         private static int Reenter(GrpcTestServer server, string verb, string receiptPath, out string stdout, out string stderr)
         {
             using var client = new GrpcToolSpecClient(server.Channel);
@@ -468,6 +530,61 @@ namespace NodeKit.Cli.Tests
             var path = Path.Join(_workDir, "input-" + Guid.NewGuid() + ".json");
             File.WriteAllText(path, JsonSerializer.Serialize(recipe, RecipeCreateCommand.JsonOptions));
             return path;
+        }
+
+        /// <summary>
+        /// Holds the first build-ID event until the caller's token fires (i.e. until --connect-timeout expires),
+        /// then delivers it and lets the next read observe the cancellation. This pins the boundary race where
+        /// the receipt becomes acknowledged just as the connect timer fires, without depending on timer jitter.
+        /// </summary>
+        private sealed class BuildIdAtConnectTimeoutClient : IToolSpecBuildClient
+        {
+            private static readonly TimeSpan _maxHold = TimeSpan.FromSeconds(10);
+
+            private readonly GrpcToolSpecClient _inner;
+
+            public BuildIdAtConnectTimeoutClient(GrpcToolSpecClient inner)
+            {
+                _inner = inner;
+            }
+
+            public IAsyncEnumerable<BuildEvent> ResolveAndBuildAsync(
+                string toolName, string version, string rawSpec, CancellationToken cancellationToken = default) =>
+                throw new NotSupportedException("journaled submit uses the staged overload");
+
+            public async IAsyncEnumerable<BuildEvent> ResolveAndBuildAsync(
+                string toolName,
+                string version,
+                string rawSpec,
+                ToolSpecBuildOptions options,
+                [EnumeratorCancellation] CancellationToken cancellationToken = default)
+            {
+                var held = false;
+                await foreach (var ev in _inner.ResolveAndBuildAsync(toolName, version, rawSpec, options, CancellationToken.None))
+                {
+                    if (!held && !string.IsNullOrEmpty(ev.BuildId))
+                    {
+                        held = true;
+                        try
+                        {
+                            await Task.Delay(_maxHold, cancellationToken);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            // the connect timer fired; deliver the build ID at exactly this boundary
+                        }
+
+                        yield return ev;
+                        cancellationToken.ThrowIfCancellationRequested();
+                        continue;
+                    }
+
+                    yield return ev;
+                }
+            }
+
+            public Task CancelBuildAsync(string buildId, CancellationToken cancellationToken = default) =>
+                _inner.CancelBuildAsync(buildId, cancellationToken);
         }
     }
 }

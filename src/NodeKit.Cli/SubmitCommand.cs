@@ -679,7 +679,10 @@ namespace NodeKit.Cli
 
                 if (connectTimeoutCts.IsCancellationRequested && !cts.IsCancellationRequested)
                 {
-                    return ReportConnectTimeout(stdout, stderr, connectTimeout!.Value, run, jsonl);
+                    // 경계 경쟁: 타이머가 발동하는 바로 그때 build ID가 도착해 acknowledged로
+                    // 기록됐을 수 있다 — 루프의 해제는 이미 발동한 타이머에 no-op이다. 지역
+                    // buildId보다 receipt에 실제로 기록된 build ID를 우선한다.
+                    return ReportConnectTimeout(stdout, stderr, connectTimeout!.Value, run?.Handle.Receipt.BuildId ?? buildId, run, jsonl);
                 }
 
                 if (watchTimeoutCts.IsCancellationRequested && !cts.IsCancellationRequested)
@@ -731,26 +734,36 @@ namespace NodeKit.Cli
             }
         }
 
-        // 타임아웃이 발동하는 시점은 항상 buildId를 받기 전(ResolveToolSpec/
-        // SubmitToolBuild 단계)이다 — 그 이후엔 disarm된다. 취소할 build ID가
-        // 없으니 CancelServerBuildBestEffort를 부르지 않는다. 하지만 서버에
-        // 빌드가 없다는 뜻은 아니다: SubmitToolBuild가 서버에 도달하고 응답만
-        // 늦거나 유실됐을 수 있다(S2-04-C04). 그래서 원격 상태는 unknown으로
-        // 남기고, 사용자 Ctrl-C 취소(exit 130)와 다른 exit code(124, `timeout(1)`
-        // 셸 명령의 관례와 동일)를 쓴다.
-        private static int ReportConnectTimeout(TextWriter stdout, TextWriter stderr, TimeSpan timeout, ReceiptRun? run, bool jsonl)
+        // 타임아웃은 buildId를 받기 전(ResolveToolSpec/SubmitToolBuild 단계)에만
+        // 무장되어 있다 — build ID를 받으면 disarm된다. 서버 취소는 보내지 않는다.
+        // build ID가 없다고 서버에 빌드가 없다는 뜻은 아니다: SubmitToolBuild가
+        // 서버에 도달하고 응답만 늦거나 유실됐을 수 있다(S2-04-C04). 그래서 원격
+        // 상태는 unknown으로 남기고, 사용자 Ctrl-C 취소(exit 130)와 다른 exit
+        // code(124, `timeout(1)` 셸 명령의 관례와 동일)를 쓴다.
+        // 예외는 타이머 발동과 build ID 도착이 겹친 경계 경쟁이다 — 이미
+        // acknowledged로 기록된 build ID가 있으면 그 ID와 receipt watch 복구
+        // 경로를 안내하고 jsonl에도 build_id를 싣는다.
+        private static int ReportConnectTimeout(
+            TextWriter stdout, TextWriter stderr, TimeSpan timeout, string? acknowledgedBuildId, ReceiptRun? run, bool jsonl)
         {
-            var message =
-                $"NodeVault 연결이 {(int)timeout.TotalSeconds}초 동안 응답이 없어 타임아웃되었습니다 (--connect-timeout). " +
-                "주소와 네트워크 상태를 확인하세요. 요청이 서버에 도달해 빌드가 만들어졌는지는 알 수 없습니다." +
-                RequestIdHint(run);
+            var message = string.IsNullOrEmpty(acknowledgedBuildId)
+                ? $"NodeVault 연결이 {(int)timeout.TotalSeconds}초 동안 응답이 없어 타임아웃되었습니다 (--connect-timeout). " +
+                    "주소와 네트워크 상태를 확인하세요. 요청이 서버에 도달해 빌드가 만들어졌는지는 알 수 없습니다." +
+                    RequestIdHint(run)
+                : $"--connect-timeout({(int)timeout.TotalSeconds}초)이 발동했지만 그 직전에 빌드 ID를 받아 기록했습니다 (build ID: {acknowledgedBuildId}). " +
+                    "서버에서는 빌드가 계속 진행 중일 수 있습니다." +
+                    (run is null ? " Build ID로 나중에 빌드 상태를 다시 확인하세요." : WatchHint(run));
 
             if (jsonl)
             {
-                // connect-timeout은 정의상 buildId를 받기 전(ResolveToolSpec/
-                // SubmitToolBuild 단계)에만 발동하므로 completed 레코드에
-                // build_id가 붙는 경우는 없다.
-                WriteJsonl(stdout, SubmitJsonlRecord.Completed("Failed", errorCode: "CONNECT_TIMEOUT", message: message, recovery: RecoveryDisposition.Uncertain));
+                WriteJsonl(
+                    stdout,
+                    SubmitJsonlRecord.Completed(
+                        "Failed",
+                        acknowledgedBuildId,
+                        "CONNECT_TIMEOUT",
+                        message,
+                        recovery: RecoveryDisposition.Uncertain));
                 return 124;
             }
 
