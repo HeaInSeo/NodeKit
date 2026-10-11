@@ -139,5 +139,13 @@
     <Compile Include="..\Grpc\ToolSpecSubmitBasis.cs" Link="Grpc\ToolSpecSubmitBasis.cs" />
     <Compile Include="..\Grpc\ToolSpecRawSpecFactory.cs" Link="Grpc\ToolSpecRawSpecFactory.cs" />
     <Compile Include="..\Grpc\ToolFunctionBuildRequestPreviewFactory.cs" Link="Grpc\ToolFunctionBuildRequestPreviewFactory.cs" />
+    <Compile Include="..\Grpc\ToolFunctionWireError.cs" Link="Grpc\ToolFunctionWireError.cs" />
+    <Compile Include="..\Grpc\ToolFunctionRawSpecFactory.cs" Link="Grpc\ToolFunctionRawSpecFactory.cs" />
+    <Compile Include="..\Grpc\ToolFunctionRegistrationInputs.cs" Link="Grpc\ToolFunctionRegistrationInputs.cs" />
+    <Compile Include="..\Grpc\ToolFunctionRegistrationPlan.cs" Link="Grpc\ToolFunctionRegistrationPlan.cs" />
+    <Compile Include="..\Grpc\ToolFunctionRegistrationRequestFactory.cs" Link="Grpc\ToolFunctionRegistrationRequestFactory.cs" />
+    <Compile Include="..\Grpc\ToolFunctionBaseBuildObservation.cs" Link="Grpc\ToolFunctionBaseBuildObservation.cs" />
+    <Compile Include="..\Grpc\ToolFunctionBaseLinkState.cs" Link="Grpc\ToolFunctionBaseLinkState.cs" />
+    <Compile Include="..\Grpc\ToolFunctionBaseLinkEvidence.cs" Link="Grpc\ToolFunctionBaseLinkEvidence.cs" />
   </ItemGroup>
 </Project>
