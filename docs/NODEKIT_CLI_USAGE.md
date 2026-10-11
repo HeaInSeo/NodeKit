@@ -985,6 +985,10 @@ $ echo $?
 124
 ```
 
+타이머 발동과 build ID 도착이 겹쳐 receipt에 이미 `acknowledged`로 build ID가 기록된 경우에는
+같은 `CONNECT_TIMEOUT`/exit 124이지만 `build_id`가 붙고, 안내도 request ID 대신
+`nodekit receipt watch <receipt>`로 다시 관찰하라고 한다(서버 빌드는 계속 진행 중일 수 있다).
+
 Ctrl-C로 취소한 경우(`status: "Cancelled"` — `Failed`가 아니다):
 
 ```bash

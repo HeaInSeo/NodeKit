@@ -66,7 +66,26 @@ namespace NodeKit.Cli
             TextWriter stdout,
             TextWriter stderr,
             IToolSpecBuildClient? toolSpecClient = null,
-            Func<string>? requestIdProvider = null)
+            Func<string>? requestIdProvider = null) =>
+            RunCore(args, stdout, stderr, toolSpecClient, requestIdProvider, CancellationToken.None);
+
+        /// <summary>테스트 전용: <see cref="Run"/>과 같지만 사용자 취소 신호(Ctrl-C와 같은 경로)를 받는다.</summary>
+        internal static int RunUntilUserCancel(
+            string[] args,
+            TextWriter stdout,
+            TextWriter stderr,
+            IToolSpecBuildClient toolSpecClient,
+            Func<string>? requestIdProvider,
+            CancellationToken userCancellation) =>
+            RunCore(args, stdout, stderr, toolSpecClient, requestIdProvider, userCancellation);
+
+        private static int RunCore(
+            string[] args,
+            TextWriter stdout,
+            TextWriter stderr,
+            IToolSpecBuildClient? toolSpecClient,
+            Func<string>? requestIdProvider,
+            CancellationToken cancellationToken)
         {
             if (args.Any(a => a is "--help" or "-h"))
             {
@@ -183,7 +202,8 @@ namespace NodeKit.Cli
                             stderr,
                             connectTimeout,
                             watchTimeout,
-                            jsonl)
+                            jsonl,
+                            cancellationToken)
                         .GetAwaiter().GetResult();
                 }
 
@@ -210,7 +230,7 @@ namespace NodeKit.Cli
                 using (handle)
                 {
                     PrintBanner(stdout, url, definition.Name, definition.Version, handle!.ReceiptPath, requestId, jsonl);
-                    var run = new ReceiptRun();
+                    var run = new ReceiptRun { Handle = handle };
                     return SubmitAsync(
                             ct => RunWithReceiptAsync(handle, client, endpoint, run, ct),
                             client,
@@ -219,7 +239,8 @@ namespace NodeKit.Cli
                             stderr,
                             connectTimeout,
                             watchTimeout,
-                            jsonl)
+                            jsonl,
+                            cancellationToken)
                         .GetAwaiter().GetResult();
                 }
             }
@@ -363,9 +384,10 @@ namespace NodeKit.Cli
             TextWriter stderr,
             TimeSpan? connectTimeout = null,
             TimeSpan? watchTimeout = null,
-            bool jsonl = false)
+            bool jsonl = false,
+            CancellationToken userCancellation = default)
         {
-            using var cts = new CancellationTokenSource();
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(userCancellation);
 
             // 별도 CTS로 분리한 이유: ResolveToolSpec/SubmitToolBuild 단계(빌드
             // ID가 아직 없는 상태)가 네트워크/서버 문제로 멈추면 Ctrl-C 외에는
@@ -647,14 +669,25 @@ namespace NodeKit.Cli
             catch (Exception ex) when (linkedCts.IsCancellationRequested || IsCancellationShaped(ex))
 #pragma warning restore CA1031
             {
+                // S2-04: terminal을 관측하기 전에 로컬에서 멈췄다는 사실을 먼저 receipt에 남긴다.
+                // 원격 상태는 unknown으로만 기록하고, 그 뒤에야 서버 취소 best-effort를 보낸다.
+                var abortReason = cts.IsCancellationRequested ? OperationLocalAbort.UserCancel
+                    : connectTimeoutCts.IsCancellationRequested ? OperationLocalAbort.ConnectTimeout
+                    : watchTimeoutCts.IsCancellationRequested ? OperationLocalAbort.WatchTimeout
+                    : OperationLocalAbort.TransportCancelled;
+                RecordLocalAbort(run, abortReason, stderr);
+
                 if (connectTimeoutCts.IsCancellationRequested && !cts.IsCancellationRequested)
                 {
-                    return ReportConnectTimeout(stdout, stderr, connectTimeout!.Value, jsonl);
+                    // 경계 경쟁: 타이머가 발동하는 바로 그때 build ID가 도착해 acknowledged로
+                    // 기록됐을 수 있다 — 루프의 해제는 이미 발동한 타이머에 no-op이다. 지역
+                    // buildId보다 receipt에 실제로 기록된 build ID를 우선한다.
+                    return ReportConnectTimeout(stdout, stderr, connectTimeout!.Value, run?.Handle.Receipt.BuildId ?? buildId, run, jsonl);
                 }
 
                 if (watchTimeoutCts.IsCancellationRequested && !cts.IsCancellationRequested)
                 {
-                    return ReportWatchTimeout(stdout, stderr, watchTimeout!.Value, buildId, lastEventReceivedAt, jsonl);
+                    return ReportWatchTimeout(stdout, stderr, watchTimeout!.Value, buildId, lastEventReceivedAt, run, jsonl);
                 }
 
                 // 서버 취소 best-effort 알림 실패 경고는 진단성 성격이라(외부
@@ -671,6 +704,9 @@ namespace NodeKit.Cli
                 }
 
                 stderr.WriteLine("빌드 요청이 취소되었습니다.");
+                stderr.WriteLine(string.IsNullOrEmpty(buildId)
+                    ? "요청이 서버에 도달해 빌드가 만들어졌는지는 알 수 없습니다." + RequestIdHint(run)
+                    : $"서버 빌드가 실제로 멈췄는지는 확인하지 않았습니다 (build ID: {buildId})." + WatchHint(run));
                 return 130;
             }
             // Final fallback after the cancellation-filtered catch above — any
@@ -698,23 +734,36 @@ namespace NodeKit.Cli
             }
         }
 
-        // 타임아웃이 발동하는 시점은 항상 buildId를 받기 전(ResolveToolSpec/
-        // SubmitToolBuild 단계)이므로 — 그 이후엔 disarm된다 — 서버에 실제로
-        // 시작된 빌드가 없다. CancelServerBuildBestEffort를 부를 대상 자체가
-        // 없다는 뜻이라 사용자 Ctrl-C 취소(exit 130)와 다른, 구분되는 exit
+        // 타임아웃은 buildId를 받기 전(ResolveToolSpec/SubmitToolBuild 단계)에만
+        // 무장되어 있다 — build ID를 받으면 disarm된다. 서버 취소는 보내지 않는다.
+        // build ID가 없다고 서버에 빌드가 없다는 뜻은 아니다: SubmitToolBuild가
+        // 서버에 도달하고 응답만 늦거나 유실됐을 수 있다(S2-04-C04). 그래서 원격
+        // 상태는 unknown으로 남기고, 사용자 Ctrl-C 취소(exit 130)와 다른 exit
         // code(124, `timeout(1)` 셸 명령의 관례와 동일)를 쓴다.
-        private static int ReportConnectTimeout(TextWriter stdout, TextWriter stderr, TimeSpan timeout, bool jsonl)
+        // 예외는 타이머 발동과 build ID 도착이 겹친 경계 경쟁이다 — 이미
+        // acknowledged로 기록된 build ID가 있으면 그 ID와 receipt watch 복구
+        // 경로를 안내하고 jsonl에도 build_id를 싣는다.
+        private static int ReportConnectTimeout(
+            TextWriter stdout, TextWriter stderr, TimeSpan timeout, string? acknowledgedBuildId, ReceiptRun? run, bool jsonl)
         {
-            var message =
-                $"NodeVault 연결이 {(int)timeout.TotalSeconds}초 동안 응답이 없어 타임아웃되었습니다 (--connect-timeout). " +
-                "주소와 네트워크 상태를 확인하세요.";
+            var message = string.IsNullOrEmpty(acknowledgedBuildId)
+                ? $"NodeVault 연결이 {(int)timeout.TotalSeconds}초 동안 응답이 없어 타임아웃되었습니다 (--connect-timeout). " +
+                    "주소와 네트워크 상태를 확인하세요. 요청이 서버에 도달해 빌드가 만들어졌는지는 알 수 없습니다." +
+                    RequestIdHint(run)
+                : $"--connect-timeout({(int)timeout.TotalSeconds}초)이 발동했지만 그 직전에 빌드 ID를 받아 기록했습니다 (build ID: {acknowledgedBuildId}). " +
+                    "서버에서는 빌드가 계속 진행 중일 수 있습니다." +
+                    (run is null ? " Build ID로 나중에 빌드 상태를 다시 확인하세요." : WatchHint(run));
 
             if (jsonl)
             {
-                // connect-timeout은 정의상 buildId를 받기 전(ResolveToolSpec/
-                // SubmitToolBuild 단계)에만 발동하므로 completed 레코드에
-                // build_id가 붙는 경우는 없다.
-                WriteJsonl(stdout, SubmitJsonlRecord.Completed("Failed", errorCode: "CONNECT_TIMEOUT", message: message, recovery: RecoveryDisposition.Uncertain));
+                WriteJsonl(
+                    stdout,
+                    SubmitJsonlRecord.Completed(
+                        "Failed",
+                        acknowledgedBuildId,
+                        "CONNECT_TIMEOUT",
+                        message,
+                        recovery: RecoveryDisposition.Uncertain));
                 return 124;
             }
 
@@ -728,7 +777,7 @@ namespace NodeKit.Cli
         // CLI의 로컬 관찰만 끝내고 서버 빌드는 건드리지 않는다. exit code는
         // --connect-timeout(124)/Ctrl-C(130)와 구분되는 별도 값을 쓴다.
         private static int ReportWatchTimeout(
-            TextWriter stdout, TextWriter stderr, TimeSpan timeout, string? buildId, DateTimeOffset? lastEventReceivedAt, bool jsonl)
+            TextWriter stdout, TextWriter stderr, TimeSpan timeout, string? buildId, DateTimeOffset? lastEventReceivedAt, ReceiptRun? run, bool jsonl)
         {
             if (jsonl)
             {
@@ -754,7 +803,9 @@ namespace NodeKit.Cli
             stderr.WriteLine(
                 $"마지막 이벤트 수신 시각: {(lastEventReceivedAt is { } t2 ? t2.ToString("yyyy-MM-ddTHH:mm:sszzz", System.Globalization.CultureInfo.InvariantCulture) : "(없음)")}");
             stderr.WriteLine();
-            stderr.WriteLine("Build ID로 나중에 빌드 상태를 다시 확인하세요.");
+            stderr.WriteLine(run?.Handle is { } handle
+                ? $"receipt로 나중에 다시 관찰하세요: {ReceiptCommand.FollowUpCommand("watch", handle.ReceiptPath)}"
+                : "Build ID로 나중에 빌드 상태를 다시 확인하세요.");
             return 125;
         }
 
@@ -996,7 +1047,34 @@ namespace NodeKit.Cli
 
         private sealed class ReceiptRun
         {
+            public required OperationHandle Handle { get; init; }
+
             public ToolSpecOperationResult? Result { get; set; }
         }
+
+        // receipt runner가 끝난 뒤에만 부른다(RunWithReceiptAsync가 runner를 기다린 뒤 예외를 다시 던진다).
+        // 기록에 실패해도 이미 정해진 종료 코드는 바꾸지 않고 경고만 남긴다 — receipt는 이전 phase 그대로다.
+        private static void RecordLocalAbort(ReceiptRun? run, string reason, TextWriter stderr)
+        {
+            if (run is null)
+            {
+                return;
+            }
+
+            if (ToolSpecOperationRunner.RecordLocalAbort(run.Handle, reason) is { } error)
+            {
+                stderr.WriteLine($"경고: 로컬 중단을 receipt에 기록하지 못했습니다 ({error.Code}): {error.Message}");
+            }
+        }
+
+        private static string RequestIdHint(ReceiptRun? run) =>
+            run is null
+                ? string.Empty
+                : $" 자동으로 다시 제출하지 않습니다 — 이 request ID로 NodeVault에서 확인하세요 (request ID: {run.Handle.Receipt.RequestId}, receipt: {run.Handle.ReceiptPath}).";
+
+        private static string WatchHint(ReceiptRun? run) =>
+            run is null
+                ? string.Empty
+                : $" 확인하려면 {ReceiptCommand.FollowUpCommand("watch", run.Handle.ReceiptPath)}";
     }
 }

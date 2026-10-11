@@ -200,6 +200,7 @@ namespace NodeKit.Cli.Operations
                 {
                     Phase = OperationPhase.Terminal,
                     LastObservation = terminal,
+                    LocalAbort = null,
                 });
                 if (terminalError is not null)
                 {
@@ -328,6 +329,7 @@ namespace NodeKit.Cli.Operations
                 {
                     Phase = OperationPhase.Terminal,
                     LastObservation = terminal,
+                    LocalAbort = null,
                 });
                 if (terminalError is not null)
                 {
@@ -356,6 +358,31 @@ namespace NodeKit.Cli.Operations
                 StreamEnded = true,
                 Receipt = handle.Receipt,
             };
+        }
+
+        /// <summary>
+        /// terminal 관측 전에 CLI가 로컬에서 멈췄다는 사실을 receipt에 남긴다(S2-04). phase·build_id·관측은
+        /// 바꾸지 않고 원격 상태는 unknown으로만 적는다 — 서버 빌드가 성공/취소됐다고 확정하지 않는다.
+        /// 이미 terminal을 관측한 receipt는 그대로 둔다.
+        /// </summary>
+        public static OperationStoreError? RecordLocalAbort(OperationHandle handle, string reason, TimeProvider? timeProvider = null)
+        {
+            ArgumentNullException.ThrowIfNull(handle);
+            if (handle.Receipt.Phase == OperationPhase.Terminal)
+            {
+                return null;
+            }
+
+            var clock = timeProvider ?? TimeProvider.System;
+            return handle.Advance(handle.Receipt with
+            {
+                LocalAbort = new OperationLocalAbort
+                {
+                    Reason = reason,
+                    RemoteBuildState = OperationLocalAbort.UnknownRemoteState,
+                    RecordedAt = clock.GetUtcNow().ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture),
+                },
+            });
         }
 
         private static OperationStoreError? RecordResolved(OperationHandle handle, ToolSpecSubmitBasis basis)
