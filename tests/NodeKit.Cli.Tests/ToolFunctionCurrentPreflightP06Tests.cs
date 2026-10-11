@@ -294,5 +294,71 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(1, typed.Exit);
             Assert.Contains(ToolFunctionRegistrationRequestFactory.PortDirectionMismatchCode, typed.Stderr);
         }
+
+        private const string NullSentinel = "__NULL_IN_PERSISTED_JSON__";
+
+        /// <summary>
+        /// 저장된 JSON에 Command.Environment 항목 하나를 넣는다. sentinel 값은 파일 텍스트에서
+        /// JSON null로 바꾼다 — 메모리 객체가 아니라 실제 load 경로를 거친다.
+        /// </summary>
+        private string SaveWithEnvironmentEntry(string name, string source)
+        {
+            var recipe = ReadyRecipe();
+            recipe.Command.Environment.Add(new EnvironmentEntry { Name = name, Source = source });
+            var recipePath = Save(recipe);
+            var json = File.ReadAllText(recipePath).Replace("\"" + NullSentinel + "\"", "null", StringComparison.Ordinal);
+            File.WriteAllText(recipePath, json);
+            return recipePath;
+        }
+
+        // Codex P2 r4241971212: persisted Ready JSON의 environment name/source null은
+        // protobuf setter의 ArgumentNullException이 아니라 exit 1 진단이어야 한다.
+        [Theory]
+        [InlineData("name-null", NullSentinel, "runtime.tmp")]
+        [InlineData("source-null", "TMPDIR", NullSentinel)]
+        [InlineData("both-null", NullSentinel, NullSentinel)]
+        public void TypedPrerequisite_NullEnvironmentFieldInPersistedJson_FailsWithExit1Diagnostic(
+            string variant, string name, string source)
+        {
+            var recipePath = SaveWithEnvironmentEntry(name, source);
+            Assert.Contains("null", File.ReadAllText(recipePath));
+            Assert.True(ToolFunctionRecipeCliIo.TryLoad(recipePath, TextWriter.Null, out var loaded), variant);
+            Assert.True(loaded!.Command.Environment[0].Name is null || loaded.Command.Environment[0].Source is null, variant);
+
+            var mapped = ToolFunctionRegistrationRequestFactory.TryCheckSpecMapping(loaded, out var mappingError);
+            var typed = Preflight(recipePath, requireTypedRegistration: true);
+            var built = ToolFunctionRegistrationRequestFactory.TryBuild(
+                loaded, new ToolFunctionRegistrationInputs("req-1", DigestC1, "sha256:" + new string('b', 64), null), out var plan, out var buildError);
+
+            Assert.False(built, variant);
+            Assert.Null(plan);
+            Assert.Equal(ToolFunctionRegistrationRequestFactory.NullEnvironmentFieldCode, buildError!.Code);
+            Assert.False(mapped, variant);
+            Assert.Equal(ToolFunctionRegistrationRequestFactory.NullEnvironmentFieldCode, mappingError!.Code);
+            Assert.Equal(1, mappingError.ExitCode);
+            Assert.Contains("Command.Environment[0]", mappingError.Message);
+            Assert.False(typed.Ok, variant);
+            Assert.Equal(1, typed.Exit);
+            Assert.Null(typed.Preflight);
+            Assert.Contains(ToolFunctionRegistrationRequestFactory.NullEnvironmentFieldCode, typed.Stderr);
+        }
+
+        [Fact]
+        public void TypedPrerequisite_ValidEnvironmentEntryInPersistedJson_PassesAndKeepsValues()
+        {
+            var recipePath = SaveWithEnvironmentEntry("TMPDIR", "runtime.tmp");
+            Assert.True(ToolFunctionRecipeCliIo.TryLoad(recipePath, TextWriter.Null, out var loaded));
+
+            Assert.True(ToolFunctionRegistrationRequestFactory.TryCheckSpecMapping(loaded!, out var mappingError), mappingError?.Message);
+            var typed = Preflight(recipePath, requireTypedRegistration: true);
+            Assert.True(typed.Ok, typed.Stderr);
+
+            var inputs = new ToolFunctionRegistrationInputs(
+                "req-1", DigestC1, "sha256:" + new string('b', 64), null);
+            Assert.True(ToolFunctionRegistrationRequestFactory.TryBuild(loaded!, inputs, out var plan, out var buildError), buildError?.Message);
+            var entry = Assert.Single(plan!.Request.Spec.Command.Environment);
+            Assert.Equal("TMPDIR", entry.Name);
+            Assert.Equal("runtime.tmp", entry.Source);
+        }
     }
 }

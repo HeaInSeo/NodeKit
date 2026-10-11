@@ -36,6 +36,7 @@ namespace NodeKit.Grpc
         public const string DuplicateOutputPresentationCode = "DUPLICATE_OUTPUT_PRESENTATION";
         public const string OrphanOutputPresentationCode = "ORPHAN_OUTPUT_PRESENTATION";
         public const string PortDirectionMismatchCode = "PORT_DIRECTION_MISMATCH";
+        public const string NullEnvironmentFieldCode = "NULL_ENVIRONMENT_FIELD";
 
         // C1은 ResolvedToolSpec의 ToolSpecDigest — 'sha256:' 접두 없는 64자리 소문자 hex.
         private static readonly Regex _toolSpecDigestPattern =
@@ -206,7 +207,25 @@ namespace NodeKit.Grpc
                 WorkingDirectory = command.WorkingDirectory,
             };
             pbCommand.Arguments.AddRange(command.Arguments);
-            pbCommand.Environment.AddRange(command.Environment.Select(e => new Pb.EnvironmentEntry { Name = e.Name, Source = e.Source }));
+
+            // EnvironmentEntry는 Normalize가 없어 JSON의 null이 그대로 남는다. protobuf
+            // string setter는 null에서 ArgumentNullException을 던지므로 그 전에 거부한다.
+            // 빈 문자열로 바꿔 채우지 않는다.
+            for (var i = 0; i < command.Environment.Count; i++)
+            {
+                var entry = command.Environment[i];
+                if (entry.Name is null || entry.Source is null)
+                {
+                    errors.Add(new ToolFunctionWireError(
+                        NullEnvironmentFieldCode,
+                        $"Command.Environment[{i}]의 name/source가 null입니다. 값을 채우거나 해당 항목을 지우세요.",
+                        1));
+                    continue;
+                }
+
+                pbCommand.Environment.Add(new Pb.EnvironmentEntry { Name = entry.Name, Source = entry.Source });
+            }
+
             pbCommand.SuccessExitCodes.AddRange(command.SuccessExitCodes);
 
             // 미지정(null)과 0은 모두 unset이다(N1). 두 값이 모두 unset인 빈 그룹
