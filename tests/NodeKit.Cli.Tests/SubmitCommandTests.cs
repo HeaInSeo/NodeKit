@@ -1324,9 +1324,9 @@ namespace NodeKit.Cli.Tests
         [Fact]
         public void Submit_FormatJsonl_PreWatchAndWatchFailures_HumanOutputAndExitCodeUnchanged()
         {
-            // human 출력과 기존 exit code는 변경되지 않음(둘 다 exit 1, 동일한
-            // "빌드 실패: {message}" stderr 문구) -- phase/remote_build_state
-            // distinction is jsonl-only.
+            // 기존 exit code는 변경되지 않음(둘 다 exit 1). S2-05-C03: build ID 없는
+            // pre-watch 실패는 human 출력에서도 "빌드 실패"로 단정하지 않는다 --
+            // watch 단계 실패만 "빌드 실패: {message}" 문구를 유지한다.
             var recipePath = WriteFile("recipe.json", ValidRecipeJson);
             using var preWatchStdout = new StringWriter();
             using var preWatchStderr = new StringWriter();
@@ -1353,7 +1353,9 @@ namespace NodeKit.Cli.Tests
 
             Assert.Equal(1, preWatchExit);
             Assert.Equal(1, watchExit);
-            Assert.Equal("빌드 실패: 연결 실패", preWatchStderr.ToString().Trim());
+            Assert.Equal(
+                "빌드 요청 단계에서 실패했습니다 (build ID 없음 — 원격 빌드가 만들어졌는지는 확인하지 못했습니다): 연결 실패",
+                preWatchStderr.ToString().Trim());
             Assert.Contains("빌드 실패: 빌드 실패함", watchStderr.ToString());
             Assert.DoesNotContain('{', preWatchStdout.ToString());
         }
