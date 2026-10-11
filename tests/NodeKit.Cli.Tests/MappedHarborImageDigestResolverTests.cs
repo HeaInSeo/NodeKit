@@ -8,6 +8,7 @@ using Xunit;
 
 namespace NodeKit.Cli.Tests
 {
+    [Collection(nameof(HarborImageMapEnvironmentCollection))]
     public class MappedHarborImageDigestResolverTests : IDisposable
     {
         private readonly string? _originalMap = Environment.GetEnvironmentVariable("NODEKIT_HARBOR_IMAGE_MAP");

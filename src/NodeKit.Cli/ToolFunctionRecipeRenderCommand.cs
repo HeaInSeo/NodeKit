@@ -2,17 +2,15 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
-using NodeKit.Authoring.ToolFunctionRecipes;
 using NodeKit.Grpc;
-using NodeKit.Validation;
 
 namespace NodeKit.Cli
 {
     /// <summary>
     /// nodekit function-recipe render &lt;path&gt; --out &lt;out.json&gt; [--pretty] —
-    /// contracts/cli-function-recipe-commands.md §render. Ready 상태가 아니면
-    /// 거부하고(FR-019), 네트워크 호출은 하지 않으며 State를 바꾸지 않는다
-    /// (FR-020).
+    /// contracts/cli-function-recipe-commands.md §render. Ready 상태가 아니거나
+    /// 현재 내용이 current preflight(S3-09)를 통과하지 못하면 거부하고(FR-019),
+    /// 네트워크 호출은 하지 않으며 State를 바꾸지 않는다(FR-020).
     /// </summary>
     internal static class ToolFunctionRecipeRenderCommand
     {
@@ -56,23 +54,16 @@ namespace NodeKit.Cli
                 return 2;
             }
 
-            // 파일의 State=Ready만 믿고 렌더링하면 목록 원소 null에서
-            // NullReferenceException이 난다 — 출력 파일을 쓰기 전에 L1 위반으로
-            // 돌려준다(S4-03-C).
-            var nullElements = NullCollectionElementValidator.Validate(recipe!, "L1-TFR-013");
-            if (!nullElements.IsValid)
+            // 파일의 State=Ready 표지만 믿지 않는다 — 출력 파일을 쓰기 전에 현재
+            // 내용·base image A·script source를 다시 검증한다(S3-09, S4-03-C/F).
+            // render는 typed 등록을 하지 않으므로 C1 형식 guard는 적용하지 않는다.
+            if (!ToolFunctionSubmissionPreflight.TryRun(
+                recipe!, args[2], requireTypedRegistration: false, stderr, out _, out var exitCode))
             {
-                CliApp.PrintViolations(nullElements.Violations, stderr);
-                return 1;
+                return exitCode;
             }
 
-            if (recipe!.State != ToolFunctionRecipeState.Ready)
-            {
-                stderr.WriteLine("먼저 검증을 통과해 Ready 상태가 되어야 합니다 (nodekit function-recipe validate 실행).");
-                return 1;
-            }
-
-            var json = ToolFunctionBuildRequestPreviewFactory.Build(recipe);
+            var json = ToolFunctionBuildRequestPreviewFactory.Build(recipe!);
             if (flags.Contains("--pretty"))
             {
                 using var document = JsonDocument.Parse(json);
