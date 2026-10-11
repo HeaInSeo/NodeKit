@@ -324,6 +324,84 @@ namespace NodeKit.Cli.Tests
             AssertUnknownCompleted(Assert.Single(ParseRecords(stdout, "cancel")), "CANCEL_REQUEST_ABORTED", 130, "uncertain");
         }
 
+        // r4240863799: Ctrl-C itself (not an injected token) must reach the cancel request. The caller token never
+        // fires here, so the only way to abort the hanging request is the registered interrupt callback.
+        [Fact]
+        public void Cancel_CtrlC_ReachesCancelRequest_OneAbortedCompletedRecord_HandlerRemoved()
+        {
+            var receiptPath = CreateAcknowledgedReceipt();
+            var before = File.ReadAllBytes(receiptPath);
+            using var server = new GrpcTestServer();
+            server.Fake.HangOnCancelToolBuild = true;
+            var interrupt = new RecordingInterrupt();
+            using var press = new Timer(_ => interrupt.Press(), null, TimeSpan.FromMilliseconds(500), Timeout.InfiniteTimeSpan);
+
+            var exitCode = Run(
+                server,
+                new[] { "receipt", "cancel", receiptPath, "--format", "jsonl" },
+                CancellationToken.None,
+                interrupt.Register,
+                out var stdout,
+                out var stderr);
+
+            Assert.Equal(130, exitCode);
+            Assert.Equal(_fixtureBuildIdOnce, server.Fake.CancelledBuildIds);
+            AssertUnknownCompleted(Assert.Single(ParseRecords(stdout, "cancel")), "CANCEL_REQUEST_ABORTED", 130, "uncertain");
+            Assert.Contains("취소 요청을 중단했습니다", stderr, StringComparison.Ordinal);
+            Assert.Equal(1, interrupt.Registrations);
+            Assert.True(interrupt.Removed);
+            Assert.Equal(before, File.ReadAllBytes(receiptPath));
+        }
+
+        // the handler is removed on every cancel outcome, not only after an abort
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void Cancel_AnyOutcome_RegistersCtrlCOnce_AndRemovesIt(bool jsonl)
+        {
+            var receiptPath = CreateAcknowledgedReceipt();
+            using var server = new GrpcTestServer();
+            var interrupt = new RecordingInterrupt();
+            var args = jsonl
+                ? new[] { "receipt", "cancel", receiptPath, "--format", "jsonl" }
+                : new[] { "receipt", "cancel", receiptPath };
+
+            var exitCode = Run(server, args, TestContext.Current.CancellationToken, interrupt.Register, out _, out _);
+
+            Assert.Equal(0, exitCode);
+            Assert.Equal(1, interrupt.Registrations);
+            Assert.True(interrupt.Removed);
+        }
+
+        // watch uses the same interrupt wiring: Ctrl-C stops observation only (no Cancel RPC) and the handler is removed
+        [Fact]
+        public void Watch_CtrlC_StopsObservationOnly_HandlerRemoved()
+        {
+            var receiptPath = CreateAcknowledgedReceipt();
+            using var server = new GrpcTestServer();
+            server.Fake.WatchEvents = new List<ProtoBuildEvent>
+            {
+                new() { Kind = ProtoBuildEventKind.Log, Status = "Running", BuildId = FixtureBuildId },
+            };
+            server.Fake.HangAfterEvents = true;
+            var interrupt = new RecordingInterrupt();
+            using var press = new Timer(_ => interrupt.Press(), null, TimeSpan.FromMilliseconds(500), Timeout.InfiniteTimeSpan);
+
+            var exitCode = Run(
+                server,
+                new[] { "receipt", "watch", receiptPath, "--format", "jsonl" },
+                CancellationToken.None,
+                interrupt.Register,
+                out var stdout,
+                out _);
+
+            Assert.Equal(130, exitCode);
+            Assert.Empty(server.Fake.CancelledBuildIds);
+            AssertUnknownCompleted(ParseRecords(stdout, "watch")[^1], "WATCH_STOPPED", 130, "terminal");
+            Assert.Equal(1, interrupt.Registrations);
+            Assert.True(interrupt.Removed);
+        }
+
         // receipt refusals: existing local code, exit 2, RPC 0, exactly one completed line
         [Theory]
         [InlineData("watch", "corrupt", LocalOperationStore.InvalidCode)]
@@ -468,15 +546,63 @@ namespace NodeKit.Cli.Tests
             GrpcTestServer server, string verb, string receiptPath, CancellationToken cancellationToken, out string stdout, out string stderr) =>
             Run(server, new[] { "receipt", verb, receiptPath, "--format", "jsonl" }, cancellationToken, out stdout, out stderr);
 
-        private static int Run(GrpcTestServer server, string[] args, CancellationToken cancellationToken, out string stdout, out string stderr)
+        private static int Run(GrpcTestServer server, string[] args, CancellationToken cancellationToken, out string stdout, out string stderr) =>
+            Run(server, args, cancellationToken, new RecordingInterrupt().Register, out stdout, out stderr);
+
+        private static int Run(
+            GrpcTestServer server,
+            string[] args,
+            CancellationToken cancellationToken,
+            Func<Action, IDisposable> interruptRegistration,
+            out string stdout,
+            out string stderr)
         {
             using var client = new GrpcToolSpecClient(server.Channel);
             using var stdoutWriter = new StringWriter();
             using var stderrWriter = new StringWriter();
-            var exitCode = ReceiptCommand.Run(args, stdoutWriter, stderrWriter, client, cancellationToken);
+            var exitCode = ReceiptCommand.Run(args, stdoutWriter, stderrWriter, client, cancellationToken, interruptRegistration);
             stdout = stdoutWriter.ToString();
             stderr = stderrWriter.ToString();
             return exitCode;
+        }
+
+        // Console.CancelKeyPress cannot be raised from a test; this stands in for it and records the handler lifetime.
+        private sealed class RecordingInterrupt
+        {
+            private Action? _onInterrupt;
+
+            private int _registrations;
+
+            private int _removed;
+
+            public int Registrations => Volatile.Read(ref _registrations);
+
+            public bool Removed => Volatile.Read(ref _removed) == 1;
+
+            public IDisposable Register(Action onInterrupt)
+            {
+                Volatile.Write(ref _onInterrupt, onInterrupt);
+                Interlocked.Increment(ref _registrations);
+                return new Removal(this);
+            }
+
+            // like a real Ctrl-C after the handler is gone, a press after removal does nothing
+            public void Press()
+            {
+                if (!Removed)
+                {
+                    Volatile.Read(ref _onInterrupt)?.Invoke();
+                }
+            }
+
+            private sealed class Removal : IDisposable
+            {
+                private readonly RecordingInterrupt _owner;
+
+                public Removal(RecordingInterrupt owner) => _owner = owner;
+
+                public void Dispose() => Interlocked.Exchange(ref _owner._removed, 1);
+            }
         }
 
         private static string CorruptReceipt(string receiptPath)

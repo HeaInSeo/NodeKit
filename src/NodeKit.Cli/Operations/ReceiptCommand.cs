@@ -29,12 +29,14 @@ namespace NodeKit.Cli.Operations
         /// <summary>receipt 하위 명령을 실행하고 CLI 종료 코드를 돌려준다.</summary>
         /// <param name="toolSpecClient">테스트 전용 client. 없으면 receipt endpoint로 연결한다.</param>
         /// <param name="cancellationToken">테스트 전용 사용자 취소 신호(Ctrl-C와 같은 경로).</param>
+        /// <param name="interruptRegistration">테스트 전용 Ctrl-C 연결. 없으면 Console.CancelKeyPress에 연결한다.</param>
         public static int Run(
             string[] args,
             TextWriter stdout,
             TextWriter stderr,
             IToolSpecBuildClient? toolSpecClient = null,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            Func<Action, IDisposable>? interruptRegistration = null)
         {
             if (args.Any(a => a is "--help" or "-h"))
             {
@@ -117,9 +119,10 @@ namespace NodeKit.Cli.Operations
                         stdout.WriteLine();
                     }
 
+                    var registerInterrupt = interruptRegistration ?? RegisterConsoleInterrupt;
                     return watch
-                        ? WatchAsync(handle, client, stdout, stderr, jsonl, cancellationToken).GetAwaiter().GetResult()
-                        : CancelAsync(receipt.BuildId!, handle.ReceiptPath, client, stdout, stderr, jsonl, cancellationToken).GetAwaiter().GetResult();
+                        ? WatchAsync(handle, client, stdout, stderr, jsonl, cancellationToken, registerInterrupt).GetAwaiter().GetResult()
+                        : CancelAsync(receipt.BuildId!, handle.ReceiptPath, client, stdout, stderr, jsonl, cancellationToken, registerInterrupt).GetAwaiter().GetResult();
                 }
             }
         }
@@ -188,16 +191,17 @@ namespace NodeKit.Cli.Operations
         }
 
         private static async Task<int> WatchAsync(
-            OperationHandle handle, IToolSpecBuildClient client, TextWriter stdout, TextWriter stderr, bool jsonl, CancellationToken cancellationToken)
+            OperationHandle handle,
+            IToolSpecBuildClient client,
+            TextWriter stdout,
+            TextWriter stderr,
+            bool jsonl,
+            CancellationToken cancellationToken,
+            Func<Action, IDisposable> registerInterrupt)
         {
             var buildId = handle.Receipt.BuildId!;
             using var userCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            ConsoleCancelEventHandler onCancelKeyPress = (_, e) =>
-            {
-                e.Cancel = true;
-                userCts.Cancel();
-            };
-            Console.CancelKeyPress += onCancelKeyPress;
+            using var interrupt = registerInterrupt(() => CancelQuietly(userCts));
             try
             {
                 var result = await ToolSpecOperationRunner.WatchKnownBuildAsync(
@@ -314,23 +318,30 @@ namespace NodeKit.Cli.Operations
                     remoteBuildState: "unknown",
                     message: message);
             }
-            finally
-            {
-                Console.CancelKeyPress -= onCancelKeyPress;
-            }
         }
 
         private static async Task<int> CancelAsync(
-            string buildId, string receiptPath, IToolSpecBuildClient client, TextWriter stdout, TextWriter stderr, bool jsonl, CancellationToken cancellationToken)
+            string buildId,
+            string receiptPath,
+            IToolSpecBuildClient client,
+            TextWriter stdout,
+            TextWriter stderr,
+            bool jsonl,
+            CancellationToken cancellationToken,
+            Func<Action, IDisposable> registerInterrupt)
         {
+            // watch와 같이 Ctrl-C를 이 요청의 token에 연결한다. 연결하지 않으면 프로세스가 그대로 끝나
+            // CANCEL_REQUEST_ABORTED completed 레코드를 내지 못한다(r4240863799).
+            using var userCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            using var interrupt = registerInterrupt(() => CancelQuietly(userCts));
             using var timeoutCts = new CancellationTokenSource(_cancelRequestTimeout);
-            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(userCts.Token, timeoutCts.Token);
             try
             {
                 await client.CancelBuildAsync(buildId, linkedCts.Token).ConfigureAwait(false);
             }
 #pragma warning disable CA1031 // our own token is the only reliable cancel signal; the exception shape varies (SubmitCommand)
-            catch (Exception) when (cancellationToken.IsCancellationRequested)
+            catch (Exception) when (userCts.IsCancellationRequested)
 #pragma warning restore CA1031
             {
                 var message = $"취소 요청을 중단했습니다 (build ID: {buildId}). 서버가 요청을 받았는지 알 수 없습니다.";
@@ -360,6 +371,40 @@ namespace NodeKit.Cli.Operations
 
             stderr.WriteLine(sent);
             return CancelCompleted(stdout, jsonl, 0, buildId, "CANCEL_REQUESTED", "취소 요청을 보냈습니다. 서버가 실제로 멈췄는지는 확인하지 않았습니다.");
+        }
+
+        // 기본 Ctrl-C 연결: e.Cancel로 프로세스를 살려 두어 마지막 completed 레코드를 낼 수 있게 한다.
+        // 반환값을 Dispose하면 handler를 뗀다.
+        private static IDisposable RegisterConsoleInterrupt(Action onInterrupt)
+        {
+            ConsoleCancelEventHandler onCancelKeyPress = (_, e) =>
+            {
+                e.Cancel = true;
+                onInterrupt();
+            };
+            Console.CancelKeyPress += onCancelKeyPress;
+            return new ConsoleInterruptRegistration(onCancelKeyPress);
+        }
+
+        private static void CancelQuietly(CancellationTokenSource userCts)
+        {
+            try
+            {
+                userCts.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // Dispose와 동시에 들어온 신호 — 이미 흐름이 끝났으므로 할 일이 없다.
+            }
+        }
+
+        private sealed class ConsoleInterruptRegistration : IDisposable
+        {
+            private readonly ConsoleCancelEventHandler _handler;
+
+            public ConsoleInterruptRegistration(ConsoleCancelEventHandler handler) => _handler = handler;
+
+            public void Dispose() => Console.CancelKeyPress -= _handler;
         }
 
         private static int WatchCompleted(
