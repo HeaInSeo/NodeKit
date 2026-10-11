@@ -112,12 +112,30 @@ namespace NodeKit.Cli.Operations
             OperationEnvelope envelope,
             SourceSnapshot source,
             string? receiptPath,
+            out OperationHandle? handle) =>
+            TryCreateOperation(OperationReceipt.ToolSpecBuildKind, requestId, endpoint, envelope, source, receiptPath, out handle);
+
+        /// <summary>
+        /// <see cref="TryCreateToolSpecOperation"/>과 같지만 operation 종류를 정한다. 종류는 생성 후 바뀌지 않는다.
+        /// </summary>
+        public OperationStoreError? TryCreateOperation(
+            string operationKind,
+            string requestId,
+            string endpoint,
+            OperationEnvelope envelope,
+            SourceSnapshot source,
+            string? receiptPath,
             out OperationHandle? handle)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(requestId);
             ArgumentNullException.ThrowIfNull(endpoint);
             ArgumentNullException.ThrowIfNull(envelope);
             ArgumentNullException.ThrowIfNull(source);
+            if (!OperationReceipt.IsKnownKind(operationKind))
+            {
+                throw new ArgumentException($"지원하지 않는 operation_kind '{operationKind}'", nameof(operationKind));
+            }
+
             handle = null;
 
             // request ID는 기본 receipt 파일 이름이 된다 — 경로 구분자나 `..`가 섞인 값이
@@ -178,7 +196,7 @@ namespace NodeKit.Cli.Operations
             var receipt = new OperationReceipt
             {
                 SchemaVersion = OperationReceipt.CurrentSchemaVersion,
-                OperationKind = OperationReceipt.ToolSpecBuildKind,
+                OperationKind = operationKind,
                 RequestId = requestId,
                 Endpoint = endpoint,
                 Phase = OperationPhase.Prepared,
@@ -373,7 +391,7 @@ namespace NodeKit.Cli.Operations
                 return Invalid(path, $"지원하지 않는 schema_version '{receipt.SchemaVersion}'");
             }
 
-            if (receipt.OperationKind != OperationReceipt.ToolSpecBuildKind)
+            if (!OperationReceipt.IsKnownKind(receipt.OperationKind))
             {
                 return Invalid(path, $"지원하지 않는 operation_kind '{receipt.OperationKind}'");
             }

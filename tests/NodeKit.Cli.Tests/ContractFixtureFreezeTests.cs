@@ -161,7 +161,7 @@ namespace NodeKit.Cli.Tests
         }
 
         [Fact]
-        public void SubmitBlockDisposition_AnchorsExistInCurrentRepo()
+        public void SubmitBlockDisposition_ReplacedTogetherInP07()
         {
             using var doc = Load("cli-acceptance-contract.json");
             var entries = doc.RootElement.GetProperty("submitBlockDisposition").GetProperty("entries").EnumerateArray().ToArray();
@@ -172,14 +172,21 @@ namespace NodeKit.Cli.Tests
                 Assert.Contains(required, ids);
             }
 
+            // P07 기능 PR이 계약·spec 조항·차단 시험을 함께 바꿨다 — 새 문구는 있어야 하고 옛 차단 문구는 없어야 한다.
             foreach (var entry in entries)
             {
                 var path = Path.Join(RepoRoot(), entry.GetProperty("file").GetString());
                 Assert.True(File.Exists(path), $"missing file: {path}");
+                var content = File.ReadAllText(path);
                 var anchor = entry.GetProperty("anchor").GetString()!;
-                Assert.Contains(anchor, File.ReadAllText(path), StringComparison.Ordinal);
-                Assert.Equal("KEEP_UNTIL_P07", entry.GetProperty("disposition").GetString());
+                Assert.Contains(anchor, content, StringComparison.Ordinal);
+                var retired = entry.GetProperty("retiredAnchor").GetString()!;
+                Assert.DoesNotContain(retired, content, StringComparison.Ordinal);
+                Assert.Equal("REPLACED_IN_P07", entry.GetProperty("disposition").GetString());
             }
+
+            var cliSource = File.ReadAllText(Path.Join(RepoRoot(), "src", "NodeKit.Cli", "ToolFunctionRecipeSubmitCommand.cs"));
+            Assert.DoesNotContain("게이트가 아직 열려 있지 않습니다", cliSource, StringComparison.Ordinal);
         }
 
         [Fact]

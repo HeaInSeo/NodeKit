@@ -29,5 +29,19 @@ namespace NodeKit.Cli
             recipe!.Normalize();
             return true;
         }
+
+        /// <summary>
+        /// 위와 같지만 진단을 직접 쓰지 않고, 파싱한 바로 그 파일 bytes도 돌려준다(submit의 source snapshot용).
+        /// </summary>
+        public static bool TryLoad(string path, out ToolFunctionRecipe? recipe, out AuthoringLoadError? error, out byte[]? rawBytes)
+        {
+            if (!AuthoringFileLoader.TryLoad(path, JsonOptions, out recipe, out error, out rawBytes))
+            {
+                return false;
+            }
+
+            recipe!.Normalize();
+            return true;
+        }
     }
 }

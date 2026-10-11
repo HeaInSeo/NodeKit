@@ -1027,6 +1027,15 @@ $ echo $?
 `type`/`status`/`error_code`로 판단해야 한다 — `message`는 사람이 읽는
 설명 텍스트일 뿐 안정적인 값 집합이 아니다.
 
+`nodekit function-recipe submit`(두 번째 이미지 빌드)은 같은 레코드에 두 값을 더 쓴다:
+`SECOND_IMAGE_DIGEST_MISSING` — Watch가 `Succeeded`를 보냈지만 record `image_digest`가
+`sha256:` + 16진수 64자리가 아니다(exit 1, `phase: "watch"`, `remote_build_state:
+"succeeded"`, `recovery: "uncertain"`; 기반 이미지나 로그 digest로 대신하지 않는다).
+`PREFLIGHT_FAILED` — 로컬 current preflight 거부, 요청 0회(exit 1 또는 source 입력 오류 2,
+`recovery: "terminal"`). 성공 레코드의 `image_digest`는 두 번째 이미지 B, `tool_spec_digest`는
+이번 요청의 C2다. `nodekit receipt watch`도 이 receipt의 B 없는 `Succeeded`를
+`SECOND_IMAGE_DIGEST_MISSING`으로 보고한다.
+
 제출 이전(로컬) 확정 실패에 쓰이는 값 — 전부 `recovery: "terminal"`:
 
 - `URL_REQUIRED` — NodeVault 주소가 없다(`--url`/`NODEKIT_NODEVAULT_URL` 미설정). exit 2.
@@ -2038,9 +2047,15 @@ dotnet run --project src/NodeKit.Cli -- validate /home/user/samtools-1.17.json
   canonicalizer 선택 결과의 기록은 NodeVault가 소유하며 NodeKit은 서버가 돌려준 값을
   그대로 보존한다. 벤더 proto(`protos/SOURCE.md`)는 `RegisterToolFunction`의
   `canonicalization_version`(request 8 / response 4)까지 포함하지만, NodeKit은 아직
-  `RegisterToolFunction`을 호출하지 않는다. `nodekit function-recipe submit`은 지금도 항상
-  차단되며 `function-recipe render`의 build request preview까지만 지원한다. Console/GUI와
-  실제 서버 연동은 후속 단계다.
+  `RegisterToolFunction`을 호출하지 않는다. `nodekit function-recipe submit`(P07)은
+  current preflight를 통과한 `Ready` Recipe의 두 번째 이미지 빌드만 요청한다 —
+  `operation_kind=toolfunction_image_build` receipt를 먼저 남기고 `ResolveToolSpec`(tool_name=
+  FunctionId, version=Revision, raw_spec v1 kind 2) → `SubmitToolBuild` → `WatchToolBuild`를 보낸다.
+  Watch `Succeeded`에 전체 image digest B가 있어야 exit 0이고, B가 없으면
+  `SECOND_IMAGE_DIGEST_MISSING`(exit 1)이다. 빌드 성공은 승인이 아니며 typed 등록은 후속
+  P08이다. 옵션/exit code는 `nodekit submit`과 같고(`--strict-reproducible` 제외), 로컬
+  preflight 실패의 jsonl `error_code`는 `PREFLIGHT_FAILED`다. Console/GUI와 실제 NodeVault
+  function-image builder 연동은 후속 단계다.
 - 5개 method가 생성하는 Dockerfile은 NodeKit L1 정적 검증만 통과했을 뿐,
   실제 `docker build`로 검증된 적은 없다.
 - `recipe create`의 escape hatch는 `/help`, `/review`, `/change-method`,

@@ -230,6 +230,28 @@ namespace NodeKit.Cli.Operations
                 if (result.ExitCode == 0)
                 {
                     var observed = result.ObservedResult;
+
+                    // S3-05-E: 두 번째 이미지 receipt의 Succeeded는 full image digest B가 있어야만 성공이다.
+                    if (handle.Receipt.OperationKind == OperationReceipt.ToolFunctionImageBuildKind
+                        && !SecondImageBuildContext.IsFullImageDigest(observed?.ImageDigest))
+                    {
+                        var missing =
+                            "서버가 Succeeded를 보냈지만 두 번째 이미지 digest(B)가 'sha256:' + 16진수 64자리로 오지 않았습니다. " +
+                            "등록 가능한 결과로 쓰지 않습니다 — NodeVault에서 빌드 결과를 직접 확인하세요.";
+                        stderr.WriteLine($"{SubmitCommand.SecondImageDigestMissingCode}: {missing} (build ID: {buildId})");
+                        return WatchCompleted(
+                            stdout,
+                            jsonl,
+                            1,
+                            RecoveryDisposition.Uncertain,
+                            buildId,
+                            status: observed?.Status,
+                            errorCode: SubmitCommand.SecondImageDigestMissingCode,
+                            remoteBuildState: "succeeded",
+                            message: missing,
+                            integrityHealth: observed?.IntegrityHealth);
+                    }
+
                     if (jsonl)
                     {
                         // S2-05-C06과 같은 원칙: Partial 등 integrity 상태는 필드로만 싣고 stderr에 따로 내지 않는다.

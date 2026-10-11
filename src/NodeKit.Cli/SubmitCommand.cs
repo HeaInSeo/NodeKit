@@ -39,6 +39,9 @@ namespace NodeKit.Cli
         // 주입된 test client에는 실제 주소가 없다 — receipt endpoint에는 이 표식을 남긴다.
         private const string InjectedClientEndpoint = "injected-client";
 
+        /// <summary>두 번째 이미지 빌드가 Succeeded인데 full image digest B가 없다(S3-05-E).</summary>
+        internal const string SecondImageDigestMissingCode = "SECOND_IMAGE_DIGEST_MISSING";
+
         private static readonly JsonSerializerOptions _recipeReadOptions = new()
         {
             PropertyNameCaseInsensitive = true,
@@ -107,19 +110,8 @@ namespace NodeKit.Cli
 
             var journal = toolSpecClient is null || receiptOption is not null || requestIdProvider is not null;
 
-            var url = urlOption ?? Environment.GetEnvironmentVariable("NODEKIT_NODEVAULT_URL");
-
-            if (toolSpecClient is null && string.IsNullOrWhiteSpace(url))
+            if (!TryRequireUrl(urlOption, toolSpecClient, jsonl, "nodekit submit recipe.json", stdout, stderr, out var url))
             {
-                const string message = "NodeVault 주소가 필요합니다. --url 옵션 또는 NODEKIT_NODEVAULT_URL 환경변수를 설정하세요.";
-                if (jsonl)
-                {
-                    WriteJsonl(stdout, SubmitJsonlRecord.Completed("Failed", errorCode: "URL_REQUIRED", message: message, recovery: RecoveryDisposition.Terminal));
-                    return 2;
-                }
-
-                stderr.WriteLine(message);
-                stderr.WriteLine("예: NODEKIT_NODEVAULT_URL=http://100.123.80.48:50051 nodekit submit recipe.json");
                 return 2;
             }
 
@@ -155,7 +147,68 @@ namespace NodeKit.Cli
             }
 
             var definition = RecipeRenderer.Render(recipe);
-            var rawSpec = ToolSpecRawSpecFactory.Build(definition);
+            var request = new SubmitOperationRequest
+            {
+                RecipePath = recipePath,
+                Url = url,
+                ReceiptPath = receiptOption,
+                ConnectTimeout = connectTimeout,
+                WatchTimeout = watchTimeout,
+                Jsonl = jsonl,
+                Journal = journal,
+                OperationKind = OperationReceipt.ToolSpecBuildKind,
+                Envelope = new OperationEnvelope
+                {
+                    ToolName = definition.Name,
+                    Version = definition.Version,
+                    RawSpec = ToolSpecRawSpecFactory.Build(definition),
+                },
+                SourceFiles = new[] { (Path.GetFileName(recipePath), recipeBytes!) },
+            };
+
+            return RunOperation(request, stdout, stderr, toolSpecClient, requestIdProvider, cancellationToken);
+        }
+
+        /// <summary>
+        /// NodeVault 주소를 정한다. 주입된 client가 없는데 --url도 환경변수도 없으면 안내 후 false(exit 2).
+        /// </summary>
+        internal static bool TryRequireUrl(
+            string? urlOption, IToolSpecBuildClient? toolSpecClient, bool jsonl, string example, TextWriter stdout, TextWriter stderr, out string? url)
+        {
+            url = urlOption ?? Environment.GetEnvironmentVariable("NODEKIT_NODEVAULT_URL");
+            if (toolSpecClient is not null || !string.IsNullOrWhiteSpace(url))
+            {
+                return true;
+            }
+
+            const string message = "NodeVault 주소가 필요합니다. --url 옵션 또는 NODEKIT_NODEVAULT_URL 환경변수를 설정하세요.";
+            if (jsonl)
+            {
+                WriteJsonl(stdout, SubmitJsonlRecord.Completed("Failed", errorCode: "URL_REQUIRED", message: message, recovery: RecoveryDisposition.Terminal));
+                return false;
+            }
+
+            stderr.WriteLine(message);
+            stderr.WriteLine($"예: NODEKIT_NODEVAULT_URL=http://100.123.80.48:50051 {example}");
+            return false;
+        }
+
+        /// <summary>
+        /// 로컬 검증을 마친 요청을 ResolveToolSpec → SubmitToolBuild → WatchToolBuild로 보낸다.
+        /// journal이면 prepared receipt를 먼저 저장하고, 저장하지 못하면 어떤 RPC도 보내지 않는다(exit 2).
+        /// </summary>
+        internal static int RunOperation(
+            SubmitOperationRequest request,
+            TextWriter stdout,
+            TextWriter stderr,
+            IToolSpecBuildClient? toolSpecClient,
+            Func<string>? requestIdProvider,
+            CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+            var url = request.Url;
+            var jsonl = request.Jsonl;
+            var envelope = request.Envelope;
 
             GrpcToolSpecClient? grpc = null;
             if (toolSpecClient is null)
@@ -191,37 +244,32 @@ namespace NodeKit.Cli
             using (grpc)
             {
                 IToolSpecBuildClient client = toolSpecClient ?? grpc!;
-                if (!journal)
+                if (!request.Journal)
                 {
-                    PrintBanner(stdout, url, definition.Name, definition.Version, receiptPath: null, requestId: null, jsonl);
+                    PrintBanner(stdout, url, envelope.ToolName, envelope.Version, receiptPath: null, requestId: null, jsonl, request.SecondImage);
                     return SubmitAsync(
-                            ct => client.ResolveAndBuildAsync(definition.Name, definition.Version, rawSpec, ct),
+                            ct => client.ResolveAndBuildAsync(envelope.ToolName, envelope.Version, envelope.RawSpec, ct),
                             client,
                             run: null,
                             stdout,
                             stderr,
-                            connectTimeout,
-                            watchTimeout,
+                            request.ConnectTimeout,
+                            request.WatchTimeout,
                             jsonl,
-                            cancellationToken)
+                            cancellationToken,
+                            request.SecondImage)
                         .GetAwaiter().GetResult();
                 }
 
-                // S2-02: 검증·렌더한 바로 그 Recipe bytes와 요청 envelope를 prepared로 먼저 저장한다.
+                // S2-02: 검증·렌더한 바로 그 입력 bytes와 요청 envelope를 prepared로 먼저 저장한다.
                 // 저장하지 못하면 어떤 RPC도 보내지 않는다(exit 2).
                 var endpoint = url ?? InjectedClientEndpoint;
-                var store = receiptOption is null
-                    ? LocalOperationStore.ForRecipe(recipePath)
-                    : LocalOperationStore.ForReceipt(receiptOption);
+                var store = request.ReceiptPath is null
+                    ? LocalOperationStore.ForRecipe(request.RecipePath)
+                    : LocalOperationStore.ForReceipt(request.ReceiptPath);
                 var requestId = (requestIdProvider ?? NewRequestId)();
-                var envelope = new OperationEnvelope
-                {
-                    ToolName = definition.Name,
-                    Version = definition.Version,
-                    RawSpec = rawSpec,
-                };
-                var source = SourceSnapshot.FromFiles(new[] { (Path.GetFileName(recipePath), recipeBytes!) });
-                var createError = store.TryCreateToolSpecOperation(requestId, endpoint, envelope, source, receiptOption, out var handle);
+                var source = SourceSnapshot.FromFiles(request.SourceFiles);
+                var createError = store.TryCreateOperation(request.OperationKind, requestId, endpoint, envelope, source, request.ReceiptPath, out var handle);
                 if (createError is not null)
                 {
                     return ReportStoreFailure(stdout, stderr, createError.Code, createError.Message, createError.ExitCode, buildId: null, jsonl);
@@ -229,7 +277,7 @@ namespace NodeKit.Cli
 
                 using (handle)
                 {
-                    PrintBanner(stdout, url, definition.Name, definition.Version, handle!.ReceiptPath, requestId, jsonl);
+                    PrintBanner(stdout, url, envelope.ToolName, envelope.Version, handle!.ReceiptPath, requestId, jsonl, request.SecondImage);
                     var run = new ReceiptRun { Handle = handle };
                     return SubmitAsync(
                             ct => RunWithReceiptAsync(handle, client, endpoint, run, ct),
@@ -237,10 +285,11 @@ namespace NodeKit.Cli
                             run,
                             stdout,
                             stderr,
-                            connectTimeout,
-                            watchTimeout,
+                            request.ConnectTimeout,
+                            request.WatchTimeout,
                             jsonl,
-                            cancellationToken)
+                            cancellationToken,
+                            request.SecondImage)
                         .GetAwaiter().GetResult();
                 }
             }
@@ -248,7 +297,8 @@ namespace NodeKit.Cli
 
         private static string NewRequestId() => Guid.NewGuid().ToString("D");
 
-        private static void PrintBanner(TextWriter stdout, string? url, string toolName, string version, string? receiptPath, string? requestId, bool jsonl)
+        private static void PrintBanner(
+            TextWriter stdout, string? url, string toolName, string version, string? receiptPath, string? requestId, bool jsonl, SecondImageBuildContext? secondImage)
         {
             // --format jsonl에서는 stdout에 JSON 레코드만 나가야 한다(Issue #82) —
             // 이 안내 문구도 사람이 읽는 프리텍스트라 jsonl 모드에서는 생략한다.
@@ -258,8 +308,18 @@ namespace NodeKit.Cli
                 return;
             }
 
-            stdout.WriteLine($"NodeVault에 빌드 요청을 시작합니다: {url ?? "(주입된 클라이언트)"}");
-            stdout.WriteLine($"  도구: {toolName} {version}");
+            if (secondImage is null)
+            {
+                stdout.WriteLine($"NodeVault에 빌드 요청을 시작합니다: {url ?? "(주입된 클라이언트)"}");
+                stdout.WriteLine($"  도구: {toolName} {version}");
+            }
+            else
+            {
+                stdout.WriteLine($"NodeVault에 ToolFunction 두 번째 이미지 빌드 요청을 시작합니다: {url ?? "(주입된 클라이언트)"}");
+                stdout.WriteLine($"  함수: {toolName} {version}");
+                stdout.WriteLine($"  기반 이미지(A): {secondImage.BaseImageDigest}");
+                stdout.WriteLine($"  기반 ToolSpec(C1): {secondImage.BaseToolSpecDigest}");
+            }
             if (receiptPath is not null)
             {
                 stdout.WriteLine($"  기록: {receiptPath} (request ID: {requestId})");
@@ -314,6 +374,84 @@ namespace NodeKit.Cli
                 ? message
                 : $"{message} NodeVault에서 빌드 상태를 직접 확인하세요 (build ID: {buildId}).");
             return stopped.ExitCode;
+        }
+
+        // S3-05-A/E: 두 번째 이미지 빌드의 Succeeded는 WatchToolBuild record가 full image digest B를
+        // 실어 보냈을 때만 등록에 쓸 수 있는 결과다. B가 없거나 잘렸으면 기반 이미지 A나 로그
+        // digest로 채우지 않고 exit 1로 끝낸다 — 빌드는 서버에서 끝났을 수 있으므로 recovery는
+        // uncertain이다. 어느 쪽이든 typed 등록(RegisterToolFunction)은 하지 않는다.
+        private static int ReportSecondImageSucceeded(
+            TextWriter stdout,
+            TextWriter stderr,
+            SecondImageBuildContext secondImage,
+            string? buildId,
+            string? watchImageDigest,
+            string? imageRef,
+            string? integrityHealth,
+            string? requestToolSpecDigest,
+            ReceiptRun? run,
+            bool jsonl)
+        {
+            if (!SecondImageBuildContext.IsFullImageDigest(watchImageDigest))
+            {
+                var message =
+                    "서버가 Succeeded를 보냈지만 두 번째 이미지 digest(B)가 'sha256:' + 16진수 64자리로 오지 않았습니다 " +
+                    $"(받은 값: {(string.IsNullOrEmpty(watchImageDigest) ? "(없음)" : watchImageDigest)}). " +
+                    "등록 가능한 결과로 쓰지 않으며, 기반 이미지(A)나 로그 digest로 대신하지 않습니다.";
+                if (jsonl)
+                {
+                    WriteJsonl(
+                        stdout,
+                        SubmitJsonlRecord.Completed(
+                            "Failed",
+                            buildId,
+                            SecondImageDigestMissingCode,
+                            message,
+                            phase: "watch",
+                            remoteBuildState: "succeeded",
+                            recovery: RecoveryDisposition.Uncertain,
+                            toolSpecDigest: requestToolSpecDigest));
+                    return 1;
+                }
+
+                stderr.WriteLine($"{SecondImageDigestMissingCode}: {message}");
+                stderr.WriteLine(string.IsNullOrEmpty(buildId)
+                    ? "NodeVault에서 빌드 결과를 직접 확인하세요."
+                    : $"NodeVault에서 빌드 결과를 직접 확인하세요 (build ID: {buildId})." + WatchHint(run));
+                return 1;
+            }
+
+            if (jsonl)
+            {
+                WriteJsonl(
+                    stdout,
+                    SubmitJsonlRecord.Completed(
+                        "Succeeded",
+                        buildId,
+                        imageRef: imageRef,
+                        imageDigest: watchImageDigest,
+                        integrityHealth: integrityHealth,
+                        recovery: RecoveryDisposition.None,
+                        toolSpecDigest: requestToolSpecDigest));
+                return 0;
+            }
+
+            stdout.WriteLine(string.IsNullOrEmpty(imageRef)
+                ? $"두 번째 이미지(B) digest: {watchImageDigest}"
+                : $"두 번째 이미지(B) digest: {imageRef}@{watchImageDigest}");
+            if (!string.IsNullOrEmpty(requestToolSpecDigest))
+            {
+                stdout.WriteLine($"이번 요청 ToolSpec digest(C2): {requestToolSpecDigest}");
+            }
+
+            stdout.WriteLine($"기반 이미지(A)·기반 ToolSpec(C1)은 그대로입니다: {secondImage.BaseImageDigest} / {secondImage.BaseToolSpecDigest}");
+            stdout.WriteLine("빌드 성공은 승인(Approved)이 아니며, ToolFunction typed 등록은 하지 않았습니다.");
+            if (!string.IsNullOrEmpty(integrityHealth) && integrityHealth != "Healthy")
+            {
+                stderr.WriteLine($"경고: 무결성 상태가 {integrityHealth}입니다 — 빌드는 성공했지만 후속 검증/등록에 문제가 있을 수 있습니다. NodeVault 인덱스에서 확인하세요.");
+            }
+
+            return 0;
         }
 
         /// <summary>
@@ -385,7 +523,8 @@ namespace NodeKit.Cli
             TimeSpan? connectTimeout = null,
             TimeSpan? watchTimeout = null,
             bool jsonl = false,
-            CancellationToken userCancellation = default)
+            CancellationToken userCancellation = default,
+            SecondImageBuildContext? secondImage = null)
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(userCancellation);
 
@@ -414,6 +553,10 @@ namespace NodeKit.Cli
             string? lastImageRef = null;
             string? lastIntegrityHealth = null;
             string? resolvedToolSpecDigest = null;
+
+            // WatchToolBuild record의 image_digest만 담는다. legacy DigestAcquired 로그 digest는
+            // 두 번째 이미지 B의 근거로 쓰지 않는다(S3-05-E).
+            string? watchImageDigest = null;
             DateTimeOffset? lastEventReceivedAt = null;
             ConsoleCancelEventHandler onCancelKeyPress = (_, e) =>
             {
@@ -507,6 +650,7 @@ namespace NodeKit.Cli
                         digestReceived = true;
                         lastImageDigest = ev.ImageDigest;
                         lastImageRef = ev.ImageRef;
+                        watchImageDigest = ev.ImageDigest;
                     }
 
                     if (!string.IsNullOrEmpty(ev.IntegrityHealth))
@@ -521,6 +665,12 @@ namespace NodeKit.Cli
 
                     if (ev.Kind == BuildEventKind.Succeeded)
                     {
+                        if (secondImage is not null)
+                        {
+                            return ReportSecondImageSucceeded(
+                                stdout, stderr, secondImage, buildId, watchImageDigest, lastImageRef, lastIntegrityHealth, resolvedToolSpecDigest, run, jsonl);
+                        }
+
                         if (jsonl)
                         {
                             // 아래 human 전용 분기의 degraded IntegrityHealth stderr 경고를
@@ -896,7 +1046,7 @@ namespace NodeKit.Cli
             }
         }
 
-        private static void WriteJsonl(TextWriter stdout, SubmitJsonlRecord record) =>
+        internal static void WriteJsonl(TextWriter stdout, SubmitJsonlRecord record) =>
             stdout.WriteLine(JsonSerializer.Serialize(record, _jsonlOptions));
 
         // --format jsonl의 "state" 필드 값 — ev.Status(WatchToolBuild 경로가
@@ -920,6 +1070,23 @@ namespace NodeKit.Cli
             out TimeSpan? connectTimeout,
             out TimeSpan? watchTimeout,
             out bool strictReproducible,
+            out bool jsonl) =>
+            TryParseOptions(args, 2, allowStrictReproducible: true, stderr, out url, out receiptPath, out connectTimeout, out watchTimeout, out strictReproducible, out jsonl);
+
+        /// <summary>
+        /// submit 계열 공통 옵션. `function-recipe submit`은 옵션이 인덱스 3부터 시작하고
+        /// --strict-reproducible(ToolSpec Recipe 전용 L1)을 받지 않는다.
+        /// </summary>
+        internal static bool TryParseOptions(
+            string[] args,
+            int startIndex,
+            bool allowStrictReproducible,
+            TextWriter stderr,
+            out string? url,
+            out string? receiptPath,
+            out TimeSpan? connectTimeout,
+            out TimeSpan? watchTimeout,
+            out bool strictReproducible,
             out bool jsonl)
         {
             url = null;
@@ -931,10 +1098,10 @@ namespace NodeKit.Cli
 
             if (!CliOptionParser.TryParse(
                 args,
-                startIndex: 2,
+                startIndex,
                 stderr,
                 valueOptions: new[] { "--url", "--receipt", "--connect-timeout", "--watch-timeout", "--format" },
-                flagOptions: new[] { "--strict-reproducible" },
+                flagOptions: allowStrictReproducible ? new[] { "--strict-reproducible" } : Array.Empty<string>(),
                 out var values,
                 out var flags))
             {

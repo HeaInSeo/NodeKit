@@ -41,6 +41,17 @@ namespace NodeKit.Cli.Operations
 
         public const string ToolSpecBuildKind = "toolspec_build";
 
+        /// <summary>
+        /// ToolFunctionRecipe의 두 번째 이미지 빌드(raw_spec.v1 kind 2, P07). ToolSpec 빌드와 같은
+        /// Resolve→Submit→Watch 순서·phase를 쓰지만, resolved snapshot의 ToolSpec digest는 이번 요청의
+        /// C2이고 terminal 관측의 image_digest는 두 번째 이미지 B다. 기반 C1/A의 receipt와 섞이지 않도록
+        /// 종류를 따로 둔다. typed 등록(RegisterToolFunction)은 이 operation에 들어 있지 않다.
+        /// </summary>
+        public const string ToolFunctionImageBuildKind = "toolfunction_image_build";
+
+        public static bool IsKnownKind(string? kind) =>
+            kind is ToolSpecBuildKind or ToolFunctionImageBuildKind;
+
         [JsonPropertyName("schema_version")]
         public required string SchemaVersion { get; init; }
 

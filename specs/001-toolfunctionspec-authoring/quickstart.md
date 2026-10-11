@@ -57,13 +57,17 @@ dotnet run --project src/NodeKit.Cli -- function-recipe render samtools-sort.jso
 
 같은 명령을 `state: "Draft"`인 파일에 실행하면 exit 1 + "먼저 검증을 통과해야 합니다" 메시지.
 
-## 시나리오 3b — FR-021/SC-005: 제출 시도는 항상 차단
+## 시나리오 3b — FR-020/FR-021/SC-005: 두 번째 이미지 빌드 제출 (P07, 2026-10-11 정정)
 
 ```bash
-dotnet run --project src/NodeKit.Cli -- function-recipe submit samtools-sort.json
+NODEKIT_NODEVAULT_URL=http://<nodevault>:50051 dotnet run --project src/NodeKit.Cli -- function-recipe submit samtools-sort.json
 ```
 
-**기대 결과**: `samtools-sort.json`이 `Ready`(시나리오 1 이후)든 `Draft`(검증 전)든 **State와 무관하게 항상** exit 1 + "NodeVault ToolFunction 빌드 게이트가 아직 열려 있지 않습니다" 계열의 구체적 안내. 일반 "알 수 없는 명령" usage 오류(exit 2)가 아니어야 한다 — 이게 실수하기 가장 쉬운 지점이다(이전 계획 초안에서 실제로 이 요구사항을 빠뜨렸던 이력 참고). 파일은 어떤 필드도 변경되지 않는다(네트워크 호출 없음, `State`는 `Submitted`로 전이하지 않음).
+**기대 결과**:
+- `Draft`(검증 전)이거나 현재 내용이 검증에 실패하면 exit 1 + 구체적 진단, 요청 0회. 일반 "알 수 없는 명령" usage 오류(exit 2)가 아니어야 한다.
+- 유효한 `Ready`이면 Recipe 옆 `.nodekit/receipts/<request-id>.json`(`operation_kind=toolfunction_image_build`)을 먼저 남긴 뒤 `ResolveToolSpec → SubmitToolBuild → WatchToolBuild`를 보낸다. Watch `Succeeded`에 전체 두 번째 이미지 digest B가 있으면 exit 0과 B/C2/build ID를 출력한다.
+- `Failed`/`Interrupted`, 최종 상태 없는 종료, B 없는 `Succeeded`는 exit 1이다.
+- 빌드 성공은 승인이 아니고 typed 등록은 하지 않는다. Recipe 파일은 어떤 필드도 변경되지 않는다.
 
 ## 시나리오 4 — FR-023: 파일 충돌 감지
 
@@ -85,7 +89,7 @@ dotnet run --project src/NodeKit.Cli -- recipe create --non-interactive --method
 - 시나리오 1 → `tests/NodeKit.Tests/ToolFunctionRecipes/ToolFunctionRecipeValidationPipelineTests.cs` + `tests/NodeKit.Cli.Tests/ToolFunctionRecipeCreateCommandTests.cs`
 - 시나리오 2 → `tests/NodeKit.Tests/ToolFunctionRecipes/ToolFunctionRecipeValidatorTests.cs`(`L1-TFR-003` 케이스)
 - 시나리오 3 → `tests/NodeKit.Cli.Tests/ToolFunctionRecipeCreateCommandTests.cs`(render 하위 케이스) 또는 별도 `ToolFunctionRecipeRenderCommandTests.cs`
-- 시나리오 3b → `tests/NodeKit.Cli.Tests/ToolFunctionRecipeSubmitCommandTests.cs` — `Draft`/`Ready` 두 State 모두에서 exit 1 + 게이트 메시지 확인하는 테스트 최소 2개(SC-005 "모든 경우 100%"를 부분적으로나마 회귀 방지)
+- 시나리오 3b → `tests/NodeKit.Cli.Tests/ToolFunctionRecipeSubmitCommandTests.cs`(입력/Draft/invalid RPC 0회) + `tests/NodeKit.Cli.Tests/ToolFunctionSecondImageBuildP07Tests.cs`(in-process fake BuildService로 S3-05-A..E, S3-04-C, S3-09)
 - 시나리오 4 → `tests/NodeKit.Cli.Tests/ToolFunctionRecipeSavePathConfirmationTests.cs`
 - 시나리오 5 → `tests/NodeKit.Cli.Tests/RecipeCreateCommandTests.cs`에 회귀 케이스 추가(기존 파일 수정)
 
