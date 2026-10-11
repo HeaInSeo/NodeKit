@@ -55,7 +55,6 @@ namespace NodeKit.Cli
         };
 
         /// <param name="requestIdProvider">테스트 전용 고정 request ID. 주면 receipt 기록도 켠다.</param>
-        /// <param name="cancellationToken">테스트 전용 사용자 취소 신호(Ctrl-C와 같은 경로).</param>
         /// <remarks>
         /// 실제 CLI(주입 client 없음)는 항상 durable receipt를 남긴다(S2-02): 기본 위치는 Recipe 옆
         /// `.nodekit/receipts/&lt;request-id&gt;.json`, `--receipt`로 바꿀 수 있다. 주입된 client로
@@ -67,8 +66,26 @@ namespace NodeKit.Cli
             TextWriter stdout,
             TextWriter stderr,
             IToolSpecBuildClient? toolSpecClient = null,
-            Func<string>? requestIdProvider = null,
-            CancellationToken cancellationToken = default)
+            Func<string>? requestIdProvider = null) =>
+            RunCore(args, stdout, stderr, toolSpecClient, requestIdProvider, CancellationToken.None);
+
+        /// <summary>테스트 전용: <see cref="Run"/>과 같지만 사용자 취소 신호(Ctrl-C와 같은 경로)를 받는다.</summary>
+        internal static int RunUntilUserCancel(
+            string[] args,
+            TextWriter stdout,
+            TextWriter stderr,
+            IToolSpecBuildClient toolSpecClient,
+            Func<string>? requestIdProvider,
+            CancellationToken userCancellation) =>
+            RunCore(args, stdout, stderr, toolSpecClient, requestIdProvider, userCancellation);
+
+        private static int RunCore(
+            string[] args,
+            TextWriter stdout,
+            TextWriter stderr,
+            IToolSpecBuildClient? toolSpecClient,
+            Func<string>? requestIdProvider,
+            CancellationToken cancellationToken)
         {
             if (args.Any(a => a is "--help" or "-h"))
             {

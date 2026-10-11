@@ -399,7 +399,7 @@ namespace NodeKit.Cli.Tests
             using var stdoutWriter = new StringWriter();
             using var stderrWriter = new StringWriter();
             var args = new[] { "submit", WriteRecipe() }.Concat(extraArgs).ToArray();
-            var exitCode = SubmitCommand.Run(args, stdoutWriter, stderrWriter, client, () => FixedRequestId, cancellationToken);
+            var exitCode = SubmitCommand.RunUntilUserCancel(args, stdoutWriter, stderrWriter, client, () => FixedRequestId, cancellationToken);
             stdout = stdoutWriter.ToString();
             stderr = stderrWriter.ToString();
             return exitCode;
