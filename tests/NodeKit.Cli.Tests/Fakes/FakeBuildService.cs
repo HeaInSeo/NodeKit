@@ -34,6 +34,9 @@ namespace NodeKit.Cli.Tests.Fakes
 
         public List<string> CancelledBuildIds { get; } = new();
 
+        /// <summary>null이 아니면 CancelToolBuild가 요청을 기록한 뒤 이 예외로 실패한다.</summary>
+        public RpcException? CancelToolBuildFailure { get; set; }
+
         // S2-01 wire capture: 실제 generated gRPC로 역직렬화된 요청과 RPC 순서를
         // 그대로 남긴다. fake는 raw_spec parse/DisallowUnknownFields/full pin/
         // server dedup/registry 존재 여부를 검증하지 않는다 — 전송 계약만 본다.
@@ -100,6 +103,11 @@ namespace NodeKit.Cli.Tests.Fakes
             CancelToolBuildRequest request, ServerCallContext context)
         {
             CancelledBuildIds.Add(request.BuildId);
+            if (CancelToolBuildFailure is { } failure)
+            {
+                throw failure;
+            }
+
             return Task.FromResult(new CancelToolBuildResponse
             {
                 BuildId = request.BuildId,

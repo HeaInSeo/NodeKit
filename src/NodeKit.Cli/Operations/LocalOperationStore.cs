@@ -413,7 +413,7 @@ namespace NodeKit.Cli.Operations
                 return resolvedError;
             }
 
-            if (CheckPhaseField(path, receipt.Phase, "build_id", receipt.BuildId is not null, !string.IsNullOrEmpty(receipt.BuildId), rank >= OperationPhase.Rank(OperationPhase.Acknowledged)) is { } buildIdError)
+            if (CheckPhaseField(path, receipt.Phase, "build_id", receipt.BuildId is not null, !string.IsNullOrWhiteSpace(receipt.BuildId), rank >= OperationPhase.Rank(OperationPhase.Acknowledged)) is { } buildIdError)
             {
                 return buildIdError;
             }
