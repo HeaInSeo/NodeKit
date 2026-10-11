@@ -155,7 +155,7 @@ namespace NodeKit.Cli.Tests
 
         [Theory]
         [MemberData(nameof(RejectedSchemaVariants))]
-        public void RejectedSchema_FunctionRecipeSubmit_ReturnsTwoBeforeGateMessage(string id, string? schemaJson)
+        public void RejectedSchema_FunctionRecipeSubmit_ReturnsTwoBeforeAnyRequest(string id, string? schemaJson)
         {
             var recipePath = WriteFile($"{id}.json", FunctionRecipe(schemaJson));
 

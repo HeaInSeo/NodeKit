@@ -80,7 +80,7 @@ NodeKit 사용자(도구 작성자)는 이미 확정된 ToolSpec image digest를
 
 1. **Given** `Ready` 상태의 Recipe, **When** 사용자가 렌더링을 실행하면, **Then** 모든 선언 필드가 포함된 canonical JSON 파일이 로컬에 생성되고 Recipe 상태는 `Ready`로 유지된다.
 2. **Given** 아직 `Draft` 상태인 Recipe, **When** 사용자가 렌더링을 시도하면, **Then** 시스템은 렌더링을 거부하고 먼저 검증을 통과해 `Ready` 상태가 되어야 한다고 안내한다.
-3. **Given** 렌더링된 JSON 미리보기, **When** 사용자가 이를 NodeVault로 제출하려는 동작을 시도하면, **Then** 시스템은 실제로 전송하지 않고 "NodeVault ToolFunction 빌드 게이트가 아직 열려 있지 않다"는 명확한 안내를 표시하며 Recipe는 `Ready`에 머무른다.
+3. **Given** `Ready` 상태이고 현재 내용이 검증을 통과하는 Recipe, **When** 사용자가 `function-recipe submit`으로 제출하면, **Then** 시스템은 두 번째 이미지 빌드를 NodeVault BuildService(`ResolveToolSpec → SubmitToolBuild → WatchToolBuild`, raw_spec v1 kind 2)로 요청하고 그 결과(build ID, 이번 요청 ToolSpec digest C2, 두 번째 이미지 digest B 또는 실패/미확인)를 명확히 보여준다. 빌드 성공은 승인이 아니며, Recipe 파일의 `State`는 바뀌지 않는다. 단, 현재 NodeVault 빌드 경로는 kind 2를 받지 않으므로(벤더 proto `BUILD_KIND_TOOLFUNCTIONSPEC` 예약) NodeVault가 kind 2를 수용하기 전까지 시스템은 요청을 보내지 않고 `TOOLFUNCTION_BUILD_GATE_CLOSED` 안내와 exit 1로 끝낸다. (P07, 2026-10-11 정정)
 
 ---
 
@@ -105,7 +105,7 @@ NodeKit 사용자(도구 작성자)는 이미 확정된 ToolSpec image digest를
 - enforced 자원에서 limit이 request보다 작으면 어떻게 되는가? → 검증 실패, 구체적 필드 지목.
 - `functionId`가 형식 규칙(공백/허용 문자/대소문자 규칙 등)을 어기면 어떻게 되는가? → 검증 실패, 형식 안내 메시지 표시.
 - 같은 `functionId`로 여러 revision의 Recipe 파일을 동시에 만들면 어떻게 되는가? → 로컬 파일 경로/이름 충돌을 감지하고 명확히 안내한다(덮어쓰기 묵인 금지).
-- 사용자가 (아직 존재하지 않는) 제출 동작을 시도하면 어떻게 되는가? → 오류 코드 노출이나 무응답 대신 "NodeVault ToolFunction 빌드 게이트 미개방"이라는 사용자 친화적 안내를 표시하며 상태 전이는 일어나지 않는다.
+- 사용자가 `Draft`이거나 현재 내용이 검증에 실패하는 Recipe를 제출하면 어떻게 되는가? → 요청을 보내지 않고(RPC 0회) 구체적 진단과 exit 1을 낸다. NodeVault가 빌드를 거부·실패·중단하거나 결과를 확인하지 못한 채 끝나면, 성공으로 표시하지 않고 원인과 다음 확인 방법을 안내한다. NodeVault가 아직 kind 2를 받지 않는 동안에는 유효한 `Ready`도 요청 없이 그 사유(`TOOLFUNCTION_BUILD_GATE_CLOSED`)를 안내한다. 어느 경우에도 Recipe 파일의 상태 전이는 일어나지 않는다.
 - 필수 자원 필드가 비어 있는 상태로 렌더링을 시도하면 어떻게 되는가? → 렌더링이 거부되고 어떤 필드가 누락됐는지 표시된다. 포트가 0개인 것은 누락이 아니다.
 - 사용자가 로컬에서 직접 Recipe 상태를 `Submitted`/`Built`/`Validated`/`Approved`로 바꾸려 하면 어떻게 되는가? → 이 상태들은 NodeVault/NodeSentinel의 실제 처리 결과를 반영하는 자리이며, 이번 기능은 이 상태로의 전이 수단을 제공하지 않는다.
 
@@ -132,8 +132,8 @@ NodeKit 사용자(도구 작성자)는 이미 확정된 ToolSpec image digest를
 - **FR-017**: 시스템은 `Ready` 상태로 전이하기 전에 다음 규칙을 포함한 정적 검증을 수행해야 한다: `functionId` 형식, 명령 구조화 강제, 포트 이름 유일성, enforced 자원의 limit ≥ request, 필수 필드(샘플 데이터/fixture 참조 포함) 완결성.
 - **FR-018**: 시스템은 검증에 실패한 Recipe를 `Ready`로 전이시키지 않고, 실패한 구체적 필드/규칙을 사용자에게 표시해야 한다.
 - **FR-019**: 시스템은 `Ready` 상태의 Recipe만 canonical JSON(`ToolFunctionBuildRequest` 미리보기, NodeVault ToolFunction 빌드 계약과 동일한 wire shape)으로 렌더링/export할 수 있어야 한다. 이 wire shape는 새로운 proto 메시지를 정의하지 않고, 기존 `ToolSpecRequest`/`BuildRequest`(`kind = BUILD_KIND_TOOLFUNCTIONSPEC`)를 재사용하는 것을 전제로 설계한다.
-- **FR-020**: 시스템은 이 기능의 범위 내에서 렌더링된 `ToolFunctionBuildRequest` 미리보기를 실제 gRPC로 NodeVault에 전송하지 않아야 하며, Recipe를 `Submitted` 이후 상태로 전이시키지 않아야 한다.
-- **FR-021**: 시스템은 사용자가 제출을 시도하는 진입점을 노출할 경우, 실제 전송 대신 "NodeVault ToolFunction 빌드 게이트가 아직 열려 있지 않다"는 명확한 안내를 표시해야 한다.
+- **FR-020**: `render`는 네트워크 호출을 하지 않아야 한다(RPC 0회). `function-recipe submit`은 `Ready`이고 현재 내용이 검증을 통과하는 Recipe에 대해서만 두 번째 이미지 빌드를 NodeVault BuildService로 보낼 수 있다 — 먼저 요청 envelope를 로컬 receipt에 저장한 뒤 `ResolveToolSpec → SubmitToolBuild → WatchToolBuild`를 각각 한 번 호출한다. 이 전송은 NodeVault 빌드 경로가 kind 2를 수용한 뒤에만 열린다 — 그 전에는 유효한 `Ready`도 주소 확인·receipt·RPC 없이 `TOOLFUNCTION_BUILD_GATE_CLOSED`(exit 1)로 끝난다. typed 등록(`RegisterToolFunction`)은 이 명령이 아직 보내지 않는 후속 단계다. 시스템은 명령 실행만으로 Recipe 파일을 `Submitted` 이후 상태로 바꾸지 않아야 한다. (P07, 2026-10-11 정정)
+- **FR-021**: `Draft`이거나 현재 내용이 검증에 실패하는 Recipe의 제출 시도에는 요청을 보내지 않고 구체적 진단을 표시해야 한다. 유효한 `Ready` Recipe의 제출은 이전의 State 무관 고정 차단 대신, NodeVault가 kind 2를 받기 전에는 요청 없이 상류 게이트 사유를 안내하고(exit 1) 받은 뒤에는 실제 제출 경로를 탄다. Watch가 `Failed`/`Interrupted`를 보내거나, 최종 상태 없이 끝나거나, `Succeeded`인데 전체 두 번째 이미지 digest B가 없으면 등록에 쓸 수 있는 성공으로 표시하지 않는다(exit 1). (P07, 2026-10-11 정정)
 - **FR-022**: 시스템은 ToolFunctionRecipe를 로컬 파일로 저장해야 하며, 작성과 검증에 NodeVault로의 실시간 연결을 요구하지 않아야 한다.
 - **FR-023**: 시스템은 같은 `functionId`/`revision` 조합으로 기존 Recipe 파일과 충돌이 발생하면 이를 감지하고 사용자에게 명확히 알려야 하며, 묵시적으로 덮어써서는 안 된다.
 - **FR-024**: 시스템은 기존 `recipe create` 마법사의 Inputs/Outputs/Command 입력 단계를 제거하고, 해당 지점에서 새 ToolFunctionRecipe 플로우로 사용자를 안내해야 한다.
@@ -142,7 +142,7 @@ NodeKit 사용자(도구 작성자)는 이미 확정된 ToolSpec image digest를
 ### Key Entities *(include if feature involves data)*
 
 - **ToolFunctionRecipe** (NodeKit): NodeKit에서 사용자가 작성하는 빌드·검증 입력. 기존 `RecipeDocument`(ToolSpec Recipe)와 개념적으로 대응하는 새로운 저작 모델이지만, `RecipeBuildKind`(Conda/Micromamba/Container 등)와 같은 "빌드 방식 선택"이 없다는 점에서 구조가 다르므로 별도 모델로 취급한다. functionId, revision, 참조 `toolSpecDigest`/`baseToolImageDigest`, 스크립트 참조, 명령/포트/parameter/fixture/예상 결과/자원/환경/validation requirements를 담으며, `Draft → Ready → Submitted → Built → Validated → Approved` lifecycle 상태를 가진다. 아직 최종 ToolFunctionSpec이 아니다.
-- **ToolFunctionBuildRequest** (NodeKit → NodeVault, wire 개념): `Ready` 상태의 ToolFunctionRecipe를 NodeVault에 전달하기 위한 요청 형태. 이번 기능은 이 payload를 렌더링/미리보기만 하고 실제로 전송하지 않는다.
+- **ToolFunctionBuildRequest** (NodeKit → NodeVault, wire 개념): `Ready` 상태의 ToolFunctionRecipe를 NodeVault에 전달하기 위한 요청 형태. 두 번째 이미지 빌드의 실제 wire payload는 `nodevault.build.raw_spec.v1`(exact 4키: schema_version, kind=2, base_image_digest=A, script)이며 `render --format raw-spec`과 `submit`이 같은 값을 쓴다. 제출 시 `ToolSpecRequest`의 tool_name/version은 `functionId`/`revision`이다. (P07, 2026-10-11 정정)
 - **ToolFunctionImage** (NodeVault, 참조): NodeVault가 기반 ToolSpec image를 확장하여 생성하는 실행 이미지. NodeKit은 만들지 않는다.
 - **ToolFunctionSpec** (NodeVault, 참조): 이미지 빌드, dry-run, 관찰, 검토와 승인을 통과한 최종 실행 계약. NodeKit은 이 객체를 만들지 않으며 이번 기능에서 조회하지도 않는다.
 - **CommandContract**: executable, 순서 있는 arguments, workingDirectory, environment allowlist, 성공 exit code, timeout 정책으로 구성된 구조화된 실행 명령.
@@ -162,7 +162,7 @@ NodeKit 사용자(도구 작성자)는 이미 확정된 ToolSpec image digest를
 - **SC-002**: 구조화되지 않은(raw shell) 명령 입력은 100%의 경우 검증 단계에서 차단되고, 실패 원인이 함께 표시된다.
 - **SC-003**: 렌더링된 `ToolFunctionBuildRequest` 미리보기를 확인하는 사용자 중 90% 이상이 추가 설명 없이 필드 라벨만으로 최종 계약의 각 구성요소(명령/포트/자원/환경/fixture)가 무엇을 의미하는지 식별할 수 있다.
 - **SC-004**: 기존 `recipe create` 마법사에서 새 플로우로 넘어가는 과정에서, 과거 Inputs/Outputs/Command 데이터로 인해 마법사가 중단되거나 오류를 내는 사례가 0건이다.
-- **SC-005**: 사용자가 제출을 시도하는 모든 경우(100%)에 명확한 "NodeVault ToolFunction 빌드 게이트 미개방" 안내를 받으며, 원인 불명의 오류나 무응답은 발생하지 않는다.
+- **SC-005**: 사용자가 제출을 시도하는 모든 경우(100%)에 명확한 결과(요청을 보내지 않은 이유, 빌드 결과, 또는 결과 미확인과 다음 확인 방법)를 받으며, 원인 불명의 오류나 무응답은 발생하지 않는다. `Draft`/검증 실패 Recipe의 제출과 NodeVault kind 2 게이트가 닫힌 동안의 제출은 100% 요청 0회다. (P07, 2026-10-11 정정)
 
 ## Assumptions
 
@@ -172,7 +172,7 @@ NodeKit 사용자(도구 작성자)는 이미 확정된 ToolSpec image digest를
 - 기존 `ToolDefinition.Inputs`/`Outputs`/`Command` 필드와 이를 채우던 `recipe create` 마법사 단계는 이 기능으로 대체되며, 사용자와 이미 이 방향으로 확정했다.
 - 이 기능이 참조하는 ToolSpec image는 이미 기존 ToolSpec Recipe → NodeVault 빌드 경로를 통해 확정되었다고 가정하며, 이 기능은 NodeVault에 대해 digest를 재검증하는 새로운 gRPC 읽기 경로를 추가하지 않는다.
 - 참조 데이터(DataDefinition) 쪽의 ToolFunctionSpec 대응 개념은 이 기능의 범위에 포함하지 않는다. ToolFunctionSpec v0.3 문서 자체가 Tool 전용으로 설계되어 있다.
-- Recipe의 `Submitted`/`Built`/`Validated`/`Approved` 상태는 NodeVault/NodeSentinel의 실제 처리 결과를 반영하기 위한 자리로 스키마에 예약하되, 이번 기능은 이 상태들로의 실제 전이 수단(제출 API 연동)을 구현하지 않는다.
+- Recipe의 `Submitted`/`Built`/`Validated`/`Approved` 상태는 NodeVault/NodeSentinel의 실제 처리 결과를 반영하기 위한 자리로 스키마에 예약한다. 제출 결과는 Recipe 파일이 아니라 로컬 operation receipt와 서버 관측에 남으며, 명령 실행만으로 Recipe의 `State`를 바꾸지 않는다. (P07, 2026-10-11 정정)
 
 ### 의존성 및 위험 (Dependencies & Risks)
 
@@ -196,7 +196,7 @@ NodeKit 사용자(도구 작성자)는 이미 확정된 ToolSpec image digest를
 
 - NodeVault의 ToolFunction image builder(admission, 기반 digest 검증, 빌드 정책·재현성 검증, nan+스크립트 결합, 빌드 오케스트레이션, Harbor push, provenance, lifecycle 관리) — NodeVault 소관.
 - `BUILD_KIND_TOOLFUNCTIONSPEC` 빌드 게이트 해제 — NodeVault 소관.
-- 실제 `ToolFunctionBuildRequest` gRPC 제출 경로(`SubmitToolBuild` 등 기존 RPC 재사용 여부 포함) — 게이트 개방 후 별도 spec.
+- ToolFunction typed 등록(`RegisterToolFunction`) client 경로 — P08 범위. 두 번째 이미지 빌드 제출 client(`ResolveToolSpec`/`SubmitToolBuild`/`WatchToolBuild` 재사용)는 P07에서 범위에 들어왔으나, 실제 전송은 위 NodeVault 게이트 해제 뒤에만 열린다(2026-10-11 정정).
 - dry-run 실행과 관찰(NodeSentinel) — NodeSentinel 소관.
 - declared/observed/proposed 차이를 보여주는 리뷰 UI, ToolProfile v0.3 §9가 정의하는 "NodeKit 관리자 화면"(Candidate/실패/무효 Profile 이력, 재검증 트리거, 승인·무효화)과 이를 위한 ToolProfile evidence 읽기/쓰기 API — 후속 기능으로 분리.
 - canonicalization, `toolFunctionSpecDigest` 계산, 승인 상태 전이 강제, 불변 저장, catalog/index 갱신 — NodeVault 소관.

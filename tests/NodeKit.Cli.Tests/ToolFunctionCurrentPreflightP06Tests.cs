@@ -13,8 +13,8 @@ namespace NodeKit.Cli.Tests
     /// P06.current — render/submit 경계의 current preflight (v0.9.1 계약 S3-09-A..D,
     /// current_preflight_ready). 저장된 State=Ready 표지만 믿지 않고 현재 파일 내용,
     /// base image A, ScriptPath source, raw_spec과 typed 등록 전제를 다시 확인한다.
-    /// render는 RPC가 없고, 실제 submit caller 연결과 RPC transcript는 P07 범위다
-    /// (function-recipe submit의 차단 문구는 KEEP_UNTIL_P07).
+    /// render는 RPC가 없고, 실제 submit caller 연결과 RPC transcript는 P07
+    /// (ToolFunctionSecondImageBuildP07Tests)에 있다.
     /// </summary>
     public class ToolFunctionCurrentPreflightP06Tests : IDisposable
     {
@@ -359,6 +359,54 @@ namespace NodeKit.Cli.Tests
             var entry = Assert.Single(plan!.Request.Spec.Command.Environment);
             Assert.Equal("TMPDIR", entry.Name);
             Assert.Equal("runtime.tmp", entry.Source);
+        }
+
+        // P06 review P3-10: 빈 문자열은 null이 아니다 — 거부하지 않고 그대로 매핑한다
+        // (mapper가 IsNullOrEmpty로 넓어지면 이 시험이 실패한다).
+        [Theory]
+        [InlineData("both-empty", "", "")]
+        [InlineData("source-empty", "TMPDIR", "")]
+        [InlineData("name-empty", "", "runtime.tmp")]
+        public void TypedPrerequisite_EmptyStringEnvironmentField_IsNotNull_PassesAndKeepsValues(
+            string variant, string name, string source)
+        {
+            var recipePath = SaveWithEnvironmentEntry(name, source);
+            Assert.True(ToolFunctionRecipeCliIo.TryLoad(recipePath, TextWriter.Null, out var loaded), variant);
+
+            Assert.True(ToolFunctionRegistrationRequestFactory.TryCheckSpecMapping(loaded!, out var mappingError), $"{variant}: {mappingError?.Message}");
+            var typed = Preflight(recipePath, requireTypedRegistration: true);
+            Assert.True(typed.Ok, $"{variant}: {typed.Stderr}");
+
+            var inputs = new ToolFunctionRegistrationInputs("req-1", DigestC1, "sha256:" + new string('b', 64), null);
+            Assert.True(ToolFunctionRegistrationRequestFactory.TryBuild(loaded!, inputs, out var plan, out var buildError), $"{variant}: {buildError?.Message}");
+            var entry = Assert.Single(plan!.Request.Spec.Command.Environment);
+            Assert.Equal(name, entry.Name);
+            Assert.Equal(source, entry.Source);
+        }
+
+        // P06 review P3-11: null이 뒤쪽 항목에 있으면 진단은 그 실제 index를 가리킨다(고정 [0] 아님).
+        [Fact]
+        public void TypedPrerequisite_NullEnvironmentFieldInLaterEntry_DiagnosticNamesThatIndex()
+        {
+            var recipe = ReadyRecipe();
+            recipe.Command.Environment.Add(new EnvironmentEntry { Name = "TMPDIR", Source = "runtime.tmp" });
+            recipe.Command.Environment.Add(new EnvironmentEntry { Name = "HOME", Source = "runtime.home" });
+            recipe.Command.Environment.Add(new EnvironmentEntry { Name = NullSentinel, Source = "runtime.cache" });
+            var recipePath = Save(recipe);
+            File.WriteAllText(
+                recipePath,
+                File.ReadAllText(recipePath).Replace("\"" + NullSentinel + "\"", "null", StringComparison.Ordinal));
+            Assert.True(ToolFunctionRecipeCliIo.TryLoad(recipePath, TextWriter.Null, out var loaded));
+            Assert.Null(loaded!.Command.Environment[2].Name);
+
+            Assert.False(ToolFunctionRegistrationRequestFactory.TryCheckSpecMapping(loaded, out var mappingError));
+            Assert.Equal(ToolFunctionRegistrationRequestFactory.NullEnvironmentFieldCode, mappingError!.Code);
+            Assert.Contains("Command.Environment[2]", mappingError.Message);
+            Assert.DoesNotContain("Command.Environment[0]", mappingError.Message);
+
+            var typed = Preflight(recipePath, requireTypedRegistration: true);
+            Assert.False(typed.Ok);
+            Assert.Contains("Command.Environment[2]", typed.Stderr);
         }
     }
 }
