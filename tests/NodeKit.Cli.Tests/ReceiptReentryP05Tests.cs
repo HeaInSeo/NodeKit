@@ -432,7 +432,7 @@ namespace NodeKit.Cli.Tests
             using (var server = new GrpcTestServer())
             {
                 Assert.Equal(0, Reenter(server, "cancel", receiptPath, out var stdout, out _));
-                Assert.Contains("nodekit receipt watch " + ReceiptCommand.QuoteArgument(receiptPath) + " ", stdout, StringComparison.Ordinal);
+                Assert.EndsWith(ReceiptCommand.FollowUpCommand("watch", receiptPath), stdout.TrimEnd(), StringComparison.Ordinal);
             }
 
             using (var server = new GrpcTestServer())
@@ -445,13 +445,14 @@ namespace NodeKit.Cli.Tests
                 using var userCancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
                 userCancel.CancelAfter(TimeSpan.FromMilliseconds(500));
                 Assert.Equal(130, ReenterUntil(server, "watch", receiptPath, userCancel.Token, out _, out var stderr));
-                Assert.EndsWith("nodekit receipt cancel " + ReceiptCommand.QuoteArgument(receiptPath), stderr.TrimEnd(), StringComparison.Ordinal);
+                Assert.EndsWith(ReceiptCommand.FollowUpCommand("cancel", receiptPath), stderr.TrimEnd(), StringComparison.Ordinal);
             }
 
-            Assert.NotEqual(receiptPath, ReceiptCommand.QuoteArgument(receiptPath));
             if (!OperatingSystem.IsWindows())
             {
-                Assert.Equal(receiptPath, ShellEcho(ReceiptCommand.QuoteArgument(receiptPath)));
+                var quoted = ReceiptCommand.QuoteArgument(receiptPath, windows: false)!;
+                Assert.NotEqual(receiptPath, quoted);
+                Assert.Equal(receiptPath, ShellEcho(quoted));
             }
         }
 
@@ -463,8 +464,90 @@ namespace NodeKit.Cli.Tests
         [InlineData("", "''")]
         public void QuoteArgument_Posix(string path, string expected)
         {
-            Assert.SkipWhen(OperatingSystem.IsWindows(), "POSIX quoting");
-            Assert.Equal(expected, ReceiptCommand.QuoteArgument(path));
+            Assert.Equal(expected, ReceiptCommand.QuoteArgument(path, windows: false));
+        }
+
+        // Codex r4239650954: inside double quotes cmd.exe still expands %VAR% (and !VAR!), PowerShell $var/$(...)/`
+        // and treats Unicode quotes as quotes. Double quotes are used only when both shells read the path literally.
+        [Theory]
+        [InlineData(@"C:\r\2222.json", @"C:\r\2222.json")]
+        [InlineData(@"C:\Users\John Smith\r\2222.json", "\"C:\\Users\\John Smith\\r\\2222.json\"")]
+        [InlineData(@"C:\a&b (1)\r;x.json", "\"C:\\a&b (1)\\r;x.json\"")]
+        [InlineData(@"C:\it's\r.json", "\"C:\\it's\\r.json\"")]
+        [InlineData(@"C:\%TEMP%\r.json", null)]
+        [InlineData(@"C:\a!b!\r.json", null)]
+        [InlineData(@"C:\$(Remove-Item x)\r.json", null)]
+        [InlineData(@"C:\$env:USERPROFILE\r.json", null)]
+        [InlineData("C:\\a`b\\r.json", null)]
+        [InlineData("C:\\a\u201Cb\\r.json", null)]
+        [InlineData("C:\\a\u2019b\\r.json", null)]
+        [InlineData("", null)]
+        public void QuoteArgument_Windows_OnlyWhenLiteralInCmdAndPowerShell(string path, string? expected)
+        {
+            Assert.Equal(expected, ReceiptCommand.QuoteArgument(path, windows: true));
+        }
+
+        [Fact]
+        public void FollowUpCommand_Windows_ExpandingPath_IsExplicitlyNotRunnable()
+        {
+            const string path = @"C:\$(Remove-Item x)\%TEMP%\r.json";
+
+            var hint = ReceiptCommand.FollowUpCommand("watch", path, windows: true);
+
+            Assert.StartsWith("nodekit receipt watch <receipt.json> (", hint, StringComparison.Ordinal);
+            Assert.Contains("그대로 붙여 넣을 수 있는 형태로 적지 않았습니다", hint, StringComparison.Ordinal);
+            Assert.DoesNotContain("\"" + path + "\"", hint, StringComparison.Ordinal);
+            Assert.Equal(
+                "nodekit receipt cancel \"C:\\my receipts\\r.json\"",
+                ReceiptCommand.FollowUpCommand("cancel", @"C:\my receipts\r.json", windows: true));
+            Assert.Equal(
+                "nodekit receipt cancel '/tmp/$(x)/r.json'",
+                ReceiptCommand.FollowUpCommand("cancel", "/tmp/$(x)/r.json", windows: false));
+        }
+
+        // Codex r4239650951: an unset script variable ("$RECEIPT") or an OS-invalid path must end as a local
+        // input error (exit 2, RPC 0), not an unhandled exception.
+        [Theory]
+        [InlineData("watch", "")]
+        [InlineData("watch", "   ")]
+        [InlineData("cancel", "")]
+        [InlineData("cancel", "\t")]
+        public void BlankReceiptPath_ExitsTwo_NoRpc(string verb, string receiptPath)
+        {
+            using var server = new GrpcTestServer();
+
+            var exitCode = Reenter(server, verb, receiptPath, out _, out var stderr);
+
+            Assert.Equal(2, exitCode);
+            Assert.Contains("receipt 경로가 비어 있습니다", stderr, StringComparison.Ordinal);
+            Assert.Empty(server.Fake.CallOrder);
+            Assert.Empty(server.Fake.CancelledBuildIds);
+        }
+
+        [Theory]
+        [InlineData("watch")]
+        [InlineData("cancel")]
+        public void InvalidReceiptPath_NulCharacter_ExitsTwo_NoRpc(string verb)
+        {
+            using var server = new GrpcTestServer();
+
+            var exitCode = Reenter(server, verb, Path.Join(_workDir, "bad\0name.json"), out _, out var stderr);
+
+            Assert.Equal(2, exitCode);
+            Assert.Contains(LocalOperationStore.InvalidCode, stderr, StringComparison.Ordinal);
+            Assert.Contains("receipt 경로를 사용할 수 없습니다", stderr, StringComparison.Ordinal);
+            Assert.Empty(server.Fake.CallOrder);
+            Assert.Empty(server.Fake.CancelledBuildIds);
+        }
+
+        [Fact]
+        public void CliApp_BlankReceiptPath_ExitsTwo()
+        {
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            Assert.Equal(2, CliApp.Run(new[] { "receipt", "watch", string.Empty }, stdout, stderr));
+            Assert.Contains("receipt 경로가 비어 있습니다", stderr.ToString(), StringComparison.Ordinal);
         }
 
         [Fact]
