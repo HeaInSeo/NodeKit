@@ -613,7 +613,11 @@ namespace NodeKit.Cli
                             return 1;
                         }
 
-                        stderr.WriteLine($"빌드 실패: {ev.Message}");
+                        // S2-05-C03: build ID 없이 온 Failed는 jsonl의 PRE_WATCH_FAILED/unknown과 같은
+                        // 사실이다 — human 출력도 원격 빌드 실패로 단정하지 않고 실패 진단만 낸다.
+                        stderr.WriteLine(buildId is null
+                            ? $"빌드 요청 단계에서 실패했습니다 (build ID 없음 — 원격 빌드가 만들어졌는지는 확인하지 못했습니다): {ev.Message}"
+                            : $"빌드 실패: {ev.Message}");
                         return 1;
                     }
                 }

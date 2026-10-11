@@ -959,7 +959,28 @@ $ echo $?
   "빌드가 생성되지 않았다"고 단정하지 않고 `unknown`으로만 표시한다. 실제로
   원격 빌드가 생성됐는지 확인하려면 NodeVault 쪽 인덱스/로그를 직접 확인해야
   한다(현재 CLI에는 idempotency key 기반 자동 조회/재시도 기능이 없다 —
-  [Issue #86](https://github.com/HeaInSeo/NodeKit/issues/86) 참고).
+  [Issue #86](https://github.com/HeaInSeo/NodeKit/issues/86) 참고). human 출력도
+  같은 사실만 말한다 — stderr에 "빌드 요청 단계에서 실패했습니다 (build ID 없음 —
+  원격 빌드가 만들어졌는지는 확인하지 못했습니다): ..."를 내고 "빌드 실패"로
+  단정하지 않는다(exit 1은 그대로).
+
+`WatchToolBuild` 이벤트의 terminal 판정은 `status` 문자열을 먼저 보고, 그 외에는
+proto `kind`로 돌아간다. 이 표에 없는 status(예: 새 서버의 `FutureState`)는
+진행 상태(`state` 레코드, human `[로그]`)로만 표시하고 그것만으로 `completed`를
+만들지 않는다 — 그 뒤 terminal 없이 스트림이 끝나면 `STREAM_ENDED_WITHOUT_RESULT`다.
+
+| `status` | proto `kind` | 판정 |
+|---|---|---|
+| `Succeeded` | (무관) | 성공 terminal → `completed` `Succeeded`, exit 0 |
+| `Failed` | (무관) | 실패 terminal → `BUILD_FAILED`, exit 1 |
+| `Interrupted` | (무관) | 실패 terminal → `BUILD_FAILED`, exit 1 |
+| 그 외/빈 값 | `SUCCEEDED` | 성공 terminal |
+| 그 외/빈 값 | `FAILED` | 실패 terminal |
+| 그 외/빈 값 | 그 외 | 진행 상태만 (대소문자 다른 `succeeded`도 여기에 해당) |
+
+legacy `DIGEST_ACQUIRED` 이벤트의 `digest`나 `integrity_health: "Partial"`이 붙은
+성공도 관측한 `Succeeded`이므로 exit 0을 유지하고 그 값을 `completed`에 그대로
+남긴다. 이것은 관측된 build 결과일 뿐 이미지 생성·등록 전체의 증명이 아니다.
 
 ```bash
 $ nodekit submit recipe.json --format jsonl
