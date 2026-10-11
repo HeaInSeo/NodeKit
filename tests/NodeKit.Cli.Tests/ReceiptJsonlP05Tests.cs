@@ -154,6 +154,30 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(OperationObservation.FailedOutcome, ReadReceipt(receiptPath).LastObservation!.Outcome);
         }
 
+        // Codex r4240668558: an observed terminal name other than Failed (Interrupted) is kept in status
+        [Fact]
+        public void Watch_Interrupted_KeepsObservedStatus_ClassifiedBuildFailed()
+        {
+            var receiptPath = CreateAcknowledgedReceipt();
+            using var server = new GrpcTestServer();
+            server.Fake.WatchEvents = new List<ProtoBuildEvent>
+            {
+                new() { Kind = ProtoBuildEventKind.Log, Status = "Interrupted", BuildId = FixtureBuildId, Message = "fixture: interrupted" },
+            };
+
+            var exitCode = Reenter(server, "watch", receiptPath, out var stdout, out _);
+
+            Assert.Equal(1, exitCode);
+            var completed = Assert.Single(ParseRecords(stdout, "watch"));
+            Assert.Equal("Interrupted", Str(completed, "status"));
+            Assert.Equal("BUILD_FAILED", Str(completed, "error_code"));
+            Assert.Equal("failed", Str(completed, "remote_build_state"));
+            Assert.Equal("terminal", Str(completed, "recovery"));
+            var receipt = ReadReceipt(receiptPath);
+            Assert.Equal(OperationObservation.FailedOutcome, receipt.LastObservation!.Outcome);
+            Assert.Equal("Interrupted", receipt.LastObservation.Status);
+        }
+
         [Fact]
         public void Watch_StreamEndsWithoutTerminal_Uncertain_NoStatus_ReceiptUnchanged()
         {
@@ -400,10 +424,8 @@ namespace NodeKit.Cli.Tests
             var lines = stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(l => l.TrimEnd('\r')).ToList();
             Assert.NotEmpty(lines);
             var records = new List<JsonElement>();
-            foreach (var line in lines)
+            foreach (var root in lines.Select(ParseObject))
             {
-                using var doc = JsonDocument.Parse(line);
-                var root = doc.RootElement.Clone();
                 Assert.Equal(JsonValueKind.Object, root.ValueKind);
                 foreach (var property in root.EnumerateObject())
                 {
@@ -419,6 +441,12 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(1, records.Count(r => Str(r, "type") == "completed"));
             Assert.Equal("completed", Str(records[^1], "type"));
             return records;
+        }
+
+        private static JsonElement ParseObject(string line)
+        {
+            using var doc = JsonDocument.Parse(line);
+            return doc.RootElement.Clone();
         }
 
         private static void AssertUnknownCompleted(JsonElement completed, string errorCode, int exitCode, string recovery)

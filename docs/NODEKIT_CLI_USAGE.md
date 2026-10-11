@@ -1057,13 +1057,14 @@ submit이 남긴 receipt의 build ID로 다시 관찰(`watch`)하거나 서버�
 stderr로만 간다.
 
 `status`는 서버가 실제로 보낸 상태에만 싣는다 — `watch`의 `state` 진행 상태와, 관측한
-terminal `Succeeded`/`Failed`. 관찰 중단·취소 요청·로컬 거절에는 `Cancelled` 같은 원격
-terminal 이름을 만들지 않는다.
+terminal 이름(`Succeeded`/`Failed`, 또는 실패로 분류되는 `Interrupted` 같은 서버 값 그대로).
+실패 여부의 분류는 `error_code`가 맡는다. 관찰 중단·취소 요청·로컬 거절에는 `Cancelled` 같은
+원격 terminal 이름을 만들지 않는다.
 
 | 상황 | `error_code` | exit | `remote_build_state` | `recovery` | receipt |
 |---|---|---|---|---|---|
 | watch: `Succeeded` 관측 | (없음) | 0 | (없음) | `none` | terminal 기록 |
-| watch: `Failed` 관측 | `BUILD_FAILED` | 1 | `failed` | `terminal` | terminal 기록 |
+| watch: `Failed`(또는 `Interrupted` 등 실패 terminal) 관측 | `BUILD_FAILED` | 1 | `failed` | `terminal` | terminal 기록 |
 | watch: terminal 없이 스트림 종료 | `STREAM_ENDED_WITHOUT_RESULT` | 1 | `unknown` | `uncertain` | 그대로 |
 | watch: Watch RPC 오류 | `WATCH_FAILED` | 1 | `unknown` | `uncertain` | 그대로 |
 | watch: 다른 빌드의 이벤트로 관찰 중단 | `UNEXPECTED_ERROR` | 1 | `unknown` | `uncertain` | 그대로 |

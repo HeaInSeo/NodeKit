@@ -235,7 +235,7 @@ namespace NodeKit.Cli.Operations
                             0,
                             RecoveryDisposition.None,
                             buildId,
-                            status: OperationObservation.SucceededOutcome,
+                            status: observed?.Status ?? OperationObservation.SucceededOutcome,
                             imageRef: observed?.ImageRef,
                             imageDigest: observed?.ImageDigest,
                             integrityHealth: observed?.IntegrityHealth);
@@ -256,13 +256,15 @@ namespace NodeKit.Cli.Operations
                 {
                     stderr.WriteLine($"빌드 실패: {result.Message}");
                     stderr.WriteLine("최종 상태를 receipt에 기록했습니다.");
+
+                    // status는 서버가 보낸 terminal 이름(예: Interrupted)을 그대로 싣고, 실패 분류는 error_code가 맡는다.
                     return WatchCompleted(
                         stdout,
                         jsonl,
                         result.ExitCode,
                         RecoveryDisposition.Terminal,
                         buildId,
-                        status: OperationObservation.FailedOutcome,
+                        status: result.ObservedResult.Status ?? OperationObservation.FailedOutcome,
                         errorCode: "BUILD_FAILED",
                         remoteBuildState: "failed",
                         message: result.Message);
