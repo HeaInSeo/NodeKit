@@ -191,7 +191,7 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(124, exitCode);
             Assert.Single(server.Fake.SubmitRequests);
             Assert.Empty(server.Fake.CancelledBuildIds);
-            var completed = SingleJsonl(stdout);
+            var completed = CompletedJsonl(stdout);
             Assert.Equal("CONNECT_TIMEOUT", completed.GetProperty("error_code").GetString());
             Assert.Equal("uncertain", completed.GetProperty("recovery").GetString());
             Assert.False(completed.TryGetProperty("build_id", out _));
@@ -437,11 +437,17 @@ namespace NodeKit.Cli.Tests
             }
         }
 
-        private static JsonElement SingleJsonl(string stdout)
+        // every stdout line is one JSON record; exactly one of them is the completed record
+        private static JsonElement CompletedJsonl(string stdout)
         {
-            var line = Assert.Single(stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries));
-            using var document = JsonDocument.Parse(line);
-            return document.RootElement.Clone();
+            var records = stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                .Select(line =>
+                {
+                    using var document = JsonDocument.Parse(line);
+                    return document.RootElement.Clone();
+                })
+                .ToList();
+            return Assert.Single(records, r => r.GetProperty("type").GetString() == "completed");
         }
 
         private string DefaultReceiptPath() => Path.Join(_workDir, ".nodekit", "receipts", FixedRequestId + ".json");
