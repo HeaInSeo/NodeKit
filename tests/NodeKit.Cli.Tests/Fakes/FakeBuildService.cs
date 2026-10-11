@@ -23,7 +23,21 @@ namespace NodeKit.Cli.Tests.Fakes
         public Func<SubmitToolBuildRequest, SubmitToolBuildResponse> OnSubmitToolBuild { get; set; } =
             _ => new SubmitToolBuildResponse { BuildId = "fake-build-id", Status = "Requested" };
 
+        /// <summary>true면 SubmitToolBuild 요청을 기록한 뒤 응답하지 않고 클라이언트가 취소할 때까지
+        /// 대기한다 (요청은 서버에 도달했지만 응답이 늦거나 유실된 경우 재현용).</summary>
+        public bool HangOnSubmitToolBuild { get; set; }
+
         public List<BuildEvent> WatchEvents { get; set; } = new();
+
+        /// <summary>WatchEvents 각 이벤트를 보내기 전 기다리는 시간 (취소 token 준수).</summary>
+        public TimeSpan WatchEventDelay { get; set; }
+
+        /// <summary>null이 아니면 WatchEvents를 다 보낸 뒤 이 예외로 스트림을 끝낸다.</summary>
+        public RpcException? WatchFailure { get; set; }
+
+        /// <summary>true면 CancelToolBuild가 요청을 기록한 뒤 클라이언트가 취소할 때까지 응답하지 않는다
+        /// (token-cooperative hanging cancel).</summary>
+        public bool HangOnCancelToolBuild { get; set; }
 
         /// <summary>true면 WatchEvents를 다 보낸 뒤 스트림 취소 전까지 계속 대기한다
         /// (취소 시나리오 재현용).</summary>
@@ -65,7 +79,7 @@ namespace NodeKit.Cli.Tests.Fakes
             return OnResolveToolSpec(request);
         }
 
-        public override Task<SubmitToolBuildResponse> SubmitToolBuild(
+        public override async Task<SubmitToolBuildResponse> SubmitToolBuild(
             SubmitToolBuildRequest request, ServerCallContext context)
         {
             lock (CallOrder)
@@ -74,7 +88,12 @@ namespace NodeKit.Cli.Tests.Fakes
                 CallOrder.Add("Submit");
             }
 
-            return Task.FromResult(OnSubmitToolBuild(request));
+            if (HangOnSubmitToolBuild)
+            {
+                await Task.Delay(System.Threading.Timeout.Infinite, context.CancellationToken);
+            }
+
+            return OnSubmitToolBuild(request);
         }
 
         public override async Task WatchToolBuild(
@@ -90,7 +109,17 @@ namespace NodeKit.Cli.Tests.Fakes
 
             foreach (var ev in WatchEvents)
             {
+                if (WatchEventDelay > TimeSpan.Zero)
+                {
+                    await Task.Delay(WatchEventDelay, context.CancellationToken);
+                }
+
                 await responseStream.WriteAsync(ev);
+            }
+
+            if (WatchFailure is { } watchFailure)
+            {
+                throw watchFailure;
             }
 
             if (HangAfterEvents)
@@ -99,20 +128,29 @@ namespace NodeKit.Cli.Tests.Fakes
             }
         }
 
-        public override Task<CancelToolBuildResponse> CancelToolBuild(
+        public override async Task<CancelToolBuildResponse> CancelToolBuild(
             CancelToolBuildRequest request, ServerCallContext context)
         {
-            CancelledBuildIds.Add(request.BuildId);
+            lock (CancelledBuildIds)
+            {
+                CancelledBuildIds.Add(request.BuildId);
+            }
+
             if (CancelToolBuildFailure is { } failure)
             {
                 throw failure;
             }
 
-            return Task.FromResult(new CancelToolBuildResponse
+            if (HangOnCancelToolBuild)
+            {
+                await Task.Delay(System.Threading.Timeout.Infinite, context.CancellationToken);
+            }
+
+            return new CancelToolBuildResponse
             {
                 BuildId = request.BuildId,
                 Status = "Interrupted",
-            });
+            };
         }
 
         public override Task<ResolveRecipeResponse> ResolveRecipe(

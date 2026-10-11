@@ -433,6 +433,23 @@ namespace NodeKit.Cli.Operations
                 return Invalid(path, $"{receipt.Phase}인데 last_observation.outcome이 Succeeded/Failed가 아님");
             }
 
+            // 로컬 중단은 원격 결과를 모른다는 기록이다 — terminal 관측과 함께 있거나 원격 상태를
+            // unknown 이외로 적으면 관측하지 않은 서버 결과를 확정한 것이 된다.
+            if (receipt.LocalAbort is { } abort)
+            {
+                if (rank >= OperationPhase.Rank(OperationPhase.Terminal))
+                {
+                    return Invalid(path, $"{receipt.Phase}에는 local_abort가 있을 수 없음");
+                }
+
+                if (!OperationLocalAbort.IsKnownReason(abort.Reason)
+                    || abort.RemoteBuildState != OperationLocalAbort.UnknownRemoteState
+                    || string.IsNullOrWhiteSpace(abort.RecordedAt))
+                {
+                    return Invalid(path, "local_abort의 reason/remote_build_state/recorded_at이 올바르지 않음");
+                }
+            }
+
             return null;
         }
 

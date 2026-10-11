@@ -73,6 +73,43 @@ namespace NodeKit.Cli.Operations
 
         [JsonPropertyName("last_observation")]
         public OperationObservation? LastObservation { get; init; }
+
+        /// <summary>
+        /// 이 CLI가 terminal 관측 전에 로컬에서 실행을 멈춘 마지막 기록(S2-04). 원격 결과는 알 수 없음으로만
+        /// 남기고 서버 성공/취소를 확정하지 않는다. terminal에는 둘 수 없다 — 이후 terminal 관측이 대신한다.
+        /// </summary>
+        [JsonPropertyName("local_abort")]
+        public OperationLocalAbort? LocalAbort { get; init; }
+    }
+
+    /// <summary>
+    /// 로컬 중단 기록. 사용자 취소·timeout으로 CLI가 관찰/요청을 멈췄다는 사실만 담는다.
+    /// 원격 빌드 상태는 관측하지 않았으므로 항상 unknown이다.
+    /// </summary>
+    internal sealed record OperationLocalAbort
+    {
+        public const string UserCancel = "user_cancel";
+
+        public const string ConnectTimeout = "connect_timeout";
+
+        public const string WatchTimeout = "watch_timeout";
+
+        /// <summary>CLI가 요청하지 않았지만 전송 계층이 취소로 끝낸 경우.</summary>
+        public const string TransportCancelled = "transport_cancelled";
+
+        public const string UnknownRemoteState = "unknown";
+
+        public static bool IsKnownReason(string? reason) =>
+            reason is UserCancel or ConnectTimeout or WatchTimeout or TransportCancelled;
+
+        [JsonPropertyName("reason")]
+        public required string Reason { get; init; }
+
+        [JsonPropertyName("remote_build_state")]
+        public required string RemoteBuildState { get; init; }
+
+        [JsonPropertyName("recorded_at")]
+        public required string RecordedAt { get; init; }
     }
 
     /// <summary>
