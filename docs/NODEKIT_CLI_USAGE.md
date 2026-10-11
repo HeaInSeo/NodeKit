@@ -1076,8 +1076,10 @@ terminal 이름을 만들지 않는다.
 receipt를 열거나 검사하다 거절하면 어떤 RPC도 보내지 않고 기존 로컬 코드 그대로
 `completed` 한 줄만 낸다(exit 2, `recovery: "terminal"`, `remote_build_state` 없음):
 손상·미지원 schema·hash 불일치·사용할 수 없는 경로나 endpoint는
-`OPERATION_RECORD_INVALID`(또는 store가 낸 `OPERATION_RECORD_MISMATCH`), build ID가 없는
-receipt와 이미 terminal을 관측한 receipt의 `cancel`은 `OPERATION_NOT_RESUMABLE`이다.
+`OPERATION_RECORD_INVALID`, build ID가 없는 receipt와 이미 terminal을 관측한 receipt의
+`cancel`은 `OPERATION_NOT_RESUMABLE`이고, 그 밖에 receipt를 열 때 store가 낸 코드
+(`OPERATION_RECORD_MISMATCH`, 다른 프로세스가 같은 receipt를 쓰는 중인 `OPERATION_LOCKED`,
+`OPERATION_WRITE_FAILED`)도 그대로 싣는다.
 terminal 기록 중 로컬 저장이 실패하면 그 store 코드와 `recovery: "uncertain"`이다.
 사용법/옵션 오류(잘못된 하위 명령·옵션, 빈 receipt 경로, `--help`)는 submit과 같이
 jsonl 레코드 없이 끝난다.
