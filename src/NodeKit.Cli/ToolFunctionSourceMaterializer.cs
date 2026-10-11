@@ -129,10 +129,24 @@ namespace NodeKit.Cli
                 return false;
             }
 
-            var recipeDirectory = Path.GetDirectoryName(Path.GetFullPath(recipeFilePath))!;
-            var resolvedPath = Path.GetFullPath(Path.Combine(recipeDirectory, scriptPath));
-
+            string resolvedPath;
             byte[] bytes;
+            try
+            {
+                // 절대 경로는 위에서 거부했으므로 Join은 Recipe 디렉터리를 버리지 않는다.
+                var recipeDirectory = Path.GetDirectoryName(Path.GetFullPath(recipeFilePath))!;
+                resolvedPath = Path.GetFullPath(Path.Join(recipeDirectory, scriptPath));
+            }
+            catch (ArgumentException ex)
+            {
+                // NUL 같은 파일 시스템에서 쓸 수 없는 문자가 든 경로.
+                error = new ToolFunctionSourceError(
+                    ScriptReadFailedCode,
+                    $"script 경로를 해석할 수 없습니다: '{scriptPath}' ({ex.Message})",
+                    2);
+                return false;
+            }
+
             try
             {
                 bytes = File.ReadAllBytes(resolvedPath);

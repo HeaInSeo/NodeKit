@@ -174,6 +174,19 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(ToolFunctionSourceMaterializer.ScriptReadFailedCode, error.Code);
         }
 
+        [Theory]
+        [InlineData("bad\0.sh")]
+        [InlineData("./scripts/\0run.sh")]
+        public void S3_03_C_PathWithInvalidCharacter_ReturnsExit2Diagnostic_WithoutException(string scriptPath)
+        {
+            Directory.CreateDirectory(ProjectDir);
+
+            var error = Fail(Recipe(scriptPath));
+
+            Assert.Equal(2, error.ExitCode);
+            Assert.Equal(ToolFunctionSourceMaterializer.ScriptReadFailedCode, error.Code);
+        }
+
         [Fact]
         public void S3_03_C_InvalidUtf8_ReturnsExit2Diagnostic()
         {
