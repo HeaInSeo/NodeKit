@@ -202,6 +202,9 @@ namespace NodeKit.Cli.Operations
             var buildId = handle.Receipt.BuildId!;
             using var userCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             using var interrupt = registerInterrupt(() => CancelQuietly(userCts));
+            // 두 번째 이미지 receipt의 [성공]은 full B를 확인한 뒤에만 찍는다(P07 Codex r4243045979).
+            var secondImage = handle.Receipt.OperationKind == OperationReceipt.ToolFunctionImageBuildKind;
+            BuildEvent? deferredSuccess = null;
             try
             {
                 var result = await ToolSpecOperationRunner.WatchKnownBuildAsync(
@@ -212,6 +215,10 @@ namespace NodeKit.Cli.Operations
                             if (jsonl)
                             {
                                 WriteStateRecord(ev, buildId, stdout);
+                            }
+                            else if (secondImage && ev.Kind == BuildEventKind.Succeeded)
+                            {
+                                deferredSuccess = ev;
                             }
                             else
                             {
@@ -232,8 +239,7 @@ namespace NodeKit.Cli.Operations
                     var observed = result.ObservedResult;
 
                     // S3-05-E: 두 번째 이미지 receipt의 Succeeded는 full image digest B가 있어야만 성공이다.
-                    if (handle.Receipt.OperationKind == OperationReceipt.ToolFunctionImageBuildKind
-                        && !SecondImageBuildContext.IsFullImageDigest(observed?.ImageDigest))
+                    if (secondImage && !SecondImageBuildContext.IsFullImageDigest(observed?.ImageDigest))
                     {
                         var missing =
                             "서버가 Succeeded를 보냈지만 두 번째 이미지 digest(B)가 'sha256:' + 16진수 64자리로 오지 않았습니다. " +
@@ -265,6 +271,11 @@ namespace NodeKit.Cli.Operations
                             imageRef: observed?.ImageRef,
                             imageDigest: observed?.ImageDigest,
                             integrityHealth: observed?.IntegrityHealth);
+                    }
+
+                    if (deferredSuccess is not null)
+                    {
+                        PrintEvent(deferredSuccess, stdout);
                     }
 
                     if (!string.IsNullOrEmpty(observed?.ImageDigest))

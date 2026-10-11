@@ -384,6 +384,7 @@ namespace NodeKit.Cli
             TextWriter stdout,
             TextWriter stderr,
             SecondImageBuildContext secondImage,
+            BuildEvent succeededEvent,
             string? buildId,
             string? watchImageDigest,
             string? imageRef,
@@ -436,6 +437,8 @@ namespace NodeKit.Cli
                 return 0;
             }
 
+            // 이벤트 루프가 미뤄 둔 [성공] 줄 — full B를 확인한 지금에서야 찍는다(r4243045979).
+            PrintEvent(succeededEvent, stdout);
             stdout.WriteLine(string.IsNullOrEmpty(imageRef)
                 ? $"두 번째 이미지(B) digest: {watchImageDigest}"
                 : $"두 번째 이미지(B) digest: {imageRef}@{watchImageDigest}");
@@ -608,7 +611,12 @@ namespace NodeKit.Cli
                         // 같은 메시지가 stdout/stderr에 중복으로 나가 자동화
                         // 스크립트가 stdout만 파싱해도 실패 문구에 오염될 수
                         // 있었다(외부 리뷰로 발견).
-                        if (ev.Kind != BuildEventKind.Failed)
+                        // 두 번째 이미지 빌드의 Succeeded도 여기서 찍지 않는다 — full B
+                        // 검증 전에 [성공]이 먼저 나가면 바로 뒤의 SECOND_IMAGE_DIGEST_MISSING
+                        // 실패와 모순된다. ReportSecondImageSucceeded가 B를 확인한 뒤에만
+                        // 찍는다(P07 Codex r4243045979).
+                        var deferSecondImageSuccess = secondImage is not null && ev.Kind == BuildEventKind.Succeeded;
+                        if (ev.Kind != BuildEventKind.Failed && !deferSecondImageSuccess)
                         {
                             PrintEvent(ev, stdout);
                         }
@@ -674,7 +682,7 @@ namespace NodeKit.Cli
                         if (secondImage is not null)
                         {
                             return ReportSecondImageSucceeded(
-                                stdout, stderr, secondImage, buildId, watchImageDigest, lastImageRef, lastIntegrityHealth, resolvedToolSpecDigest, run, jsonl);
+                                stdout, stderr, secondImage, ev, buildId, watchImageDigest, lastImageRef, lastIntegrityHealth, resolvedToolSpecDigest, run, jsonl);
                         }
 
                         if (jsonl)

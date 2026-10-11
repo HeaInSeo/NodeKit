@@ -93,6 +93,11 @@ namespace NodeKit.Cli.Tests
             else
             {
                 Assert.Contains($"두 번째 이미지(B) digest: {ImageRefB}@{DigestB}", stdout);
+                // [성공]은 full B 확인 뒤 결과 블록 바로 앞에 한 번만 나온다(r4243045979).
+                var success = stdout.IndexOf("[성공]", StringComparison.Ordinal);
+                Assert.True(success >= 0, stdout);
+                Assert.Equal(success, stdout.LastIndexOf("[성공]", StringComparison.Ordinal));
+                Assert.True(success < stdout.IndexOf("두 번째 이미지(B) digest", StringComparison.Ordinal), stdout);
                 Assert.Contains($"이번 요청 ToolSpec digest(C2): {DigestC2}", stdout);
                 // 진행 이벤트("빌드 제출됨 (build ID: …)")가 아니라 결과 블록의 독립 줄이어야 한다(r4242930898).
                 Assert.Contains($"build ID: {FixtureBuildId}", stdout.Split('\n').Select(l => l.TrimEnd('\r')));
@@ -260,6 +265,9 @@ namespace NodeKit.Cli.Tests
                 Assert.Contains(SubmitCommand.SecondImageDigestMissingCode, stderr);
                 Assert.DoesNotContain("두 번째 이미지(B) digest", stdout);
                 Assert.DoesNotContain("typed 등록은 하지 않았습니다", stdout);
+
+                // B 검증 전에 성공 배너가 먼저 나가면 바로 뒤의 실패와 모순된다(r4243045979).
+                Assert.DoesNotContain("[성공]", stdout);
             }
 
             // 진행 중 legacy 로그 digest는 보일 수 있지만 결과 자리에는 A·legacy 어느 것도 쓰이지 않는다.
@@ -441,6 +449,48 @@ namespace NodeKit.Cli.Tests
             }
 
             Assert.Equal(OperationReceipt.ToolFunctionImageBuildKind, ReadReceipt(receiptPath).OperationKind);
+        }
+
+        // human receipt watch도 같은 규칙: full B가 없으면 [성공]을 찍지 않고, 있으면 B 확인 뒤에 찍는다(r4243045979).
+        [Theory]
+        [InlineData("", 1)]
+        [InlineData(DigestB, 0)]
+        public void ReceiptWatch_SecondImageReceipt_Human_SuccessBannerOnlyAfterFullB(string watchDigest, int expectedExit)
+        {
+            string receiptPath;
+            using (var first = NewServer())
+            {
+                first.Fake.WatchEvents = new List<ProtoBuildEvent>
+                {
+                    new() { Kind = ProtoBuildEventKind.Log, Status = "Running", BuildId = FixtureBuildId },
+                };
+                var (submitExit, _, _) = Submit(first, Save(ReadyRecipe()));
+                Assert.Equal(1, submitExit);
+                receiptPath = DefaultReceiptPath();
+            }
+
+            using var server = NewServer();
+            server.Fake.WatchEvents = new List<ProtoBuildEvent> { SucceededEvent(watchDigest) };
+            using var client = new GrpcToolSpecClient(server.Channel);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exit = ReceiptCommand.Run(
+                new[] { "receipt", "watch", receiptPath }, stdout, stderr, client, TestContext.Current.CancellationToken);
+
+            Assert.Equal(expectedExit, exit);
+            var output = stdout.ToString();
+            if (expectedExit == 0)
+            {
+                var success = output.IndexOf("[성공]", StringComparison.Ordinal);
+                Assert.True(success >= 0, output);
+                Assert.True(success < output.IndexOf($"이미지 digest: {ImageRefB}@{DigestB}", StringComparison.Ordinal), output);
+            }
+            else
+            {
+                Assert.Contains(SubmitCommand.SecondImageDigestMissingCode, stderr.ToString());
+                Assert.DoesNotContain("[성공]", output);
+            }
         }
 
         [Fact]
