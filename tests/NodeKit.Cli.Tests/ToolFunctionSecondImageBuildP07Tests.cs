@@ -94,6 +94,8 @@ namespace NodeKit.Cli.Tests
             {
                 Assert.Contains($"두 번째 이미지(B) digest: {ImageRefB}@{DigestB}", stdout);
                 Assert.Contains($"이번 요청 ToolSpec digest(C2): {DigestC2}", stdout);
+                // 진행 이벤트("빌드 제출됨 (build ID: …)")가 아니라 결과 블록의 독립 줄이어야 한다(r4242930898).
+                Assert.Contains($"build ID: {FixtureBuildId}", stdout.Split('\n').Select(l => l.TrimEnd('\r')));
                 Assert.Contains("typed 등록은 하지 않았습니다", stdout);
                 Assert.DoesNotContain("Approved로", stdout);
                 Assert.Equal(string.Empty, stderr);
@@ -494,6 +496,29 @@ namespace NodeKit.Cli.Tests
                 Assert.Contains(ToolFunctionRecipeSubmitCommand.UpstreamGateClosedCode, stderr.ToString());
                 Assert.Contains("kind 2", stderr.ToString());
             }
+
+            // r4242930894: render는 상위 수준 미리보기일 뿐 실제 4키 raw_spec이 아니라고 안내한다.
+            var message = jsonl ? Completed(stdout.ToString()).GetProperty("message").GetString()! : stderr.ToString();
+            Assert.Contains("상위 수준 미리보기", message);
+            Assert.Contains("같지 않습니다", message);
+            Assert.DoesNotContain("보낼 요청 내용은", message);
+        }
+
+        // P3-a: 게이트는 주소 확인보다 먼저다 — 주소가 없어도 URL_REQUIRED(exit 2)가 아니라 게이트 사유(exit 1)로 끝난다.
+        [Fact]
+        public void UpstreamGateClosed_WithoutUrl_Exit1_GateBeforeUrlCheck()
+        {
+            var recipePath = Save(ReadyRecipe());
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exit = ToolFunctionRecipeSubmitCommand.Run(
+                new[] { "function-recipe", "submit", recipePath, "--url", " " }, stdout, stderr);
+
+            Assert.Equal(1, exit);
+            Assert.Contains(ToolFunctionRecipeSubmitCommand.UpstreamGateClosedCode, stderr.ToString());
+            Assert.DoesNotContain("NodeVault 주소가 필요합니다", stderr.ToString());
+            Assert.False(Directory.Exists(Path.Join(_workDir, ".nodekit")));
         }
 
         // 실제 CLI 진입점: 주소가 있어도(연결 불가 주소) 게이트에서 끝나므로 연결 시도·receipt가 없다.

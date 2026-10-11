@@ -1030,7 +1030,8 @@ $ echo $?
 `nodekit function-recipe submit`(두 번째 이미지 빌드)은 같은 레코드에 세 값을 더 쓴다:
 `TOOLFUNCTION_BUILD_GATE_CLOSED` — 로컬 검사는 통과했지만 현재 NodeVault가 kind 2 빌드를 받지 않는다.
 요청·receipt 0, 주소 확인 전(exit 1, `recovery: "terminal"`). NodeVault가 kind 2를 받기 전까지 유효한
-`Ready`의 결과는 항상 이 값이다.
+`Ready`의 결과는 항상 이 값이다. 안내에 나오는 `function-recipe render`는 stage1/stage2 상위 수준
+미리보기일 뿐이며, 실제로 보낼 exact 4키 raw_spec(materialize된 script 내용 포함)과 같지 않다.
 `SECOND_IMAGE_DIGEST_MISSING` — Watch가 `Succeeded`를 보냈지만 record `image_digest`가
 `sha256:` + 16진수 64자리가 아니다(exit 1, `phase: "watch"`, `remote_build_state:
 "succeeded"`, `recovery: "uncertain"`; 기반 이미지나 로그 digest로 대신하지 않는다).

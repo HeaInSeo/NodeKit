@@ -444,6 +444,12 @@ namespace NodeKit.Cli
                 stdout.WriteLine($"이번 요청 ToolSpec digest(C2): {requestToolSpecDigest}");
             }
 
+            // jsonl의 build_id와 같은 값 — NodeVault 조회·receipt 대조에 쓴다(r4242930898).
+            if (!string.IsNullOrEmpty(buildId))
+            {
+                stdout.WriteLine($"build ID: {buildId}");
+            }
+
             stdout.WriteLine($"기반 이미지(A)·기반 ToolSpec(C1)은 그대로입니다: {secondImage.BaseImageDigest} / {secondImage.BaseToolSpecDigest}");
             stdout.WriteLine("빌드 성공은 승인(Approved)이 아니며, ToolFunction typed 등록은 하지 않았습니다.");
             if (!string.IsNullOrEmpty(integrityHealth) && integrityHealth != "Healthy")

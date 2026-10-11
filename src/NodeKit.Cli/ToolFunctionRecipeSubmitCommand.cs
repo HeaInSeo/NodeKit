@@ -43,9 +43,12 @@ namespace NodeKit.Cli
         /// <summary>로컬 검사는 통과했지만 NodeVault가 아직 kind 2 빌드를 받지 않는다. 주소 확인·receipt·RPC 0.</summary>
         internal const string UpstreamGateClosedCode = "TOOLFUNCTION_BUILD_GATE_CLOSED";
 
+        // render는 stage1/stage2 상위 수준 미리보기(script는 경로)라 실제로 보낼 exact 4키 raw_spec(materialize된
+        // script 내용)과 다르다 — 안내는 그 차이를 그대로 말한다(r4242930894).
         private const string UpstreamGateClosedMessage =
             "NodeVault가 아직 ToolFunction 이미지 빌드(BUILD_KIND_TOOLFUNCTIONSPEC, kind 2)를 받지 않습니다. 요청을 보내지 않았습니다 — " +
-            "로컬 검사는 통과했으며 보낼 요청 내용은 `nodekit function-recipe render <path> --out <out.json>`으로 확인할 수 있습니다.";
+            "로컬 검사는 통과했습니다. `nodekit function-recipe render <path> --out <out.json>`은 stage1/stage2 상위 수준 미리보기일 뿐이며, " +
+            "실제로 보낼 4키 raw_spec(materialize된 script 내용 포함)과 같지 않습니다.";
 
         /// <summary>
         /// 현재 NodeVault 빌드 경로가 kind 2를 받는지. 벤더 proto가 BUILD_KIND_TOOLFUNCTIONSPEC를 예약만 하는 동안 false다.
