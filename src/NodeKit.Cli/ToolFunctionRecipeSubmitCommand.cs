@@ -19,9 +19,10 @@ namespace NodeKit.Cli
     /// WatchToolBuild다. ResolveToolSpec의 tool_name/version은 FunctionId/Revision이고 raw_spec은
     /// exact 4키 kind 2 payload다.
     ///
-    /// 빌드 성공은 승인(Approved)이 아니며 typed 등록(RegisterToolFunction)은 하지 않는다 — 그것은
-    /// 후속 P08 경로다. Failed/Interrupted, terminal 없는 종료, full B 없는 Succeeded는 모두 등록에
-    /// 쓸 수 있는 성공이 아니다(exit 1). preflight 실패는 RPC를 보내지 않는다. image 생성이나
+    /// 빌드 성공은 승인(Approved)이 아니다. full B를 확인한 뒤에만 P08.registry typed 등록
+    /// (<see cref="ToolFunctionRegistrar"/>: durable 요청 저장 → RegisterToolFunction → versioned receipt)으로
+    /// 넘어간다. Failed/Interrupted, terminal 없는 종료, full B 없는 Succeeded는 모두 등록에
+    /// 쓸 수 있는 성공이 아니다(exit 1, 등록 RPC 0). preflight 실패는 RPC를 보내지 않는다. image 생성이나
     /// Kubernetes 호출은 하지 않는다 — NodeKit은 NodeVault client로만 동작한다.
     ///
     /// `nodekit submit`과 달리 로컬 입력·preflight 검사를 NodeVault 주소 확인보다 먼저 한다.
@@ -60,6 +61,8 @@ namespace NodeKit.Cli
         /// <param name="toolFunctionBuildGateOpen">
         /// 테스트 전용 상류 게이트 값. 없으면 <see cref="UpstreamAcceptsToolFunctionBuild"/>를 쓴다.
         /// </param>
+        /// <param name="registryClient">테스트 전용 주입 등록 client. 주입하면 full B 뒤 typed 등록까지 간다.</param>
+        /// <param name="registrationRequestIdProvider">테스트 전용 고정 등록 request ID.</param>
         /// <remarks>
         /// SubmitCommand와 같은 receipt 규칙이다: 실제 CLI는 항상 durable receipt를 남기고, 주입 client로
         /// 도는 테스트는 --receipt나 requestIdProvider를 줄 때만 기록한다.
@@ -70,7 +73,9 @@ namespace NodeKit.Cli
             TextWriter stderr,
             IToolSpecBuildClient? toolSpecClient = null,
             Func<string>? requestIdProvider = null,
-            bool? toolFunctionBuildGateOpen = null)
+            bool? toolFunctionBuildGateOpen = null,
+            IToolFunctionRegistryClient? registryClient = null,
+            Func<string>? registrationRequestIdProvider = null)
         {
             if (args.Any(a => a is "--help" or "-h"))
             {
@@ -101,6 +106,10 @@ namespace NodeKit.Cli
             }
 
             var journal = toolSpecClient is null || receiptOption is not null || requestIdProvider is not null;
+
+            // P08.registry: 실제 CLI는 full B 뒤 항상 typed 등록까지 간다. 빌드 client만 주입한 테스트(P07)는 빌드에서
+            // 멈추고, 등록 client를 함께 주입한 테스트만 등록한다 — receipt 규칙과 같은 주입 규칙이다.
+            var registerAfterBuild = toolSpecClient is null || registryClient is not null;
 
             // 주소 확인보다 로컬 입력 검사를 먼저 한다 — Draft/invalid/SchemaVersion 오류는 NodeVault
             // 주소 설정 여부와 무관하게 같은 진단·exit로 끝나야 한다(RPC0).
@@ -181,7 +190,24 @@ namespace NodeKit.Cli
                     (Path.GetFileName(recipePath), recipeBytes!),
                     (source.ScriptPath, Encoding.UTF8.GetBytes(source.Script)),
                 },
-                SecondImage = new SecondImageBuildContext(source.BaseImageDigest, recipe.ToolSpecDigest),
+                SecondImage = new SecondImageBuildContext(source.BaseImageDigest, recipe.ToolSpecDigest)
+                {
+                    Register = registerAfterBuild ? built => ToolFunctionRegistrar.RegisterAfterBuild(
+                        recipe,
+                        new RegistrationContext(
+                            receiptOption is null
+                                ? LocalOperationStore.ForRecipe(recipePath).RootDirectory
+                                : LocalOperationStore.RootForReceipt(receiptOption),
+                            url ?? SubmitCommand.InjectedClientEndpoint,
+                            registryClient,
+                            registrationRequestIdProvider ?? (() => Guid.NewGuid().ToString("D")),
+                            source.BaseImageDigest),
+                        built,
+                        stdout,
+                        stderr,
+                        jsonl)
+                        : null,
+                },
             };
 
             return SubmitCommand.RunOperation(request, stdout, stderr, toolSpecClient, requestIdProvider, CancellationToken.None);

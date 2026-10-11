@@ -56,5 +56,11 @@ namespace NodeKit.Cli
         /// </summary>
         public static bool IsFullImageDigest(string? digest) =>
             digest is not null && _fullDigestPattern.IsMatch(digest);
+
+        /// <summary>
+        /// full B를 확인한 뒤 이어서 할 typed 등록(P08.registry). null이면 빌드에서 멈춘다(P07 동작). 반환값이 최종
+        /// exit code이며, 등록이 있으면 빌드 성공은 jsonl에서 state 레코드로만 나가고 completed는 등록이 한 번 쓴다.
+        /// </summary>
+        public Func<SecondImageSucceeded, int>? Register { get; init; }
     }
 }

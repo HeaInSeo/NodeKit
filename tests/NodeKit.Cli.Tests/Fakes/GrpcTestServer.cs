@@ -19,11 +19,15 @@ namespace NodeKit.Cli.Tests.Fakes
 
         public FakeBuildService Fake { get; }
 
+        /// <summary>같은 서버의 ToolRegistryService 대역(P08 typed 등록).</summary>
+        public FakeToolRegistryService Registry { get; }
+
         public GrpcChannel Channel { get; }
 
         public GrpcTestServer()
         {
             Fake = new FakeBuildService();
+            Registry = new FakeToolRegistryService();
 
             _host = new HostBuilder()
                 .ConfigureWebHost(webBuilder =>
@@ -34,11 +38,16 @@ namespace NodeKit.Cli.Tests.Fakes
                         {
                             services.AddGrpc();
                             services.AddSingleton(Fake);
+                            services.AddSingleton(Registry);
                         })
                         .Configure(app =>
                         {
                             app.UseRouting();
-                            app.UseEndpoints(endpoints => endpoints.MapGrpcService<FakeBuildService>());
+                            app.UseEndpoints(endpoints =>
+                            {
+                                endpoints.MapGrpcService<FakeBuildService>();
+                                endpoints.MapGrpcService<FakeToolRegistryService>();
+                            });
                         });
                 })
                 .Start();
