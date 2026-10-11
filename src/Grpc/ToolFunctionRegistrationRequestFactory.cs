@@ -118,6 +118,24 @@ namespace NodeKit.Grpc
             return true;
         }
 
+        /// <summary>
+        /// B(두 번째 이미지)가 생기기 전에 typed 등록 mapping 전제를 미리 확인한다
+        /// (S3-09 current preflight). TryBuild와 같은 mapper를 돌려 unknown enum,
+        /// output note 중복/고아, port 방향 오류를 찾고 만든 객체는 버린다. C1 형식은
+        /// TryCheckToolSpecDigest가 따로 본다.
+        /// </summary>
+        public static bool TryCheckSpecMapping(ToolFunctionRecipe recipe, out ToolFunctionWireError? error)
+        {
+            ArgumentNullException.ThrowIfNull(recipe);
+
+            var errors = new MappingErrors();
+            _ = MapSpec(recipe, errors);
+            _ = MapPresentation(recipe, errors);
+            _ = MapValidationPolicy(recipe, errors);
+            error = errors.First;
+            return error is null;
+        }
+
         // ── local enum → proto enum: 이름별 명시 표. local은 0부터, proto는 0=UNSPECIFIED
         //    이므로 숫자 cast는 한 칸씩 어긋난다. 표에 없는 값은 null(=거부)이다(S3-06-B/E).
         internal static Pb.Cardinality? MapCardinality(PortCardinality value) => value switch

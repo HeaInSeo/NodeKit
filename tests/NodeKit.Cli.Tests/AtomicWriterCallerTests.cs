@@ -377,6 +377,8 @@ namespace NodeKit.Cli.Tests
             var path = Path.Join(inputDir, "ready.json");
             if (!File.Exists(path))
             {
+                // render는 ScriptPath source를 현재 내용으로 다시 읽는다(S3-09).
+                File.WriteAllText(Path.Join(inputDir, "sort.sh"), "#!/bin/sh\nsamtools sort \"$@\"\n");
                 CreateFunctionRecipe(path);
                 var (exit, _, stderr) = Run("function-recipe", "validate", path);
                 Assert.True(exit == 0, stderr);
