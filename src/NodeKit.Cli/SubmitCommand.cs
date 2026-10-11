@@ -376,23 +376,24 @@ namespace NodeKit.Cli
             return stopped.ExitCode;
         }
 
-        // S3-05-A/E: 두 번째 이미지 빌드의 Succeeded는 WatchToolBuild record가 full image digest B를
-        // 실어 보냈을 때만 등록에 쓸 수 있는 결과다. B가 없거나 잘렸으면 기반 이미지 A나 로그
-        // digest로 채우지 않고 exit 1로 끝낸다 — 빌드는 서버에서 끝났을 수 있으므로 recovery는
-        // uncertain이다. 어느 쪽이든 typed 등록(RegisterToolFunction)은 하지 않는다.
+        // S3-05-A/E: 두 번째 이미지 빌드의 Succeeded는 terminal Succeeded record 자체가 full image
+        // digest B를 실어 보냈을 때만 등록에 쓸 수 있는 결과다. 앞선 진행 이벤트의 digest를 B로 이어
+        // 쓰지 않는다(P07 Codex r4243205102). B가 없거나 잘렸으면 기반 이미지 A나 로그 digest로 채우지
+        // 않고 exit 1로 끝낸다 — 빌드는 서버에서 끝났을 수 있으므로 recovery는 uncertain이다. 어느
+        // 쪽이든 typed 등록(RegisterToolFunction)은 하지 않는다.
         private static int ReportSecondImageSucceeded(
             TextWriter stdout,
             TextWriter stderr,
             SecondImageBuildContext secondImage,
             BuildEvent succeededEvent,
             string? buildId,
-            string? watchImageDigest,
-            string? imageRef,
             string? integrityHealth,
             string? requestToolSpecDigest,
             ReceiptRun? run,
             bool jsonl)
         {
+            var watchImageDigest = succeededEvent.ImageDigest;
+            var imageRef = succeededEvent.ImageRef;
             if (!SecondImageBuildContext.IsFullImageDigest(watchImageDigest))
             {
                 var message =
@@ -562,10 +563,6 @@ namespace NodeKit.Cli
             string? lastImageRef = null;
             string? lastIntegrityHealth = null;
             string? resolvedToolSpecDigest = null;
-
-            // WatchToolBuild record의 image_digest만 담는다. legacy DigestAcquired 로그 digest는
-            // 두 번째 이미지 B의 근거로 쓰지 않는다(S3-05-E).
-            string? watchImageDigest = null;
             DateTimeOffset? lastEventReceivedAt = null;
             ConsoleCancelEventHandler onCancelKeyPress = (_, e) =>
             {
@@ -664,7 +661,6 @@ namespace NodeKit.Cli
                         digestReceived = true;
                         lastImageDigest = ev.ImageDigest;
                         lastImageRef = ev.ImageRef;
-                        watchImageDigest = ev.ImageDigest;
                     }
 
                     if (!string.IsNullOrEmpty(ev.IntegrityHealth))
@@ -682,7 +678,7 @@ namespace NodeKit.Cli
                         if (secondImage is not null)
                         {
                             return ReportSecondImageSucceeded(
-                                stdout, stderr, secondImage, ev, buildId, watchImageDigest, lastImageRef, lastIntegrityHealth, resolvedToolSpecDigest, run, jsonl);
+                                stdout, stderr, secondImage, ev, buildId, lastIntegrityHealth, resolvedToolSpecDigest, run, jsonl);
                         }
 
                         if (jsonl)

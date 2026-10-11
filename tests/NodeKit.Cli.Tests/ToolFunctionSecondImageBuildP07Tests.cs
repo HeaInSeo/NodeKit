@@ -34,6 +34,9 @@ namespace NodeKit.Cli.Tests
         private const string DigestC2 = "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2";
         private const string DigestB = "sha256:b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2";
         private const string LegacyDigest = "sha256:9999999999999999999999999999999999999999999999999999999999999999";
+
+        // terminal 전 진행 이벤트가 실어 보낸 full digest — B가 아니다(r4243205102).
+        private const string ProgressDigest = "sha256:e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5";
         private const string ImageRefB = "harbor.local/nodevault/fn/samtools.sort:r7";
         private const string Script = "#!/bin/sh\nsamtools sort \"$@\"\n";
 
@@ -491,6 +494,127 @@ namespace NodeKit.Cli.Tests
                 Assert.Contains(SubmitCommand.SecondImageDigestMissingCode, stderr.ToString());
                 Assert.DoesNotContain("[성공]", output);
             }
+        }
+
+        // r4243205102: 앞선 진행 이벤트가 full digest를 실어 보냈어도 terminal Succeeded에 B가 없으면 성공이 아니다.
+        // 그 digest는 출력의 B 자리에도, receipt의 성공 관측에도 남지 않는다.
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void E_ProgressDigestThenSucceededWithoutB_Exit1_ProgressDigestNotUsedAsB(bool jsonl)
+        {
+            using var server = NewServer();
+            server.Fake.WatchEvents = new List<ProtoBuildEvent>
+            {
+                new() { Kind = ProtoBuildEventKind.Log, Status = "Running", BuildId = FixtureBuildId, ImageRef = ImageRefB, ImageDigest = ProgressDigest },
+                SucceededEvent(string.Empty),
+            };
+
+            var (exit, stdout, stderr) = jsonl
+                ? Submit(server, Save(ReadyRecipe()), "--format", "jsonl")
+                : Submit(server, Save(ReadyRecipe()));
+
+            Assert.Equal(1, exit);
+            if (jsonl)
+            {
+                var completed = Completed(stdout);
+                Assert.Equal("Failed", completed.GetProperty("status").GetString());
+                Assert.Equal(SubmitCommand.SecondImageDigestMissingCode, completed.GetProperty("error_code").GetString());
+                Assert.False(completed.TryGetProperty("image_digest", out _));
+            }
+            else
+            {
+                Assert.Contains(SubmitCommand.SecondImageDigestMissingCode, stderr);
+                Assert.DoesNotContain("[성공]", stdout);
+                Assert.DoesNotContain("두 번째 이미지(B) digest", stdout);
+            }
+
+            var receipt = ReadReceipt(DefaultReceiptPath());
+            Assert.Equal(OperationObservation.SucceededOutcome, receipt.LastObservation!.Outcome);
+            Assert.Null(receipt.LastObservation.ImageDigest);
+        }
+
+        // receipt watch도 같은 규칙: 같은 스트림의 진행 이벤트가 가진 digest를 terminal B로 쓰지 않는다.
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void ReceiptWatch_ProgressDigestThenSucceededWithoutB_Exit1(bool jsonl)
+        {
+            string receiptPath;
+            using (var first = NewServer())
+            {
+                first.Fake.WatchEvents = new List<ProtoBuildEvent>
+                {
+                    new() { Kind = ProtoBuildEventKind.Log, Status = "Running", BuildId = FixtureBuildId },
+                };
+                var (submitExit, _, _) = Submit(first, Save(ReadyRecipe()));
+                Assert.Equal(1, submitExit);
+                receiptPath = DefaultReceiptPath();
+            }
+
+            using var server = NewServer();
+            server.Fake.WatchEvents = new List<ProtoBuildEvent>
+            {
+                new() { Kind = ProtoBuildEventKind.Log, Status = "Running", BuildId = FixtureBuildId, ImageRef = ImageRefB, ImageDigest = ProgressDigest },
+                SucceededEvent(string.Empty),
+            };
+            using var client = new GrpcToolSpecClient(server.Channel);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var args = jsonl
+                ? new[] { "receipt", "watch", receiptPath, "--format", "jsonl" }
+                : new[] { "receipt", "watch", receiptPath };
+
+            var exit = ReceiptCommand.Run(args, stdout, stderr, client, TestContext.Current.CancellationToken);
+
+            Assert.Equal(1, exit);
+            Assert.Contains(SubmitCommand.SecondImageDigestMissingCode, stderr.ToString());
+            if (jsonl)
+            {
+                var completed = Completed(stdout.ToString());
+                Assert.Equal(SubmitCommand.SecondImageDigestMissingCode, completed.GetProperty("error_code").GetString());
+                Assert.False(completed.TryGetProperty("image_digest", out _));
+            }
+            else
+            {
+                Assert.DoesNotContain("[성공]", stdout.ToString());
+                Assert.DoesNotContain($"이미지 digest: {ImageRefB}@{ProgressDigest}", stdout.ToString());
+            }
+
+            var receipt = ReadReceipt(receiptPath);
+            Assert.Equal(OperationObservation.SucceededOutcome, receipt.LastObservation!.Outcome);
+            Assert.Null(receipt.LastObservation.ImageDigest);
+        }
+
+        // 이미 terminal Succeeded record의 B로 끝난 receipt를 다시 관찰할 때, 재전송된 terminal 이벤트에 B가
+        // 빠졌다고 기록된 B를 지우지 않는다. 같은 스트림의 진행 digest도 그 자리를 차지하지 못한다.
+        [Fact]
+        public void ReceiptWatch_RewatchTerminalReceipt_KeepsRecordedTerminalB()
+        {
+            using (var first = NewServer())
+            {
+                first.Fake.WatchEvents = new List<ProtoBuildEvent> { SucceededEvent(DigestB) };
+                var (submitExit, _, submitStderr) = Submit(first, Save(ReadyRecipe()));
+                Assert.True(submitExit == 0, submitStderr);
+            }
+
+            var receiptPath = DefaultReceiptPath();
+            using var server = NewServer();
+            server.Fake.WatchEvents = new List<ProtoBuildEvent>
+            {
+                new() { Kind = ProtoBuildEventKind.Log, Status = "Running", BuildId = FixtureBuildId, ImageRef = ImageRefB, ImageDigest = ProgressDigest },
+                SucceededEvent(string.Empty),
+            };
+            using var client = new GrpcToolSpecClient(server.Channel);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exit = ReceiptCommand.Run(
+                new[] { "receipt", "watch", receiptPath, "--format", "jsonl" }, stdout, stderr, client, TestContext.Current.CancellationToken);
+
+            Assert.True(exit == 0, stderr.ToString());
+            Assert.Equal(DigestB, Completed(stdout.ToString()).GetProperty("image_digest").GetString());
+            Assert.Equal(DigestB, ReadReceipt(receiptPath).LastObservation!.ImageDigest);
         }
 
         [Fact]

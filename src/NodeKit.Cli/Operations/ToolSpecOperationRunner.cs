@@ -186,16 +186,7 @@ namespace NodeKit.Cli.Operations
                     };
                 }
 
-                // status 없이 terminal kind로만 끝을 알린 이벤트도 결과를 남긴다 — 이전 관측의
-                // Running 같은 값을 그대로 두면 다시 열었을 때 성공/실패를 구분할 수 없다.
-                var outcome = ev.Kind == BuildEventKind.Succeeded
-                    ? OperationObservation.SucceededOutcome
-                    : OperationObservation.FailedOutcome;
-                var terminal = Observe(ev, observed, clock) with
-                {
-                    Status = NullIfEmpty(ev.Status) ?? outcome,
-                    Outcome = outcome,
-                };
+                var terminal = ObserveTerminal(ev, observed, recordedSuccess: null, handle.Receipt.OperationKind, clock);
                 var terminalError = handle.Advance(handle.Receipt with
                 {
                     Phase = OperationPhase.Terminal,
@@ -317,14 +308,7 @@ namespace NodeKit.Cli.Operations
                     continue;
                 }
 
-                var outcome = ev.Kind == BuildEventKind.Succeeded
-                    ? OperationObservation.SucceededOutcome
-                    : OperationObservation.FailedOutcome;
-                var terminal = Observe(ev, observed ?? recorded, clock) with
-                {
-                    Status = NullIfEmpty(ev.Status) ?? outcome,
-                    Outcome = outcome,
-                };
+                var terminal = ObserveTerminal(ev, observed ?? recorded, recorded, handle.Receipt.OperationKind, clock);
                 var terminalError = handle.Advance(handle.Receipt with
                 {
                     Phase = OperationPhase.Terminal,
@@ -419,6 +403,38 @@ namespace NodeKit.Cli.Operations
                 SpecReferrerDigest = NullIfEmpty(ev.SpecReferrerDigest) ?? previous?.SpecReferrerDigest,
                 ObservedAt = clock.GetUtcNow().ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture),
             };
+
+        // status 없이 terminal kind로만 끝을 알린 이벤트도 결과를 남긴다 — 이전 관측의 Running 같은 값을
+        // 그대로 두면 다시 열었을 때 성공/실패를 구분할 수 없다. 두 번째 이미지 빌드의 Succeeded는 B를
+        // terminal Succeeded record에서만 받는다(S3-05-E, P07 Codex r4243205102): 앞선 진행 이벤트의 image
+        // digest/ref를 성공 결과로 이어 붙이지 않는다. 이미 terminal 성공으로 기록된 receipt를 다시 관찰할
+        // 때(recordedSuccess)는 그 성공 record의 값만 빈 필드의 기준으로 쓴다.
+        private static OperationObservation ObserveTerminal(
+            BuildEvent ev,
+            OperationObservation? previous,
+            OperationObservation? recordedSuccess,
+            string operationKind,
+            TimeProvider clock)
+        {
+            var succeeded = ev.Kind == BuildEventKind.Succeeded;
+            var outcome = succeeded ? OperationObservation.SucceededOutcome : OperationObservation.FailedOutcome;
+            var terminal = Observe(ev, previous, clock) with
+            {
+                Status = NullIfEmpty(ev.Status) ?? outcome,
+                Outcome = outcome,
+            };
+            if (!succeeded || operationKind != OperationReceipt.ToolFunctionImageBuildKind)
+            {
+                return terminal;
+            }
+
+            var basis = recordedSuccess?.Outcome == OperationObservation.SucceededOutcome ? recordedSuccess : null;
+            return terminal with
+            {
+                ImageRef = NullIfEmpty(ev.ImageRef) ?? basis?.ImageRef,
+                ImageDigest = NullIfEmpty(ev.ImageDigest) ?? basis?.ImageDigest,
+            };
+        }
 
         private static string? NullIfEmpty(string? value) => string.IsNullOrEmpty(value) ? null : value;
 
