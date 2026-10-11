@@ -190,13 +190,19 @@ namespace NodeKit.Grpc
             pbCommand.Arguments.AddRange(command.Arguments);
             pbCommand.Environment.AddRange(command.Environment.Select(e => new Pb.EnvironmentEntry { Name = e.Name, Source = e.Source }));
             pbCommand.SuccessExitCodes.AddRange(command.SuccessExitCodes);
-            if (command.TimeoutPolicy is { } timeout)
+
+            // 미지정(null)과 0은 모두 unset이다(N1). 두 값이 모두 unset인 빈 그룹
+            // ({} / {"softSeconds":0})은 timeout 없음과 같은 의미이므로 timeout_policy를
+            // 아예 만들지 않는다 — NodeVault canonicalizer는 present-empty와 absent를
+            // 다른 digest로 구분한다(S3-06-C).
+            var softSeconds = command.TimeoutPolicy?.SoftSeconds ?? 0;
+            var hardSeconds = command.TimeoutPolicy?.HardSeconds ?? 0;
+            if (softSeconds != 0 || hardSeconds != 0)
             {
-                // 미지정(null)은 0 = canonical JSON에서 생략(N1).
                 pbCommand.TimeoutPolicy = new Pb.TimeoutPolicy
                 {
-                    SoftSeconds = timeout.SoftSeconds ?? 0,
-                    HardSeconds = timeout.HardSeconds ?? 0,
+                    SoftSeconds = softSeconds,
+                    HardSeconds = hardSeconds,
                 };
             }
 

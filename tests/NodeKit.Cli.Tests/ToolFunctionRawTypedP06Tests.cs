@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Google.Protobuf;
 using NodeKit.Authoring.ToolFunctionRecipes;
 using NodeKit.Cli;
@@ -397,6 +398,7 @@ namespace NodeKit.Cli.Tests
         [Theory]
         [InlineData("sha256:bad")]
         [InlineData(DigestC1)]
+        [InlineData(DigestB + "\n")]
         public void S3_02_D_MalformedSecondImageDigestIsRejected(string b)
         {
             var error = MapFails(FullRecipe(), Inputs(b: b));
@@ -716,6 +718,35 @@ namespace NodeKit.Cli.Tests
 
             Assert.Equal(0, request.Spec.Command.TimeoutPolicy.SoftSeconds);
             Assert.Equal(30, request.Spec.Command.TimeoutPolicy.HardSeconds);
+        }
+
+        // 빈 optional timeout 그룹은 "timeout 없음"과 같은 의미다. 저장→재로드→L1 검증을
+        // 거친 뒤에도 timeout_policy가 생기면 NodeVault digest가 달라진다(S3-06-C).
+        [Theory]
+        [InlineData("null")]
+        [InlineData("{}")]
+        [InlineData("{\"softSeconds\":0}")]
+        [InlineData("{\"hardSeconds\":0}")]
+        [InlineData("{\"softSeconds\":0,\"hardSeconds\":0}")]
+        [InlineData("{\"softSeconds\":null,\"hardSeconds\":null}")]
+        public void S3_06_C_EmptyTimeoutGroupMapsLikeAbsentAfterSaveReload(string timeoutJson)
+        {
+            var noTimeout = FullRecipe();
+            noTimeout.Command.TimeoutPolicy = null;
+            var expected = Map(noTimeout);
+
+            var root = JsonNode.Parse(JsonSerializer.Serialize(FullRecipe(), ToolFunctionRecipeCliIo.JsonOptions))!;
+            root["Command"]!["TimeoutPolicy"] = JsonNode.Parse(timeoutJson);
+            var path = Path.Join(_workDir, "recipe.json");
+            File.WriteAllText(path, root.ToJsonString());
+            Assert.True(ToolFunctionRecipeCliIo.TryLoad(path, TextWriter.Null, out var loaded));
+            Assert.True(ToolFunctionRecipeValidationPipeline.Validate(loaded!).IsValid);
+
+            var request = Map(loaded!);
+
+            Assert.Null(request.Spec.Command.TimeoutPolicy);
+            Assert.Equal(expected.Spec, request.Spec);
+            Assert.DoesNotContain("timeoutPolicy", JsonFormatter.Default.Format(request.Spec), StringComparison.Ordinal);
         }
 
         [Theory]
