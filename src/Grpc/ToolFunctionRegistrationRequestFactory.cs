@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using NodeKit.Authoring.ToolFunctionRecipes;
@@ -34,6 +35,7 @@ namespace NodeKit.Grpc
         public const string UnknownEnumValueCode = "UNKNOWN_ENUM_VALUE";
         public const string DuplicateOutputPresentationCode = "DUPLICATE_OUTPUT_PRESENTATION";
         public const string OrphanOutputPresentationCode = "ORPHAN_OUTPUT_PRESENTATION";
+        public const string PortDirectionMismatchCode = "PORT_DIRECTION_MISMATCH";
 
         // C1은 ResolvedToolSpec의 ToolSpecDigest — 'sha256:' 접두 없는 64자리 소문자 hex.
         private static readonly Regex _toolSpecDigestPattern =
@@ -200,6 +202,11 @@ namespace NodeKit.Grpc
 
             var spec = new Pb.ToolFunctionSpec { Command = pbCommand };
 
+            // Direction은 PortContract의 판별자다. 담긴 목록과 다르면 어느 쪽 의미로
+            // 등록할지 정할 수 없으므로 목록 기준으로 조용히 옮기지 않고 거부한다.
+            errors.RequireDirection(recipe.InputPorts, PortDirection.Input, nameof(recipe.InputPorts));
+            errors.RequireDirection(recipe.OutputPorts, PortDirection.Output, nameof(recipe.OutputPorts));
+
             // PortContract는 입력/출력 공용 모양이다. 각 방향에서 의미 있는 필드만
             // 옮긴다 — Required/PathPlacementRule/CompanionFiles는 입력 전용,
             // PathOrGlob/CompletionCheck는 출력 전용(PortContract 주석). 출력 note는
@@ -349,6 +356,17 @@ namespace NodeKit.Grpc
             public ToolFunctionWireError? First { get; private set; }
 
             public void Add(ToolFunctionWireError error) => First ??= error;
+
+            public void RequireDirection(IEnumerable<PortContract> ports, PortDirection expected, string listName)
+            {
+                foreach (var port in ports.Where(port => port.Direction != expected))
+                {
+                    Add(new ToolFunctionWireError(
+                        PortDirectionMismatchCode,
+                        $"{listName}의 port '{port.Name}' direction이 {port.Direction}입니다. {expected}여야 합니다.",
+                        1));
+                }
+            }
 
             public T Require<T>(T? mapped, string enumName, int value)
                 where T : struct, Enum

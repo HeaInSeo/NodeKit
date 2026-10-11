@@ -718,6 +718,26 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(30, request.Spec.Command.TimeoutPolicy.HardSeconds);
         }
 
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void PortWhoseDirectionConflictsWithItsListIsRejected(bool outputInInputs)
+        {
+            var recipe = FullRecipe();
+            if (outputInInputs)
+            {
+                recipe.InputPorts[0].Direction = PortDirection.Output;
+            }
+            else
+            {
+                recipe.OutputPorts[1].Direction = PortDirection.Input;
+            }
+
+            var error = MapFails(recipe);
+
+            Assert.Equal(ToolFunctionRegistrationRequestFactory.PortDirectionMismatchCode, error.Code);
+        }
+
         [Fact]
         public void S3_06_D_OutputWithoutNoteHasNoPresentationEntry()
         {
