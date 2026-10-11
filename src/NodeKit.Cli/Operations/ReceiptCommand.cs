@@ -13,14 +13,15 @@ namespace NodeKit.Cli.Operations
     {
         private const string UsageText =
             "사용법:\n" +
-            "  nodekit receipt watch <receipt.json>\n" +
-            "  nodekit receipt cancel <receipt.json>\n" +
+            "  nodekit receipt watch <receipt.json> [--format human|jsonl]\n" +
+            "  nodekit receipt cancel <receipt.json> [--format human|jsonl]\n" +
             "\n" +
             "watch: 저장된 build ID로 서버 빌드를 다시 관찰하고 최종 관측을 receipt에 기록합니다. 새로 제출하지 않습니다.\n" +
             "  서버가 보내는 관측을 처음부터 다시 받아 표시할 뿐, 이전 관찰 위치를 이어받거나 이벤트를 한 번만 보여 준다고 보장하지 않습니다.\n" +
             "  Ctrl-C는 이 관찰만 멈추고 서버 빌드는 취소하지 않습니다.\n" +
             "cancel: 저장된 build ID에 서버 취소 요청을 한 번 보냅니다. 서버가 실제로 멈췄는지는 watch로 확인하세요.\n" +
-            "build ID가 없는 receipt(제출 결과를 모르는 submit_in_flight 포함)는 아무 요청도 보내지 않고 다시 제출하지도 않습니다.";
+            "build ID가 없는 receipt(제출 결과를 모르는 submit_in_flight 포함)는 아무 요청도 보내지 않고 다시 제출하지도 않습니다.\n" +
+            "--format jsonl: stdout에 nodekit.receipt.v1 JSON 레코드만 한 줄씩 냅니다(마지막은 항상 completed). 진단과 후속 명령은 stderr로 갑니다.";
 
         // 사용자가 기다리는 명시적 취소라도 서버/네트워크가 응답하지 않으면 제어를 돌려줘야 한다.
         private static readonly TimeSpan _cancelRequestTimeout = TimeSpan.FromSeconds(5);
@@ -41,13 +42,21 @@ namespace NodeKit.Cli.Operations
                 return 0;
             }
 
-            if (args.Length != 3 || args[1] is not ("watch" or "cancel") || args[2].StartsWith("--", StringComparison.Ordinal))
+            if (args.Length < 3 || args[1] is not ("watch" or "cancel") || args[2].StartsWith("--", StringComparison.Ordinal))
+            {
+                stderr.WriteLine(UsageText);
+                return 2;
+            }
+
+            // 사용법/옵션 오류는 형식이 확정되기 전이므로 jsonl 레코드 없이 2로 끝난다(submit과 같은 규칙).
+            if (!TryParseFormat(args, stderr, out var jsonl))
             {
                 stderr.WriteLine(UsageText);
                 return 2;
             }
 
             var watch = args[1] == "watch";
+            var command = watch ? ReceiptJsonlRecord.WatchCommand : ReceiptJsonlRecord.CancelCommand;
             var receiptPath = args[2];
 
             // 스크립트의 빈 변수("$RECEIPT")가 그대로 들어오는 경우: store를 만들기 전에 사용법 오류로 끝낸다.
@@ -61,7 +70,7 @@ namespace NodeKit.Cli.Operations
             if (TryOpenReceipt(receiptPath, out var handle) is { } openError)
             {
                 stderr.WriteLine($"로컬 기록 오류 ({openError.Code}): {openError.Message}");
-                return openError.ExitCode;
+                return LocalRefusal(stdout, jsonl, command, openError.ExitCode, openError.Code, openError.Message, buildId: null);
             }
 
             using (handle)
@@ -70,14 +79,14 @@ namespace NodeKit.Cli.Operations
                 if (ToolSpecOperationRunner.RefuseWithoutBuildId(receipt) is { } refusal)
                 {
                     stderr.WriteLine($"재진입 불가 ({refusal.Code}): {refusal.Message}");
-                    return refusal.ExitCode;
+                    return LocalRefusal(stdout, jsonl, command, refusal.ExitCode, refusal.Code!, refusal.Message, buildId: null);
                 }
 
                 if (!watch && receipt.Phase == OperationPhase.Terminal)
                 {
-                    stderr.WriteLine(
-                        $"이미 최종 상태({receipt.LastObservation!.Outcome})를 관측한 빌드입니다 (build ID: {receipt.BuildId}). 취소 요청을 보내지 않았습니다.");
-                    return 2;
+                    var message = $"이미 최종 상태({receipt.LastObservation!.Outcome})를 관측한 빌드입니다 (build ID: {receipt.BuildId}). 취소 요청을 보내지 않았습니다.";
+                    stderr.WriteLine(message);
+                    return LocalRefusal(stdout, jsonl, command, 2, ToolSpecOperationRunner.NotResumableCode, message, receipt.BuildId);
                 }
 
                 GrpcToolSpecClient? grpc = null;
@@ -92,21 +101,25 @@ namespace NodeKit.Cli.Operations
                     catch (Exception ex)
 #pragma warning restore CA1031
                     {
-                        stderr.WriteLine($"receipt의 NodeVault endpoint로 연결할 수 없습니다: {receipt.Endpoint} ({ex.Message}). 아무 요청도 보내지 않았습니다.");
-                        return 2;
+                        var message = $"receipt의 NodeVault endpoint로 연결할 수 없습니다: {receipt.Endpoint} ({ex.Message}). 아무 요청도 보내지 않았습니다.";
+                        stderr.WriteLine(message);
+                        return LocalRefusal(stdout, jsonl, command, 2, LocalOperationStore.InvalidCode, message, receipt.BuildId);
                     }
                 }
 
                 using (grpc)
                 {
                     IToolSpecBuildClient client = toolSpecClient ?? grpc!;
-                    stdout.WriteLine($"receipt {(watch ? "재관찰" : "취소 요청")}: {handle.ReceiptPath}");
-                    stdout.WriteLine($"  request ID: {receipt.RequestId}, build ID: {receipt.BuildId}, endpoint: {receipt.Endpoint}");
-                    stdout.WriteLine();
+                    if (!jsonl)
+                    {
+                        stdout.WriteLine($"receipt {(watch ? "재관찰" : "취소 요청")}: {handle.ReceiptPath}");
+                        stdout.WriteLine($"  request ID: {receipt.RequestId}, build ID: {receipt.BuildId}, endpoint: {receipt.Endpoint}");
+                        stdout.WriteLine();
+                    }
 
                     return watch
-                        ? WatchAsync(handle, client, stdout, stderr, cancellationToken).GetAwaiter().GetResult()
-                        : CancelAsync(receipt.BuildId!, handle.ReceiptPath, client, stdout, stderr, cancellationToken).GetAwaiter().GetResult();
+                        ? WatchAsync(handle, client, stdout, stderr, jsonl, cancellationToken).GetAwaiter().GetResult()
+                        : CancelAsync(receipt.BuildId!, handle.ReceiptPath, client, stdout, stderr, jsonl, cancellationToken).GetAwaiter().GetResult();
                 }
             }
         }
@@ -136,8 +149,46 @@ namespace NodeKit.Cli.Operations
         private static OperationStoreError InvalidReceiptPath(string receiptPath, Exception ex) =>
             new(LocalOperationStore.InvalidCode, $"receipt 경로를 사용할 수 없습니다: {receiptPath} ({ex.Message}). 아무 요청도 보내지 않았습니다.");
 
+        // args[0]은 "receipt", args[1]은 하위 명령, args[2]는 receipt 경로 — 옵션은 인덱스 3부터다.
+        private static bool TryParseFormat(string[] args, TextWriter stderr, out bool jsonl)
+        {
+            jsonl = false;
+            if (!CliOptionParser.TryParse(args, 3, stderr, new[] { "--format" }, Array.Empty<string>(), out var values, out _))
+            {
+                return false;
+            }
+
+            if (values.TryGetValue("--format", out var formatValue))
+            {
+                var normalized = formatValue.Trim().ToLowerInvariant();
+                if (normalized is not ("human" or "jsonl"))
+                {
+                    stderr.WriteLine($"--format 옵션 값이 올바르지 않습니다: {formatValue} (human 또는 jsonl)");
+                    return false;
+                }
+
+                jsonl = normalized == "jsonl";
+            }
+
+            return true;
+        }
+
+        // receipt를 열거나 검사하다 거절했다: 어떤 RPC도 보내지 않았고 receipt도 그대로다. 같은 입력으로
+        // 다시 실행해도 결과가 같으므로 recovery는 terminal이고, 원격 상태는 건드리지 않았으므로 싣지 않는다.
+        private static int LocalRefusal(
+            TextWriter stdout, bool jsonl, string command, int exitCode, string code, string? message, string? buildId)
+        {
+            if (jsonl)
+            {
+                ReceiptJsonlRecord.Completed(command, exitCode, RecoveryDisposition.Terminal, buildId, errorCode: code, message: message)
+                    .WriteTo(stdout);
+            }
+
+            return exitCode;
+        }
+
         private static async Task<int> WatchAsync(
-            OperationHandle handle, IToolSpecBuildClient client, TextWriter stdout, TextWriter stderr, CancellationToken cancellationToken)
+            OperationHandle handle, IToolSpecBuildClient client, TextWriter stdout, TextWriter stderr, bool jsonl, CancellationToken cancellationToken)
         {
             var buildId = handle.Receipt.BuildId!;
             using var userCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -152,19 +203,44 @@ namespace NodeKit.Cli.Operations
                 var result = await ToolSpecOperationRunner.WatchKnownBuildAsync(
                         handle,
                         client,
-                        onEvent: ev => PrintEvent(ev, stdout),
+                        onEvent: ev =>
+                        {
+                            if (jsonl)
+                            {
+                                WriteStateRecord(ev, buildId, stdout);
+                            }
+                            else
+                            {
+                                PrintEvent(ev, stdout);
+                            }
+                        },
                         cancellationToken: userCts.Token)
                     .ConfigureAwait(false);
 
                 if (result.Code is { } storeCode)
                 {
                     stderr.WriteLine($"로컬 기록 실패 ({storeCode}): {result.Message}");
-                    return result.ExitCode;
+                    return WatchCompleted(stdout, jsonl, result.ExitCode, RecoveryDisposition.Uncertain, buildId, errorCode: storeCode, message: result.Message);
                 }
 
                 if (result.ExitCode == 0)
                 {
                     var observed = result.ObservedResult;
+                    if (jsonl)
+                    {
+                        // S2-05-C06과 같은 원칙: Partial 등 integrity 상태는 필드로만 싣고 stderr에 따로 내지 않는다.
+                        return WatchCompleted(
+                            stdout,
+                            jsonl,
+                            0,
+                            RecoveryDisposition.None,
+                            buildId,
+                            status: OperationObservation.SucceededOutcome,
+                            imageRef: observed?.ImageRef,
+                            imageDigest: observed?.ImageDigest,
+                            integrityHealth: observed?.IntegrityHealth);
+                    }
+
                     if (!string.IsNullOrEmpty(observed?.ImageDigest))
                     {
                         stdout.WriteLine(string.IsNullOrEmpty(observed.ImageRef)
@@ -180,26 +256,61 @@ namespace NodeKit.Cli.Operations
                 {
                     stderr.WriteLine($"빌드 실패: {result.Message}");
                     stderr.WriteLine("최종 상태를 receipt에 기록했습니다.");
-                    return result.ExitCode;
+                    return WatchCompleted(
+                        stdout,
+                        jsonl,
+                        result.ExitCode,
+                        RecoveryDisposition.Terminal,
+                        buildId,
+                        status: OperationObservation.FailedOutcome,
+                        errorCode: "BUILD_FAILED",
+                        remoteBuildState: "failed",
+                        message: result.Message);
                 }
 
                 // 스트림 종료·다른 빌드 이벤트: 결과를 확인하지 못했다. receipt는 바뀌지 않았다.
                 stderr.WriteLine($"{result.Message} 원격 빌드 결과를 확인하지 못했습니다 (build ID: {buildId}). receipt는 그대로 두었습니다 — 나중에 다시 watch하세요.");
-                return result.ExitCode;
+                return WatchCompleted(
+                    stdout,
+                    jsonl,
+                    result.ExitCode,
+                    RecoveryDisposition.Uncertain,
+                    buildId,
+                    errorCode: result.StreamEnded ? "STREAM_ENDED_WITHOUT_RESULT" : "UNEXPECTED_ERROR",
+                    remoteBuildState: "unknown",
+                    message: result.Message);
             }
 #pragma warning disable CA1031 // our own token is the only reliable cancel signal; the exception shape varies (SubmitCommand)
             catch (Exception) when (userCts.IsCancellationRequested)
 #pragma warning restore CA1031
             {
+                // 관찰만 멈췄다: 서버 취소를 주장하지 않으므로 status(Cancelled 등)를 만들지 않는다.
                 stderr.WriteLine($"관찰을 멈췄습니다 (build ID: {buildId}). 서버 빌드는 취소하지 않았습니다 — 취소하려면 {FollowUpCommand("cancel", handle.ReceiptPath)}");
-                return 130;
+                return WatchCompleted(
+                    stdout,
+                    jsonl,
+                    130,
+                    RecoveryDisposition.Terminal,
+                    buildId,
+                    errorCode: "WATCH_STOPPED",
+                    remoteBuildState: "unknown",
+                    message: "관찰을 멈췄습니다. 서버 빌드는 취소하지 않았습니다.");
             }
 #pragma warning disable CA1031 // a failed watch must end with a diagnostic, not a stack trace; the receipt stays re-watchable
             catch (Exception ex)
 #pragma warning restore CA1031
             {
-                stderr.WriteLine($"{BuildErrorMessages.Describe(ex)} 원격 빌드 상태는 확인하지 못했습니다 (build ID: {buildId}). receipt는 그대로 두었습니다.");
-                return 1;
+                var message = BuildErrorMessages.Describe(ex);
+                stderr.WriteLine($"{message} 원격 빌드 상태는 확인하지 못했습니다 (build ID: {buildId}). receipt는 그대로 두었습니다.");
+                return WatchCompleted(
+                    stdout,
+                    jsonl,
+                    1,
+                    RecoveryDisposition.Uncertain,
+                    buildId,
+                    errorCode: "WATCH_FAILED",
+                    remoteBuildState: "unknown",
+                    message: message);
             }
             finally
             {
@@ -208,7 +319,7 @@ namespace NodeKit.Cli.Operations
         }
 
         private static async Task<int> CancelAsync(
-            string buildId, string receiptPath, IToolSpecBuildClient client, TextWriter stdout, TextWriter stderr, CancellationToken cancellationToken)
+            string buildId, string receiptPath, IToolSpecBuildClient client, TextWriter stdout, TextWriter stderr, bool jsonl, CancellationToken cancellationToken)
         {
             using var timeoutCts = new CancellationTokenSource(_cancelRequestTimeout);
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
@@ -220,22 +331,86 @@ namespace NodeKit.Cli.Operations
             catch (Exception) when (cancellationToken.IsCancellationRequested)
 #pragma warning restore CA1031
             {
-                stderr.WriteLine($"취소 요청을 중단했습니다 (build ID: {buildId}). 서버가 요청을 받았는지 알 수 없습니다.");
-                return 130;
+                var message = $"취소 요청을 중단했습니다 (build ID: {buildId}). 서버가 요청을 받았는지 알 수 없습니다.";
+                stderr.WriteLine(message);
+                return CancelCompleted(stdout, jsonl, 130, buildId, "CANCEL_REQUEST_ABORTED", message);
             }
 #pragma warning disable CA1031 // any failure keeps the remote state unknown; it is reported, never turned into "cancelled"
             catch (Exception ex)
 #pragma warning restore CA1031
             {
-                var reason = timeoutCts.IsCancellationRequested
+                var timedOut = timeoutCts.IsCancellationRequested;
+                var reason = timedOut
                     ? $"{(int)_cancelRequestTimeout.TotalSeconds}초 안에 응답이 없었습니다"
                     : BuildErrorMessages.Describe(ex);
-                stderr.WriteLine($"취소 요청이 실패했습니다 (build ID: {buildId}): {reason}. 서버 빌드가 멈췄는지 알 수 없습니다 — receipt는 그대로 두었습니다.");
-                return 1;
+                var message = $"취소 요청이 실패했습니다 (build ID: {buildId}): {reason}. 서버 빌드가 멈췄는지 알 수 없습니다 — receipt는 그대로 두었습니다.";
+                stderr.WriteLine(message);
+                return CancelCompleted(stdout, jsonl, 1, buildId, timedOut ? "CANCEL_REQUEST_TIMEOUT" : "CANCEL_REQUEST_FAILED", message);
             }
 
-            stdout.WriteLine($"취소 요청을 보냈습니다 (build ID: {buildId}). 서버가 실제로 멈췄는지는 아직 확인하지 않았습니다 — 확인하려면 {FollowUpCommand("watch", receiptPath)}");
-            return 0;
+            // 요청을 보내고 응답을 받았을 뿐 서버가 멈췄다는 뜻이 아니다 — jsonl도 status를 싣지 않는다.
+            var sent = $"취소 요청을 보냈습니다 (build ID: {buildId}). 서버가 실제로 멈췄는지는 아직 확인하지 않았습니다 — 확인하려면 {FollowUpCommand("watch", receiptPath)}";
+            if (!jsonl)
+            {
+                stdout.WriteLine(sent);
+                return 0;
+            }
+
+            stderr.WriteLine(sent);
+            return CancelCompleted(stdout, jsonl, 0, buildId, "CANCEL_REQUESTED", "취소 요청을 보냈습니다. 서버가 실제로 멈췄는지는 확인하지 않았습니다.");
+        }
+
+        private static int WatchCompleted(
+            TextWriter stdout,
+            bool jsonl,
+            int exitCode,
+            RecoveryDisposition recovery,
+            string buildId,
+            string? status = null,
+            string? errorCode = null,
+            string? remoteBuildState = null,
+            string? message = null,
+            string? imageRef = null,
+            string? imageDigest = null,
+            string? integrityHealth = null)
+        {
+            if (jsonl)
+            {
+                ReceiptJsonlRecord.Completed(
+                        ReceiptJsonlRecord.WatchCommand,
+                        exitCode,
+                        recovery,
+                        buildId,
+                        status,
+                        errorCode,
+                        remoteBuildState,
+                        message,
+                        imageRef,
+                        imageDigest,
+                        integrityHealth)
+                    .WriteTo(stdout);
+            }
+
+            return exitCode;
+        }
+
+        // 취소 요청의 모든 결과는 원격 상태를 확인하지 않은 채 끝나고 receipt도 바꾸지 않는다.
+        private static int CancelCompleted(TextWriter stdout, bool jsonl, int exitCode, string buildId, string errorCode, string message)
+        {
+            if (jsonl)
+            {
+                ReceiptJsonlRecord.Completed(
+                        ReceiptJsonlRecord.CancelCommand,
+                        exitCode,
+                        RecoveryDisposition.Uncertain,
+                        buildId,
+                        errorCode: errorCode,
+                        remoteBuildState: "unknown",
+                        message: message)
+                    .WriteTo(stdout);
+            }
+
+            return exitCode;
         }
 
         internal static string FollowUpCommand(string verb, string receiptPath) =>
@@ -281,6 +456,25 @@ namespace NodeKit.Cli.Operations
         // cmd: %VAR%, 지연 확장 !VAR!, 따옴표 종료. PowerShell: $var/$(...), ` escape, 유니코드 따옴표도 따옴표로 취급.
         private static bool IsExpandedInsideWindowsDoubleQuotes(char c) =>
             char.IsControl(c) || "\"%!$`‘’‚‛“”„".Contains(c, StringComparison.Ordinal);
+
+        // terminal 이벤트는 completed 레코드로 한 번만 다룬다. status 값은 submit jsonl의 state와 같이
+        // 서버 Status를, 없으면 Kind 이름을 그대로 쓴다.
+        private static void WriteStateRecord(BuildEvent ev, string buildId, TextWriter stdout)
+        {
+            if (ev.Kind is BuildEventKind.Succeeded or BuildEventKind.Failed)
+            {
+                return;
+            }
+
+            ReceiptJsonlRecord.State(
+                    buildId,
+                    string.IsNullOrEmpty(ev.Status) ? ev.Kind.ToString() : ev.Status,
+                    ev.Message,
+                    ev.ImageRef,
+                    ev.ImageDigest,
+                    ev.IntegrityHealth)
+                .WriteTo(stdout);
+        }
 
         private static void PrintEvent(BuildEvent ev, TextWriter stdout)
         {

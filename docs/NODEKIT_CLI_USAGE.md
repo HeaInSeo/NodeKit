@@ -1042,6 +1042,54 @@ $ echo $?
 스키마는 additive하게만 바뀐다 — 새 필드나 새 `state` 값이 나중에 추가될 수
 있으니, 모르는 필드/값은 무시하도록 소비자를 작성하는 게 안전하다.
 
+### `nodekit receipt watch|cancel <receipt.json> [--format human|jsonl]`
+
+submit이 남긴 receipt의 build ID로 다시 관찰(`watch`)하거나 서버에 취소 요청을 한 번
+보낸다(`cancel`). 새로 제출하지 않는다. 기본(`human`) 출력과 종료 코드는 그대로이고,
+`--format jsonl`은 opt-in이다.
+
+`--format jsonl`의 stdout 레코드는 submit과 다른 `schema_version: "nodekit.receipt.v1"`이다.
+모든 레코드에 `command`(`watch`/`cancel`)와 `type`(`state`/`completed`)이 있고, 마지막
+레코드는 항상 `completed` 하나다(`submitted` 레코드는 없다). `completed`에는
+`exit_code`(프로세스 종료 코드와 같은 값)와 `recovery`가 있다. 없는 optional 필드
+(`build_id`, `status`, `error_code`, `remote_build_state`, `message`, `image_ref`,
+`image_digest`, `integrity_health`)는 키 자체를 생략한다. 사람용 진단과 후속 명령 안내는
+stderr로만 간다.
+
+`status`는 서버가 실제로 보낸 상태에만 싣는다 — `watch`의 `state` 진행 상태와, 관측한
+terminal `Succeeded`/`Failed`. 관찰 중단·취소 요청·로컬 거절에는 `Cancelled` 같은 원격
+terminal 이름을 만들지 않는다.
+
+| 상황 | `error_code` | exit | `remote_build_state` | `recovery` | receipt |
+|---|---|---|---|---|---|
+| watch: `Succeeded` 관측 | (없음) | 0 | (없음) | `none` | terminal 기록 |
+| watch: `Failed` 관측 | `BUILD_FAILED` | 1 | `failed` | `terminal` | terminal 기록 |
+| watch: terminal 없이 스트림 종료 | `STREAM_ENDED_WITHOUT_RESULT` | 1 | `unknown` | `uncertain` | 그대로 |
+| watch: Watch RPC 오류 | `WATCH_FAILED` | 1 | `unknown` | `uncertain` | 그대로 |
+| watch: 다른 빌드의 이벤트로 관찰 중단 | `UNEXPECTED_ERROR` | 1 | `unknown` | `uncertain` | 그대로 |
+| watch: Ctrl-C(관찰만 멈춤, 서버 빌드는 취소하지 않음) | `WATCH_STOPPED` | 130 | `unknown` | `terminal` | 그대로 |
+| cancel: 요청 전송·응답 받음(서버가 멈췄다는 뜻이 아님, `status` 없음) | `CANCEL_REQUESTED` | 0 | `unknown` | `uncertain` | 그대로 |
+| cancel: Ctrl-C로 요청 중단 | `CANCEL_REQUEST_ABORTED` | 130 | `unknown` | `uncertain` | 그대로 |
+| cancel: 5초 안에 응답 없음 | `CANCEL_REQUEST_TIMEOUT` | 1 | `unknown` | `uncertain` | 그대로 |
+| cancel: 그 밖의 RPC 실패 | `CANCEL_REQUEST_FAILED` | 1 | `unknown` | `uncertain` | 그대로 |
+
+receipt를 열거나 검사하다 거절하면 어떤 RPC도 보내지 않고 기존 로컬 코드 그대로
+`completed` 한 줄만 낸다(exit 2, `recovery: "terminal"`, `remote_build_state` 없음):
+손상·미지원 schema·hash 불일치·사용할 수 없는 경로나 endpoint는
+`OPERATION_RECORD_INVALID`(또는 store가 낸 `OPERATION_RECORD_MISMATCH`), build ID가 없는
+receipt와 이미 terminal을 관측한 receipt의 `cancel`은 `OPERATION_NOT_RESUMABLE`이다.
+terminal 기록 중 로컬 저장이 실패하면 그 store 코드와 `recovery: "uncertain"`이다.
+사용법/옵션 오류(잘못된 하위 명령·옵션, 빈 receipt 경로, `--help`)는 submit과 같이
+jsonl 레코드 없이 끝난다.
+
+```bash
+$ nodekit receipt watch .nodekit/receipts/2222.json --format jsonl
+{"schema_version":"nodekit.receipt.v1","command":"watch","type":"state","build_id":"abc-123","status":"Running"}
+{"schema_version":"nodekit.receipt.v1","command":"watch","type":"completed","build_id":"abc-123","status":"Succeeded","image_digest":"sha256:...","exit_code":0,"recovery":"none"}
+$ nodekit receipt cancel .nodekit/receipts/2222.json --format jsonl
+{"schema_version":"nodekit.receipt.v1","command":"cancel","type":"completed","build_id":"abc-123","error_code":"CANCEL_REQUESTED","remote_build_state":"unknown","message":"...","exit_code":0,"recovery":"uncertain"}
+```
+
 ## 4. `nodekit validate <recipe.json> [--strict-reproducible]`
 
 recipe를 검증만 한다. 파일을 만들지 않는다. `submit`과 마찬가지로 옵션 파싱은
