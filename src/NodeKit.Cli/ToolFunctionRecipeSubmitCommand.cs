@@ -25,6 +25,12 @@ namespace NodeKit.Cli
     /// Kubernetes 호출은 하지 않는다 — NodeKit은 NodeVault client로만 동작한다.
     ///
     /// `nodekit submit`과 달리 로컬 입력·preflight 검사를 NodeVault 주소 확인보다 먼저 한다.
+    ///
+    /// 상류 게이트: 현재 NodeVault 빌드 경로는 kind 2를 받지 않는다(벤더 proto
+    /// `protos/nodevault/v1/nodevault.proto` BuildRequest — BUILD_KIND_TOOLFUNCTIONSPEC는 미래
+    /// function-image builder용 예약). 그래서 실제 CLI는 로컬 검사를 통과한 Ready Recipe에도 주소 확인·
+    /// receipt·RPC 없이 <see cref="UpstreamGateClosedCode"/>로 끝난다. 위 client 경로는 NodeVault가 kind 2를
+    /// 수용하고 벤더 proto가 갱신된 뒤 이 게이트만 열어 쓰도록 남겨 둔다.
     /// </summary>
     internal static class ToolFunctionRecipeSubmitCommand
     {
@@ -34,8 +40,23 @@ namespace NodeKit.Cli
         /// <summary>current preflight가 Recipe 내용을 거부했다 — 진단은 stderr에 있다. RPC0.</summary>
         internal const string PreflightFailedCode = "PREFLIGHT_FAILED";
 
+        /// <summary>로컬 검사는 통과했지만 NodeVault가 아직 kind 2 빌드를 받지 않는다. 주소 확인·receipt·RPC 0.</summary>
+        internal const string UpstreamGateClosedCode = "TOOLFUNCTION_BUILD_GATE_CLOSED";
+
+        private const string UpstreamGateClosedMessage =
+            "NodeVault가 아직 ToolFunction 이미지 빌드(BUILD_KIND_TOOLFUNCTIONSPEC, kind 2)를 받지 않습니다. 요청을 보내지 않았습니다 — " +
+            "로컬 검사는 통과했으며 보낼 요청 내용은 `nodekit function-recipe render <path> --out <out.json>`으로 확인할 수 있습니다.";
+
+        /// <summary>
+        /// 현재 NodeVault 빌드 경로가 kind 2를 받는지. 벤더 proto가 BUILD_KIND_TOOLFUNCTIONSPEC를 예약만 하는 동안 false다.
+        /// </summary>
+        internal static bool UpstreamAcceptsToolFunctionBuild => false;
+
         /// <param name="toolSpecClient">테스트 전용 주입 client. 없으면 실제 gRPC client를 만든다.</param>
         /// <param name="requestIdProvider">테스트 전용 고정 request ID.</param>
+        /// <param name="toolFunctionBuildGateOpen">
+        /// 테스트 전용 상류 게이트 값. 없으면 <see cref="UpstreamAcceptsToolFunctionBuild"/>를 쓴다.
+        /// </param>
         /// <remarks>
         /// SubmitCommand와 같은 receipt 규칙이다: 실제 CLI는 항상 durable receipt를 남기고, 주입 client로
         /// 도는 테스트는 --receipt나 requestIdProvider를 줄 때만 기록한다.
@@ -45,7 +66,8 @@ namespace NodeKit.Cli
             TextWriter stdout,
             TextWriter stderr,
             IToolSpecBuildClient? toolSpecClient = null,
-            Func<string>? requestIdProvider = null)
+            Func<string>? requestIdProvider = null,
+            bool? toolFunctionBuildGateOpen = null)
         {
             if (args.Any(a => a is "--help" or "-h"))
             {
@@ -110,6 +132,21 @@ namespace NodeKit.Cli
                 }
 
                 return preflightExit;
+            }
+
+            // 상류 게이트가 닫혀 있으면 주소 확인·receipt·RPC 없이 끝난다 — kind 2를 거부할 서버에 보내지 않는다.
+            if (!(toolFunctionBuildGateOpen ?? UpstreamAcceptsToolFunctionBuild))
+            {
+                if (jsonl)
+                {
+                    SubmitCommand.WriteJsonl(
+                        stdout,
+                        SubmitJsonlRecord.Completed("Failed", errorCode: UpstreamGateClosedCode, message: UpstreamGateClosedMessage, recovery: RecoveryDisposition.Terminal));
+                    return 1;
+                }
+
+                stderr.WriteLine($"{UpstreamGateClosedCode}: {UpstreamGateClosedMessage}");
+                return 1;
             }
 
             if (!SubmitCommand.TryRequireUrl(urlOption, toolSpecClient, jsonl, "nodekit function-recipe submit recipe.json", stdout, stderr, out var url))

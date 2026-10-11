@@ -189,6 +189,17 @@ namespace NodeKit.Cli.Tests
             Assert.DoesNotContain("게이트가 아직 열려 있지 않습니다", cliSource, StringComparison.Ordinal);
         }
 
+        // r4242704027: 벤더 NodeVault proto가 kind 2를 예약만 하는 동안 function-recipe submit의 상류 게이트는 닫혀 있다.
+        // proto 갱신(hash pin 변경)과 게이트 개방은 함께 판단해야 한다.
+        [Fact]
+        public void SubmitUpstreamGate_ClosedWhileVendoredProtoReservesKind2()
+        {
+            var proto = File.ReadAllText(Path.Join(RepoRoot(), "protos", "nodevault", "v1", "nodevault.proto"));
+
+            Assert.Contains("rejected by the Dockerfile build path until the function-image builder exists", proto, StringComparison.Ordinal);
+            Assert.False(ToolFunctionRecipeSubmitCommand.UpstreamAcceptsToolFunctionBuild);
+        }
+
         [Fact]
         public void FieldMap_TypedFields_MatchVendoredProtoDescriptor()
         {

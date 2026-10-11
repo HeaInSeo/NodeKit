@@ -20,6 +20,8 @@ namespace NodeKit.Cli.Tests
     /// 실제 generated gRPC 요청·RPC 순서·exit·출력·durable receipt를 본다. fake는 고정 응답만 돌려주므로
     /// 실제 NodeVault function-image build·Harbor·등록의 증거가 아니다. typed 등록 RPC는 이 경로에 없다
     /// (BuildService에는 RegisterToolFunction이 없다) — 등록0은 "빌드 응답 뒤 다른 호출 없음"으로 본다.
+    /// client 경로 case는 상류 게이트를 테스트에서만 열어서 돈다. 실제 CLI 기본값은 닫힘이며(현재 NodeVault는
+    /// kind 2를 거부) 그 동작은 UpstreamGateClosed_* case가 본다.
     /// </summary>
     public class ToolFunctionSecondImageBuildP07Tests : IDisposable
     {
@@ -447,11 +449,90 @@ namespace NodeKit.Cli.Tests
             using var stderr = new StringWriter();
 
             var exit = ToolFunctionRecipeSubmitCommand.Run(
-                new[] { "function-recipe", "submit", recipePath, "--url", " " }, stdout, stderr);
+                new[] { "function-recipe", "submit", recipePath, "--url", " " }, stdout, stderr, toolFunctionBuildGateOpen: true);
 
             Assert.Equal(2, exit);
             Assert.Contains("NodeVault 주소가 필요합니다", stderr.ToString());
             Assert.False(Directory.Exists(Path.Join(_workDir, ".nodekit")));
+        }
+
+        // 상류 게이트(r4242704027): 현재 NodeVault는 kind 2를 거부하므로 기본 게이트에서는 valid Ready도
+        // 주소 확인·receipt·RPC 없이 TOOLFUNCTION_BUILD_GATE_CLOSED / exit 1로 끝난다. 주입 client가 있어도 같다.
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void UpstreamGateClosed_ValidReady_Exit1_RpcZero_NoReceipt(bool jsonl)
+        {
+            using var server = NewServer();
+            server.Fake.WatchEvents = new List<ProtoBuildEvent> { SucceededEvent(DigestB) };
+            var recipePath = Save(ReadyRecipe());
+            var before = File.ReadAllText(recipePath);
+            using var client = new GrpcToolSpecClient(server.Channel);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var args = jsonl
+                ? new[] { "function-recipe", "submit", recipePath, "--format", "jsonl" }
+                : new[] { "function-recipe", "submit", recipePath };
+
+            var exit = ToolFunctionRecipeSubmitCommand.Run(args, stdout, stderr, client, () => FixedRequestId);
+
+            Assert.Equal(1, exit);
+            Assert.Empty(server.Fake.CallOrder);
+            Assert.False(Directory.Exists(Path.Join(_workDir, ".nodekit")));
+            Assert.DoesNotContain("두 번째 이미지(B)", stdout.ToString());
+            Assert.Equal(before, File.ReadAllText(recipePath));
+            if (jsonl)
+            {
+                var completed = Completed(stdout.ToString());
+                Assert.Equal("Failed", completed.GetProperty("status").GetString());
+                Assert.Equal(ToolFunctionRecipeSubmitCommand.UpstreamGateClosedCode, completed.GetProperty("error_code").GetString());
+                Assert.Equal("terminal", completed.GetProperty("recovery").GetString());
+                Assert.False(completed.TryGetProperty("image_digest", out _));
+            }
+            else
+            {
+                Assert.Contains(ToolFunctionRecipeSubmitCommand.UpstreamGateClosedCode, stderr.ToString());
+                Assert.Contains("kind 2", stderr.ToString());
+            }
+        }
+
+        // 실제 CLI 진입점: 주소가 있어도(연결 불가 주소) 게이트에서 끝나므로 연결 시도·receipt가 없다.
+        [Fact]
+        public void UpstreamGateClosed_CliEntry_WithUrl_Exit1_BeforeUrlAndReceipt()
+        {
+            var recipePath = Save(ReadyRecipe());
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exit = CliApp.Run(
+                new[] { "function-recipe", "submit", recipePath, "--url", "http://127.0.0.1:9", "--connect-timeout", "1" },
+                new StringReader(string.Empty),
+                stdout,
+                stderr);
+
+            Assert.Equal(1, exit);
+            Assert.Contains(ToolFunctionRecipeSubmitCommand.UpstreamGateClosedCode, stderr.ToString());
+            Assert.False(Directory.Exists(Path.Join(_workDir, ".nodekit")));
+        }
+
+        // 로컬 검사 실패는 게이트보다 먼저 같은 진단으로 끝난다(Draft → RECIPE_NOT_READY, 게이트 문구 없음).
+        [Fact]
+        public void UpstreamGateClosed_DraftStillGetsPreflightDiagnosticFirst()
+        {
+            using var server = NewServer();
+            var recipe = ReadyRecipe();
+            recipe.State = ToolFunctionRecipeState.Draft;
+            var recipePath = Save(recipe);
+            using var client = new GrpcToolSpecClient(server.Channel);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exit = ToolFunctionRecipeSubmitCommand.Run(new[] { "function-recipe", "submit", recipePath }, stdout, stderr, client, () => FixedRequestId);
+
+            Assert.Equal(1, exit);
+            Assert.Empty(server.Fake.CallOrder);
+            Assert.Contains("RECIPE_NOT_READY", stderr.ToString());
+            Assert.DoesNotContain(ToolFunctionRecipeSubmitCommand.UpstreamGateClosedCode, stderr.ToString());
         }
 
         /// <summary>P06 fixture와 같은 값의 현재 valid Ready Recipe.</summary>
@@ -537,7 +618,7 @@ namespace NodeKit.Cli.Tests
             using var stdout = new StringWriter();
             using var stderr = new StringWriter();
             var args = new[] { "function-recipe", "submit", recipePath }.Concat(extraArgs).ToArray();
-            var exit = ToolFunctionRecipeSubmitCommand.Run(args, stdout, stderr, client, () => FixedRequestId);
+            var exit = ToolFunctionRecipeSubmitCommand.Run(args, stdout, stderr, client, () => FixedRequestId, toolFunctionBuildGateOpen: true);
             return (exit, stdout.ToString(), stderr.ToString());
         }
 

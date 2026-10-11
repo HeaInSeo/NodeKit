@@ -10,8 +10,9 @@ namespace NodeKit.Cli.Tests
     /// SC-005 (P07, 2026-10-11 정정) — `function-recipe submit`은 모든 시도에 명확한 결과를 준다.
     /// 여기서는 실제 CLI 진입점(CliApp)으로 로컬 입력 단계만 본다: 파일/SchemaVersion 오류는 exit 2,
     /// Draft와 현재 검증 실패 Ready는 exit 1이며 둘 다 NodeVault 주소 확인 전에 끝난다(요청 0회).
-    /// 유효한 Ready의 실제 BuildService 경로와 RPC transcript는 ToolFunctionSecondImageBuildP07Tests.
-    /// 이전의 "빌드 게이트 미개방" 안내는 더 이상 나오지 않는다.
+    /// 유효한 Ready는 현재 NodeVault가 kind 2를 받지 않으므로 상류 게이트에서 RPC 0회로 끝난다. 그 동작과
+    /// 게이트를 연 BuildService client 경로·RPC transcript는 ToolFunctionSecondImageBuildP07Tests.
+    /// 이전의 issue #19 "빌드 게이트 미개방" 고정 안내(State 무관 차단)는 더 이상 나오지 않는다.
     /// </summary>
     public class ToolFunctionRecipeSubmitCommandTests : IDisposable
     {

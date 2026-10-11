@@ -37,13 +37,14 @@
 
 ## `nodekit function-recipe submit <path>` — 두 번째 이미지 빌드 제출 (P07, 2026-10-11 정정)
 
-이전(2026-07-24) 계약의 "항상 차단되는 명령"은 P07 기능 PR에서 실제 BuildService client 경로로 바뀌었다(v0.9.1 S3-05, S3-09). 명령이 없거나 일반 usage 오류로 끝나면 안 된다는 SC-005의 요구("원인 불명의 오류나 무응답 없음")는 그대로 유지한다.
+이전(2026-07-24) 계약의 "항상 차단되는 명령"은 P07 기능 PR에서 실제 BuildService client 경로로 바뀌었다(v0.9.1 S3-05, S3-09). 다만 현재 NodeVault 빌드 경로는 kind 2를 받지 않으므로(벤더 `protos/nodevault/v1/nodevault.proto` BuildRequest: `BUILD_KIND_TOOLFUNCTIONSPEC`는 미래 function-image builder용 예약) 이 경로는 아래 2a의 상류 게이트 뒤에 닫혀 있다. 명령이 없거나 일반 usage 오류로 끝나면 안 된다는 SC-005의 요구("원인 불명의 오류나 무응답 없음")는 그대로 유지한다.
 
 **입력**: `<path>`(필수, ToolFunctionRecipe JSON 파일), 선택 `--url <nodevault-url>`(없으면 `NODEKIT_NODEVAULT_URL`), `--receipt <path>`, `--connect-timeout <seconds>`, `--watch-timeout <duration>`, `--format human|jsonl`. 옵션 의미와 timeout/취소 exit code(124/125/130)는 `nodekit submit`과 같다. `--strict-reproducible`은 ToolSpec Recipe 전용이라 받지 않는다.
 
 **동작**:
 1. 파일을 읽는다. 읽기/파싱/`SchemaVersion` 누락·미지원 오류는 exit 2, RPC 0회.
 2. current preflight(P06): 저장된 `State=Ready` 표지만 믿지 않는다. `Ready`가 아니면 `RECIPE_NOT_READY`, 현재 내용 full L1 위반, base image A 형식, ScriptPath source(없음/절대 경로/UTF-8 아님/빈 내용), raw_spec v1, typed 등록 전제(C1 형식·typed mapping)를 확인한다. 실패하면 진단을 stderr에 쓰고 exit 1(source 파일 입력 오류는 2), RPC 0회. `State`는 바꾸지 않는다.
+2a. **상류 게이트(현재 닫힘)**: NodeVault가 kind 2를 받기 전에는 로컬 검사를 통과한 `Ready`도 여기서 끝난다 — `TOOLFUNCTION_BUILD_GATE_CLOSED`, exit 1, 주소 확인·receipt·RPC 0회, `State` 불변. jsonl은 `error_code=TOOLFUNCTION_BUILD_GATE_CLOSED`, `recovery=terminal` completed 레코드 하나다. 게이트는 NodeVault가 kind 2를 수용하고 벤더 proto가 갱신된 뒤에 연다. 아래 3–6은 게이트가 열린 뒤의 동작이며 지금은 in-process fake BuildService 시험으로만 검증된다.
 3. 위 로컬 검사를 통과한 뒤에야 NodeVault 주소를 확인한다(없으면 exit 2, RPC 0회).
 4. 요청 envelope(tool_name=`FunctionId`, version=`Revision`, raw_spec=`nodevault.build.raw_spec.v1` exact 4키 kind 2)와 Recipe 파일 bytes·전송한 script 내용을 `operation_kind=toolfunction_image_build` receipt에 prepared로 먼저 저장한다. 저장하지 못하면 RPC 0회, exit 2. 기본 위치는 Recipe 옆 `.nodekit/receipts/<request-id>.json`이며 ToolSpec 첫 이미지(C1/A)의 receipt와 섞이지 않는다.
 5. `ResolveToolSpec → SubmitToolBuild → WatchToolBuild`를 각각 한 번 호출한다. ResolveToolSpec이 거부(예: InvalidArgument)하면 Submit/Watch를 보내지 않는다.
@@ -54,7 +55,7 @@
    - 최종 상태 없이 스트림 종료 → exit 1, 결과 미확인(uncertain).
 7. 빌드 성공은 승인(`Approved`)이 아니다. typed 등록(`RegisterToolFunction`)은 보내지 않는다(P08). NodeKit은 이미지를 만들거나 Kubernetes를 호출하지 않는다. Recipe 파일의 `State`는 어떤 경우에도 바꾸지 않는다.
 
-**출력**: human은 진행 이벤트와 결과를 stdout, 실패 진단을 stderr에 쓴다. `--format jsonl`은 `nodekit submit`과 같은 `nodekit.submit.v1` 레코드를 쓰며, 로컬 preflight 실패는 `error_code=PREFLIGHT_FAILED` completed 레코드 하나다. `nodekit receipt watch`도 이 receipt의 `Succeeded`에 B가 없으면 같은 `SECOND_IMAGE_DIGEST_MISSING`/exit 1로 보고한다.
+**출력**: human은 진행 이벤트와 결과를 stdout, 실패 진단을 stderr에 쓴다. `--format jsonl`은 `nodekit submit`과 같은 `nodekit.submit.v1` 레코드를 쓰며, 로컬 preflight 실패는 `error_code=PREFLIGHT_FAILED`, 상류 게이트 차단은 `error_code=TOOLFUNCTION_BUILD_GATE_CLOSED` completed 레코드 하나다. `nodekit receipt watch`도 이 receipt의 `Succeeded`에 B가 없으면 같은 `SECOND_IMAGE_DIGEST_MISSING`/exit 1로 보고한다.
 
 ## 공통 계약
 

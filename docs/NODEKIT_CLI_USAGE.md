@@ -1027,7 +1027,10 @@ $ echo $?
 `type`/`status`/`error_code`로 판단해야 한다 — `message`는 사람이 읽는
 설명 텍스트일 뿐 안정적인 값 집합이 아니다.
 
-`nodekit function-recipe submit`(두 번째 이미지 빌드)은 같은 레코드에 두 값을 더 쓴다:
+`nodekit function-recipe submit`(두 번째 이미지 빌드)은 같은 레코드에 세 값을 더 쓴다:
+`TOOLFUNCTION_BUILD_GATE_CLOSED` — 로컬 검사는 통과했지만 현재 NodeVault가 kind 2 빌드를 받지 않는다.
+요청·receipt 0, 주소 확인 전(exit 1, `recovery: "terminal"`). NodeVault가 kind 2를 받기 전까지 유효한
+`Ready`의 결과는 항상 이 값이다.
 `SECOND_IMAGE_DIGEST_MISSING` — Watch가 `Succeeded`를 보냈지만 record `image_digest`가
 `sha256:` + 16진수 64자리가 아니다(exit 1, `phase: "watch"`, `remote_build_state:
 "succeeded"`, `recovery: "uncertain"`; 기반 이미지나 로그 digest로 대신하지 않는다).
@@ -2047,8 +2050,10 @@ dotnet run --project src/NodeKit.Cli -- validate /home/user/samtools-1.17.json
   canonicalizer 선택 결과의 기록은 NodeVault가 소유하며 NodeKit은 서버가 돌려준 값을
   그대로 보존한다. 벤더 proto(`protos/SOURCE.md`)는 `RegisterToolFunction`의
   `canonicalization_version`(request 8 / response 4)까지 포함하지만, NodeKit은 아직
-  `RegisterToolFunction`을 호출하지 않는다. `nodekit function-recipe submit`(P07)은
-  current preflight를 통과한 `Ready` Recipe의 두 번째 이미지 빌드만 요청한다 —
+  `RegisterToolFunction`을 호출하지 않는다. `nodekit function-recipe submit`(P07)은 현재
+  NodeVault 빌드 경로가 kind 2를 받지 않으므로(벤더 proto `BUILD_KIND_TOOLFUNCTIONSPEC` 예약)
+  유효한 `Ready`도 요청 없이 `TOOLFUNCTION_BUILD_GATE_CLOSED`(exit 1)로 끝난다. NodeVault가 kind 2를
+  수용해 이 게이트가 열린 뒤에는 current preflight를 통과한 `Ready` Recipe의 두 번째 이미지 빌드만 요청한다 —
   `operation_kind=toolfunction_image_build` receipt를 먼저 남기고 `ResolveToolSpec`(tool_name=
   FunctionId, version=Revision, raw_spec v1 kind 2) → `SubmitToolBuild` → `WatchToolBuild`를 보낸다.
   Watch `Succeeded`에 전체 image digest B가 있어야 exit 0이고, B가 없으면
