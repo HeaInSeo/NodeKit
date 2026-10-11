@@ -1151,6 +1151,23 @@ Recipe의 `Command`/`Inputs`/`Outputs`/`Display*` 필드는 `build-request`
 `recipe create`의 대화형 흐름은 이 단계를 안내만 하고 건너뛰며,
 `--non-interactive --field Command=...`는 값을 저장하되 같은 안내를 경고로 출력한다.
 
+ToolFunctionRecipe의 `ScriptPath`는 **Recipe 파일이 있는 디렉터리 기준 상대 경로**다
+(예: Recipe가 `/tmp/project/recipe.json`이고 `ScriptPath`가 `./sort.sh`이면 어느
+디렉터리에서 실행하든 `/tmp/project/sort.sh`를 읽는다). 다른 환경으로 옮길 때는 script를
+Recipe와 같은 상대 위치에 함께 둔다. 새 요청을 만들 때 NodeKit은 이 파일의 **내용**을
+읽어 고정하며 경로 문자열을 보내지 않고, script를 실행하지도 않는다.
+`baseToolImageDigest`는 `sha256:` 뒤 16진수 64자리여야 한다(대문자 hex도 그대로 받는다).
+
+| 상황 | 종료 코드 |
+|------|-----------|
+| `ScriptPath`가 절대 경로 (자동 변환 없음) | 2 |
+| script 파일 없음 / 디렉터리 / 읽기 권한 없음 / UTF-8 아님 | 2 |
+| `ScriptPath` 비어 있음, script 내용이 공백/개행뿐 | 1 |
+| `baseToolImageDigest` 없음 또는 형식 오류 (`toolSpecDigest`로 대신하지 않음) | 1 |
+
+이 source 읽기 단계(P06.base_script)는 아직 `function-recipe render`/`submit` 명령에
+연결되지 않았다. 명령 연결과 raw_spec 생성은 후속 단계에서 추가한다.
+
 `--format` 값은 대소문자와 `_`/`-`를 구분하지 않는다(`RAW-SPEC`, `raw_spec`
 모두 `raw-spec`으로 인식) — 그래도 안 맞으면 종료 코드 2로 명시적으로
 거부한다.
