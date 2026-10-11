@@ -19,6 +19,7 @@ namespace NodeKit.Cli.Tests
     /// HTTP layer (HarborImageDigestResolver.CreateForTest), so no live
     /// network is used.
     /// </summary>
+    [Collection(nameof(HarborImageMapEnvironmentCollection))]
     public class HarborBaseImageSelectionTests : IDisposable
     {
         private static readonly IRecipeCreateCancellationSource _noCancellation =
