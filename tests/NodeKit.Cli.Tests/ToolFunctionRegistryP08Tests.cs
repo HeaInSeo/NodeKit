@@ -361,6 +361,64 @@ namespace NodeKit.Cli.Tests
             Assert.Single(server.Registry.RegisterRequests);
         }
 
+        // OS가 거부하는 receipt 경로(NUL 문자·공백뿐)는 예외로 죽지 않고 exit 2다. jsonl이면 구조화된 실패 한 줄(RPC 0).
+        [Theory]
+        [InlineData("bad\0path.json", false)]
+        [InlineData("bad\0path.json", true)]
+        [InlineData("   ", false)]
+        [InlineData("   ", true)]
+        public void Replay_InvalidReceiptPath_Exit2_NoThrow_RpcZero(string receiptPath, bool jsonl)
+        {
+            using var server = NewServer();
+
+            var (exit, stdout, stderr) = jsonl
+                ? Replay(server, receiptPath, "--format", "jsonl")
+                : Replay(server, receiptPath);
+
+            Assert.Equal(2, exit);
+            Assert.Empty(server.Registry.RegisterRequests);
+            if (jsonl)
+            {
+                var completed = Completed(stdout);
+                Assert.Equal(LocalOperationStore.InvalidCode, completed.GetProperty("error_code").GetString());
+            }
+            else
+            {
+                Assert.Contains(LocalOperationStore.InvalidCode, stderr);
+            }
+        }
+
+        // S3-07-G: 저장된 registered 결과도 처음 응답과 같은 identity·version 검사를 받는다. 손상되면 RPC 없는
+        // 성공(exit 0)이 아니라 신뢰할 수 없는 기록(exit 2)이다.
+        [Theory]
+        [InlineData("", ServerH, Version)]
+        [InlineData("   ", ServerH, Version)]
+        [InlineData(ServerF, "", Version)]
+        [InlineData(ServerF, "sha256:ab cd", Version)]
+        [InlineData(ServerF, ServerH, "w2-set-v0")]
+        [InlineData(ServerF, ServerH, "")]
+        public void Replay_CorruptRegisteredResult_Exit2_NotSucceeded_RpcZero(string f, string h, string version)
+        {
+            using var server = NewServer();
+            server.Registry.OnRegisterToolFunction = _ => Response(ServerF, ServerH);
+            Assert.Equal(0, Submit(server, Save(ReadyRecipe())).Exit);
+            var receipt = ReadRawReceipt(RegistrationPath());
+            Assert.Equal(RegistrationState.Registered, receipt.State);
+            var corrupted = receipt with
+            {
+                Result = receipt.Result! with { ToolFunctionDigest = f, CasHash = h, CanonicalizationVersion = version },
+            };
+            File.WriteAllBytes(RegistrationPath(), JsonSerializer.SerializeToUtf8Bytes(corrupted));
+
+            var (exit, stdout, stderr) = Replay(server, RegistrationPath(), "--format", "jsonl");
+
+            Assert.Equal(2, exit);
+            Assert.Single(server.Registry.RegisterRequests);
+            var completed = Completed(stdout);
+            Assert.Equal(LocalOperationStore.InvalidCode, completed.GetProperty("error_code").GetString());
+            Assert.DoesNotContain(ServerH, stdout + stderr);
+        }
+
         // receipt 경로 뒤에 붙인 --help/-h도 다른 하위 명령처럼 stdout 도움말·exit 0이다(RPC 0).
         [Theory]
         [InlineData("--help")]

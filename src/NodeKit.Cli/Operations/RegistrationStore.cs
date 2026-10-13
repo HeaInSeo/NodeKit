@@ -367,6 +367,16 @@ namespace NodeKit.Cli.Operations
                 return Invalid(path, $"{receipt.State}와 result가 맞지 않음");
             }
 
+            // 저장된 결과는 요청 snapshot hash로 보호되지 않는다. 처음 응답을 분류할 때와 같은 identity·version
+            // 검사를 다시 해, 손상된 registered 기록을 RPC 없는 성공으로 보여주지 않는다(S3-07-G).
+            if (receipt.Result is { } result
+                && (result.CanonicalizationVersion != receipt.CanonicalizationVersion
+                    || !IsPresentIdentity(result.ToolFunctionDigest)
+                    || !IsPresentIdentity(result.CasHash)))
+            {
+                return Invalid(path, "registered result의 tool_function_digest/cas_hash가 없거나 손상됐거나 canonicalization_version이 요청과 다름");
+            }
+
             if (receipt.State is RegistrationState.Unknown or RegistrationState.Rejected && receipt.LastError is null)
             {
                 return Invalid(path, $"{receipt.State}인데 last_error가 없음");
@@ -379,6 +389,10 @@ namespace NodeKit.Cli.Operations
 
             return null;
         }
+
+        // 형식은 NodeVault가 소유한다 — 여기서는 비었거나 공백·제어 문자가 섞인 값만 손상으로 본다.
+        internal static bool IsPresentIdentity(string? value) =>
+            !string.IsNullOrEmpty(value) && !value.Any(c => char.IsWhiteSpace(c) || char.IsControl(c));
 
         internal OperationStoreError? WriteReceipt(string path, RegistrationReceipt receipt)
         {

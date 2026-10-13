@@ -111,8 +111,7 @@ namespace NodeKit.Cli
             }
 
             var receiptPath = args[2];
-            var store = RegistrationStore.ForReceipt(receiptPath);
-            if (store.TryOpen(receiptPath, out var handle) is { } openError)
+            if (TryOpenReceipt(receiptPath, out var handle) is { } openError)
             {
                 return Report(stdout, stderr, jsonl, new Outcome(openError.ExitCode, openError.Code, openError.Message, "not_submitted", null, null, null));
             }
@@ -140,6 +139,32 @@ namespace NodeKit.Cli
                 return WithClient(client, receipt.Endpoint, stdout, stderr, jsonl, c => Send(handle, c, stdout, stderr, jsonl, built: null));
             }
         }
+
+        // ReceiptCommand.TryOpenReceipt와 같다: OS가 거부하는 경로(NUL 문자·공백뿐·과도한 길이)는 예외로 죽지 않고
+        // 로컬 입력 오류(2)로 돌려준다.
+        private static OperationStoreError? TryOpenReceipt(string receiptPath, out RegistrationHandle? handle)
+        {
+            handle = null;
+            try
+            {
+                return RegistrationStore.ForReceipt(receiptPath).TryOpen(receiptPath, out handle);
+            }
+            catch (ArgumentException ex)
+            {
+                return InvalidReceiptPath(receiptPath, ex);
+            }
+            catch (NotSupportedException ex)
+            {
+                return InvalidReceiptPath(receiptPath, ex);
+            }
+            catch (PathTooLongException ex)
+            {
+                return InvalidReceiptPath(receiptPath, ex);
+            }
+        }
+
+        private static OperationStoreError InvalidReceiptPath(string receiptPath, Exception ex) =>
+            new(RegistrationStore.InvalidCode, $"등록 receipt 경로를 사용할 수 없습니다: {receiptPath} ({ex.Message}). 아무 요청도 보내지 않았습니다.");
 
         private static bool TryParseReplayOptions(string[] args, out string? url, out bool jsonl)
         {
@@ -255,7 +280,7 @@ namespace NodeKit.Cli
                     null);
             }
 
-            if (!IsPresent(response.ToolFunctionDigest) || !IsPresent(response.CasHash))
+            if (!RegistrationStore.IsPresentIdentity(response.ToolFunctionDigest) || !RegistrationStore.IsPresentIdentity(response.CasHash))
             {
                 return new Classified(
                     RegistrationState.Unknown,
@@ -279,10 +304,6 @@ namespace NodeKit.Cli
                     ObservedAt = string.Empty,
                 });
         }
-
-        // 형식은 NodeVault가 소유한다 — 여기서는 비었거나 공백·제어 문자가 섞인 값만 손상으로 본다.
-        private static bool IsPresent(string? value) =>
-            !string.IsNullOrEmpty(value) && !value.Any(c => char.IsWhiteSpace(c) || char.IsControl(c));
 
         private sealed record Outcome(
             int ExitCode, string Code, string Message, string RemoteState, string? RequestId, RegistrationResult? Result, SecondImageSucceeded? Built, string? ReceiptPath = null);
