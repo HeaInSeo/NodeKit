@@ -435,6 +435,93 @@ namespace NodeKit.Cli.Tests
             Assert.Empty(server.Registry.RegisterRequests);
         }
 
+        // --url은 terminal(registered/rejected) receipt에도 먼저 비교된다. 다른 endpoint면 저장된 성공/거부를 보여주지 않고
+        // exit 2 REGISTRATION_ENDPOINT_MISMATCH(RPC 0). 같은 endpoint면 저장된 결과를 그대로 보여준다.
+        [Theory]
+        [InlineData(false, false)]
+        [InlineData(false, true)]
+        [InlineData(true, false)]
+        [InlineData(true, true)]
+        public void Replay_TerminalReceipt_EndpointMismatch_Exit2_RpcZero(bool rejected, bool jsonl)
+        {
+            using var server = NewServer();
+            server.Registry.OnRegisterToolFunction = rejected
+                ? _ => throw new RpcException(new Status(StatusCode.InvalidArgument, "spec rejected: fixture"))
+                : _ => Response(ServerF, ServerH);
+            Assert.Equal(rejected ? 1 : 0, Submit(server, Save(ReadyRecipe())).Exit);
+            var receipt = ReadRawReceipt(RegistrationPath());
+            Assert.Equal(rejected ? RegistrationState.Rejected : RegistrationState.Registered, receipt.State);
+            var format = jsonl ? new[] { "--format", "jsonl" } : Array.Empty<string>();
+
+            var (exit, stdout, stderr) = Replay(server, RegistrationPath(), new[] { "--url", "http://other.example:50051" }.Concat(format).ToArray());
+
+            Assert.Equal(2, exit);
+            Assert.Single(server.Registry.RegisterRequests);
+            if (jsonl)
+            {
+                var completed = Completed(stdout);
+                Assert.Equal("Failed", completed.GetProperty("status").GetString());
+                Assert.Equal(ToolFunctionRegistrar.EndpointMismatchCode, completed.GetProperty("error_code").GetString());
+                Assert.False(completed.TryGetProperty("cas_hash", out _));
+            }
+            else
+            {
+                Assert.Contains(ToolFunctionRegistrar.EndpointMismatchCode, stderr);
+                Assert.Equal(string.Empty, stdout);
+            }
+
+            Assert.DoesNotContain(ServerH, stdout + stderr);
+            Assert.DoesNotContain(ToolFunctionRegistrar.RejectedCode, stdout + stderr);
+
+            var (sameExit, _, _) = Replay(server, RegistrationPath(), new[] { "--url", receipt.Endpoint }.Concat(format).ToArray());
+            Assert.Equal(rejected ? 1 : 0, sameExit);
+            Assert.Single(server.Registry.RegisterRequests);
+        }
+
+        // 결과 불명 안내의 replay 명령은 receipt 경로를 셸 인자 하나로 인용한다(ReceiptCommand.QuoteArgument와 같은 규칙).
+        // record root에 공백·셸 메타문자가 있어도 붙여 넣으면 같은 경로 하나가 된다.
+        [Theory]
+        [InlineData("dir with space", false)]
+        [InlineData("dir with space", true)]
+        [InlineData("a'b $(touch x);c*", false)]
+        [InlineData("a'b $(touch x);c*", true)]
+        public void UnknownHint_QuotesReceiptPath(string dirName, bool jsonl)
+        {
+            using var server = NewServer();
+            server.Registry.OnRegisterToolFunction = _ => throw new RpcException(new Status(StatusCode.Unavailable, "down: fixture"));
+            var dir = Path.Join(_workDir, dirName);
+            Directory.CreateDirectory(dir);
+
+            var (exit, stdout, stderr) = jsonl
+                ? Submit(server, SaveIn(dir, ReadyRecipe()), "--format", "jsonl")
+                : Submit(server, SaveIn(dir, ReadyRecipe()));
+
+            Assert.Equal(1, exit);
+            var receiptPath = Path.Join(dir, ".nodekit", "registrations", RegistrationId + ".json");
+            Assert.Equal(RegistrationState.Unknown, ReadRawReceipt(receiptPath).State);
+            var quoted = ReceiptCommand.QuoteArgument(receiptPath, windows: false)!;
+            Assert.StartsWith("'", quoted, StringComparison.Ordinal);
+            var expected = "nodekit function-recipe register-replay " + quoted;
+            Assert.Equal(expected, ToolFunctionRegistrar.ReplayCommand(receiptPath, windows: false));
+            var message = jsonl ? Completed(stdout).GetProperty("message").GetString()! : stderr.TrimEnd();
+            Assert.EndsWith(ToolFunctionRegistrar.ReplayCommand(receiptPath), message, StringComparison.Ordinal);
+        }
+
+        // Windows는 cmd/PowerShell 모두 글자 그대로 읽는 경로만 큰따옴표로 감싸고, 확장되는 문자가 있으면 실행 가능한
+        // 명령이라고 주장하지 않는다(ReceiptCommand.FollowUpCommand와 같은 fallback).
+        [Fact]
+        public void ReplayCommand_WindowsFallback()
+        {
+            Assert.Equal(
+                "nodekit function-recipe register-replay \"C:\\work dir\\.nodekit\\registrations\\r.json\"",
+                ToolFunctionRegistrar.ReplayCommand("C:\\work dir\\.nodekit\\registrations\\r.json", windows: true));
+
+            var unsafePath = "C:\\100%\\.nodekit\\registrations\\r.json";
+            var fallback = ToolFunctionRegistrar.ReplayCommand(unsafePath, windows: true);
+            Assert.StartsWith("nodekit function-recipe register-replay <registration-receipt.json> (", fallback, StringComparison.Ordinal);
+            Assert.Contains(unsafePath, fallback, StringComparison.Ordinal);
+        }
+
         // full B가 없는 빌드 성공은 등록으로 넘어가지 않는다(등록 RPC 0, receipt 0).
         [Fact]
         public void NoFullB_NoRegistration()
@@ -526,10 +613,12 @@ namespace NodeKit.Cli.Tests
             return server;
         }
 
-        private string Save(ToolFunctionRecipe recipe)
+        private string Save(ToolFunctionRecipe recipe) => SaveIn(_workDir, recipe);
+
+        private static string SaveIn(string dir, ToolFunctionRecipe recipe)
         {
-            File.WriteAllText(Path.Join(_workDir, "sort.sh"), Script);
-            var path = Path.Join(_workDir, "recipe.json");
+            File.WriteAllText(Path.Join(dir, "sort.sh"), Script);
+            var path = Path.Join(dir, "recipe.json");
             File.WriteAllText(path, JsonSerializer.Serialize(recipe, ToolFunctionRecipeCliIo.JsonOptions));
             return path;
         }

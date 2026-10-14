@@ -119,15 +119,18 @@ namespace NodeKit.Cli
             using (handle)
             {
                 var receipt = handle!.Receipt;
-                if (RegistrationState.IsTerminal(receipt.State))
-                {
-                    return ReportStored(handle, stdout, stderr, jsonl);
-                }
 
+                // --url은 이 receipt가 그 NodeVault의 것인지 확인하는 용도이기도 하다. 저장된 terminal 결과를
+                // 보여주기 전에 비교해야 다른 endpoint의 성공/거부를 받아들이지 않는다.
                 if (url is not null && url != receipt.Endpoint)
                 {
                     var message = $"저장된 등록은 {receipt.Endpoint}로 보낸 요청입니다. 다른 주소({url})로 replay하지 않았습니다.";
                     return Report(stdout, stderr, jsonl, new Outcome(2, EndpointMismatchCode, message, receipt.State, receipt.RequestId, null, null));
+                }
+
+                if (RegistrationState.IsTerminal(receipt.State))
+                {
+                    return ReportStored(handle, stdout, stderr, jsonl);
                 }
 
                 if (client is null && receipt.Endpoint == SubmitCommand.InjectedClientEndpoint)
@@ -161,6 +164,21 @@ namespace NodeKit.Cli
             {
                 return InvalidReceiptPath(receiptPath, ex);
             }
+        }
+
+        internal static string ReplayCommand(string receiptPath) =>
+            ReplayCommand(receiptPath, OperatingSystem.IsWindows());
+
+        /// <summary>
+        /// replay 안내 명령. ReceiptCommand.FollowUpCommand와 같은 인용 규칙: 경로를 셸 인자 하나로 안전하게 적을 수 있으면
+        /// 그대로 실행 가능한 명령을, 그럴 수 없으면(Windows에서 셸마다 해석이 다른 문자) 실행 가능하다고 주장하지 않는 형태를 돌려준다.
+        /// </summary>
+        internal static string ReplayCommand(string receiptPath, bool windows)
+        {
+            var quoted = ReceiptCommand.QuoteArgument(receiptPath, windows);
+            return quoted is null
+                ? $"nodekit function-recipe register-replay <registration-receipt.json> (receipt 경로: {receiptPath} — 셸마다 해석이 달라 그대로 붙여 넣을 수 있는 형태로 적지 않았습니다. 사용하는 셸에 맞게 인용해 입력하세요)"
+                : $"nodekit function-recipe register-replay {quoted}";
         }
 
         private static OperationStoreError InvalidReceiptPath(string receiptPath, Exception ex) =>
@@ -359,7 +377,7 @@ namespace NodeKit.Cli
         private static int Report(TextWriter stdout, TextWriter stderr, bool jsonl, Outcome o)
         {
             var hint = o.RemoteState == RegistrationState.Unknown && o.ReceiptPath is not null
-                ? $" 같은 요청을 다시 보내려면: nodekit function-recipe register-replay {o.ReceiptPath}"
+                ? $" 같은 요청을 다시 보내려면: {ReplayCommand(o.ReceiptPath)}"
                 : string.Empty;
             if (jsonl)
             {
