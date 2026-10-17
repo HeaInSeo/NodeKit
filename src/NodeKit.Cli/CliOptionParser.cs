@@ -57,7 +57,9 @@ namespace NodeKit.Cli
                 }
 
                 var supported = string.Join(", ", valueOptions.Select(o => $"{o} <value>").Concat(flagOptions));
-                stderr.WriteLine($"알 수 없는 옵션입니다: {arg} (지원: {supported})");
+                stderr.WriteLine(supported.Length == 0
+                    ? $"알 수 없는 옵션입니다: {arg} (이 명령은 옵션을 지원하지 않습니다)"
+                    : $"알 수 없는 옵션입니다: {arg} (지원: {supported})");
                 return false;
             }
 
