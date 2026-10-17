@@ -49,6 +49,17 @@ jobs:
       - name: CLI manifest writer self-test
         run: python3 scripts/test_write_cli_manifest.py -v
 
+      # Runs the package script exactly as docs §5 writes it (not via bash), so a
+      # lost executable bit fails here (rc 126) instead of on a user's clone.
+      - name: CLI package script runs as documented
+        run: |
+          rc=0
+          scripts/package-cli.sh --help 2>/dev/null || rc=$?
+          if [ "$rc" -ne 2 ]; then
+            echo "::error::scripts/package-cli.sh --help exited $rc, expected 2 (126 = not executable)"
+            exit 1
+          fi
+
       - name: NuGet package audit
         run: ./scripts/ci-audit-packages.sh
 
