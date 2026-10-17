@@ -44,6 +44,7 @@ namespace NodeKit.Cli
             "  nodekit function-recipe register-replay <registration-receipt.json> [--url <url>] [--registration-timeout <seconds>] [--format human|jsonl]";
 
         private const string ValidateUsage = "사용법: nodekit validate <recipe.json> [--strict-reproducible]";
+        private const string FunctionRecipeValidateUsage = "사용법: nodekit function-recipe validate <path>";
 
         private const string RenderUsageLine1 =
             "사용법: nodekit render <recipe.json> --out <build-request.json> [--format build-request|raw-spec] [--pretty] [--strict-reproducible]";
@@ -126,9 +127,29 @@ namespace NodeKit.Cli
 
         private static int RunFunctionRecipeValidate(string[] args, TextWriter stdout, TextWriter stderr)
         {
+            // S4-03-D: --help는 파일을 열지 않고 사용법만 출력한다.
+            if (IsHelpRequested(args))
+            {
+                stdout.WriteLine(FunctionRecipeValidateUsage);
+                return 0;
+            }
+
             if (args.Length < 3)
             {
-                stderr.WriteLine("사용법: nodekit function-recipe validate <path>");
+                stderr.WriteLine(FunctionRecipeValidateUsage);
+                return 2;
+            }
+
+            // S4-03-E: 지원 옵션이 없으므로 path 뒤의 옵션은 조용히 무시하지 않고 exit 2로 거부한다.
+            if (!CliOptionParser.TryParse(
+                args,
+                startIndex: 3,
+                stderr,
+                valueOptions: System.Array.Empty<string>(),
+                flagOptions: System.Array.Empty<string>(),
+                out _,
+                out _))
+            {
                 return 2;
             }
 
