@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using NodeKit.UI;
+using NodeKit.UI.Spikes;
 
 namespace NodeKit
 {
@@ -16,7 +17,10 @@ namespace NodeKit
         {
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                desktop.MainWindow = new MainWindow();
+                var spike = System.Environment.GetEnvironmentVariable("NODEKIT_UI_SPIKE");
+                desktop.MainWindow = string.Equals(spike, "v16", System.StringComparison.OrdinalIgnoreCase)
+                    ? new V16AuthoringSpikeWindow()
+                    : new MainWindow();
             }
 
             base.OnFrameworkInitializationCompleted();
