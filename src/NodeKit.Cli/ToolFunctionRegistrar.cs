@@ -427,9 +427,10 @@ namespace NodeKit.Cli
             {
                 return Classify(rpc.GetAwaiter().GetResult(), requestedVersion);
             }
-            catch (Exception ex) when (linked.IsCancellationRequested && ex is OperationCanceledException or RpcException)
+            catch (Exception ex) when (linked.IsCancellationRequested && IsCancellationShaped(ex))
             {
-                // 내가 취소/만료시킨 호출이 그 신호로 끝났다 — 서버 오류가 아니라 로컬 중단이다.
+                // 내가 취소/만료시킨 호출이 그 신호로 끝났다 — 서버 오류가 아니라 로컬 중단이다. 서버가 먼저 돌려준 다른 오류
+                // (InvalidArgument 등)는 그 뒤 신호가 와도 서버 결과 그대로 분류한다.
                 return LocalAbort(call, timeoutCts);
             }
             catch (RpcException ex)
@@ -439,6 +440,9 @@ namespace NodeKit.Cli
                     : new Classified(RegistrationState.Unknown, UnknownCode, $"등록 결과를 확인하지 못했습니다 ({ex.StatusCode}): {ex.Status.Detail}", null, null);
             }
         }
+
+        private static bool IsCancellationShaped(Exception ex) =>
+            ex is OperationCanceledException || ex is RpcException { StatusCode: StatusCode.Cancelled };
 
         // 요청은 이미 보냈다(attempts 기록 뒤). 원격 등록 여부는 모른다 — 실패로 확정하지 않는다. 사용자 취소가 타이머보다 우선한다.
         private static Classified LocalAbort(RegistrationCall call, CancellationTokenSource timeoutCts)

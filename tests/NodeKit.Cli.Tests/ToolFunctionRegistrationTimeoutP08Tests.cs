@@ -392,6 +392,74 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(ServerH, settled.Result.CasHash);
         }
 
+        // 응답(서버 오류)이 이긴 뒤에 예산 만료/Ctrl-C가 와도 서버가 돌려준 오류 분류를 유지한다 — 확정 거부를 unknown 124/130으로 바꾸지 않는다.
+        [Theory]
+        [InlineData(false, StatusCode.InvalidArgument)]
+        [InlineData(true, StatusCode.InvalidArgument)]
+        [InlineData(false, StatusCode.AlreadyExists)]
+        [InlineData(true, StatusCode.FailedPrecondition)]
+        [InlineData(false, StatusCode.Unavailable)]
+        [InlineData(true, StatusCode.DeadlineExceeded)]
+        public void Settle_ResponseWonWithServerError_SignalAfterwards_KeepsServerClassification(bool userAbort, StatusCode code)
+        {
+            using var user = new CancellationTokenSource();
+            using var timeoutCts = new CancellationTokenSource();
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(user.Token, timeoutCts.Token);
+            var rpc = Task.FromException<Pb.RegisterToolFunctionResponse>(new RpcException(new Status(code, "server said no")));
+            var call = new ToolFunctionRegistrar.RegistrationCall(userAbort ? null : TimeSpan.FromSeconds(1), user.Token);
+            if (userAbort)
+            {
+                user.Cancel();
+            }
+            else
+            {
+                timeoutCts.Cancel();
+            }
+
+            var settled = ToolFunctionRegistrar.Settle(rpc, rpc, Version, call, timeoutCts, linked.Token);
+
+            var rejected = code is StatusCode.InvalidArgument or StatusCode.FailedPrecondition or StatusCode.AlreadyExists;
+            Assert.Equal(rejected ? RegistrationState.Rejected : RegistrationState.Unknown, settled.State);
+            Assert.Equal(rejected ? ToolFunctionRegistrar.RejectedCode : ToolFunctionRegistrar.UnknownCode, settled.ErrorCode);
+            Assert.Equal(1, settled.ExitCode);
+            Assert.Contains("server said no", settled.Message!, StringComparison.Ordinal);
+            Assert.Null(settled.Result);
+        }
+
+        // 대조: 신호 때문에 끝난 호출(Cancelled RpcException / OperationCanceledException)은 여전히 로컬 중단 124/130이다.
+        [Theory]
+        [InlineData(false, false)]
+        [InlineData(true, false)]
+        [InlineData(false, true)]
+        [InlineData(true, true)]
+        public void Settle_ResponseWonWithCancellation_AfterSignal_IsLocalAbort(bool userAbort, bool operationCanceled)
+        {
+            using var user = new CancellationTokenSource();
+            using var timeoutCts = new CancellationTokenSource();
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(user.Token, timeoutCts.Token);
+            if (userAbort)
+            {
+                user.Cancel();
+            }
+            else
+            {
+                timeoutCts.Cancel();
+            }
+
+            Exception failure = operationCanceled
+                ? new OperationCanceledException(linked.Token)
+                : new RpcException(new Status(StatusCode.Cancelled, "call cancelled"));
+            var rpc = Task.FromException<Pb.RegisterToolFunctionResponse>(failure);
+            var call = new ToolFunctionRegistrar.RegistrationCall(userAbort ? null : TimeSpan.FromSeconds(1), user.Token);
+
+            var settled = ToolFunctionRegistrar.Settle(rpc, rpc, Version, call, timeoutCts, linked.Token);
+
+            Assert.Equal(RegistrationState.Unknown, settled.State);
+            Assert.Equal(userAbort ? ToolFunctionRegistrar.CancelledCode : ToolFunctionRegistrar.TimeoutCode, settled.ErrorCode);
+            Assert.Equal(userAbort ? 130 : 124, settled.ExitCode);
+            Assert.Null(settled.Result);
+        }
+
         // register-replay도 같은 규칙: --registration-timeout 만료 124 / Ctrl-C 130, 둘 다 unknown·attempts 증가, 결과를 합성하지 않는다.
         [Theory]
         [InlineData(false)]
