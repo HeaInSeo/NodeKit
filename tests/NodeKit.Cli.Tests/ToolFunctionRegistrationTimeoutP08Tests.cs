@@ -23,7 +23,7 @@ namespace NodeKit.Cli.Tests
     public partial class ToolFunctionRegistryP08Tests
     {
         // 실행 환경 차이를 감안한 상한 — 1초 예산/즉시 취소가 이 안에 끝나야 한다(S3-08-E의 10초 경계).
-        private static readonly TimeSpan ShutdownBound = TimeSpan.FromSeconds(10);
+        private static readonly TimeSpan _shutdownBound = TimeSpan.FromSeconds(10);
 
         // registration_deadline: 보낸 뒤 응답 없음 → 예산 만료 124·unknown·completed1. 저장 요청 보존, CancelToolBuild0·새 빌드0,
         // 이어서 같은 envelope replay가 같은 bytes/ID로 등록한다.
@@ -41,7 +41,7 @@ namespace NodeKit.Cli.Tests
             watch.Stop();
 
             Assert.True(exit == 124, stderr);
-            Assert.InRange(watch.Elapsed, TimeSpan.FromSeconds(0.9), ShutdownBound);
+            Assert.InRange(watch.Elapsed, TimeSpan.FromSeconds(0.9), _shutdownBound);
             Assert.Single(server.Registry.RegisterRequests);
             Assert.Empty(server.Fake.CancelledBuildIds);
             Assert.Equal(new[] { "Resolve", "Submit", "Watch" }, server.Fake.CallOrder);
@@ -130,7 +130,7 @@ namespace NodeKit.Cli.Tests
             watch.Stop();
 
             Assert.True(exit == 130, stderr);
-            Assert.True(watch.Elapsed < ShutdownBound, watch.Elapsed.ToString());
+            Assert.True(watch.Elapsed < _shutdownBound, watch.Elapsed.ToString());
             Assert.Single(server.Registry.RegisterRequests);
             Assert.Empty(server.Fake.CancelledBuildIds);
             Assert.Equal(new[] { "Resolve", "Submit", "Watch" }, server.Fake.CallOrder);
@@ -367,7 +367,7 @@ namespace NodeKit.Cli.Tests
             watch.Stop();
 
             Assert.True(exit == (userAbort ? 130 : 124), stderr);
-            Assert.True(watch.Elapsed < ShutdownBound, watch.Elapsed.ToString());
+            Assert.True(watch.Elapsed < _shutdownBound, watch.Elapsed.ToString());
             Assert.Equal(2, server.Registry.RegisterRequests.Count);
             Assert.Equal(server.Registry.RegisterRequestBytes[0], server.Registry.RegisterRequestBytes[1]);
             var receipt = ReadRawReceipt(RegistrationPath());
