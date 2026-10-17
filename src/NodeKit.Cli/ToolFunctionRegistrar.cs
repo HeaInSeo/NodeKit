@@ -314,7 +314,7 @@ namespace NodeKit.Cli
         }
 
         /// <summary>등록 RPC 한 번의 시간 제한(없으면 자동 deadline 없음)과 사용자 취소 신호.</summary>
-        private sealed record RegistrationCall(TimeSpan? Timeout, CancellationToken UserCancellation);
+        internal sealed record RegistrationCall(TimeSpan? Timeout, CancellationToken UserCancellation);
 
         private static int Send(
             RegistrationHandle handle,
@@ -400,8 +400,23 @@ namespace NodeKit.Cli
             }
 
             var abandon = Task.Delay(System.Threading.Timeout.Infinite, linked.Token);
-            Task.WhenAny(rpc, abandon).GetAwaiter().GetResult();
-            if (!rpc.IsCompleted)
+            var winner = Task.WhenAny(rpc, abandon).GetAwaiter().GetResult();
+            return Settle(winner, rpc, requestedVersion, call, timeoutCts, linked.Token);
+        }
+
+        /// <summary>
+        /// 먼저 끝난 쪽(<paramref name="winner"/>)이 결과를 정한다. 중단이 이긴 뒤 응답이 곧바로 끝나도(rpc 상태를 다시 보기 전)
+        /// 그 응답은 늦은 ACK다 — registered로 바꾸지 않는다(registration_late_ack).
+        /// </summary>
+        internal static Classified Settle(
+            Task winner,
+            Task<RegisterToolFunctionResponse> rpc,
+            string requestedVersion,
+            RegistrationCall call,
+            CancellationTokenSource timeoutCts,
+            CancellationToken linked)
+        {
+            if (!ReferenceEquals(winner, rpc))
             {
                 // 응답을 버린다 — 나중에 실패하더라도 관측되지 않은 예외로 남지 않게 한다.
                 _ = rpc.ContinueWith(t => _ = t.Exception, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
@@ -452,7 +467,7 @@ namespace NodeKit.Cli
                 ExitCode: 124);
         }
 
-        private sealed record Classified(
+        internal sealed record Classified(
             string State, string? ErrorCode, string? Message, string? Observed, RegistrationResult? Result, int ExitCode = 1, string Status = "Failed");
 
         private static Classified Classify(RegisterToolFunctionResponse response, string requestedVersion)

@@ -343,6 +343,55 @@ namespace NodeKit.Cli.Tests
             }
         }
 
+        // registration_late_ack 경합: 예산 만료/Ctrl-C 쪽이 먼저 끝나 WhenAny가 그것을 돌려줬는데, rpc 상태를 다시 보기 전에 성공 응답이
+        // 끝나 있어도 결과는 이긴 쪽, 즉 로컬 중단이다. 그 틈은 in-process로 재현할 수 없어 결정 지점(Settle)을 직접 본다.
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void Settle_AbortWonButResponseAlreadyCompleted_LocalOutcomeWins(bool userAbort)
+        {
+            using var user = new CancellationTokenSource();
+            using var timeoutCts = new CancellationTokenSource();
+            if (userAbort)
+            {
+                user.Cancel();
+            }
+            else
+            {
+                timeoutCts.Cancel();
+            }
+
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(user.Token, timeoutCts.Token);
+            var abandon = Task.Delay(Timeout.Infinite, linked.Token);
+            var rpc = Task.FromResult(Response(ServerF, ServerH));
+            var call = new ToolFunctionRegistrar.RegistrationCall(userAbort ? null : TimeSpan.FromSeconds(1), user.Token);
+
+            var settled = ToolFunctionRegistrar.Settle(abandon, rpc, Version, call, timeoutCts, linked.Token);
+
+            Assert.Equal(RegistrationState.Unknown, settled.State);
+            Assert.Null(settled.Result);
+            Assert.Equal(userAbort ? ToolFunctionRegistrar.CancelledCode : ToolFunctionRegistrar.TimeoutCode, settled.ErrorCode);
+            Assert.Equal(userAbort ? 130 : 124, settled.ExitCode);
+        }
+
+        // 대조: 응답이 이겼으면 (취소 신호가 그 뒤에 왔더라도) 받은 응답을 그대로 분류한다.
+        [Fact]
+        public void Settle_ResponseWon_ClassifiesResponse()
+        {
+            using var user = new CancellationTokenSource();
+            using var timeoutCts = new CancellationTokenSource();
+            timeoutCts.Cancel();
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(user.Token, timeoutCts.Token);
+            var rpc = Task.FromResult(Response(ServerF, ServerH));
+            var call = new ToolFunctionRegistrar.RegistrationCall(TimeSpan.FromSeconds(1), user.Token);
+
+            var settled = ToolFunctionRegistrar.Settle(rpc, rpc, Version, call, timeoutCts, linked.Token);
+
+            Assert.Equal(RegistrationState.Registered, settled.State);
+            Assert.Equal(ServerF, settled.Result!.ToolFunctionDigest);
+            Assert.Equal(ServerH, settled.Result.CasHash);
+        }
+
         // register-replay도 같은 규칙: --registration-timeout 만료 124 / Ctrl-C 130, 둘 다 unknown·attempts 증가, 결과를 합성하지 않는다.
         [Theory]
         [InlineData(false)]
