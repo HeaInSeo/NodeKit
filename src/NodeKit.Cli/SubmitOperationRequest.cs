@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using System.Threading;
 using NodeKit.Cli.Operations;
 
 namespace NodeKit.Cli
@@ -60,7 +61,8 @@ namespace NodeKit.Cli
         /// <summary>
         /// full B를 확인한 뒤 이어서 할 typed 등록(P08.registry). null이면 빌드에서 멈춘다(P07 동작). 반환값이 최종
         /// exit code이며, 등록이 있으면 빌드 성공은 jsonl에서 state 레코드로만 나가고 completed는 등록이 한 번 쓴다.
+        /// 두 번째 인자는 사용자 취소(Ctrl-C) 신호다 — 빌드 단계의 connect/watch 타이머는 넘기지 않는다.
         /// </summary>
-        public Func<SecondImageSucceeded, int>? Register { get; init; }
+        public Func<SecondImageSucceeded, CancellationToken, int>? Register { get; init; }
     }
 }

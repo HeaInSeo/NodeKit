@@ -2075,7 +2075,16 @@ dotnet run --project src/NodeKit.Cli -- validate /home/user/samtools-1.17.json
   `nodekit function-recipe register-replay <registrations/…json> [--url <url>] [--format human|jsonl]`로
   확인한다 — 저장된 같은 endpoint·request ID·version·요청 bytes만 다시 보내며(다른 `--url`은 exit 2), Recipe/script를
   다시 읽거나 새 이미지를 빌드하지 않는다. registered/rejected 기록의 replay는 RPC 없이 저장된 결과를 보여준다.
-  client 쪽 replay는 실제 서버 멱등성의 증거가 아니다. 등록 timeout/Ctrl-C(`--registration-timeout`)는 아직 없다(P08.timeout).
+  client 쪽 replay는 실제 서버 멱등성의 증거가 아니다. 등록 시간 제한·취소(P08.timeout, S3-08): 등록에는 자동
+  deadline이 없고 앞 단계 `--connect-timeout`/`--watch-timeout`은 등록 RPC를 취소하지 않는다.
+  `--registration-timeout <seconds>`(submit·register-replay 공통, 문화권 무관 10진 정수 1..4294967초 —
+  타이머 상한 4294967294 ms에서 도출; 0/음수/부호/소수/지수/NaN/Infinity/범위 초과/값 누락은 업무 RPC 전 exit 2)를 주면
+  `RegisterToolFunction` 호출 시작부터 그 예산만 잰다. 보낸 뒤 만료는 `REGISTRATION_TIMEOUT`(exit 124), Ctrl-C는
+  `REGISTRATION_CANCELLED`(exit 130, jsonl `status: "Cancelled"`)이며 둘 다 `remote_registration_state: "unknown"`
+  (`recovery: "uncertain"`)이다 — 등록 실패로 확정하지 않고 저장된 요청을 그대로 두며, `CancelToolBuild`·새 이미지 빌드·
+  새 request ID 자동 등록은 하지 않는다. 같은 요청은 register-replay로 확인한다. 보내기 전 취소는
+  exit 130·`not_submitted`(등록 RPC 0, prepared 기록 보존)다. CLI가 결과를 확정한 뒤 늦게 온 응답은 출력·저장하지 않는다
+  (completed는 한 번). 실제 NodeVault 응답 시간·서버 멱등성은 이 client 시험의 범위가 아니다.
   옵션/exit code는 `nodekit submit`과 같고(`--strict-reproducible` 제외), 로컬
   preflight 실패의 jsonl `error_code`는 `PREFLIGHT_FAILED`다. Console/GUI와 실제 NodeVault
   function-image builder 연동은 후속 단계다.

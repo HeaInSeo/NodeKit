@@ -390,7 +390,8 @@ namespace NodeKit.Cli
             string? integrityHealth,
             string? requestToolSpecDigest,
             ReceiptRun? run,
-            bool jsonl)
+            bool jsonl,
+            CancellationToken userCancellation)
         {
             var watchImageDigest = succeededEvent.ImageDigest;
             var imageRef = succeededEvent.ImageRef;
@@ -458,7 +459,9 @@ namespace NodeKit.Cli
                     }
                 }
 
-                return register(new SecondImageSucceeded(watchImageDigest!, requestToolSpecDigest, buildId, run?.Handle.Receipt.RequestId));
+                // 등록에는 사용자 취소(Ctrl-C)만 넘긴다. connect/watch 타이머는 등록을 취소하지 않으며, 등록 자체의
+                // 시간 제한은 --registration-timeout이 RPC 시작부터 따로 잰다(S3-08-G).
+                return register(new SecondImageSucceeded(watchImageDigest!, requestToolSpecDigest, buildId, run?.Handle.Receipt.RequestId), userCancellation);
             }
 
             if (jsonl)
@@ -716,7 +719,7 @@ namespace NodeKit.Cli
                         if (secondImage is not null)
                         {
                             return ReportSecondImageSucceeded(
-                                stdout, stderr, secondImage, ev, buildId, lastIntegrityHealth, resolvedToolSpecDigest, run, jsonl);
+                                stdout, stderr, secondImage, ev, buildId, lastIntegrityHealth, resolvedToolSpecDigest, run, jsonl, cts.Token);
                         }
 
                         if (jsonl)
@@ -1119,21 +1122,25 @@ namespace NodeKit.Cli
             out TimeSpan? watchTimeout,
             out bool strictReproducible,
             out bool jsonl) =>
-            TryParseOptions(args, 2, allowStrictReproducible: true, stderr, out url, out receiptPath, out connectTimeout, out watchTimeout, out strictReproducible, out jsonl);
+            TryParseOptions(
+                args, 2, allowStrictReproducible: true, allowRegistrationTimeout: false, stderr, out url, out receiptPath, out connectTimeout, out watchTimeout, out _, out strictReproducible, out jsonl);
 
         /// <summary>
         /// submit 계열 공통 옵션. `function-recipe submit`은 옵션이 인덱스 3부터 시작하고
-        /// --strict-reproducible(ToolSpec Recipe 전용 L1)을 받지 않는다.
+        /// --strict-reproducible(ToolSpec Recipe 전용 L1)을 받지 않으며, typed 등록 단계의
+        /// --registration-timeout(S3-08)을 받는다.
         /// </summary>
         internal static bool TryParseOptions(
             string[] args,
             int startIndex,
             bool allowStrictReproducible,
+            bool allowRegistrationTimeout,
             TextWriter stderr,
             out string? url,
             out string? receiptPath,
             out TimeSpan? connectTimeout,
             out TimeSpan? watchTimeout,
+            out TimeSpan? registrationTimeout,
             out bool strictReproducible,
             out bool jsonl)
         {
@@ -1141,14 +1148,21 @@ namespace NodeKit.Cli
             receiptPath = null;
             connectTimeout = null;
             watchTimeout = null;
+            registrationTimeout = null;
             strictReproducible = false;
             jsonl = false;
+
+            var valueOptions = new List<string> { "--url", "--receipt", "--connect-timeout", "--watch-timeout", "--format" };
+            if (allowRegistrationTimeout)
+            {
+                valueOptions.Add(ToolFunctionRegistrar.RegistrationTimeoutOption);
+            }
 
             if (!CliOptionParser.TryParse(
                 args,
                 startIndex,
                 stderr,
-                valueOptions: new[] { "--url", "--receipt", "--connect-timeout", "--watch-timeout", "--format" },
+                valueOptions: valueOptions,
                 flagOptions: allowStrictReproducible ? new[] { "--strict-reproducible" } : Array.Empty<string>(),
                 out var values,
                 out var flags))
@@ -1194,6 +1208,16 @@ namespace NodeKit.Cli
                 }
 
                 watchTimeout = duration;
+            }
+
+            if (values.TryGetValue(ToolFunctionRegistrar.RegistrationTimeoutOption, out var registrationTimeoutValue))
+            {
+                if (!ToolFunctionRegistrar.TryParseRegistrationTimeout(registrationTimeoutValue, stderr, out var parsed))
+                {
+                    return false;
+                }
+
+                registrationTimeout = parsed;
             }
 
             if (values.TryGetValue("--format", out var formatValue))

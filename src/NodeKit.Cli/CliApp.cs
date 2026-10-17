@@ -29,8 +29,8 @@ namespace NodeKit.Cli
             "  nodekit function-recipe create [<path>] --tool-spec-digest <digest> --base-tool-image-digest <digest> [--non-interactive --field Name=Value ...]\n" +
             "  nodekit function-recipe validate <path>\n" +
             "  nodekit function-recipe render <path> --out <out.json> [--pretty]\n" +
-            "  nodekit function-recipe submit <path> [--url <url>] [--receipt <path>] [--connect-timeout <seconds>] [--watch-timeout <duration>] [--format human|jsonl]\n" +
-            "  nodekit function-recipe register-replay <registration-receipt.json> [--url <url>] [--format human|jsonl]\n" +
+            "  nodekit function-recipe submit <path> [--url <url>] [--receipt <path>] [--connect-timeout <seconds>] [--watch-timeout <duration>] [--registration-timeout <seconds>] [--format human|jsonl]\n" +
+            "  nodekit function-recipe register-replay <registration-receipt.json> [--url <url>] [--registration-timeout <seconds>] [--format human|jsonl]\n" +
             "  nodekit receipt watch|cancel <receipt.json>\n" +
             "\n" +
             "각 명령의 자세한 옵션은 `nodekit <명령> --help`로 확인하세요 (예: nodekit submit --help).";
@@ -40,8 +40,8 @@ namespace NodeKit.Cli
             "  nodekit function-recipe create [<path>] --tool-spec-digest <digest> --base-tool-image-digest <digest> [--non-interactive --field Name=Value ...]\n" +
             "  nodekit function-recipe validate <path>\n" +
             "  nodekit function-recipe render <path> --out <out.json> [--pretty]\n" +
-            "  nodekit function-recipe submit <path> [--url <url>] [--receipt <path>] [--connect-timeout <seconds>] [--watch-timeout <duration>] [--format human|jsonl]\n" +
-            "  nodekit function-recipe register-replay <registration-receipt.json> [--url <url>] [--format human|jsonl]";
+            "  nodekit function-recipe submit <path> [--url <url>] [--receipt <path>] [--connect-timeout <seconds>] [--watch-timeout <duration>] [--registration-timeout <seconds>] [--format human|jsonl]\n" +
+            "  nodekit function-recipe register-replay <registration-receipt.json> [--url <url>] [--registration-timeout <seconds>] [--format human|jsonl]";
 
         private const string ValidateUsage = "사용법: nodekit validate <recipe.json> [--strict-reproducible]";
 

@@ -20,6 +20,12 @@ namespace NodeKit.Cli.Tests.Fakes
         /// <summary>요청을 받은 직후, 응답 전에 호출된다(예: 그 시점의 로컬 receipt 상태 확인).</summary>
         public Action<RegisterToolFunctionRequest>? OnReceived { get; set; }
 
+        /// <summary>
+        /// 있으면 <see cref="OnRegisterToolFunction"/> 대신 쓴다 — 응답 지연·hang(P08.timeout)을 server call의
+        /// 취소 토큰과 함께 흉내 낸다.
+        /// </summary>
+        public Func<RegisterToolFunctionRequest, ServerCallContext, Task<RegisterToolFunctionResponse>>? OnRegisterToolFunctionAsync { get; set; }
+
         public List<RegisterToolFunctionRequest> RegisterRequests { get; } = new();
 
         public List<byte[]> RegisterRequestBytes { get; } = new();
@@ -29,7 +35,9 @@ namespace NodeKit.Cli.Tests.Fakes
             RegisterRequests.Add(request);
             RegisterRequestBytes.Add(request.ToByteArray());
             OnReceived?.Invoke(request);
-            return Task.FromResult(OnRegisterToolFunction(request));
+            return OnRegisterToolFunctionAsync is { } async
+                ? async(request, context)
+                : Task.FromResult(OnRegisterToolFunction(request));
         }
     }
 }

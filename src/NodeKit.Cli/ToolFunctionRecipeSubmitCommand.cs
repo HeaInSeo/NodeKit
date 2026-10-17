@@ -10,7 +10,8 @@ namespace NodeKit.Cli
 {
     /// <summary>
     /// nodekit function-recipe submit &lt;path&gt; [--url &lt;nodevault-url&gt;] [--receipt &lt;path&gt;]
-    /// [--connect-timeout &lt;seconds&gt;] [--watch-timeout &lt;duration&gt;] [--format human|jsonl]
+    /// [--connect-timeout &lt;seconds&gt;] [--watch-timeout &lt;duration&gt;] [--registration-timeout &lt;seconds&gt;]
+    /// [--format human|jsonl]
     ///
     /// P07.build (v0.9.1 S3-05): ToolFunctionRecipe의 두 번째(function) 이미지 B를 NodeVault
     /// BuildService client로 요청한다. 순서는 P06 current preflight(Ready·현재 내용 full L1·
@@ -36,7 +37,8 @@ namespace NodeKit.Cli
     internal static class ToolFunctionRecipeSubmitCommand
     {
         private const string UsageLine =
-            "사용법: nodekit function-recipe submit <path> [--url <nodevault-url>] [--receipt <path>] [--connect-timeout <seconds>] [--watch-timeout <duration>] [--format human|jsonl]";
+            "사용법: nodekit function-recipe submit <path> [--url <nodevault-url>] [--receipt <path>] [--connect-timeout <seconds>] [--watch-timeout <duration>] " +
+            ToolFunctionRegistrar.RegistrationTimeoutUsage + " [--format human|jsonl]";
 
         /// <summary>current preflight가 Recipe 내용을 거부했다 — 진단은 stderr에 있다. RPC0.</summary>
         internal const string PreflightFailedCode = "PREFLIGHT_FAILED";
@@ -75,7 +77,31 @@ namespace NodeKit.Cli
             Func<string>? requestIdProvider = null,
             bool? toolFunctionBuildGateOpen = null,
             IToolFunctionRegistryClient? registryClient = null,
-            Func<string>? registrationRequestIdProvider = null)
+            Func<string>? registrationRequestIdProvider = null) =>
+            RunCore(args, stdout, stderr, toolSpecClient, requestIdProvider, toolFunctionBuildGateOpen, registryClient, registrationRequestIdProvider, CancellationToken.None);
+
+        /// <summary>테스트 전용: <see cref="Run"/>과 같지만 사용자 취소 신호(Ctrl-C와 같은 경로)를 받는다.</summary>
+        internal static int RunUntilUserCancel(
+            string[] args,
+            TextWriter stdout,
+            TextWriter stderr,
+            IToolSpecBuildClient toolSpecClient,
+            Func<string>? requestIdProvider,
+            IToolFunctionRegistryClient registryClient,
+            Func<string>? registrationRequestIdProvider,
+            CancellationToken userCancellation) =>
+            RunCore(args, stdout, stderr, toolSpecClient, requestIdProvider, toolFunctionBuildGateOpen: true, registryClient, registrationRequestIdProvider, userCancellation);
+
+        private static int RunCore(
+            string[] args,
+            TextWriter stdout,
+            TextWriter stderr,
+            IToolSpecBuildClient? toolSpecClient,
+            Func<string>? requestIdProvider,
+            bool? toolFunctionBuildGateOpen,
+            IToolFunctionRegistryClient? registryClient,
+            Func<string>? registrationRequestIdProvider,
+            CancellationToken userCancellation)
         {
             if (args.Any(a => a is "--help" or "-h"))
             {
@@ -94,11 +120,13 @@ namespace NodeKit.Cli
                     args,
                     startIndex: 3,
                     allowStrictReproducible: false,
+                    allowRegistrationTimeout: true,
                     stderr,
                     out var urlOption,
                     out var receiptOption,
                     out var connectTimeout,
                     out var watchTimeout,
+                    out var registrationTimeout,
                     out _,
                     out var jsonl))
             {
@@ -192,7 +220,7 @@ namespace NodeKit.Cli
                 },
                 SecondImage = new SecondImageBuildContext(source.BaseImageDigest, recipe.ToolSpecDigest)
                 {
-                    Register = registerAfterBuild ? built => ToolFunctionRegistrar.RegisterAfterBuild(
+                    Register = registerAfterBuild ? (built, registrationCancellation) => ToolFunctionRegistrar.RegisterAfterBuild(
                         recipe,
                         new RegistrationContext(
                             receiptOption is null
@@ -201,16 +229,20 @@ namespace NodeKit.Cli
                             url ?? SubmitCommand.InjectedClientEndpoint,
                             registryClient,
                             registrationRequestIdProvider ?? (() => Guid.NewGuid().ToString("D")),
-                            source.BaseImageDigest),
+                            source.BaseImageDigest)
+                        {
+                            Timeout = registrationTimeout,
+                        },
                         built,
                         stdout,
                         stderr,
-                        jsonl)
+                        jsonl,
+                        registrationCancellation)
                         : null,
                 },
             };
 
-            return SubmitCommand.RunOperation(request, stdout, stderr, toolSpecClient, requestIdProvider, CancellationToken.None);
+            return SubmitCommand.RunOperation(request, stdout, stderr, toolSpecClient, requestIdProvider, userCancellation);
         }
     }
 }
