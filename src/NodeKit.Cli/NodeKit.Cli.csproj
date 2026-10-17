@@ -144,6 +144,8 @@
     <Compile Include="..\Grpc\ToolFunctionRegistrationInputs.cs" Link="Grpc\ToolFunctionRegistrationInputs.cs" />
     <Compile Include="..\Grpc\ToolFunctionRegistrationPlan.cs" Link="Grpc\ToolFunctionRegistrationPlan.cs" />
     <Compile Include="..\Grpc\ToolFunctionRegistrationRequestFactory.cs" Link="Grpc\ToolFunctionRegistrationRequestFactory.cs" />
+    <Compile Include="..\Grpc\IToolFunctionRegistryClient.cs" Link="Grpc\IToolFunctionRegistryClient.cs" />
+    <Compile Include="..\Grpc\GrpcToolFunctionRegistryClient.cs" Link="Grpc\GrpcToolFunctionRegistryClient.cs" />
     <Compile Include="..\Grpc\ToolFunctionBaseBuildObservation.cs" Link="Grpc\ToolFunctionBaseBuildObservation.cs" />
     <Compile Include="..\Grpc\ToolFunctionBaseLinkState.cs" Link="Grpc\ToolFunctionBaseLinkState.cs" />
     <Compile Include="..\Grpc\ToolFunctionBaseLinkEvidence.cs" Link="Grpc\ToolFunctionBaseLinkEvidence.cs" />

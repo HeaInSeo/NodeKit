@@ -37,7 +37,7 @@ namespace NodeKit.Cli
             "사용법: nodekit submit <recipe.json> [--url <nodevault-url>] [--receipt <path>] [--connect-timeout <seconds>] [--watch-timeout <duration>] [--format human|jsonl] [--strict-reproducible]";
 
         // 주입된 test client에는 실제 주소가 없다 — receipt endpoint에는 이 표식을 남긴다.
-        private const string InjectedClientEndpoint = "injected-client";
+        internal const string InjectedClientEndpoint = "injected-client";
 
         /// <summary>두 번째 이미지 빌드가 Succeeded인데 full image digest B가 없다(S3-05-E).</summary>
         internal const string SecondImageDigestMissingCode = "SECOND_IMAGE_DIGEST_MISSING";
@@ -421,6 +421,44 @@ namespace NodeKit.Cli
                     ? "NodeVault에서 빌드 결과를 직접 확인하세요."
                     : $"NodeVault에서 빌드 결과를 직접 확인하세요 (build ID: {buildId})." + WatchHint(run));
                 return 1;
+            }
+
+            // P08.registry: full B를 확인한 뒤에만 typed 등록으로 넘어간다. 빌드 성공은 jsonl에서 state 레코드이고
+            // completed는 등록이 한 번만 쓴다(S3-08-A: 실제 완료한 단계만 성공으로 보인다).
+            if (secondImage.Register is { } register)
+            {
+                if (jsonl)
+                {
+                    WriteJsonl(
+                        stdout,
+                        SubmitJsonlRecord.ProgressState(
+                            buildId,
+                            "Succeeded",
+                            "두 번째 이미지 빌드 완료 — typed 등록을 시작합니다.",
+                            imageRef,
+                            watchImageDigest,
+                            integrityHealth,
+                            requestToolSpecDigest));
+                }
+                else
+                {
+                    PrintEvent(succeededEvent, stdout);
+                    stdout.WriteLine(string.IsNullOrEmpty(imageRef)
+                        ? $"두 번째 이미지(B) digest: {watchImageDigest}"
+                        : $"두 번째 이미지(B) digest: {imageRef}@{watchImageDigest}");
+                    if (!string.IsNullOrEmpty(buildId))
+                    {
+                        stdout.WriteLine($"build ID: {buildId}");
+                    }
+
+                    stdout.WriteLine("빌드 성공은 승인(Approved)이 아닙니다. 이어서 ToolFunction typed 등록을 보냅니다.");
+                    if (!string.IsNullOrEmpty(integrityHealth) && integrityHealth != "Healthy")
+                    {
+                        stderr.WriteLine($"경고: 무결성 상태가 {integrityHealth}입니다 — NodeVault 인덱스에서 확인하세요.");
+                    }
+                }
+
+                return register(new SecondImageSucceeded(watchImageDigest!, requestToolSpecDigest, buildId, run?.Handle.Receipt.RequestId));
             }
 
             if (jsonl)

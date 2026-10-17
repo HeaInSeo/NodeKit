@@ -1037,7 +1037,10 @@ $ echo $?
 "succeeded"`, `recovery: "uncertain"`; 기반 이미지나 로그 digest로 대신하지 않는다).
 `PREFLIGHT_FAILED` — 로컬 current preflight 거부, 요청 0회(exit 1 또는 source 입력 오류 2,
 `recovery: "terminal"`). 성공 레코드의 `image_digest`는 두 번째 이미지 B, `tool_spec_digest`는
-이번 요청의 C2다. `nodekit receipt watch`도 이 receipt의 B 없는 `Succeeded`를
+이번 요청의 C2다. typed 등록까지 가는 경로에서는 빌드 성공이 `state` 레코드(`state: "Succeeded"`)로만 나가고
+`completed`는 등록이 한 번 쓴다(`phase: "registration"`, `registration_request_id`, 성공이면 `tool_function_digest`/
+`cas_hash`/`presentation_revision_id`/`canonicalization_version`, 실패면 `error_code`와
+`remote_registration_state`: `rejected`/`unknown`/`not_submitted`). `nodekit receipt watch`도 이 receipt의 B 없는 `Succeeded`를
 `SECOND_IMAGE_DIGEST_MISSING`으로 보고한다.
 
 제출 이전(로컬) 확정 실패에 쓰이는 값 — 전부 `recovery: "terminal"`:
@@ -2050,16 +2053,30 @@ dotnet run --project src/NodeKit.Cli -- validate /home/user/samtools-1.17.json
   이미지 빌드, `tool_function_digest`/`cas_hash` 같은 canonical digest 계산과
   canonicalizer 선택 결과의 기록은 NodeVault가 소유하며 NodeKit은 서버가 돌려준 값을
   그대로 보존한다. 벤더 proto(`protos/SOURCE.md`)는 `RegisterToolFunction`의
-  `canonicalization_version`(request 8 / response 4)까지 포함하지만, NodeKit은 아직
-  `RegisterToolFunction`을 호출하지 않는다. `nodekit function-recipe submit`(P07)은 현재
+  `canonicalization_version`(request 8 / response 4)까지 포함한다. `nodekit function-recipe submit`(P07)은 현재
   NodeVault 빌드 경로가 kind 2를 받지 않으므로(벤더 proto `BUILD_KIND_TOOLFUNCTIONSPEC` 예약)
   유효한 `Ready`도 요청 없이 `TOOLFUNCTION_BUILD_GATE_CLOSED`(exit 1)로 끝난다. NodeVault가 kind 2를
   수용해 이 게이트가 열린 뒤에는 current preflight를 통과한 `Ready` Recipe의 두 번째 이미지 빌드만 요청한다 —
   `operation_kind=toolfunction_image_build` receipt를 먼저 남기고 `ResolveToolSpec`(tool_name=
   FunctionId, version=Revision, raw_spec v1 kind 2) → `SubmitToolBuild` → `WatchToolBuild`를 보낸다.
   Watch `Succeeded`에 전체 image digest B가 있어야 exit 0이고, B가 없으면
-  `SECOND_IMAGE_DIGEST_MISSING`(exit 1)이다. 빌드 성공은 승인이 아니며 typed 등록은 후속
-  P08이다. 옵션/exit code는 `nodekit submit`과 같고(`--strict-reproducible` 제외), 로컬
+  `SECOND_IMAGE_DIGEST_MISSING`(exit 1)이다. 빌드 성공은 승인이 아니다. 전체 B를 확인한 뒤에만
+  typed 등록(P08.registry)으로 넘어간다: P06 mapper가 만든 `RegisterToolFunctionRequest`
+  (`canonicalization_version=w2-set-v1`, `base_tool_spec_digest`=C1, `image_digest`=B)의 정확한 protobuf
+  bytes와 등록 receipt를 같은 record root의 `registrations/<request-id>.json`·`snapshots/registration/<sha256>.bin`에
+  먼저 저장하고(저장 실패는 exit 2, 등록 RPC 0), 보내기 직전 `attempts`를 기록한 뒤 `RegisterToolFunction`을 보낸다.
+  서버가 돌려준 `tool_function_digest`(F)·`cas_hash`(H)·`presentation_revision_id`(P)·`canonicalization_version`은
+  그대로 출력·저장하며 NodeKit이 계산하거나 대신 채우지 않는다. 최종 pin은 H다. 등록 성공도 승인(Approved)이 아니다.
+  `InvalidArgument`/`FailedPrecondition`/`AlreadyExists`는 서버 확정 거부(`REGISTRATION_REJECTED`, exit 1, terminal)다.
+  그 밖의 gRPC 오류·응답 유실(`REGISTRATION_RESULT_UNKNOWN`), 비었거나 지원하지 않는 version
+  (`REGISTRATION_VERSION_MISMATCH`), 비었거나 손상된 F/H(`REGISTRATION_IDENTITY_MISSING`)는 결과 불명(exit 1,
+  `remote_registration_state: "unknown"`)이며 다른 버전·새 request ID로 자동 재제출하지 않는다. 정상 응답을 받았어도
+  receipt를 저장하지 못하면 exit 2이고 받은 값은 진단 메시지에만 남는다. 결과 불명 등록은
+  `nodekit function-recipe register-replay <registrations/…json> [--url <url>] [--format human|jsonl]`로
+  확인한다 — 저장된 같은 endpoint·request ID·version·요청 bytes만 다시 보내며(다른 `--url`은 exit 2), Recipe/script를
+  다시 읽거나 새 이미지를 빌드하지 않는다. registered/rejected 기록의 replay는 RPC 없이 저장된 결과를 보여준다.
+  client 쪽 replay는 실제 서버 멱등성의 증거가 아니다. 등록 timeout/Ctrl-C(`--registration-timeout`)는 아직 없다(P08.timeout).
+  옵션/exit code는 `nodekit submit`과 같고(`--strict-reproducible` 제외), 로컬
   preflight 실패의 jsonl `error_code`는 `PREFLIGHT_FAILED`다. Console/GUI와 실제 NodeVault
   function-image builder 연동은 후속 단계다.
 - 5개 method가 생성하는 Dockerfile은 NodeKit L1 정적 검증만 통과했을 뿐,

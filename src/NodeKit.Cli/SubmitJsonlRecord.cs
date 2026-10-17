@@ -71,6 +71,28 @@ namespace NodeKit.Cli
         [JsonPropertyName("recovery")]
         public string? Recovery { get; init; }
 
+        // P08.registry(S3-07) typed 등록 결과 — 모두 추가 optional 필드(하위 호환). 서버가 돌려준 값
+        // 그대로이며 client가 계산하지 않는다. cas_hash(H)가 최종 pin이고 tool_function_digest(F)는 pin이 아니다.
+        [JsonPropertyName("registration_request_id")]
+        public string? RegistrationRequestId { get; init; }
+
+        [JsonPropertyName("tool_function_digest")]
+        public string? ToolFunctionDigest { get; init; }
+
+        [JsonPropertyName("cas_hash")]
+        public string? CasHash { get; init; }
+
+        [JsonPropertyName("presentation_revision_id")]
+        public string? PresentationRevisionId { get; init; }
+
+        [JsonPropertyName("canonicalization_version")]
+        public string? CanonicalizationVersion { get; init; }
+
+        // "registered"(확정) / "rejected"(서버 확정 거부) / "unknown"(보냈지만 결과 불명 — 같은 요청 replay로 확인) /
+        // "not_submitted"(RPC 전 실패).
+        [JsonPropertyName("remote_registration_state")]
+        public string? RemoteRegistrationState { get; init; }
+
         internal static SubmitJsonlRecord Submitted(string buildId) =>
             new() { Type = "submitted", BuildId = buildId };
 

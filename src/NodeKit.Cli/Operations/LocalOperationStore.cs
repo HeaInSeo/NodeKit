@@ -349,7 +349,7 @@ namespace NodeKit.Cli.Operations
         // receipt별 operation 잠금. AtomicFileWriter의 쓰기 잠금과 다른 파일이어야 한다 —
         // 같은 파일이면 operation 동안 쥔 잠금이 자기 자신의 receipt 쓰기를 막는다.
         // 잠금 파일은 지우지 않는다(AtomicFileWriter.AcquireWriterLock과 같은 이유).
-        private static OperationStoreError? TryAcquireLock(string receiptPath, out FileStream? lockStream)
+        internal static OperationStoreError? TryAcquireLock(string receiptPath, out FileStream? lockStream)
         {
             lockStream = null;
             var directory = Path.GetDirectoryName(receiptPath);
