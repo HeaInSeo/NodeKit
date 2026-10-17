@@ -5,6 +5,8 @@ bin/
 obj/
 out/
 publish/
+# scripts/package-cli.sh 기본 출력 (artifacts/cli)
+/artifacts/
 
 # Visual Studio 파일
 .vs/
