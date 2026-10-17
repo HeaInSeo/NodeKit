@@ -19,10 +19,10 @@ namespace NodeKit.Cli.Tests
     /// P08.registry (v0.9.1 S3-07-A..G): `function-recipe submit`이 full B 뒤 보내는 typed RegisterToolFunction과
     /// `function-recipe register-replay`. 실제 GrpcToolSpecClient/GrpcToolFunctionRegistryClient를 in-process fake
     /// BuildService/ToolRegistryService에 붙여 실제 generated 요청 bytes·RPC 순서·exit·출력·durable receipt를 본다.
-    /// fake는 고정 응답만 돌려주므로 실제 NodeVault 등록·서버 멱등성의 증거가 아니다. 등록 timeout/Ctrl-C(S3-08)는
-    /// P08.timeout 범위라 여기 없다.
+    /// fake는 고정 응답만 돌려주므로 실제 NodeVault 등록·서버 멱등성의 증거가 아니다. 등록 timeout/Ctrl-C(S3-08,
+    /// P08.timeout)는 같은 fixture를 쓰는 ToolFunctionRegistrationTimeoutP08Tests.cs에 있다.
     /// </summary>
-    public class ToolFunctionRegistryP08Tests : IDisposable
+    public partial class ToolFunctionRegistryP08Tests : IDisposable
     {
         private const string BuildRequestId = "77777777-7777-7777-7777-777777777777";
         private const string RegistrationId = "88888888-8888-8888-8888-888888888888";
