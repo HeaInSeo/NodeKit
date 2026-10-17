@@ -91,3 +91,35 @@ dotnet test --solution NodeKit.sln
 현재 개발 환경 경로:
 - NodeVault protos: 저장소 내 `protos/` (NodeVault에서 벤더링, 출처는 `protos/SOURCE.md`)
 - DockGuard: `/opt/dotnet/src/github.com/HeaInSeo/DockGuard`
+
+---
+
+## 5. CLI 배포 package (linux-x64 self-contained)
+
+지원 profile은 하나다: **linux-x64 / self-contained / loose directory / tar.gz**
+(대상 Ubuntu 24.04 x86_64, glibc). framework-dependent, single-file, 다른 OS/RID는
+이 범위에 없다. GUI(`NodeKit.csproj`) publish 출력은 CLI 배포물로 쓰지 않는다.
+
+```bash
+scripts/package-cli.sh --version 0.9.1            # 기본 출력: artifacts/cli/
+scripts/package-cli.sh --version 0.9.1 --output /tmp/nk-cli
+```
+
+- restore는 `src/NodeKit.Cli/packages.lock.json`의 linux-x64 섹션으로 `--locked-mode`만 쓴다.
+  CLI csproj의 `RuntimeIdentifiers`에 `linux-x64`가 있어서 그 섹션이 생긴다.
+- dirty 작업 트리면 거부한다. `--allow-dirty`는 manifest에 `source.dirty: true`를
+  남기는 시험용이며 release로 쓰지 않는다.
+- 산출물:
+  - `nodekit-cli-<version>-linux-x64.tar.gz`: 최상위 디렉터리 `nodekit-cli-<version>-linux-x64/` 하나.
+    실행 파일(apphost)은 그 안의 `NodeKit.Cli`이다.
+  - `nodekit-cli-<version>-linux-x64.tar.gz.sha256`: `sha256sum -c`로 확인한다.
+  - `nodekit-cli-<version>-linux-x64.cli-manifest.json`: archive 안 `cli-manifest.json`과 같다.
+- manifest(`release/cli-manifest.template.json`에서 생성, `scripts/write-cli-manifest.py`)에는
+  version, source SHA/dirty, `protos/provenance.json` sha256(contract source), dotnet SDK,
+  native 필요조건, `NodeKit.Cli.deps.json`의 package closure, 파일별 크기/sha256/실행 여부가 들어간다.
+  closure에 Avalonia/SkiaSharp/Wasmtime/KubernetesClient가 있으면 manifest를 쓰지 않고 실패한다.
+- 대상 machine에는 .NET SDK/runtime이 필요 없다. 필요한 OS package는 manifest의
+  `native_prerequisites`를 따른다.
+
+여기서 만든 package는 준비용이다. 최종 release package는 모든 기능 변경이 들어간
+target source SHA에서 다시 만든다.

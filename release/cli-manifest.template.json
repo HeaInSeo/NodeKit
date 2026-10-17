@@ -1,0 +1,38 @@
+{
+  "schema": "nodekit-cli-manifest/v1",
+  "name": "nodekit-cli",
+  "version": "",
+  "profile": {
+    "rid": "linux-x64",
+    "target_os": "Ubuntu 24.04 x86_64 (glibc)",
+    "self_contained": true,
+    "layout": "loose-directory",
+    "archive_format": "tar.gz"
+  },
+  "entrypoint": "NodeKit.Cli",
+  "native_prerequisites": [
+    "libc6",
+    "libgcc-s1",
+    "libstdc++6",
+    "libicu74",
+    "libssl3t64",
+    "ca-certificates",
+    "tzdata"
+  ],
+  "source": {
+    "repository": "HeaInSeo/NodeKit",
+    "sha": "",
+    "dirty": false
+  },
+  "contract_source": {
+    "path": "protos/provenance.json",
+    "sha256": ""
+  },
+  "build": {
+    "project": "src/NodeKit.Cli/NodeKit.Cli.csproj",
+    "configuration": "Release",
+    "dotnet_sdk": ""
+  },
+  "runtime_closure": [],
+  "files": []
+}

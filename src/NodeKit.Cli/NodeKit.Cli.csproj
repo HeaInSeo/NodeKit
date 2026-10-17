@@ -5,6 +5,13 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>NodeKit.Cli</RootNamespace>
+    <!--
+      P09 배포 profile은 linux-x64 self-contained 하나뿐이다(scripts/package-cli.sh).
+      RuntimeIdentifiers에 넣어야 packages.lock.json에 linux-x64 섹션이 생기고
+      publish용 restore도 locked mode로 고정된다. RuntimeIdentifier(단수)가 아니므로
+      일반 build/test 출력은 RID 없이 그대로다.
+    -->
+    <RuntimeIdentifiers>linux-x64</RuntimeIdentifiers>
   </PropertyGroup>
 
   <ItemGroup>
