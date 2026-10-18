@@ -11,6 +11,9 @@ For <dir>/nodekit-cli-<version>-<rid> it requires:
   <name>/cli-manifest.json is byte-identical to the sidecar
 - the manifest's version, profile.rid and source.dirty=false match this package
 - the manifest entrypoint is a regular executable file in the archive
+- the manifest command_alias (the documented `nodekit` command) is a symlink in
+  the archive whose target is the entrypoint; the archive has no other symlink,
+  hard link or special entry
 - every manifest files[] entry is in the archive with the same size, sha256 and
   executable flag, and the archive has no regular file the manifest omits
 
@@ -73,11 +76,16 @@ def check(package_dir, version, rid):
         errors.append("manifest source.dirty is not false")
 
     files = {}
+    links = {}
     tops = set()
     with tarfile.open(archive, "r:gz") as tar:
         for member in tar.getmembers():
             top, _, rel = member.name.partition("/")
             tops.add(top)
+            if not (member.isfile() or member.isdir() or member.issym()):
+                errors.append("archive entry %r is not a regular file, directory or symlink" % member.name)
+            if member.issym() and top == name and rel:
+                links[rel] = member.linkname
             if member.isfile() and top == name and rel:
                 data = tar.extractfile(member).read()
                 files[rel] = {
@@ -100,6 +108,18 @@ def check(package_dir, version, rid):
         errors.append("entrypoint %r is missing from the archive" % entrypoint)
     elif not files[entrypoint]["executable"]:
         errors.append("entrypoint %r is not executable in the archive" % entrypoint)
+
+    alias = manifest.get("command_alias") or {}
+    alias_path = alias.get("path")
+    if not alias_path or alias.get("target") != entrypoint:
+        errors.append("manifest command_alias %r does not target the entrypoint %r" % (alias or None, entrypoint))
+    elif alias_path not in links:
+        errors.append("command alias %r is missing from the archive or not a symlink" % alias_path)
+    elif links[alias_path] != entrypoint:
+        errors.append("command alias %r points to %r, not the entrypoint %r"
+                      % (alias_path, links[alias_path], entrypoint))
+    for path in sorted(set(links) - {alias_path}):
+        errors.append("archive symlink %r is not the manifest command alias" % path)
 
     listed = manifest.get("files") or []
     if not listed:

@@ -112,15 +112,30 @@ scripts/package-cli.sh --version 0.9.1 --output /tmp/nk-cli
   남기는 시험용이며 release로 쓰지 않는다.
 - 산출물:
   - `nodekit-cli-<version>-linux-x64.tar.gz`: 최상위 디렉터리 `nodekit-cli-<version>-linux-x64/` 하나.
-    실행 파일(apphost)은 그 안의 `NodeKit.Cli`이다.
+    실행 파일(apphost)은 그 안의 `NodeKit.Cli`이고, 문서와 CLI 안내문이 쓰는 command 이름 `nodekit`은
+    같은 디렉터리의 상대 symlink(`nodekit -> NodeKit.Cli`)다.
   - `nodekit-cli-<version>-linux-x64.tar.gz.sha256`: `sha256sum -c`로 확인한다.
   - `nodekit-cli-<version>-linux-x64.cli-manifest.json`: archive 안 `cli-manifest.json`과 같다.
 - manifest(`release/cli-manifest.template.json`에서 생성, `scripts/write-cli-manifest.py`)에는
   version, source SHA/dirty, `protos/provenance.json` sha256(contract source), dotnet SDK,
-  native 필요조건, `NodeKit.Cli.deps.json`의 package closure, 파일별 크기/sha256/실행 여부가 들어간다.
+  native 필요조건, `NodeKit.Cli.deps.json`의 package closure, 파일별 크기/sha256/실행 여부,
+  `entrypoint`(`NodeKit.Cli`)와 `command_alias`(`nodekit` → `NodeKit.Cli`)가 들어간다. symlink는 `files`에 넣지 않는다.
   closure에 Avalonia/SkiaSharp/Wasmtime/KubernetesClient가 있으면 manifest를 쓰지 않고 실패한다.
+  `nodekit` alias가 없거나 다른 대상을 가리키거나 다른 symlink가 있어도 실패한다.
 - 대상 machine에는 .NET SDK/runtime이 필요 없다. 필요한 OS package는 manifest의
   `native_prerequisites`를 따른다.
+
+설치·실행(대상 machine, 설치 위치는 예시다. repository checkout이나 특정 CWD가 필요 없다):
+
+```bash
+sha256sum -c nodekit-cli-0.9.1-linux-x64.tar.gz.sha256
+tar -xzf nodekit-cli-0.9.1-linux-x64.tar.gz -C "$HOME/.local/opt"
+ln -s "$HOME/.local/opt/nodekit-cli-0.9.1-linux-x64/nodekit" "$HOME/.local/bin/nodekit"   # 또는 그 디렉터리를 PATH에 추가
+nodekit --help
+```
+
+`scripts/verify-cli-package.py --dir <output> --version <version>`는 세 산출물, checksum, archive 안 manifest,
+파일 목록, 실행 권한과 `nodekit` alias symlink를 확인한다(CI `Build · Test`도 실행).
 
 여기서 만든 package는 준비용이다. 최종 release package는 모든 기능 변경이 들어간
 target source SHA에서 다시 만든다.

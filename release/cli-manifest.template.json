@@ -10,6 +10,10 @@
     "archive_format": "tar.gz"
   },
   "entrypoint": "NodeKit.Cli",
+  "command_alias": {
+    "path": "nodekit",
+    "target": "NodeKit.Cli"
+  },
   "native_prerequisites": [
     "libc6",
     "libgcc-s1",
