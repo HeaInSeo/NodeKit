@@ -381,16 +381,31 @@ namespace NodeKit.Cli
         private static Classified Call(IToolFunctionRegistryClient client, RegisterToolFunctionRequest request, string requestedVersion, RegistrationCall call)
         {
             using var timeoutCts = new CancellationTokenSource();
-            using var linked = CancellationTokenSource.CreateLinkedTokenSource(call.UserCancellation, timeoutCts.Token);
+            using var transport = new CancellationTokenSource();
+
+            // 이긴 쪽은 실제로 먼저 일어난 사건이다. 둘 다 끝난 뒤에야 이 스레드가 기다리기 시작하면 WhenAny는 앞 인자를 고르므로
+            // 관측 순서로 정하지 않는다 — 신호는 RPC 시작 전에 등록해 그 순간에 기록하고, 응답은 완료 continuation에서 기록한다.
+            // transport는 사용자/예산 토큰을 직접 보지 않는다: 신호가 먼저 자기를 기록한 뒤에야 transport를 취소하므로, 그 취소로
+            // 동기적으로 끝난 호출(transport callback의 Unknown 등)이 신호보다 먼저 응답으로 기록될 수 없다.
+            var abandon = Task.Delay(System.Threading.Timeout.Infinite, transport.Token);
+            var first = new TaskCompletionSource<Task>(TaskCreationOptions.RunContinuationsAsynchronously);
+            Task<RegisterToolFunctionResponse>? rpc = null;
+            void Signal()
+            {
+                first.TrySetResult(rpc is { IsCompleted: true } done ? done : abandon);
+                transport.Cancel();
+            }
+
+            using var userSignal = call.UserCancellation.Register(Signal);
+            using var timeoutSignal = timeoutCts.Token.Register(Signal);
             if (call.Timeout is { } budget)
             {
                 timeoutCts.CancelAfter(budget);
             }
 
-            Task<RegisterToolFunctionResponse> rpc;
             try
             {
-                rpc = client.RegisterToolFunctionAsync(request, linked.Token);
+                rpc = client.RegisterToolFunctionAsync(request, transport.Token);
             }
 #pragma warning disable CA1031 // 동기적으로 던진 예외도 아래 비동기 실패와 같은 분류를 거친다.
             catch (Exception ex)
@@ -399,9 +414,10 @@ namespace NodeKit.Cli
                 rpc = Task.FromException<RegisterToolFunctionResponse>(ex);
             }
 
-            var abandon = Task.Delay(System.Threading.Timeout.Infinite, linked.Token);
-            var winner = Task.WhenAny(rpc, abandon).GetAwaiter().GetResult();
-            return Settle(winner, rpc, requestedVersion, call, timeoutCts, linked.Token);
+            var response = rpc;
+            _ = response.ContinueWith(_ => first.TrySetResult(response), CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+            var winner = first.Task.GetAwaiter().GetResult();
+            return Settle(winner, response, requestedVersion, call, timeoutCts, transport.Token);
         }
 
         /// <summary>

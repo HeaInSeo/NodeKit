@@ -46,6 +46,20 @@ jobs:
       - name: Proto provenance script self-test
         run: python3 scripts/test_verify_proto_provenance.py -v
 
+      - name: CLI manifest writer self-test
+        run: python3 scripts/test_write_cli_manifest.py -v
+
+      # Runs the package script exactly as docs §5 writes it (not via bash), so a
+      # lost executable bit fails here (rc 126) instead of on a user's clone.
+      - name: CLI package script runs as documented
+        run: |
+          rc=0
+          scripts/package-cli.sh --help 2>/dev/null || rc=$?
+          if [ "$rc" -ne 2 ]; then
+            echo "::error::scripts/package-cli.sh --help exited $rc, expected 2 (126 = not executable)"
+            exit 1
+          fi
+
       - name: NuGet package audit
         run: ./scripts/ci-audit-packages.sh
 
@@ -54,6 +68,20 @@ jobs:
 
       - name: Build
         run: dotnet build NodeKit.sln --no-restore --configuration Release /p:TreatWarningsAsErrors=true /p:EnforceCodeStyleInBuild=true
+
+      # Two clean package runs of the same commit/version must produce the same
+      # archive bytes; the pause makes the second run's files get newer mtimes.
+      - name: CLI package is reproducible
+        run: |
+          scripts/package-cli.sh --version 0.0.0-ci --output "$RUNNER_TEMP/pkg-a"
+          sleep 2
+          scripts/package-cli.sh --version 0.0.0-ci --output "$RUNNER_TEMP/pkg-b"
+          a="$(cut -d' ' -f1 "$RUNNER_TEMP/pkg-a/nodekit-cli-0.0.0-ci-linux-x64.tar.gz.sha256")"
+          b="$(cut -d' ' -f1 "$RUNNER_TEMP/pkg-b/nodekit-cli-0.0.0-ci-linux-x64.tar.gz.sha256")"
+          if [ "$a" != "$b" ]; then
+            echo "::error::package archive is not reproducible: $a != $b"
+            exit 1
+          fi
 
       # Each project writes to its own subdirectory — running them together
       # via "dotnet test --solution ... --coverage-output coverage.cobertura.xml"

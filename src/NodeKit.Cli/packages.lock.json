@@ -64,6 +64,7 @@
         "resolved": "0.57.1",
         "contentHash": "IFlXdGXOGD4XCK5ybZsXgQo7PE0ZE/pt9YFFWo2cECTipS8DrViLFazx+K00/A+fY1PlHYt1Vqwrjfod4EEckw=="
       }
-    }
+    },
+    "net10.0/linux-x64": {}
   }
 }
