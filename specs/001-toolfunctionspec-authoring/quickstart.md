@@ -66,7 +66,7 @@ NODEKIT_NODEVAULT_URL=http://<nodevault>:50051 dotnet run --project src/NodeKit.
 **기대 결과**:
 - `Draft`(검증 전)이거나 현재 내용이 검증에 실패하면 exit 1 + 구체적 진단, 요청 0회. 일반 "알 수 없는 명령" usage 오류(exit 2)가 아니어야 한다.
 - 유효한 `Ready`라도 현재 NodeVault가 kind 2를 받지 않으므로 exit 1 + `TOOLFUNCTION_BUILD_GATE_CLOSED` 안내로 끝난다. 요청·receipt는 없고 주소가 있어도 연결하지 않는다.
-- NodeVault가 kind 2를 수용해 상류 게이트가 열린 뒤에는: 유효한 `Ready`이면 Recipe 옆 `.nodekit/receipts/<request-id>.json`(`operation_kind=toolfunction_image_build`)을 먼저 남긴 뒤 `ResolveToolSpec → SubmitToolBuild → WatchToolBuild`를 보낸다. Watch `Succeeded`에 전체 두 번째 이미지 digest B가 있으면 exit 0과 B/C2/build ID를 출력한다.
+- NodeVault가 kind 2를 수용해 상류 게이트가 열린 뒤에는: 유효한 `Ready`이면 Recipe 옆 `.nodekit/receipts/<request-id>.json`(`operation_kind=toolfunction_image_build`)을 먼저 남긴 뒤 `ResolveToolSpec → SubmitToolBuild → WatchToolBuild`를 보낸다. Watch `Succeeded`에 전체 두 번째 이미지 digest B가 있으면 B/C2/build ID를 출력하고 typed 등록으로 넘어간다. 최종 exit code는 등록 결과를 따른다(성공 0, 거부·결과 불명 1, timeout 124, 취소 130, 저장 실패 2).
 - `Failed`/`Interrupted`, 최종 상태 없는 종료, B 없는 `Succeeded`는 exit 1이다.
 - 빌드 성공은 승인이 아니다. 게이트가 열린 뒤 full B를 확인하면 typed 등록(`RegisterToolFunction`, P08)으로 넘어가며, 서버가 돌려준 F/H/P/version을 그대로 출력·저장한다. 결과 불명 등록은 `function-recipe register-replay`로 확인한다(`contracts/cli-function-recipe-commands.md`). Recipe 파일은 어떤 필드도 변경되지 않는다.
 

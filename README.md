@@ -69,12 +69,12 @@ chmod +x ~/nodekit/NodeKit
 
 ### CLI (`nodekit`)
 
-GUI와 별도로 `src/NodeKit.Cli`의 `nodekit` CLI가 있습니다. Recipe 작성·L1 검증·render와 NodeVault client(ToolSpec 빌드 제출/관찰, ToolFunction 두 번째 이미지 빌드와 typed 등록)를 담당합니다.
+GUI와 별도로 `src/NodeKit.Cli`의 `nodekit` CLI가 있습니다. Recipe 작성·L1 검증·render와 NodeVault ToolSpec 빌드 제출/관찰(`nodekit submit`)을 담당합니다. ToolFunction 두 번째 이미지 빌드와 typed 등록 client 경로도 구현돼 있지만, 현재 NodeVault가 kind 2 빌드를 받지 않으므로 `nodekit function-recipe submit`은 유효한 Recipe도 요청 없이 `TOOLFUNCTION_BUILD_GATE_CLOSED`(exit 1)로 끝납니다. 이 상류 게이트는 NodeVault가 kind 2를 수용한 뒤 엽니다.
 
 - 사용법: [`docs/NODEKIT_CLI_USAGE.md`](docs/NODEKIT_CLI_USAGE.md)
 - linux-x64 self-contained package와 CLI 단독 clean build 검증: [`docs/NODEKIT_BUILD_BOOTSTRAP.md`](docs/NODEKIT_BUILD_BOOTSTRAP.md) §5–§6
 
-CLI 시험은 local fixture와 loopback fake server 범위입니다. 실제 NodeVault/Harbor/Gateway/VM 연결과 승인은 CLI 완료에 포함하지 않습니다.
+기본 CLI test suite와 CI는 local fixture와 fake server 범위입니다. `NODEKIT_NODEVAULT_URL`을 설정했을 때만 실제 NodeVault에 연결하는 opt-in 통합 시험이 따로 있습니다(기본 skip). 실제 NodeVault/Harbor/Gateway/VM 연결의 인수와 승인은 CLI 완료에 포함하지 않습니다.
 
 ---
 

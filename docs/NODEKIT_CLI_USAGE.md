@@ -2072,9 +2072,10 @@ dotnet run --project src/NodeKit.Cli -- validate /home/user/samtools-1.17.json
   수용해 이 게이트가 열린 뒤에는 current preflight를 통과한 `Ready` Recipe의 두 번째 이미지 빌드만 요청한다 —
   `operation_kind=toolfunction_image_build` receipt를 먼저 남기고 `ResolveToolSpec`(tool_name=
   FunctionId, version=Revision, raw_spec v1 kind 2) → `SubmitToolBuild` → `WatchToolBuild`를 보낸다.
-  Watch `Succeeded`에 전체 image digest B가 있어야 exit 0이고, B가 없으면
+  Watch `Succeeded`에 전체 image digest B가 있어야 빌드 단계가 성공하고, B가 없으면
   `SECOND_IMAGE_DIGEST_MISSING`(exit 1)이다. 빌드 성공은 승인이 아니다. 전체 B를 확인한 뒤에만
-  typed 등록(P08.registry)으로 넘어간다: P06 mapper가 만든 `RegisterToolFunctionRequest`
+  typed 등록(P08.registry)으로 넘어가며, 그때 명령의 최종 exit code는 아래 등록 결과를 따른다(성공 0,
+  거부·결과 불명 1, 등록 timeout 124, 취소 130, 등록 요청/receipt 저장 실패 2): P06 mapper가 만든 `RegisterToolFunctionRequest`
   (`canonicalization_version=w2-set-v1`, `base_tool_spec_digest`=C1, `image_digest`=B)의 정확한 protobuf
   bytes와 등록 receipt를 같은 record root의 `registrations/<request-id>.json`·`snapshots/registration/<sha256>.bin`에
   먼저 저장하고(저장 실패는 exit 2, 등록 RPC 0), 보내기 직전 `attempts`를 기록한 뒤 `RegisterToolFunction`을 보낸다.
@@ -2115,8 +2116,10 @@ dotnet run --project src/NodeKit.Cli -- validate /home/user/samtools-1.17.json
   NodeKit은 F/H/P를 계산하거나 추정해서 채우지 않는다. A/C1을 B/C2 자리에 대신 쓰지도 않는다.
   C1→`base_tool_spec_digest` mapping은 v0.9.1 추천 계약을 따른 것이다. mapping이 바뀌면 P06 mapper와
   이 표를 함께 고친다.
-- **CLI 단독 release가 주장하지 않는 것**: 이 CLI의 시험은 local fixture와 loopback fake server 범위다.
-  실제 NodeVault 빌드·Harbor 등록, gRPC Gateway, seoy/infra-lab VM·Kubernetes 경로, NodeSentinel 관찰,
+- **CLI 단독 release가 주장하지 않는 것**: 기본(필수) CLI test suite와 CI는 local fixture와 fake server
+  범위다. `GrpcToolSpecClientIntegrationTests`·`GrpcResolveRecipeClientIntegrationTests`는
+  `NODEKIT_NODEVAULT_URL`을 설정했을 때만 실제 NodeVault에 연결하는 opt-in 시험이며(기본 skip), 그
+  결과도 아래 연결 인수를 대신하지 않는다. 실제 NodeVault 빌드·Harbor 등록, gRPC Gateway, seoy/infra-lab VM·Kubernetes 경로, NodeSentinel 관찰,
   Console/GUI, 다른 저장소의 개발과 승인(`Approved`)은 CLI 완료에 포함하지 않는다. 그 연결은 별도 연결
   스프린트에서 인수한다. 빌드 성공과 등록 성공은 어느 쪽도 승인이 아니다.
 - 5개 method가 생성하는 Dockerfile은 NodeKit L1 정적 검증만 통과했을 뿐,

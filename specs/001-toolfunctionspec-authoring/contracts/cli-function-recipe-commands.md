@@ -49,7 +49,7 @@
 4. 요청 envelope(tool_name=`FunctionId`, version=`Revision`, raw_spec=`nodevault.build.raw_spec.v1` exact 4키 kind 2)와 Recipe 파일 bytes·전송한 script 내용을 `operation_kind=toolfunction_image_build` receipt에 prepared로 먼저 저장한다. 저장하지 못하면 RPC 0회, exit 2. 기본 위치는 Recipe 옆 `.nodekit/receipts/<request-id>.json`이며 ToolSpec 첫 이미지(C1/A)의 receipt와 섞이지 않는다.
 5. `ResolveToolSpec → SubmitToolBuild → WatchToolBuild`를 각각 한 번 호출한다. ResolveToolSpec이 거부(예: InvalidArgument)하면 Submit/Watch를 보내지 않는다.
 6. 결과:
-   - Watch `Succeeded` + record `image_digest`가 `sha256:` + 16진수 64자리 → exit 0. 두 번째 이미지 B, 이번 요청 ToolSpec digest C2, build ID를 출력한다. 기반 A/C1은 그대로이며 B/C2 자리에 쓰지 않는다.
+   - Watch `Succeeded` + record `image_digest`가 `sha256:` + 16진수 64자리 → 빌드 단계 성공. 두 번째 이미지 B, 이번 요청 ToolSpec digest C2, build ID를 출력하고 7의 typed 등록으로 넘어간다. 이때 명령의 최종 exit code는 빌드가 아니라 등록 결과다: 등록 성공 0, 거부·결과 불명 1, 등록 timeout 124, 취소 130, 등록 요청/receipt 저장 실패 2. 기반 A/C1은 그대로이며 B/C2 자리에 쓰지 않는다.
    - `Succeeded`인데 B가 없거나 형식이 다름 → `SECOND_IMAGE_DIGEST_MISSING`, exit 1, recovery uncertain. 기반 이미지 A나 legacy `DigestAcquired` 로그 digest로 대신하지 않는다.
    - `Failed`/`Interrupted` → exit 1, 성공/승인 표시 없음.
    - 최종 상태 없이 스트림 종료 → exit 1, 결과 미확인(uncertain).
