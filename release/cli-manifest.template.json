@@ -16,6 +16,8 @@
     "libstdc++6",
     "libicu74",
     "libssl3t64",
+    "libgssapi-krb5-2",
+    "zlib1g",
     "ca-certificates",
     "tzdata"
   ],

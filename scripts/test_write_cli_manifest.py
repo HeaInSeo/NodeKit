@@ -89,6 +89,16 @@ class WriteCliManifestTests(unittest.TestCase):
         self.assertEqual([e["name"] for e in manifest["runtime_closure"]],
                          ["Google.Protobuf", "Grpc.Net.Client", "Spectre.Console"])
 
+    def test_native_prerequisites_cover_self_contained_ubuntu_2404(self):
+        # Microsoft's Ubuntu 24.04 list for self-contained .NET apps; the docs
+        # send users to this array for the OS packages to install.
+        self.assertEqual(self.run_script().returncode, 0)
+        prereqs = self.load()["native_prerequisites"]
+        for package in ("libc6", "libgcc-s1", "libstdc++6", "libicu74", "libssl3t64",
+                        "libgssapi-krb5-2", "zlib1g", "ca-certificates", "tzdata"):
+            self.assertIn(package, prereqs)
+        self.assertEqual(len(prereqs), len(set(prereqs)))
+
     def test_files_have_hash_size_and_executable_flag(self):
         self.assertEqual(self.run_script().returncode, 0)
         files = {e["path"]: e for e in self.load()["files"]}
