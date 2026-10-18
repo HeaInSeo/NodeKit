@@ -21,7 +21,7 @@
 ### 현재 상태 (2026-04-19)
 
 **api-protos Sprint 1-4 완료.** `nodevault.proto` canonical 경로는 `NodeVault/protos/nodevault/v1/`이다.
-`NodeKit.csproj`는 이제 `NodeVault/protos/`를 자동 탐지 기준으로 사용한다.
+NodeKit은 그 바이트를 저장소 `protos/`에 벤더링해 쓰며, `NodeVault/protos/`를 자동 탐지하지 않는다.
 
 ### 경로 설정
 
@@ -35,7 +35,8 @@ dotnet build NodeKit.sln
 ```
 
 필요하면 `/p:ApiProtosRoot=<경로>`로 명시 override할 수 있다.
-`ApiProtosRoot`가 비어 있거나 `nodevault.proto`가 없으면(벤더 사본 누락) 빌드가 명확한 에러 메시지와 함께 중단된다.
+`ApiProtosRoot`가 비어 있거나 `nodevault.proto`가 없으면(벤더 사본 누락) 빌드가 명확한 에러 메시지와 함께 중단된다
+(CLI `src/NodeKit.Cli`는 `NKPROTO004`). 옆에 NodeVault checkout이 있어도 그 경로로 fallback하지 않는다.
 
 ---
 
@@ -78,7 +79,7 @@ NodeKit과 NodeVault의 proto 스키마가 일치해야 한다:
 ## 4. 권장 부트스트랩 순서
 
 ```bash
-# 1. 빌드 (NodeVault/protos/ 자동 탐지됨 — 경로 지정 불필요)
+# 1. 빌드 (저장소 protos/ 벤더 사본 사용 — 경로 지정 불필요)
 dotnet build NodeKit.sln
 
 # 2. DockGuard .wasm 번들 생성 (DockGuard 저장소 경로 지정)
@@ -123,3 +124,23 @@ scripts/package-cli.sh --version 0.9.1 --output /tmp/nk-cli
 
 여기서 만든 package는 준비용이다. 최종 release package는 모든 기능 변경이 들어간
 target source SHA에서 다시 만든다.
+
+---
+
+## 6. CLI 단독 clean build 검증 (S4-01)
+
+```bash
+scripts/verify-cli-clean-build.sh
+```
+
+HEAD의 추적 파일만 빈 임시 디렉터리에 풀어(NodeVault/DockGuard sibling 없음) 아래를 확인한다.
+미커밋 변경은 검증하지 않으므로 commit 뒤에 실행한다. CI `Build · Test`도 같은 script를 돌린다.
+
+- A: `dotnet restore src/NodeKit.Cli/NodeKit.Cli.csproj --locked-mode`와 CLI Release build가 성공하고,
+  GUI project(`NodeKit.csproj`)는 빌드되지 않는다.
+- B: `scripts/check-cli-closure.py`가 lock 파일(linux-x64 섹션 포함)과 `NodeKit.Cli.deps.json`을 본다.
+  Avalonia/SkiaSharp/Wasmtime/KubernetesClient나 project 참조가 있으면 실패하고,
+  Spectre.Console/Grpc.Net.Client/Google.Protobuf는 Direct 의존성이자 runtime closure에 있어야 한다.
+  통과하면 runtime closure를 출력한다.
+- C: `protos/nodevault/v1/nodevault.proto`만 없거나 `protos/` 전체가 없는 checkout에서 Debug·Release build가
+  `NKPROTO004`로 실패한다. 옆에 `NodeVault/protos`를 둬도 그 경로를 쓰지 않는다.

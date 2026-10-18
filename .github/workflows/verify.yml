@@ -49,6 +49,12 @@ jobs:
       - name: CLI manifest writer self-test
         run: python3 scripts/test_write_cli_manifest.py -v
 
+      - name: CLI closure checker self-test
+        run: python3 scripts/test_check_cli_closure.py -v
+
+      - name: CLI clean build script self-test
+        run: python3 scripts/test_verify_cli_clean_build.py -v
+
       # Runs the package script exactly as docs §5 writes it (not via bash), so a
       # lost executable bit fails here (rc 126) instead of on a user's clone.
       - name: CLI package script runs as documented
@@ -82,6 +88,12 @@ jobs:
             echo "::error::package archive is not reproducible: $a != $b"
             exit 1
           fi
+
+      # S4-01: a NodeKit-only clean checkout of HEAD (no NodeVault/DockGuard
+      # sibling) restores and builds the CLI alone, its closure has no GUI/K8s
+      # package, and a missing vendored proto fails with NKPROTO004.
+      - name: CLI clean build and closure (S4-01)
+        run: scripts/verify-cli-clean-build.sh
 
       # Each project writes to its own subdirectory — running them together
       # via "dotnet test --solution ... --coverage-output coverage.cobertura.xml"
