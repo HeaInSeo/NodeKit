@@ -55,6 +55,22 @@ jobs:
       - name: CLI clean build script self-test
         run: python3 scripts/test_verify_cli_clean_build.py -v
 
+      - name: CLI package output checker self-test
+        run: python3 scripts/test_verify_cli_package.py -v
+
+      - name: CLI test report gate self-test
+        run: python3 scripts/test_check_cli_test_report.py -v
+
+      # S4-05-A: the CLI acceptance runs against local fakes only. A live
+      # NodeVault URL would turn the skipped integration tests into network
+      # calls, so the job refuses to run with one set.
+      - name: No live NodeVault endpoint
+        run: |
+          if [ -n "${NODEKIT_NODEVAULT_URL:-}" ]; then
+            echo "::error::NODEKIT_NODEVAULT_URL is set; CLI CI must not use a live NodeVault"
+            exit 1
+          fi
+
       # Runs the package script exactly as docs §5 writes it (not via bash), so a
       # lost executable bit fails here (rc 126) instead of on a user's clone.
       - name: CLI package script runs as documented
@@ -89,6 +105,11 @@ jobs:
             exit 1
           fi
 
+      # S4-05-C: a missing archive/checksum/manifest, or an archive whose files
+      # differ from its manifest, fails here even if package-cli.sh exited 0.
+      - name: CLI package output is complete
+        run: python3 scripts/verify-cli-package.py --dir "$RUNNER_TEMP/pkg-a" --version 0.0.0-ci
+
       # S4-01: a NodeKit-only clean checkout of HEAD (no NodeVault/DockGuard
       # sibling) restores and builds the CLI alone, its closure has no GUI/K8s
       # package, and a missing vendored proto fails with NKPROTO004.
@@ -103,7 +124,36 @@ jobs:
         run: dotnet test --project tests/NodeKit.Tests --no-build --configuration Release --results-directory TestResults/NodeKit.Tests --coverage --coverage-output coverage.cobertura.xml --coverage-output-format cobertura
 
       - name: Test with coverage (NodeKit.Cli.Tests)
-        run: dotnet test --project tests/NodeKit.Cli.Tests --no-build --configuration Release --results-directory TestResults/NodeKit.Cli.Tests --coverage --coverage-output coverage.cobertura.xml --coverage-output-format cobertura
+        run: dotnet test --project tests/NodeKit.Cli.Tests --no-build --configuration Release --results-directory TestResults/NodeKit.Cli.Tests --coverage --coverage-output coverage.cobertura.xml --coverage-output-format cobertura --report-xunit --report-xunit-filename cli-tests.xunit.xml
+
+      # S4-05-A/C: an empty or shrunken run, a failure, or a skip outside the two
+      # live-NodeVault integration classes is not a pass.
+      - name: CLI test report gate
+        run: >-
+          python3 scripts/check-cli-test-report.py
+          --report TestResults/NodeKit.Cli.Tests/cli-tests.xunit.xml
+          --min-total 1100
+          --allow-skip-class NodeKit.Cli.Tests.GrpcToolSpecClientIntegrationTests
+          --allow-skip-class NodeKit.Cli.Tests.GrpcResolveRecipeClientIntegrationTests
+
+      # S4-05-A / #109: both classes change the process-global
+      # NODEKIT_HARBOR_IMAGE_MAP. They share a non-parallel collection; run them
+      # together repeatedly under the normal parallel settings so a lost
+      # collection shows up as a failure here.
+      - name: NODEKIT_HARBOR_IMAGE_MAP isolation repeat (#109)
+        run: |
+          runs=20
+          echo "sha=$(git rev-parse HEAD) runs=$runs"
+          for i in $(seq 1 "$runs"); do
+            if ! dotnet test --project tests/NodeKit.Cli.Tests --no-build --configuration Release \
+                --filter-class NodeKit.Cli.Tests.HarborBaseImageSelectionTests \
+                --filter-class NodeKit.Cli.Tests.MappedHarborImageDigestResolverTests >"$RUNNER_TEMP/iso-$i.log" 2>&1; then
+              cat "$RUNNER_TEMP/iso-$i.log"
+              echo "::error::#109 isolation run $i/$runs failed"
+              exit 1
+            fi
+            echo "run $i/$runs: $(grep -m1 -E 'total: [0-9]+' "$RUNNER_TEMP/iso-$i.log" || tail -n 1 "$RUNNER_TEMP/iso-$i.log")"
+          done
 
       - name: Coverage threshold
         run: ./scripts/ci-check-coverage.py
@@ -121,4 +171,12 @@ jobs:
         with:
           name: coverage
           path: TestResults/*/coverage.cobertura.xml
+          if-no-files-found: error
+
+      - name: Upload CLI test report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cli-test-report
+          path: TestResults/NodeKit.Cli.Tests/cli-tests.xunit.xml
           if-no-files-found: error
