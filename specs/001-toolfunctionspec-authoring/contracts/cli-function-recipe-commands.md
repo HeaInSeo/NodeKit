@@ -32,8 +32,9 @@
 
 **동작**(FR-019, FR-020, FR-021):
 1. 파일의 `State`가 `Ready`가 아니면 렌더링 거부, stderr에 "먼저 검증을 통과해 Ready 상태가 되어야 합니다" 안내, exit 1(Acceptance Scenario User Story 2 #2).
-2. `Ready`이면 `ToolFunctionBuildRequestPreviewFactory`로 stage-1/stage-2 그룹이 구분된 canonical JSON을 `--out` 경로에 기록, exit 0. `State`는 변경하지 않음(`Ready` 유지, `Submitted`로 전이하지 않음 — FR-020).
-3. 이 명령은 어떤 네트워크 호출도 하지 않는다. `--submit` 같은 플래그를 이 명령에 추가하지 않는다.
+2. 출력 전에 아래 `submit` 2와 같은 current preflight를 실행한다(typed 등록 전제인 C1 형식·typed mapping은 제외). 이때 ScriptPath의 script 내용도 실제로 읽어 검증하므로 script 없음·읽기 권한 없음·UTF-8 아님은 exit 2, 빈 내용은 exit 1이며 `--out` 파일을 쓰지 않는다.
+3. 통과하면 `ToolFunctionBuildRequestPreviewFactory`로 stage-1/stage-2 그룹이 구분된 canonical JSON을 `--out` 경로에 기록, exit 0. `State`는 변경하지 않음(`Ready` 유지, `Submitted`로 전이하지 않음 — FR-020). 미리보기의 stage-1 `script`에는 경로(`ScriptPath`)만 들어가고 script 내용은 넣지 않는다.
+4. 이 명령은 어떤 네트워크 호출도 하지 않는다. `--submit` 같은 플래그를 이 명령에 추가하지 않는다.
 
 ## `nodekit function-recipe submit <path>` — 두 번째 이미지 빌드 제출 (P07, 2026-10-11 정정)
 

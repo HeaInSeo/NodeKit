@@ -235,6 +235,51 @@ namespace NodeKit.Cli.Tests
             Assert.False(Preflight(recipePath, requireTypedRegistration: true).Ok, variant);
         }
 
+        // Codex P2 r4307602930: render은 script 내용을 preflight에서 읽어 검증하지만
+        // 미리보기에는 경로만 넣는다. 사용 가이드와 명령 계약이 이 동작과 같아야 한다.
+        [Fact]
+        public void RenderReadsScriptForPreflightButPreviewHasOnlyThePath_AndDocsSayBoth()
+        {
+            var recipePath = Save(ReadyRecipe());
+            var outPath = Path.Join(_workDir, "out.json");
+
+            var (exit, _, stderr) = Render(recipePath, outPath);
+
+            Assert.True(exit == 0, stderr);
+            var preview = File.ReadAllText(outPath);
+            using (var document = JsonDocument.Parse(preview))
+            {
+                Assert.Equal("./sort.sh", document.RootElement.GetProperty("stage1").GetProperty("script").GetString());
+            }
+
+            Assert.DoesNotContain("samtools sort", preview, StringComparison.Ordinal);
+
+            File.Delete(Path.Join(_workDir, "sort.sh"));
+            var missing = Render(recipePath, Path.Join(_workDir, "missing-out.json"));
+            Assert.Equal(2, missing.Exit);
+            Assert.Contains(ToolFunctionSourceMaterializer.ScriptReadFailedCode, missing.Stderr);
+
+            var guide = File.ReadAllText(Path.Join(RepoRoot(), "docs", "NODEKIT_CLI_USAGE.md"));
+            var ruleStart = guide.IndexOf("이 source 읽기 규칙은", StringComparison.Ordinal);
+            Assert.True(ruleStart >= 0, "USAGE의 source 읽기 규칙 문단이 없습니다.");
+            var ruleEnd = guide.IndexOf("\n\n", ruleStart, StringComparison.Ordinal);
+            var rule = guide[ruleStart..ruleEnd];
+            Assert.Contains("`function-recipe render`", rule, StringComparison.Ordinal);
+            Assert.Contains("script 내용을 읽어 검증", rule, StringComparison.Ordinal);
+            Assert.Contains("경로(`ScriptPath`)로만", rule, StringComparison.Ordinal);
+            Assert.DoesNotContain("읽지 않는다", rule, StringComparison.Ordinal);
+
+            var contract = File.ReadAllText(Path.Join(
+                RepoRoot(), "specs", "001-toolfunctionspec-authoring", "contracts", "cli-function-recipe-commands.md"));
+            var renderStart = contract.IndexOf("## `nodekit function-recipe render", StringComparison.Ordinal);
+            Assert.True(renderStart >= 0, "명령 계약의 render 절이 없습니다.");
+            var renderEnd = contract.IndexOf("\n## ", renderStart + 1, StringComparison.Ordinal);
+            var renderSection = contract[renderStart..renderEnd];
+            Assert.Contains("current preflight", renderSection, StringComparison.Ordinal);
+            Assert.Contains("script 내용도 실제로 읽어 검증", renderSection, StringComparison.Ordinal);
+            Assert.Contains("경로(`ScriptPath`)만", renderSection, StringComparison.Ordinal);
+        }
+
         [Theory]
         [InlineData("Draft")]
         [InlineData("Approved")]
@@ -407,6 +452,17 @@ namespace NodeKit.Cli.Tests
             var typed = Preflight(recipePath, requireTypedRegistration: true);
             Assert.False(typed.Ok);
             Assert.Contains("Command.Environment[2]", typed.Stderr);
+        }
+
+        private static string RepoRoot()
+        {
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
+            while (dir is not null && !File.Exists(Path.Join(dir.FullName, "NodeKit.sln")))
+            {
+                dir = dir.Parent;
+            }
+
+            return dir?.FullName ?? throw new FileNotFoundException("repo root(NodeKit.sln)를 찾지 못했습니다.");
         }
     }
 }

@@ -1193,9 +1193,11 @@ Recipe와 같은 상대 위치에 함께 둔다. 새 요청을 만들 때 NodeKi
 | `ScriptPath` 비어 있음, script 내용이 공백/개행뿐 | 1 |
 | `baseToolImageDigest` 없음 또는 형식 오류 (`toolSpecDigest`로 대신하지 않음) | 1 |
 
-이 source 읽기 규칙은 `function-recipe submit`의 current preflight가 쓴다. 제출 직전에 script
-내용을 다시 읽어 exact 4키 raw_spec(kind 2)에 넣는다(§9 ToolFunctionSpec 경계). `function-recipe render`는
-stage1/stage2 미리보기라 script를 경로로만 보여 주며 이 내용을 읽지 않는다.
+이 source 읽기 규칙은 `function-recipe render`와 `function-recipe submit`의 current preflight가 함께 쓴다.
+`render`도 출력 파일을 쓰기 전에 script 내용을 읽어 검증하므로, 위 표의 경우(파일 없음·읽기 권한 없음·UTF-8
+아님은 2, 내용이 공백뿐이면 1)에는 미리보기를 쓰지 않고 실패한다. 다만 render의 stage1/stage2 미리보기에는
+script를 경로(`ScriptPath`)로만 보여 주고 내용은 넣지 않는다. `submit`은 제출 직전에 script 내용을 다시 읽어
+exact 4키 raw_spec(kind 2)에 넣는다(§9 ToolFunctionSpec 경계).
 
 `--format` 값은 대소문자와 `_`/`-`를 구분하지 않는다(`RAW-SPEC`, `raw_spec`
 모두 `raw-spec`으로 인식) — 그래도 안 맞으면 종료 코드 2로 명시적으로
