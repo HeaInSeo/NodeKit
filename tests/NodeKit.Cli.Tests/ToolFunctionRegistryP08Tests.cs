@@ -644,15 +644,21 @@ namespace NodeKit.Cli.Tests
         private static GrpcTestServer NewServer()
         {
             var server = new GrpcTestServer();
-            server.Fake.OnResolveToolSpec = request => new Pb.ResolvedToolSpecResponse
+            ArrangeBuild(server.Fake);
+            return server;
+        }
+
+        // 빌드 3 RPC의 고정 응답. in-process 서버와 loopback listener(P10)가 같은 scenario를 쓴다.
+        private static void ArrangeBuild(FakeBuildService fake)
+        {
+            fake.OnResolveToolSpec = request => new Pb.ResolvedToolSpecResponse
             {
                 ToolSpecDigest = DigestC2,
                 ToolName = request.ToolName,
                 Version = request.Version,
             };
-            server.Fake.OnSubmitToolBuild = _ => new Pb.SubmitToolBuildResponse { BuildId = FixtureBuildId, Status = "Requested" };
-            server.Fake.WatchEvents = new List<ProtoBuildEvent> { SucceededEvent(DigestB) };
-            return server;
+            fake.OnSubmitToolBuild = _ => new Pb.SubmitToolBuildResponse { BuildId = FixtureBuildId, Status = "Requested" };
+            fake.WatchEvents = new List<ProtoBuildEvent> { SucceededEvent(DigestB) };
         }
 
         private string Save(ToolFunctionRecipe recipe) => SaveIn(_workDir, recipe);
