@@ -72,7 +72,11 @@ python3 "$ROOT/scripts/write-cli-manifest.py" \
 
 mkdir -p "$OUTPUT"
 OUTPUT="$(cd "$OUTPUT" && pwd)"
-tar --sort=name --owner=0 --group=0 --numeric-owner -C "$STAGE" -czf "$OUTPUT/$NAME.tar.gz" "$NAME"
+# 같은 source/version이면 같은 archive bytes: 모든 entry mtime을 source commit 시각으로 고정하고(staging/publish 파일의
+# 새 mtime을 기록하지 않는다) gzip header에도 이름·시각을 넣지 않는다.
+SOURCE_EPOCH="$(git -C "$ROOT" log -1 --format=%ct HEAD)"
+tar --sort=name --owner=0 --group=0 --numeric-owner --mtime="@$SOURCE_EPOCH" -C "$STAGE" -cf - "$NAME" \
+    | gzip -n > "$OUTPUT/$NAME.tar.gz"
 (cd "$OUTPUT" && sha256sum "$NAME.tar.gz" > "$NAME.tar.gz.sha256")
 cp "$PUBLISH_DIR/cli-manifest.json" "$OUTPUT/$NAME.cli-manifest.json"
 

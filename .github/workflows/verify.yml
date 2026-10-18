@@ -69,6 +69,20 @@ jobs:
       - name: Build
         run: dotnet build NodeKit.sln --no-restore --configuration Release /p:TreatWarningsAsErrors=true /p:EnforceCodeStyleInBuild=true
 
+      # Two clean package runs of the same commit/version must produce the same
+      # archive bytes; the pause makes the second run's files get newer mtimes.
+      - name: CLI package is reproducible
+        run: |
+          scripts/package-cli.sh --version 0.0.0-ci --output "$RUNNER_TEMP/pkg-a"
+          sleep 2
+          scripts/package-cli.sh --version 0.0.0-ci --output "$RUNNER_TEMP/pkg-b"
+          a="$(cut -d' ' -f1 "$RUNNER_TEMP/pkg-a/nodekit-cli-0.0.0-ci-linux-x64.tar.gz.sha256")"
+          b="$(cut -d' ' -f1 "$RUNNER_TEMP/pkg-b/nodekit-cli-0.0.0-ci-linux-x64.tar.gz.sha256")"
+          if [ "$a" != "$b" ]; then
+            echo "::error::package archive is not reproducible: $a != $b"
+            exit 1
+          fi
+
       # Each project writes to its own subdirectory — running them together
       # via "dotnet test --solution ... --coverage-output coverage.cobertura.xml"
       # made both projects write to the exact same path, so one silently

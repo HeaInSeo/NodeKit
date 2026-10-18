@@ -200,6 +200,44 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(RegistrationState.Rejected, ReadRawReceipt(RegistrationPath()).State);
         }
 
+        // 취소가 transport callback을 동기적으로 돌려 호출이 비취소 오류(Unknown)로 바로 끝나는 경우: 그 callback이 신호보다
+        // 먼저 돌아도 먼저 일어난 건 Ctrl-C다 — 130·unknown·cancelled(Codex r4306631158).
+        [Fact]
+        public void UserAbort_AfterSend_TransportCallbackCompletesFirst_StillExit130()
+        {
+            using var server = NewServer();
+            using var cts = new CancellationTokenSource();
+            var registry = new CancelCompletesUnknownRegistryClient(cts.Cancel);
+
+            var (exit, _, stderr) = Invoke(server, Save(ReadyRecipe()), registry, () => RegistrationId, cts.Token);
+
+            Assert.True(registry.CompletedByTransportCallback, "fixture must complete the call from its cancellation callback");
+            Assert.True(exit == 130, stderr);
+            Assert.Contains(ToolFunctionRegistrar.CancelledCode, stderr, StringComparison.Ordinal);
+            Assert.Empty(server.Fake.CancelledBuildIds);
+            var receipt = ReadRawReceipt(RegistrationPath());
+            Assert.Equal(RegistrationState.Unknown, receipt.State);
+            Assert.Equal(1, receipt.Attempts);
+            Assert.Equal(ToolFunctionRegistrar.CancelledCode, receipt.LastError!.Code);
+        }
+
+        // 같은 경우의 예산 만료: transport callback이 Unknown으로 끝내도 예산 만료가 먼저다 — 124·deadline.
+        [Fact]
+        public void Timeout_AfterSend_TransportCallbackCompletesFirst_StillExit124()
+        {
+            using var server = NewServer();
+            var registry = new CancelCompletesUnknownRegistryClient(cancelAfterSend: null);
+
+            var (exit, _, stderr) = Invoke(server, Save(ReadyRecipe()), registry, () => RegistrationId, CancellationToken.None, "--registration-timeout", "1");
+
+            Assert.True(registry.CompletedByTransportCallback, "fixture must complete the call from its cancellation callback");
+            Assert.True(exit == 124, stderr);
+            Assert.Contains(ToolFunctionRegistrar.TimeoutCode, stderr, StringComparison.Ordinal);
+            var receipt = ReadRawReceipt(RegistrationPath());
+            Assert.Equal(RegistrationState.Unknown, receipt.State);
+            Assert.Equal(ToolFunctionRegistrar.TimeoutCode, receipt.LastError!.Code);
+        }
+
         // registration_before_send_abort: typed envelope·prepared 기록을 만든 뒤 RPC 전에 취소 → 130·not_submitted·RPC0·completed1.
         // prepared 기록은 그대로 남아 replay가 처음으로 보낸다.
         [Theory]
@@ -640,6 +678,39 @@ namespace NodeKit.Cli.Tests
                 var rpc = _inner.RegisterToolFunctionAsync(request, ct);
                 _ = rpc.ContinueWith(_ => _signal(), CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
                 return rpc;
+            }
+        }
+
+        /// <summary>
+        /// in-process transport처럼 호출 토큰에 callback을 걸고, 취소되면 그 callback 안에서 호출을 비취소 오류(Unknown)로
+        /// 동기 완료한다 — 호출 task의 continuation도 그 자리에서 돈다. <paramref name="cancelAfterSend"/>가 있으면 보낸 뒤
+        /// 다른 스레드에서 사용자 취소를 일으킨다.
+        /// </summary>
+        private sealed class CancelCompletesUnknownRegistryClient : IToolFunctionRegistryClient
+        {
+            private readonly Action? _cancelAfterSend;
+
+            public CancelCompletesUnknownRegistryClient(Action? cancelAfterSend) => _cancelAfterSend = cancelAfterSend;
+
+            public bool CompletedByTransportCallback { get; private set; }
+
+            public Task<Pb.RegisterToolFunctionResponse> RegisterToolFunctionAsync(Pb.RegisterToolFunctionRequest request, CancellationToken ct = default)
+            {
+                var call = new TaskCompletionSource<Pb.RegisterToolFunctionResponse>();
+                ct.Register(() =>
+                {
+                    CompletedByTransportCallback = call.TrySetException(new RpcException(new Status(StatusCode.Unknown, "Exception was thrown by handler.")));
+                });
+                if (_cancelAfterSend is { } cancel)
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        await Task.Delay(100).ConfigureAwait(false);
+                        cancel();
+                    });
+                }
+
+                return call.Task;
             }
         }
 
