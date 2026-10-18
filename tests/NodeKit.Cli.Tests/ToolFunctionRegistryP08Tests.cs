@@ -536,6 +536,48 @@ namespace NodeKit.Cli.Tests
             Assert.False(Directory.Exists(Path.Join(_workDir, ".nodekit", "registrations")));
         }
 
+        // Codex P2 r4307683587: submit은 full B 뒤 RegisterToolFunction을 실제로 보낸다. 상위 spec.md의 FR-020과
+        // 제외 범위도 이 동작과 같아야 한다(이전 "아직 보내지 않는 후속 단계"/"client 경로 — P08 범위" 문구 금지).
+        [Fact]
+        public void SubmitSendsTypedRegistrationAfterFullB_AndSpecFr020SaysSo()
+        {
+            using var server = NewServer();
+            server.Registry.OnRegisterToolFunction = _ => Response(ServerF, ServerH);
+
+            var (exit, _, stderr) = Submit(server, Save(ReadyRecipe()));
+
+            Assert.True(exit == 0, stderr);
+            Assert.Equal(new[] { "Resolve", "Submit", "Watch" }, server.Fake.CallOrder);
+            Assert.Equal(DigestB, Assert.Single(server.Registry.RegisterRequests).ImageDigest);
+
+            var spec = File.ReadAllText(Path.Join(RepoRoot(), "specs", "001-toolfunctionspec-authoring", "spec.md"));
+            var frStart = spec.IndexOf("- **FR-020**:", StringComparison.Ordinal);
+            Assert.True(frStart >= 0, "spec.md의 FR-020이 없습니다.");
+            var fr020 = spec[frStart..spec.IndexOf('\n', frStart)];
+            Assert.Contains("typed 등록(`RegisterToolFunction`", fr020, StringComparison.Ordinal);
+            Assert.Contains("한 번 보내", fr020, StringComparison.Ordinal);
+            Assert.Contains("register-replay", fr020, StringComparison.Ordinal);
+            Assert.DoesNotContain("아직 보내지 않는", fr020, StringComparison.Ordinal);
+
+            var outStart = spec.IndexOf("### 명시적 제외 범위 (Out of Scope)", StringComparison.Ordinal);
+            Assert.True(outStart >= 0, "spec.md의 제외 범위 절이 없습니다.");
+            var outEnd = spec.IndexOf("\n#", outStart + 1, StringComparison.Ordinal);
+            var outOfScope = outEnd < 0 ? spec[outStart..] : spec[outStart..outEnd];
+            Assert.DoesNotContain("client 경로 — P08 범위", outOfScope, StringComparison.Ordinal);
+            Assert.Contains("typed 등록 client(`RegisterToolFunction`", outOfScope, StringComparison.Ordinal);
+        }
+
+        private static string RepoRoot()
+        {
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
+            while (dir is not null && !File.Exists(Path.Join(dir.FullName, "NodeKit.sln")))
+            {
+                dir = dir.Parent;
+            }
+
+            return dir?.FullName ?? throw new FileNotFoundException("repo root(NodeKit.sln)를 찾지 못했습니다.");
+        }
+
         private static Pb.RegisterToolFunctionResponse Response(string f, string h, string version = Version) => new()
         {
             ToolFunctionDigest = f,

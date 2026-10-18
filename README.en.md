@@ -67,6 +67,15 @@ chmod +x ~/nodekit/NodeKit
 > **Note**: Avalonia UI on Ubuntu requires an X11 or Wayland display server.  
 > Works out of the box on Ubuntu with a desktop environment installed.
 
+### CLI (`nodekit`)
+
+Besides the GUI, `src/NodeKit.Cli` provides the `nodekit` CLI. It covers Recipe authoring, L1 validation and render, and NodeVault ToolSpec build submit/watch (`nodekit submit`). The client path for the second ToolFunction image build and typed registration is implemented too, but NodeVault does not accept kind 2 builds yet. So `nodekit function-recipe submit` ends every valid Recipe with `TOOLFUNCTION_BUILD_GATE_CLOSED` (exit 1) without sending a request. This upstream gate opens after NodeVault accepts kind 2.
+
+- Usage (Korean): [`docs/NODEKIT_CLI_USAGE.md`](docs/NODEKIT_CLI_USAGE.md)
+- linux-x64 self-contained package and CLI-only clean build check: [`docs/NODEKIT_BUILD_BOOTSTRAP.md`](docs/NODEKIT_BUILD_BOOTSTRAP.md) §5–§6
+
+The default CLI test suite and CI cover local fixtures and fake servers. Separate opt-in integration tests contact a real NodeVault only when `NODEKIT_NODEVAULT_URL` is set (skipped by default). Acceptance of real NodeVault/Harbor/Gateway/VM connections and approval are not part of CLI completion.
+
 ---
 
 ## Connecting to NodeVault from Another Machine

@@ -5,7 +5,7 @@
 ## 사전 조건
 
 - .NET 10 SDK 설치.
-- 이미 확정된 ToolSpec 하나의 `toolSpecDigest`/`baseToolImageDigest`(실제 NodeVault 빌드 없이도, 형식만 맞는 테스트용 sha256 문자열이면 충분 — 이 기능은 NodeVault에 실제로 조회하지 않는다).
+- 이미 확정된 ToolSpec 하나의 `toolSpecDigest`(C1)/`baseToolImageDigest`(A)(실제 NodeVault 빌드 없이도, 형식만 맞는 테스트용 문자열이면 충분 — 이 기능은 NodeVault에 실제로 조회하지 않는다). 형식은 서로 다르다: C1은 `sha256:` 없는 소문자 hex 64자리(`submit`의 typed 등록 preflight가 이 형식만 받는다), A는 `sha256:` + hex 64자리다. 식별자 표는 `docs/NODEKIT_CLI_USAGE.md` §9.
 - `dotnet build src/NodeKit.Cli/NodeKit.Cli.csproj`가 경고 0개로 성공(CLAUDE.md §8).
 
 ## 시나리오 1 — User Story 1: Draft 작성 → Ready 검증 통과
@@ -14,7 +14,7 @@
 cd tests/manual-scratch   # 또는 임시 디렉터리, 실제 프로젝트 소스는 건드리지 않음
 
 dotnet run --project src/NodeKit.Cli -- function-recipe create samtools-sort.json \
-  --tool-spec-digest sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+  --tool-spec-digest aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
   --base-tool-image-digest sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
   --non-interactive \
   --field FunctionId=samtools.sort \
@@ -66,9 +66,9 @@ NODEKIT_NODEVAULT_URL=http://<nodevault>:50051 dotnet run --project src/NodeKit.
 **기대 결과**:
 - `Draft`(검증 전)이거나 현재 내용이 검증에 실패하면 exit 1 + 구체적 진단, 요청 0회. 일반 "알 수 없는 명령" usage 오류(exit 2)가 아니어야 한다.
 - 유효한 `Ready`라도 현재 NodeVault가 kind 2를 받지 않으므로 exit 1 + `TOOLFUNCTION_BUILD_GATE_CLOSED` 안내로 끝난다. 요청·receipt는 없고 주소가 있어도 연결하지 않는다.
-- NodeVault가 kind 2를 수용해 상류 게이트가 열린 뒤에는: 유효한 `Ready`이면 Recipe 옆 `.nodekit/receipts/<request-id>.json`(`operation_kind=toolfunction_image_build`)을 먼저 남긴 뒤 `ResolveToolSpec → SubmitToolBuild → WatchToolBuild`를 보낸다. Watch `Succeeded`에 전체 두 번째 이미지 digest B가 있으면 exit 0과 B/C2/build ID를 출력한다.
+- NodeVault가 kind 2를 수용해 상류 게이트가 열린 뒤에는: 유효한 `Ready`이면 Recipe 옆 `.nodekit/receipts/<request-id>.json`(`operation_kind=toolfunction_image_build`)을 먼저 남긴 뒤 `ResolveToolSpec → SubmitToolBuild → WatchToolBuild`를 보낸다. Watch `Succeeded`에 전체 두 번째 이미지 digest B가 있으면 B/C2/build ID를 출력하고 typed 등록으로 넘어간다. 최종 exit code는 등록 결과를 따른다(성공 0, 거부·결과 불명 1, timeout 124, 취소 130, 저장 실패 2).
 - `Failed`/`Interrupted`, 최종 상태 없는 종료, B 없는 `Succeeded`는 exit 1이다.
-- 빌드 성공은 승인이 아니고 typed 등록은 하지 않는다. Recipe 파일은 어떤 필드도 변경되지 않는다.
+- 빌드 성공은 승인이 아니다. 게이트가 열린 뒤 full B를 확인하면 typed 등록(`RegisterToolFunction`, P08)으로 넘어가며, 서버가 돌려준 F/H/P/version을 그대로 출력·저장한다. 결과 불명 등록은 `function-recipe register-replay`로 확인한다(`contracts/cli-function-recipe-commands.md`). Recipe 파일은 어떤 필드도 변경되지 않는다.
 
 ## 시나리오 4 — FR-023: 파일 충돌 감지
 
