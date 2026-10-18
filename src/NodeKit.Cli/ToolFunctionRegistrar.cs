@@ -387,7 +387,12 @@ namespace NodeKit.Cli
                 timeoutCts.CancelAfter(budget);
             }
 
-            Task<RegisterToolFunctionResponse> rpc;
+            // 이긴 쪽은 실제로 먼저 일어난 사건이다. 둘 다 끝난 뒤에야 이 스레드가 기다리기 시작하면 WhenAny는 앞 인자를 고르므로
+            // 관측 순서로 정하지 않는다 — 신호는 RPC 시작 전에 등록해 그 순간에 기록하고, 응답은 완료 continuation에서 기록한다.
+            var abandon = Task.Delay(System.Threading.Timeout.Infinite, linked.Token);
+            var first = new TaskCompletionSource<Task>(TaskCreationOptions.RunContinuationsAsynchronously);
+            Task<RegisterToolFunctionResponse>? rpc = null;
+            using var signal = linked.Token.Register(() => first.TrySetResult(rpc is { IsCompleted: true } done ? done : abandon));
             try
             {
                 rpc = client.RegisterToolFunctionAsync(request, linked.Token);
@@ -399,9 +404,10 @@ namespace NodeKit.Cli
                 rpc = Task.FromException<RegisterToolFunctionResponse>(ex);
             }
 
-            var abandon = Task.Delay(System.Threading.Timeout.Infinite, linked.Token);
-            var winner = Task.WhenAny(rpc, abandon).GetAwaiter().GetResult();
-            return Settle(winner, rpc, requestedVersion, call, timeoutCts, linked.Token);
+            var response = rpc;
+            _ = response.ContinueWith(_ => first.TrySetResult(response), CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+            var winner = first.Task.GetAwaiter().GetResult();
+            return Settle(winner, response, requestedVersion, call, timeoutCts, linked.Token);
         }
 
         /// <summary>
