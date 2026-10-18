@@ -43,14 +43,15 @@ DEPS="$A/src/NodeKit.Cli/bin/Release/net10.0/NodeKit.Cli.deps.json"
 [ ! -e "$A/obj" ] && [ ! -e "$A/bin" ] || fail "CLI build also built the GUI project (root obj/ or bin/ exists)"
 
 echo "== B. CLI dependency closure"
-python3 "$ROOT/scripts/check-cli-closure.py" --lock "$A/src/NodeKit.Cli/packages.lock.json" --deps "$DEPS"
+# checker도 build/lock과 같은 archive된 HEAD에서 실행한다(작업 트리의 미커밋 checker 아님).
+python3 "$A/scripts/check-cli-closure.py" --lock "$A/src/NodeKit.Cli/packages.lock.json" --deps "$DEPS"
 
 # $1=라벨, $2=checkout 부모 디렉터리. 벤더 proto 없는 build가 NKPROTO004로 실패하고 decoy를 쓰지 않아야 한다.
 expect_missing_proto_failure() {
     local label="$1" parent="$2" config log rc
     # 외부 fallback 탐지용 decoy: 예전 기본값이던 sibling NodeVault/protos에 진짜 proto를 둔다.
     mkdir -p "$parent/NodeVault/protos/nodevault/v1"
-    cp "$ROOT/$PROTO_REL" "$parent/NodeVault/$PROTO_REL"
+    cp "$A/$PROTO_REL" "$parent/NodeVault/$PROTO_REL"
     dotnet restore "$parent/NodeKit/$CLI_REL" --locked-mode
     for config in Debug Release; do
         log="$WORK/$label-$config.log"

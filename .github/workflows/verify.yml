@@ -52,6 +52,9 @@ jobs:
       - name: CLI closure checker self-test
         run: python3 scripts/test_check_cli_closure.py -v
 
+      - name: CLI clean build script self-test
+        run: python3 scripts/test_verify_cli_clean_build.py -v
+
       # Runs the package script exactly as docs §5 writes it (not via bash), so a
       # lost executable bit fails here (rc 126) instead of on a user's clone.
       - name: CLI package script runs as documented
