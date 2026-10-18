@@ -67,6 +67,15 @@ chmod +x ~/nodekit/NodeKit
 > **참고**: Ubuntu에서 Avalonia UI 실행 시 X11 또는 Wayland 디스플레이 서버가 필요합니다.  
 > 데스크탑 환경이 설치된 Ubuntu에서 바로 실행됩니다.
 
+### CLI (`nodekit`)
+
+GUI와 별도로 `src/NodeKit.Cli`의 `nodekit` CLI가 있습니다. Recipe 작성·L1 검증·render와 NodeVault client(ToolSpec 빌드 제출/관찰, ToolFunction 두 번째 이미지 빌드와 typed 등록)를 담당합니다.
+
+- 사용법: [`docs/NODEKIT_CLI_USAGE.md`](docs/NODEKIT_CLI_USAGE.md)
+- linux-x64 self-contained package와 CLI 단독 clean build 검증: [`docs/NODEKIT_BUILD_BOOTSTRAP.md`](docs/NODEKIT_BUILD_BOOTSTRAP.md) §5–§6
+
+CLI 시험은 local fixture와 loopback fake server 범위입니다. 실제 NodeVault/Harbor/Gateway/VM 연결과 승인은 CLI 완료에 포함하지 않습니다.
+
 ---
 
 ## 다른 장비에서 NodeVault 서버에 연결하기

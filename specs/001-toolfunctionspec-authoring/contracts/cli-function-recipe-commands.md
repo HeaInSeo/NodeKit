@@ -1,6 +1,6 @@
 # CLI Contract: `nodekit function-recipe *`
 
-기존 `nodekit recipe create` / `nodekit validate` / `nodekit render` 명령 계약(문서: `docs/NODEKIT_CLI_USAGE.md`)과 동일한 관례를 따른다. exit code 체계도 동일하게 재사용한다: `0` 성공, `1` 검증/비즈니스 실패, `2` 사용법/인자 오류.
+기존 `nodekit recipe create` / `nodekit validate` / `nodekit render` 명령 계약(문서: `docs/NODEKIT_CLI_USAGE.md`)과 동일한 관례를 따른다. exit code 체계도 동일하게 재사용한다: `0` 성공, `1` 검증/비즈니스 실패, `2` 사용법/인자 오류. 원격 단계가 있는 `submit`/`register-replay`는 여기에 timeout `124`/`125`와 취소 `130`을 더한다(`docs/NODEKIT_CLI_USAGE.md` §6).
 
 ## `nodekit function-recipe create [<path>]`
 
@@ -39,7 +39,7 @@
 
 이전(2026-07-24) 계약의 "항상 차단되는 명령"은 P07 기능 PR에서 실제 BuildService client 경로로 바뀌었다(v0.9.1 S3-05, S3-09). 다만 현재 NodeVault 빌드 경로는 kind 2를 받지 않으므로(벤더 `protos/nodevault/v1/nodevault.proto` BuildRequest: `BUILD_KIND_TOOLFUNCTIONSPEC`는 미래 function-image builder용 예약) 이 경로는 아래 2a의 상류 게이트 뒤에 닫혀 있다. 명령이 없거나 일반 usage 오류로 끝나면 안 된다는 SC-005의 요구("원인 불명의 오류나 무응답 없음")는 그대로 유지한다.
 
-**입력**: `<path>`(필수, ToolFunctionRecipe JSON 파일), 선택 `--url <nodevault-url>`(없으면 `NODEKIT_NODEVAULT_URL`), `--receipt <path>`, `--connect-timeout <seconds>`, `--watch-timeout <duration>`, `--format human|jsonl`. 옵션 의미와 timeout/취소 exit code(124/125/130)는 `nodekit submit`과 같다. `--strict-reproducible`은 ToolSpec Recipe 전용이라 받지 않는다.
+**입력**: `<path>`(필수, ToolFunctionRecipe JSON 파일), 선택 `--url <nodevault-url>`(없으면 `NODEKIT_NODEVAULT_URL`), `--receipt <path>`, `--connect-timeout <seconds>`, `--watch-timeout <duration>`, `--registration-timeout <seconds>`(P08.timeout, 아래 7), `--format human|jsonl`. 옵션 의미와 timeout/취소 exit code(124/125/130)는 `nodekit submit`과 같다. `--strict-reproducible`은 ToolSpec Recipe 전용이라 받지 않는다.
 
 **동작**:
 1. 파일을 읽는다. 읽기/파싱/`SchemaVersion` 누락·미지원 오류는 exit 2, RPC 0회.
@@ -53,9 +53,19 @@
    - `Succeeded`인데 B가 없거나 형식이 다름 → `SECOND_IMAGE_DIGEST_MISSING`, exit 1, recovery uncertain. 기반 이미지 A나 legacy `DigestAcquired` 로그 digest로 대신하지 않는다.
    - `Failed`/`Interrupted` → exit 1, 성공/승인 표시 없음.
    - 최종 상태 없이 스트림 종료 → exit 1, 결과 미확인(uncertain).
-7. 빌드 성공은 승인(`Approved`)이 아니다. typed 등록(`RegisterToolFunction`)은 보내지 않는다(P08). NodeKit은 이미지를 만들거나 Kubernetes를 호출하지 않는다. Recipe 파일의 `State`는 어떤 경우에도 바꾸지 않는다.
+7. 빌드 성공은 승인(`Approved`)이 아니다. full B를 확인한 뒤에만 typed 등록으로 넘어간다(P08.registry, 2026-10-18 정정 — 이전 문구 "typed 등록은 보내지 않는다"는 P08 이전 계약이다): `RegisterToolFunctionRequest`(`canonicalization_version=w2-set-v1`, `base_tool_spec_digest`=C1, `image_digest`=B)의 protobuf bytes와 등록 receipt를 `registrations/<request-id>.json`·`snapshots/registration/<sha256>.bin`에 먼저 저장하고(실패 시 exit 2, 등록 RPC 0) `RegisterToolFunction`을 한 번 보낸다. 서버가 돌려준 `tool_function_digest`(F)·`cas_hash`(H)·`presentation_revision_id`(P)·`canonicalization_version`은 그대로 출력·저장하며 NodeKit이 계산하지 않는다. pipeline pin은 H다. 등록 성공도 승인이 아니다.
+   - `InvalidArgument`/`FailedPrecondition`/`AlreadyExists` → `REGISTRATION_REJECTED`, exit 1, terminal.
+   - 그 밖의 gRPC 오류·응답 유실 → `REGISTRATION_RESULT_UNKNOWN`; 비었거나 지원하지 않는 version → `REGISTRATION_VERSION_MISMATCH`; 비었거나 손상된 F/H → `REGISTRATION_IDENTITY_MISSING`. 모두 exit 1, `remote_registration_state: "unknown"`이며 새 request ID·다른 version으로 자동 재제출하지 않는다.
+   - `--registration-timeout <seconds>`(1..4294967, 문화권 무관 10진 정수; 잘못된 값은 업무 RPC 전 exit 2)는 opt-in이다. 기본은 등록 deadline 없음이며 `--connect-timeout`/`--watch-timeout`은 등록 RPC에 적용되지 않는다. 보낸 뒤 만료는 `REGISTRATION_TIMEOUT`(exit 124), Ctrl-C는 `REGISTRATION_CANCELLED`(exit 130)이고 둘 다 결과 불명(`unknown`)이다. `CancelToolBuild`·새 이미지 빌드·자동 재등록은 하지 않는다. 보내기 전 취소는 exit 130·`not_submitted`.
+   NodeKit은 이미지를 만들거나 Kubernetes를 호출하지 않는다. Recipe 파일의 `State`는 어떤 경우에도 바꾸지 않는다.
 
 **출력**: human은 진행 이벤트와 결과를 stdout, 실패 진단을 stderr에 쓴다. `--format jsonl`은 `nodekit submit`과 같은 `nodekit.submit.v1` 레코드를 쓰며, 로컬 preflight 실패는 `error_code=PREFLIGHT_FAILED`, 상류 게이트 차단은 `error_code=TOOLFUNCTION_BUILD_GATE_CLOSED` completed 레코드 하나다. `nodekit receipt watch`도 이 receipt의 `Succeeded`에 B가 없으면 같은 `SECOND_IMAGE_DIGEST_MISSING`/exit 1로 보고한다.
+
+## `nodekit function-recipe register-replay <registration-receipt.json>` — 결과 불명 등록 확인 (P08)
+
+**입력**: `<registration-receipt.json>`(필수, submit이 남긴 `registrations/<request-id>.json`), 선택 `--url <nodevault-url>`, `--registration-timeout <seconds>`, `--format human|jsonl`.
+
+**동작**: 저장된 같은 endpoint·request ID·version·요청 bytes만 다시 보낸다. 저장된 endpoint와 다른 `--url`은 exit 2다. Recipe/script를 다시 읽거나 새 이미지를 빌드하지 않는다. 이미 registered/rejected로 기록된 receipt는 RPC 없이 저장된 결과를 보여 준다. 결과 분류와 timeout/취소 exit code는 submit 7과 같다. client 쪽 replay는 실제 서버 멱등성의 증거가 아니다.
 
 ## 공통 계약
 

@@ -67,6 +67,15 @@ chmod +x ~/nodekit/NodeKit
 > **Note**: Avalonia UI on Ubuntu requires an X11 or Wayland display server.  
 > Works out of the box on Ubuntu with a desktop environment installed.
 
+### CLI (`nodekit`)
+
+Besides the GUI, `src/NodeKit.Cli` provides the `nodekit` CLI. It covers Recipe authoring, L1 validation and render, and acts as a NodeVault client (ToolSpec build submit/watch, the second ToolFunction image build and typed registration).
+
+- Usage (Korean): [`docs/NODEKIT_CLI_USAGE.md`](docs/NODEKIT_CLI_USAGE.md)
+- linux-x64 self-contained package and CLI-only clean build check: [`docs/NODEKIT_BUILD_BOOTSTRAP.md`](docs/NODEKIT_BUILD_BOOTSTRAP.md) §5–§6
+
+CLI tests cover local fixtures and a loopback fake server only. Real NodeVault/Harbor/Gateway/VM connections and approval are not part of CLI completion.
+
 ---
 
 ## Connecting to NodeVault from Another Machine

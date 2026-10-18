@@ -97,10 +97,22 @@ dotnet test --project tests/NodeKit.Cli.Tests/NodeKit.Cli.Tests.csproj -- \
   --filter-class NodeKit.Cli.Tests.BeginnerGuideFlowTests
 ```
 
-`NodeKit.Cli.csproj`는 NuGet 패키지를 전혀 참조하지 않는다 — `NodeKit.csproj`의
-Avalonia/Grpc.Net.Client/Google.Protobuf/Wasmtime/ReactiveUI 의존성을 전혀
-가져오지 않는다. 빌드 결과물(`bin/Debug/net10.0/`)에는
-`NodeKit.Cli.{dll,pdb,deps.json,runtimeconfig.json}`만 있다.
+`NodeKit.Cli.csproj`는 GUI 프로젝트(`NodeKit.csproj`)를 참조하지 않고, 필요한 공유
+소스만 파일 단위로 링크한다. NuGet 패키지는 명시 버전과 `src/NodeKit.Cli/packages.lock.json`으로
+고정된 다음만 쓴다(이전 문서의 "NuGet 패키지를 전혀 참조하지 않는다"는 더 이상 사실이 아니다):
+
+| 패키지 | 용도 |
+|---|---|
+| `Spectre.Console` | 대화형 프롬프트와 터미널 출력 |
+| `Grpc.Net.Client` | NodeVault gRPC client (`submit`, `receipt`, `function-recipe submit`/`register-replay`) |
+| `Google.Protobuf` | 벤더 proto(`protos/nodevault/v1/nodevault.proto`) 메시지 |
+| `Grpc.Tools` | 빌드 시 proto 코드 생성 전용(`PrivateAssets=all`, runtime 산출물에 없음) |
+
+Avalonia, SkiaSharp, Wasmtime, KubernetesClient는 CLI runtime dependency closure에 들어오면 안 된다.
+이 조건은 `scripts/check-cli-closure.py`가 lock 파일과 `NodeKit.Cli.deps.json`으로 검사하고,
+`scripts/verify-cli-clean-build.sh`가 NodeKit만 있는 clean checkout에서 다시 확인한다
+([`NODEKIT_BUILD_BOOTSTRAP.md`](NODEKIT_BUILD_BOOTSTRAP.md) §5–§6). 배포용 linux-x64 self-contained
+package도 같은 문서 §5에 있다.
 
 ### 1-1. UX 테스트용 빠른 실행
 
@@ -1181,8 +1193,9 @@ Recipe와 같은 상대 위치에 함께 둔다. 새 요청을 만들 때 NodeKi
 | `ScriptPath` 비어 있음, script 내용이 공백/개행뿐 | 1 |
 | `baseToolImageDigest` 없음 또는 형식 오류 (`toolSpecDigest`로 대신하지 않음) | 1 |
 
-이 source 읽기 단계(P06.base_script)는 아직 `function-recipe render`/`submit` 명령에
-연결되지 않았다. 명령 연결과 raw_spec 생성은 후속 단계에서 추가한다.
+이 source 읽기 규칙은 `function-recipe submit`의 current preflight가 쓴다. 제출 직전에 script
+내용을 다시 읽어 exact 4키 raw_spec(kind 2)에 넣는다(§9 ToolFunctionSpec 경계). `function-recipe render`는
+stage1/stage2 미리보기라 script를 경로로만 보여 주며 이 내용을 읽지 않는다.
 
 `--format` 값은 대소문자와 `_`/`-`를 구분하지 않는다(`RAW-SPEC`, `raw_spec`
 모두 `raw-spec`으로 인식) — 그래도 안 맞으면 종료 코드 2로 명시적으로
@@ -1269,9 +1282,9 @@ $ nodekit render recipe.json --out - --format raw-spec --pretty
 | 0 | 성공 (검증 통과, 또는 검증 통과 후 render/recipe create 완료) |
 | 1 | recipe-level 또는 L1 검증 위반 1개 이상, 또는 recipe create 최종 검증 실패 |
 | 2 | 사용법 오류, 인자 누락, 알 수 없는 옵션/필드, 파일을 읽을 수 없음(권한 포함), recipe JSON 파싱 실패, `SchemaVersion` 누락/미지원, `BuildKind` 누락/미지원, 결과 파일 저장 실패(아래 "파일 저장" 참고) |
-| 124 | `nodekit submit`: `--connect-timeout`이 만료됨 (build ID를 받기 전 단계에서만 적용) |
-| 125 | `nodekit submit`: `--watch-timeout`이 만료됨 (build ID를 받은 뒤 단계에서만 적용, 서버 빌드는 취소되지 않음) |
-| 130 | `nodekit submit`: Ctrl-C로 취소됨. `recipe create` 대화형: `/cancel` 또는 Ctrl-C로 저장 전에 취소됨 |
+| 124 | `nodekit submit`·`function-recipe submit`: `--connect-timeout`이 만료됨 (build ID를 받기 전 단계에서만 적용). `function-recipe submit`·`register-replay`: `--registration-timeout`이 등록 RPC를 보낸 뒤 만료됨(`REGISTRATION_TIMEOUT`, 결과 불명 — §9) |
+| 125 | `nodekit submit`·`function-recipe submit`: `--watch-timeout`이 만료됨 (build ID를 받은 뒤 단계에서만 적용, 서버 빌드는 취소되지 않음) |
+| 130 | `nodekit submit`·`function-recipe submit`: Ctrl-C로 취소됨(등록 단계면 `REGISTRATION_CANCELLED`, 결과 불명 — §9). `recipe create` 대화형: `/cancel` 또는 Ctrl-C로 저장 전에 취소됨 |
 
 ### 파일 저장 (create/validate/render)
 
@@ -2088,6 +2101,24 @@ dotnet run --project src/NodeKit.Cli -- validate /home/user/samtools-1.17.json
   옵션/exit code는 `nodekit submit`과 같고(`--strict-reproducible` 제외), 로컬
   preflight 실패의 jsonl `error_code`는 `PREFLIGHT_FAILED`다. Console/GUI와 실제 NodeVault
   function-image builder 연동은 후속 단계다.
+- **식별자 한눈에 보기** (ToolSpec 첫 이미지 → ToolFunction 두 번째 이미지 → typed 등록):
+
+  | 기호 | 값 | 누가 정하나 | NodeKit에서 쓰는 곳 |
+  |---|---|---|---|
+  | A | ToolSpec 첫 이미지의 image digest | NodeVault 빌드 | `function-recipe create --base-tool-image-digest`, Recipe `BaseToolImageDigest`. 등록 요청 wire에는 없다 |
+  | C1 | 첫 이미지 ToolSpec digest(typed 등록에는 `sha256:` 없는 소문자 hex 64자리만 받는다) | NodeVault `ResolveToolSpec` | `--tool-spec-digest`, Recipe `ToolSpecDigest`, 등록 요청 `base_tool_spec_digest` |
+  | B | 두 번째(ToolFunction) 이미지 digest | NodeVault 빌드(Watch `Succeeded` record) | 등록 요청 `image_digest` |
+  | C2 | 두 번째 빌드 요청의 ToolSpec digest | NodeVault `ResolveToolSpec` | submit 출력·receipt에만 기록, 등록 요청의 C1 자리에 쓰지 않음 |
+  | F / H / P | `tool_function_digest` / `cas_hash` / `presentation_revision_id` | NodeVault `RegisterToolFunction` 응답 | 출력·등록 receipt에 그대로 저장. pipeline pin은 서버가 돌려준 H |
+  | version | `canonicalization_version` (요청 `w2-set-v1`) | 요청은 NodeKit, 확정 값은 응답 | 응답 값이 비었거나 지원하지 않으면 `REGISTRATION_VERSION_MISMATCH` |
+
+  NodeKit은 F/H/P를 계산하거나 추정해서 채우지 않는다. A/C1을 B/C2 자리에 대신 쓰지도 않는다.
+  C1→`base_tool_spec_digest` mapping은 v0.9.1 추천 계약을 따른 것이다. mapping이 바뀌면 P06 mapper와
+  이 표를 함께 고친다.
+- **CLI 단독 release가 주장하지 않는 것**: 이 CLI의 시험은 local fixture와 loopback fake server 범위다.
+  실제 NodeVault 빌드·Harbor 등록, gRPC Gateway, seoy/infra-lab VM·Kubernetes 경로, NodeSentinel 관찰,
+  Console/GUI, 다른 저장소의 개발과 승인(`Approved`)은 CLI 완료에 포함하지 않는다. 그 연결은 별도 연결
+  스프린트에서 인수한다. 빌드 성공과 등록 성공은 어느 쪽도 승인이 아니다.
 - 5개 method가 생성하는 Dockerfile은 NodeKit L1 정적 검증만 통과했을 뿐,
   실제 `docker build`로 검증된 적은 없다.
 - `recipe create`의 escape hatch는 `/help`, `/review`, `/change-method`,
