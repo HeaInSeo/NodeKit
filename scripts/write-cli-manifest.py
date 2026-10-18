@@ -6,10 +6,13 @@ linux-x64 self-contained, loose directory). Called by scripts/package-cli.sh.
 The manifest starts from release/cli-manifest.template.json and fills in:
 - version, source sha/dirty, contract source sha256, dotnet SDK version
 - runtime_closure: every "package" library in NodeKit.Cli.deps.json
-- files: every file in the publish directory (path, size, sha256, executable)
+- files: every regular file in the publish directory (path, size, sha256,
+  executable). The command alias symlink is recorded as command_alias, not here.
 
 It fails (exit 1) instead of writing a manifest when:
 - the entrypoint apphost is missing or not executable
+- the command alias (`nodekit`) is not a relative symlink to the entrypoint,
+  or the publish directory has any other symlink
 - NodeKit.Cli.deps.json is missing
 - the runtime closure contains a GUI/K8s package (Avalonia, SkiaSharp,
   Wasmtime, KubernetesClient). The CLI must not ship those.
@@ -36,6 +39,16 @@ def sha256_file(path):
     return digest.hexdigest()
 
 
+def list_symlinks(publish_dir):
+    links = []
+    for root, dirs, files in os.walk(publish_dir):
+        for name in dirs + files:
+            full = os.path.join(root, name)
+            if os.path.islink(full):
+                links.append(os.path.relpath(full, publish_dir).replace(os.sep, "/"))
+    return sorted(links)
+
+
 def list_files(publish_dir):
     entries = []
     for root, dirs, files in os.walk(publish_dir):
@@ -43,7 +56,7 @@ def list_files(publish_dir):
         for name in sorted(files):
             full = os.path.join(root, name)
             rel = os.path.relpath(full, publish_dir).replace(os.sep, "/")
-            if rel == MANIFEST_NAME:
+            if rel == MANIFEST_NAME or os.path.islink(full):
                 continue
             entries.append({
                 "path": rel,
@@ -93,6 +106,20 @@ def main(argv):
         return fail("entrypoint %s is missing from %s" % (manifest["entrypoint"], args.publish_dir))
     if not os.access(entrypoint, os.X_OK):
         return fail("entrypoint %s is not executable" % manifest["entrypoint"])
+
+    alias = manifest["command_alias"]
+    if alias["target"] != manifest["entrypoint"]:
+        return fail("template command_alias.target %s is not the entrypoint %s"
+                    % (alias["target"], manifest["entrypoint"]))
+    alias_path = os.path.join(args.publish_dir, alias["path"])
+    if not os.path.islink(alias_path):
+        return fail("command alias %s is missing or not a symlink in %s" % (alias["path"], args.publish_dir))
+    if os.readlink(alias_path) != alias["target"]:
+        return fail("command alias %s points to %r, not %r"
+                    % (alias["path"], os.readlink(alias_path), alias["target"]))
+    other_links = [p for p in list_symlinks(args.publish_dir) if p != alias["path"]]
+    if other_links:
+        return fail("publish directory has symlinks other than the command alias: " + ", ".join(other_links))
 
     deps_path = os.path.join(args.publish_dir, DEPS_NAME)
     if not os.path.isfile(deps_path):

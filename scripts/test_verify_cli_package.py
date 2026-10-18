@@ -25,6 +25,8 @@ TEMPLATE = os.path.join(SCRIPT_DIR, "..", "release", "cli-manifest.template.json
 
 VERSION = "0.0.0-ci"
 NAME = "nodekit-cli-%s-linux-x64" % VERSION
+# Stand-in apphost: a script, so the fresh-extraction test can run it through the alias.
+APPHOST = b"#!/bin/sh\necho \"apphost $*\"\n"
 
 
 class VerifyCliPackageTests(unittest.TestCase):
@@ -35,9 +37,10 @@ class VerifyCliPackageTests(unittest.TestCase):
         self.out = os.path.join(self.tmp, "out")
         os.makedirs(os.path.join(self.publish, "sub"))
         os.makedirs(self.out)
-        self.write_publish("NodeKit.Cli", b"apphost", executable=True)
+        self.write_publish("NodeKit.Cli", APPHOST, executable=True)
         self.write_publish("NodeKit.Cli.dll", b"assembly")
         self.write_publish("sub/data.bin", b"data")
+        os.symlink("NodeKit.Cli", os.path.join(self.publish, "nodekit"))
         self.write_publish("NodeKit.Cli.deps.json",
                            json.dumps({"libraries": {"Grpc.Net.Client/2.76.0": {"type": "package"}}}).encode())
         self.contract = os.path.join(self.tmp, "provenance.json")
@@ -136,6 +139,55 @@ class VerifyCliPackageTests(unittest.TestCase):
         os.chmod(os.path.join(self.publish, "NodeKit.Cli"), 0o644)
         self.pack()
         self.assert_fails("entrypoint 'NodeKit.Cli' is not executable")
+
+    def test_missing_alias_fails(self):
+        os.remove(os.path.join(self.publish, "nodekit"))
+        self.pack()
+        self.assert_fails("command alias 'nodekit' is missing from the archive or not a symlink")
+
+    def test_alias_copied_as_regular_file_fails(self):
+        alias = os.path.join(self.publish, "nodekit")
+        os.remove(alias)
+        shutil.copy2(os.path.join(self.publish, "NodeKit.Cli"), alias)
+        self.pack()
+        self.assert_fails("command alias 'nodekit' is missing from the archive or not a symlink")
+
+    def test_retargeted_alias_fails(self):
+        alias = os.path.join(self.publish, "nodekit")
+        os.remove(alias)
+        os.symlink("NodeKit.Cli.dll", alias)
+        self.pack()
+        self.assert_fails("command alias 'nodekit' points to 'NodeKit.Cli.dll'")
+
+    def test_manifest_without_alias_fails(self):
+        self.edit_manifest(lambda m: m.pop("command_alias"))
+        self.pack()
+        self.assert_fails("manifest command_alias None does not target the entrypoint 'NodeKit.Cli'")
+
+    def test_undeclared_symlink_fails(self):
+        os.symlink("data.bin", os.path.join(self.publish, "sub", "link.bin"))
+        self.pack()
+        self.assert_fails("archive symlink 'sub/link.bin' is not the manifest command alias")
+
+    def test_alias_runs_entrypoint_after_fresh_extraction(self):
+        # S4-02-D: after extraction the documented command runs the apphost, both
+        # from the package directory and through a user's PATH symlink to it.
+        self.pack()
+        self.assertEqual(self.run_verify().returncode, 0)
+        dest = os.path.join(self.tmp, "install")
+        with tarfile.open(os.path.join(self.out, NAME + ".tar.gz"), "r:gz") as tar:
+            tar.extractall(dest)
+        alias = os.path.join(dest, NAME, "nodekit")
+        self.assertEqual(os.readlink(alias), "NodeKit.Cli")
+        direct = subprocess.run([alias, "--help"], stdout=subprocess.PIPE, universal_newlines=True)
+        self.assertEqual((direct.returncode, direct.stdout), (0, "apphost --help\n"))
+        bin_dir = os.path.join(self.tmp, "bin")
+        os.makedirs(bin_dir)
+        os.symlink(alias, os.path.join(bin_dir, "nodekit"))
+        env = dict(os.environ, PATH=bin_dir + os.pathsep + os.environ.get("PATH", ""))
+        via_path = subprocess.run(["nodekit", "validate", "r.json"], stdout=subprocess.PIPE,
+                                  universal_newlines=True, env=env, cwd=self.tmp)
+        self.assertEqual((via_path.returncode, via_path.stdout), (0, "apphost validate r.json\n"))
 
     def test_listed_file_missing_from_archive_fails(self):
         os.remove(os.path.join(self.publish, "sub", "data.bin"))

@@ -36,6 +36,7 @@ class WriteCliManifestTests(unittest.TestCase):
         self.write_file("NodeKit.Cli", b"apphost", executable=True)
         self.write_file("NodeKit.Cli.dll", b"assembly")
         self.write_file("sub/data.bin", b"data")
+        os.symlink("NodeKit.Cli", os.path.join(self.publish, "nodekit"))
         self.write_deps(DEPS_LIBRARIES)
         self.contract = os.path.join(self.tmp, "provenance.json")
         with open(self.contract, "wb") as f:
@@ -136,6 +137,39 @@ class WriteCliManifestTests(unittest.TestCase):
         result = self.run_script()
         self.assertEqual(result.returncode, 1)
         self.assertIn("missing", result.stderr)
+        self.assertFalse(os.path.exists(self.out))
+
+    def test_records_command_alias_outside_files(self):
+        self.assertEqual(self.run_script().returncode, 0)
+        manifest = self.load()
+        self.assertEqual(manifest["entrypoint"], "NodeKit.Cli")
+        self.assertEqual(manifest["command_alias"], {"path": "nodekit", "target": "NodeKit.Cli"})
+        self.assertNotIn("nodekit", [e["path"] for e in manifest["files"]])
+
+    def test_rejects_missing_copied_or_retargeted_alias(self):
+        alias = os.path.join(self.publish, "nodekit")
+        os.remove(alias)
+        result = self.run_script()
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("command alias nodekit is missing or not a symlink", result.stderr)
+
+        shutil.copy2(os.path.join(self.publish, "NodeKit.Cli"), alias)
+        result = self.run_script()
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("command alias nodekit is missing or not a symlink", result.stderr)
+
+        os.remove(alias)
+        os.symlink("NodeKit.Cli.dll", alias)
+        result = self.run_script()
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("points to 'NodeKit.Cli.dll'", result.stderr)
+        self.assertFalse(os.path.exists(self.out))
+
+    def test_rejects_other_symlinks(self):
+        os.symlink("data.bin", os.path.join(self.publish, "sub", "link.bin"))
+        result = self.run_script()
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("symlinks other than the command alias: sub/link.bin", result.stderr)
         self.assertFalse(os.path.exists(self.out))
 
     def test_rejects_missing_deps_json(self):

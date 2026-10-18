@@ -6,6 +6,7 @@
 #
 # 산출물(<dir>, 기본 artifacts/cli):
 #   nodekit-cli-<version>-linux-x64.tar.gz            최상위 디렉터리 하나를 담은 archive
+#                                                     (apphost NodeKit.Cli + command alias symlink nodekit)
 #   nodekit-cli-<version>-linux-x64.tar.gz.sha256     sha256sum -c 형식
 #   nodekit-cli-<version>-linux-x64.cli-manifest.json archive 안 cli-manifest.json과 같은 파일
 #
@@ -59,6 +60,10 @@ dotnet restore "$PROJECT" --locked-mode -r "$RID"
 dotnet publish "$PROJECT" --no-restore -c Release -r "$RID" --self-contained true \
     -p:PublishSingleFile=false -p:Version="$VERSION" -p:SourceRevisionId="$SOURCE_SHA" \
     -o "$PUBLISH_DIR"
+
+# 문서의 command 이름 nodekit은 apphost NodeKit.Cli를 가리키는 상대 symlink다.
+# 이름과 대상은 release/cli-manifest.template.json의 command_alias와 같아야 하며 write-cli-manifest.py가 확인한다.
+ln -s NodeKit.Cli "$PUBLISH_DIR/nodekit"
 
 python3 "$ROOT/scripts/write-cli-manifest.py" \
     --template "$ROOT/release/cli-manifest.template.json" \
