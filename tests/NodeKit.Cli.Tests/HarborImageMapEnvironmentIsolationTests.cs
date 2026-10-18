@@ -123,12 +123,9 @@ namespace NodeKit.Cli.Tests
                 }
 
                 var opCode = _opCodesByValue[code];
-                if (opCode == OpCodes.Ldstr)
+                if (opCode == OpCodes.Ldstr && method.Module.ResolveString(BitConverter.ToInt32(il, i)) == value)
                 {
-                    if (method.Module.ResolveString(BitConverter.ToInt32(il, i)) == value)
-                    {
-                        return true;
-                    }
+                    return true;
                 }
 
                 i += OperandSize(opCode.OperandType, il, i);
