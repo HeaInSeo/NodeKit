@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
+using Google.Protobuf;
 using Grpc.Core;
 using Nodevault.V1;
 
@@ -62,6 +64,30 @@ namespace NodeKit.Cli.Tests.Fakes
 
         public List<string> CallOrder { get; } = new();
 
+        /// <summary><see cref="CallOrder"/>와 같은 순서·같은 lock으로 남긴 Resolve/Submit/Watch 요청 message.</summary>
+        public List<IMessage> CallRequests { get; } = new();
+
+        /// <summary>지금까지 받은 Resolve/Submit/Watch 호출 수. <see cref="CallsSince"/>의 기준점으로 쓴다.</summary>
+        public int CallCount
+        {
+            get
+            {
+                lock (CallOrder)
+                {
+                    return CallOrder.Count;
+                }
+            }
+        }
+
+        /// <summary><paramref name="mark"/>번째 이후의 호출을 (RPC 이름, 요청) 순서대로 돌려준다.</summary>
+        public IReadOnlyList<(string Method, IMessage Request)> CallsSince(int mark)
+        {
+            lock (CallOrder)
+            {
+                return CallOrder.Skip(mark).Zip(CallRequests.Skip(mark)).ToList();
+            }
+        }
+
         public override async Task<ResolvedToolSpecResponse> ResolveToolSpec(
             ToolSpecRequest request, ServerCallContext context)
         {
@@ -69,6 +95,7 @@ namespace NodeKit.Cli.Tests.Fakes
             {
                 ResolveRequests.Add(request);
                 CallOrder.Add("Resolve");
+                CallRequests.Add(request);
             }
 
             if (HangOnResolveToolSpec)
@@ -86,6 +113,7 @@ namespace NodeKit.Cli.Tests.Fakes
             {
                 SubmitRequests.Add(request);
                 CallOrder.Add("Submit");
+                CallRequests.Add(request);
             }
 
             if (HangOnSubmitToolBuild)
@@ -105,6 +133,7 @@ namespace NodeKit.Cli.Tests.Fakes
             {
                 WatchRequests.Add(request);
                 CallOrder.Add("Watch");
+                CallRequests.Add(request);
             }
 
             foreach (var ev in WatchEvents)

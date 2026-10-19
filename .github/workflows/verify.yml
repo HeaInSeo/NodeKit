@@ -123,7 +123,14 @@ jobs:
       - name: Test with coverage (NodeKit.Tests)
         run: dotnet test --project tests/NodeKit.Tests --no-build --configuration Release --results-directory TestResults/NodeKit.Tests --coverage --coverage-output coverage.cobertura.xml --coverage-output-format cobertura
 
+      # S4-04-A–F (P10.executable): PublishedCliProcessTests and the published
+      # register-replay tests run the pkg-a archive checked above as a separate
+      # process from outside the repository. Without this variable they skip, and
+      # the report gate below fails on a skip in those classes.
       - name: Test with coverage (NodeKit.Cli.Tests)
+        env:
+          NODEKIT_CLI_PACKAGE_DIR: ${{ runner.temp }}/pkg-a
+          NODEKIT_CLI_ACCEPTANCE_OUT: ${{ github.workspace }}/TestResults/published-cli
         run: dotnet test --project tests/NodeKit.Cli.Tests --no-build --configuration Release --results-directory TestResults/NodeKit.Cli.Tests --coverage --coverage-output coverage.cobertura.xml --coverage-output-format cobertura --report-xunit --report-xunit-filename cli-tests.xunit.xml
 
       # S4-05-A/C: an empty or shrunken run, a failure, or a skip outside the two
@@ -179,4 +186,14 @@ jobs:
         with:
           name: cli-test-report
           path: TestResults/NodeKit.Cli.Tests/cli-tests.xunit.xml
+          if-no-files-found: error
+
+      # Each published-process run: package sha256, source sha, cwd, args, exit,
+      # stdout and stderr (S4-04-F transcript tied to the package hash).
+      - name: Upload published CLI transcript
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: published-cli-transcript
+          path: TestResults/published-cli/published-cli-transcript.jsonl
           if-no-files-found: error
