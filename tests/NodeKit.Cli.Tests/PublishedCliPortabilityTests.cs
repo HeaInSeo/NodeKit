@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using NodeKit.Cli.Tests.Fakes;
@@ -89,7 +90,8 @@ namespace NodeKit.Cli.Tests
         // S4-04-G (ToolSpec): A가 공개 방법 6개로 만든 Recipe를 A에서 validate/render/submit한 뒤 Recipe 파일만 B로
         // 옮긴다. B는 CWD 밖의 상대 경로로 같은 파일을 읽어 같은 render 결과와 같은 Resolve raw_spec을 만들고, 자기
         // endpoint로 새 request ID를 써서 fresh 제출한다. dockerfile Recipe는 A의 Dockerfile이 사라져도 저장된 내용을
-        // 쓴다. B의 어떤 파일도 A의 경로나 endpoint를 담지 않는다.
+        // 쓴다. B의 어떤 파일(디코드한 snapshot 내용 포함)도 dockerfile Recipe의 DockerfilePath 한 값 말고는 A의 경로나
+        // endpoint를 담지 않는다.
         [Fact]
         public void ToolSpecRecipes_FromA_ReusedOnCleanB_SameMeaning_FreshSubmitToOwnEndpoint()
         {
@@ -188,14 +190,15 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(_toolSpecMethods.Count, Directory.GetFiles(Path.Join(_b.Recipes, ".nodekit", "receipts"), "*.json").Length);
 
             // 관측: dockerfile Recipe는 고정한 내용 옆에 A의 작성 입력 DockerfilePath(절대 경로)도 그대로 담는다. B는
-            // 그 파일 없이(A를 지운 뒤) 위 validate/render/submit을 통과했으므로 이 값을 읽지 않는다. 이 한 값 말고는
-            // B의 Recipe·기록·render 결과 어디에도 A의 경로나 endpoint가 없다.
+            // 그 파일 없이(A를 지운 뒤) 위 validate/render/submit을 통과했으므로 이 값을 읽지 않는다. B의 source snapshot은
+            // 그 Recipe bytes를 그대로(base64로) 담으므로 같은 값이 snapshot의 dockerfile.json entry에도 한 번 있다. 이
+            // 한 값 말고는 B의 Recipe·기록(디코드한 snapshot 내용 포함)·render 결과 어디에도 A의 경로나 endpoint가 없다.
             using (var dockerRecipe = JsonDocument.Parse(authored["dockerfile"].Recipe))
             {
                 Assert.Equal(dockerfile, Property(dockerRecipe.RootElement, "DockerfilePath").GetString());
             }
 
-            AssertNoReferenceTo(_b.Root, _a.Root, urlA, allowed: (Path.Join(_b.Recipes, "dockerfile.json"), dockerfile));
+            AssertNoReferenceTo(_b.Root, _a.Root, urlA, allowed: ("dockerfile.json", dockerfile));
         }
 
         // S4-04-G (source binding): B에서 Recipe를 고쳐 다시 제출하면 새 source snapshot이 생기고, 앞 제출의 receipt와
@@ -511,6 +514,65 @@ namespace NodeKit.Cli.Tests
             }
         }
 
+        // A 참조 검사 자체의 회귀: snapshot의 content_base64 안에 숨은 A 경로도 잡고, 허용한 DockerfilePath는 그 Recipe와
+        // 같은 logical_path snapshot entry에서 한 번만 통과시킨다. published package 없이 도는 검사다.
+        [Fact]
+        public void AssertNoReferenceTo_DecodesSnapshotPayloads_AndScopesTheAllowance()
+        {
+            var root = Path.Join(Path.GetTempPath(), "nodekit-p10-port-check-" + Guid.NewGuid().ToString("N"));
+            var recipes = Path.Join(root, "recipes");
+            var snapshots = Path.Join(recipes, ".nodekit", "snapshots", "source");
+            var aRoot = Path.Join(Path.GetTempPath(), "nodekit-p10-port-a-" + Guid.NewGuid().ToString("N"));
+            const string aUrl = "http://127.0.0.1:1/";
+            var aPath = Path.Join(aRoot, "work", "project", "Dockerfile");
+            var allowed = ("dockerfile.json", aPath);
+            var recipe = JsonSerializer.Serialize(new { DockerfilePath = aPath, DockerfileContent = "FROM x" });
+            try
+            {
+                Directory.CreateDirectory(snapshots);
+                File.WriteAllText(Path.Join(recipes, "dockerfile.json"), recipe);
+
+                void WriteSnapshot(params (string LogicalPath, string Content)[] files) =>
+                    File.WriteAllText(
+                        Path.Join(snapshots, "s.json"),
+                        JsonSerializer.Serialize(new
+                        {
+                            schema_version = "nodekit.source-snapshot.v1",
+                            files = files.Select(f => new { logical_path = f.LogicalPath, content_base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(f.Content)) }),
+                        }));
+
+                void Check() => AssertNoReferenceTo(root, Path.Join(root, "install"), recipes, aRoot, aUrl, allowed);
+
+                // 허용한 값이 Recipe와 snapshot의 같은 entry에 한 번씩 있으면 통과한다.
+                WriteSnapshot(("dockerfile.json", recipe));
+                Check();
+
+                // encoded 내용 안의 A 참조는 놓치지 않는다.
+                WriteSnapshot(("dockerfile.json", recipe), ("scripts/run.sh", "cat " + Path.Join(aRoot, "x")));
+                Assert.ThrowsAny<Xunit.Sdk.XunitException>(Check);
+                WriteSnapshot(("dockerfile.json", recipe.Replace("FROM x", "FROM x " + aUrl, StringComparison.Ordinal)));
+                Assert.ThrowsAny<Xunit.Sdk.XunitException>(Check);
+
+                // 허용은 같은 logical_path에서 정확히 그 값 한 번뿐이다.
+                WriteSnapshot(("other.json", recipe));
+                Assert.ThrowsAny<Xunit.Sdk.XunitException>(Check);
+                WriteSnapshot(("dockerfile.json", recipe.Replace("FROM x", "FROM x " + aPath, StringComparison.Ordinal)));
+                Assert.ThrowsAny<Xunit.Sdk.XunitException>(Check);
+
+                // 평문 파일의 A 참조도 그대로 잡는다.
+                WriteSnapshot(("dockerfile.json", recipe));
+                File.WriteAllText(Path.Join(root, "render.json"), "{\"u\":\"" + aUrl + "\"}");
+                Assert.ThrowsAny<Xunit.Sdk.XunitException>(Check);
+            }
+            finally
+            {
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, recursive: true);
+                }
+            }
+        }
+
         private static void ExpectExit(int exit, PublishedCliResult result) =>
             Assert.True(result.Exit == exit, $"exit {result.Exit}, want {exit}\nstdout: {result.Stdout}\nstderr: {result.Stderr}");
 
@@ -536,29 +598,93 @@ namespace NodeKit.Cli.Tests
                 .OrderBy(f => f, StringComparer.Ordinal)
                 .ToList();
 
-        // B 아래의 어떤 파일(기록·render 결과 포함)도 A의 경로나 A endpoint를 담지 않는다. 설치 binary는 제외한다.
-        // allowed는 한 파일에서 정확히 한 번 나와도 되는 A 값(그 파일의 다른 곳에는 A 경로가 없어야 한다)이다.
-        private void AssertNoReferenceTo(string root, string aRoot, string? aUrl, (string File, string Value)? allowed = null)
+        private void AssertNoReferenceTo(string root, string aRoot, string? aUrl, (string LogicalPath, string Value)? allowed = null) =>
+            AssertNoReferenceTo(root, _b.Package.InstallDir, _b.Recipes, aRoot, aUrl, allowed);
+
+        // B 아래의 어떤 파일(기록·render 결과 포함)도 A의 경로나 A endpoint를 담지 않는다. skipDirectory(설치 binary)는
+        // 제외한다. JSON 기록 안의 content_base64(source snapshot이 담은 Recipe·동반 파일 exact bytes)는 디코드해 같은
+        // 검사를 한다. allowed는 Recipe 기준 상대 이름 하나와 그 파일에서 정확히 한 번 나와도 되는 A 값이다. 그 Recipe
+        // 파일과 snapshot 안의 같은 logical_path entry에만 적용되며, 그 밖의 곳이나 같은 파일의 다른 곳에는 A 경로가 없어야 한다.
+        private static void AssertNoReferenceTo(
+            string root,
+            string skipDirectory,
+            string recipes,
+            string aRoot,
+            string? aUrl,
+            (string LogicalPath, string Value)? allowed)
         {
             foreach (var file in Directory.GetFiles(root, "*", SearchOption.AllDirectories))
             {
-                if (file.StartsWith(_b.Package.InstallDir, StringComparison.Ordinal))
+                if (file.StartsWith(skipDirectory, StringComparison.Ordinal))
                 {
                     continue;
                 }
 
                 var text = File.ReadAllText(file);
-                if (allowed is { } value && file == value.File)
+                var allowedHere = allowed is { } recipe && file == Path.Join(recipes, recipe.LogicalPath) ? recipe.Value : null;
+                AssertNoReference(file, text, aRoot, aUrl, allowedHere);
+                foreach (var (logicalPath, content) in EncodedContents(text))
                 {
-                    var quoted = JsonSerializer.Serialize(value.Value);
-                    Assert.Equal(1, text.Split(quoted).Length - 1);
-                    text = text.Replace(quoted, "\"\"", StringComparison.Ordinal);
+                    var allowedEntry = allowed is { } entry && logicalPath == entry.LogicalPath ? entry.Value : null;
+                    AssertNoReference(file + "!" + logicalPath, content, aRoot, aUrl, allowedEntry);
                 }
+            }
+        }
 
-                Assert.DoesNotContain(aRoot, text, StringComparison.Ordinal);
-                if (aUrl is not null)
+        private static void AssertNoReference(string label, string text, string aRoot, string? aUrl, string? allowedValue)
+        {
+            if (allowedValue is not null)
+            {
+                var quoted = JsonSerializer.Serialize(allowedValue);
+                Assert.True(text.Split(quoted).Length - 1 == 1, label + ": 허용한 A 값이 정확히 한 번 나와야 한다");
+                text = text.Replace(quoted, "\"\"", StringComparison.Ordinal);
+            }
+
+            Assert.False(text.Contains(aRoot, StringComparison.Ordinal), label + ": A 경로를 담는다");
+            Assert.False(aUrl is not null && text.Contains(aUrl, StringComparison.Ordinal), label + ": A endpoint를 담는다");
+        }
+
+        // JSON 문서 어디든 content_base64가 있으면 디코드한 text를 (logical_path, text)로 돌려준다. JSON이 아니면 없다.
+        private static List<(string LogicalPath, string Content)> EncodedContents(string text)
+        {
+            var found = new List<(string, string)>();
+            JsonNode? node;
+            try
+            {
+                node = JsonNode.Parse(text);
+            }
+            catch (JsonException)
+            {
+                return found;
+            }
+
+            Walk(node);
+            return found;
+
+            void Walk(JsonNode? current)
+            {
+                switch (current)
                 {
-                    Assert.DoesNotContain(aUrl, text, StringComparison.Ordinal);
+                    case JsonObject obj:
+                        if (obj["content_base64"] is JsonValue encoded)
+                        {
+                            var logicalPath = obj["logical_path"]?.GetValue<string>() ?? "content_base64";
+                            found.Add((logicalPath, Encoding.UTF8.GetString(Convert.FromBase64String(encoded.GetValue<string>()))));
+                        }
+
+                        foreach (var (_, child) in obj)
+                        {
+                            Walk(child);
+                        }
+
+                        break;
+                    case JsonArray array:
+                        foreach (var child in array)
+                        {
+                            Walk(child);
+                        }
+
+                        break;
                 }
             }
         }
