@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text.Json;
+using Google.Protobuf;
 using NodeKit.Authoring.Recipes;
 using NodeKit.Cli.Tests.Fakes;
 using Xunit;
@@ -26,6 +28,9 @@ namespace NodeKit.Cli.Tests
             "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
         private const string ToolSpecDigest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        // fake ResolveToolSpec가 돌려주는 digest. Submit은 recipe 쪽 값이 아니라 이 Resolve 응답 digest를 보내야 한다.
+        private const string ResolvedToolSpecDigest = "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+
         private const string BaseToolImageDigest = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 
         private readonly string _workDir = Path.Join(Path.GetTempPath(), "nodekit-p10-executable-" + Guid.NewGuid());
@@ -169,7 +174,9 @@ namespace NodeKit.Cli.Tests
         }
 
         // S4-04-F (ToolSpec): published process가 --url의 loopback fake에 Resolve→Submit→Watch를 보내고 CWD 기준
-        // receipt를 남긴다. 별도 process의 `receipt watch`는 저장된 build ID로 Watch만 다시 보내고 새로 제출하지 않는다.
+        // receipt를 남긴다. Submit payload는 receipt에 저장한 request ID와 Resolve 응답 digest다. 별도 process의
+        // `receipt watch`는 저장된 build ID로 Watch만 다시 보내고 새로 제출하지 않으며 receipt의 request ID를 바꾸지 않는다.
+        // 각 실행의 transcript는 같은 package hash에 그 실행의 RPC 순서·요청 hash와 receipt hash를 묶는다.
         [Fact]
         public void ToolSpecSubmit_ThenSeparateProcessReceiptWatch_SameBuildId_NoResubmit()
         {
@@ -177,7 +184,7 @@ namespace NodeKit.Cli.Tests
             using var host = NewHost();
             WriteToolSpecRecipe("recipe.json");
 
-            var submit = package.Run(_workDir, new[] { "submit", "recipe.json", "--url", host.Url, "--format", "jsonl" });
+            var submit = package.Run(_workDir, new[] { "submit", "recipe.json", "--url", host.Url, "--format", "jsonl" }, host: host);
 
             Assert.True(submit.Exit == 0, submit.Stderr);
             Assert.Equal(new[] { "Resolve", "Submit", "Watch" }, host.Fake.CallOrder);
@@ -188,17 +195,26 @@ namespace NodeKit.Cli.Tests
             var stored = File.ReadAllText(receiptPath);
             Assert.Contains(host.Url, stored);
             Assert.Contains(FixtureBuildId, stored);
+            var requestId = ReadProperty(receiptPath, "request_id");
+            var submitRequest = Assert.Single(host.Fake.SubmitRequests);
+            Assert.False(string.IsNullOrEmpty(requestId));
+            Assert.Equal(requestId, submitRequest.RequestId);
+            Assert.Equal(ResolvedToolSpecDigest, submitRequest.ToolSpecDigest);
+            AssertTranscript(package, submit, host, new[] { "Resolve", "Submit", "Watch" }, receiptPath).Dispose();
 
-            var watch = package.Run(_workDir, new[] { "receipt", "watch", receiptPath, "--format", "jsonl" });
+            var watch = package.Run(_workDir, new[] { "receipt", "watch", receiptPath, "--format", "jsonl" }, host: host);
 
             Assert.True(watch.Exit == 0, watch.Stderr);
             Assert.Equal(new[] { "Resolve", "Submit", "Watch", "Watch" }, host.Fake.CallOrder);
             Assert.Single(host.Fake.SubmitRequests);
             Assert.All(host.Fake.WatchRequests, w => Assert.Equal(FixtureBuildId, w.BuildId));
             Assert.Equal("Succeeded", Completed(watch.Stdout).GetProperty("status").GetString());
+            Assert.Equal(requestId, ReadProperty(receiptPath, "request_id"));
+            AssertTranscript(package, watch, host, new[] { "Watch" }, receiptPath).Dispose();
         }
 
-        // S4-04-F: --url 없이 NODEKIT_NODEVAULT_URL로 지정한 endpoint도 같은 경로로 간다.
+        // S4-04-F: --url 없이 NODEKIT_NODEVAULT_URL로 지정한 endpoint도 같은 경로·같은 payload로 가고, transcript에
+        // 그 env override가 남는다.
         [Fact]
         public void ToolSpecSubmit_EndpointFromEnvironment_ReachesLoopbackFake()
         {
@@ -209,10 +225,17 @@ namespace NodeKit.Cli.Tests
             var submit = package.Run(
                 _workDir,
                 new[] { "submit", "recipe.json", "--format", "jsonl" },
-                environment: new Dictionary<string, string> { ["NODEKIT_NODEVAULT_URL"] = host.Url });
+                environment: new Dictionary<string, string> { ["NODEKIT_NODEVAULT_URL"] = host.Url },
+                host: host);
 
             Assert.True(submit.Exit == 0, submit.Stderr);
             Assert.Equal(new[] { "Resolve", "Submit", "Watch" }, host.Fake.CallOrder);
+            var receiptPath = Assert.Single(Directory.GetFiles(Path.Join(_workDir, ".nodekit", "receipts"), "*.json"));
+            var submitRequest = Assert.Single(host.Fake.SubmitRequests);
+            Assert.Equal(ReadProperty(receiptPath, "request_id"), submitRequest.RequestId);
+            Assert.Equal(ResolvedToolSpecDigest, submitRequest.ToolSpecDigest);
+            using var transcript = AssertTranscript(package, submit, host, new[] { "Resolve", "Submit", "Watch" }, receiptPath);
+            Assert.Equal(host.Url, transcript.RootElement.GetProperty("env").GetProperty("NODEKIT_NODEVAULT_URL").GetString());
         }
 
         // listener를 닫은 주소로는 bounded 시간 안에 실패한다 — 실제 소켓을 탔다는 대조군이다.
@@ -239,6 +262,12 @@ namespace NodeKit.Cli.Tests
         private static LoopbackGrpcFixtureHost NewHost()
         {
             var host = new LoopbackGrpcFixtureHost();
+            host.Fake.OnResolveToolSpec = request => new Nodevault.V1.ResolvedToolSpecResponse
+            {
+                ToolSpecDigest = ResolvedToolSpecDigest,
+                ToolName = request.ToolName,
+                Version = request.Version,
+            };
             host.Fake.OnSubmitToolBuild = _ => new Nodevault.V1.SubmitToolBuildResponse { BuildId = FixtureBuildId, Status = "Requested" };
             host.Fake.WatchEvents = new List<ProtoBuildEvent>
             {
@@ -247,6 +276,43 @@ namespace NodeKit.Cli.Tests
             };
             return host;
         }
+
+        // transcript record가 같은 package hash에 이 실행의 RPC 순서, fake가 받은 요청과 같은 bytes hash, Submit
+        // payload, receipt 파일의 현재 hash를 담는지 확인한다. 실행 직후에 부르므로 receipt hash는 이 실행이 남긴 값이다.
+        private static JsonDocument AssertTranscript(
+            PublishedCliPackage package,
+            PublishedCliResult result,
+            LoopbackGrpcFixtureHost host,
+            string[] expectedMethods,
+            string receiptPath)
+        {
+            var transcript = JsonDocument.Parse(result.Transcript);
+            var root = transcript.RootElement;
+            Assert.Equal(package.ArchiveSha256, root.GetProperty("package_sha256").GetString());
+            Assert.Equal(package.SourceSha, root.GetProperty("source_sha").GetString());
+            Assert.Equal(result.Exit, root.GetProperty("exit").GetInt32());
+
+            var rpc = root.GetProperty("rpc").EnumerateArray().ToList();
+            Assert.Equal(expectedMethods, rpc.Select(r => r.GetProperty("method").GetString()));
+            var recorded = host.Fake.CallsSince(host.Fake.CallCount - expectedMethods.Length);
+            for (var i = 0; i < rpc.Count; i++)
+            {
+                Assert.Equal(recorded[i].Request.Descriptor.FullName, rpc[i].GetProperty("request_type").GetString());
+                Assert.Equal(Sha256Hex(recorded[i].Request.ToByteArray()), rpc[i].GetProperty("request_sha256").GetString());
+                if (rpc[i].GetProperty("method").GetString() == "Submit")
+                {
+                    using var request = JsonDocument.Parse(rpc[i].GetProperty("request").GetString()!);
+                    Assert.Equal(ReadProperty(receiptPath, "request_id"), request.RootElement.GetProperty("requestId").GetString());
+                    Assert.Equal(ResolvedToolSpecDigest, request.RootElement.GetProperty("toolSpecDigest").GetString());
+                }
+            }
+
+            var receiptKey = ".nodekit/receipts/" + Path.GetFileName(receiptPath);
+            Assert.Equal(Sha256Hex(File.ReadAllBytes(receiptPath)), root.GetProperty("files").GetProperty(receiptKey).GetString());
+            return transcript;
+        }
+
+        private static string Sha256Hex(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
 
         private static RecipeDocument ToolSpecRecipe() => new()
         {

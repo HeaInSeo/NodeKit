@@ -1,4 +1,7 @@
+using System;
 using System.IO;
+using System.Security.Cryptography;
+using System.Text.Json;
 using Grpc.Core;
 using NodeKit.Cli.Operations;
 using NodeKit.Cli.Tests.Fakes;
@@ -48,7 +51,8 @@ namespace NodeKit.Cli.Tests
 
             var replay = package.Run(
                 _workDir,
-                new[] { "function-recipe", "register-replay", Path.Join(".nodekit", "registrations", RegistrationId + ".json"), "--url", host.Url, "--format", "jsonl" });
+                new[] { "function-recipe", "register-replay", Path.Join(".nodekit", "registrations", RegistrationId + ".json"), "--url", host.Url, "--format", "jsonl" },
+                host: host);
 
             Assert.True(replay.Exit == 0, replay.Stderr);
             Assert.Equal(2, host.Registry.RegisterRequests.Count);
@@ -62,6 +66,19 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(RegistrationState.Registered, receipt.State);
             Assert.Equal(2, receipt.Attempts);
             Assert.Equal(host.Url, receipt.Endpoint);
+
+            // 같은 package hash의 transcript record에 이 실행의 RPC는 Register 한 건이고, 그 bytes hash는 fake가 받은
+            // replay bytes, registration receipt hash는 지금 파일 값이다.
+            using var transcript = JsonDocument.Parse(replay.Transcript);
+            Assert.Equal(package.ArchiveSha256, transcript.RootElement.GetProperty("package_sha256").GetString());
+            var rpc = Assert.Single(transcript.RootElement.GetProperty("rpc").EnumerateArray());
+            Assert.Equal("Register", rpc.GetProperty("method").GetString());
+            Assert.Equal(
+                Convert.ToHexStringLower(SHA256.HashData(host.Registry.RegisterRequestBytes[1])),
+                rpc.GetProperty("request_sha256").GetString());
+            Assert.Equal(
+                Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(RegistrationPath()))),
+                transcript.RootElement.GetProperty("files").GetProperty(".nodekit/registrations/" + RegistrationId + ".json").GetString());
         }
     }
 }

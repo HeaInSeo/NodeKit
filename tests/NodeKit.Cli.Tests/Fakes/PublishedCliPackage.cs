@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text.Json;
+using Google.Protobuf;
 using Xunit;
 
 namespace NodeKit.Cli.Tests.Fakes
@@ -20,7 +21,7 @@ namespace NodeKit.Cli.Tests.Fakes
     {
         public const string PackageDirVariable = "NODEKIT_CLI_PACKAGE_DIR";
 
-        /// <summary>값이 있으면 각 실행의 args/exit/stdout/stderr와 package sha256을 이 디렉터리의 JSONL에 덧붙인다.</summary>
+        /// <summary>값이 있으면 각 실행의 <see cref="PublishedCliResult.Transcript"/>를 이 디렉터리의 JSONL에 덧붙인다.</summary>
         public const string TranscriptDirVariable = "NODEKIT_CLI_ACCEPTANCE_OUT";
 
         private static readonly TimeSpan _defaultTimeout = TimeSpan.FromSeconds(60);
@@ -60,16 +61,20 @@ namespace NodeKit.Cli.Tests.Fakes
 
         /// <summary>
         /// package의 nodekit을 <paramref name="workingDirectory"/>에서 실행한다. 부모 환경의 NODEKIT_NODEVAULT_URL은
-        /// 지워서 명시한 --url/env만 쓰게 한다. timeout이면 process tree를 끝내고 실패한다.
+        /// 지워서 명시한 --url/env만 쓰게 한다. timeout이면 process tree를 끝내고 실패한다. <paramref name="host"/>가
+        /// 있으면 이 실행 동안 그 loopback fake가 받은 RPC를 transcript에 같이 남긴다.
         /// </summary>
         public PublishedCliResult Run(
             string workingDirectory,
             IEnumerable<string> args,
             string? stdin = null,
             IReadOnlyDictionary<string, string>? environment = null,
-            TimeSpan? timeout = null)
+            TimeSpan? timeout = null,
+            LoopbackGrpcFixtureHost? host = null)
         {
             var argList = args.ToList();
+            var buildMark = host?.Fake.CallCount ?? 0;
+            var registerMark = host?.Registry.RegisterRequestBytes.Count ?? 0;
             var start = new ProcessStartInfo(Command)
             {
                 WorkingDirectory = workingDirectory,
@@ -112,12 +117,59 @@ namespace NodeKit.Cli.Tests.Fakes
             }
 
             process.WaitForExit();
-            var result = new PublishedCliResult(process.ExitCode, stdoutTask.GetAwaiter().GetResult(), stderrTask.GetAwaiter().GetResult());
-            AppendTranscript(workingDirectory, argList, result);
-            return result;
+            var exit = process.ExitCode;
+            var stdout = stdoutTask.GetAwaiter().GetResult();
+            var stderr = stderrTask.GetAwaiter().GetResult();
+
+            // S4-04-F: 같은 package hash에 이 실행의 입력·출력·fake RPC·로컬 파일 hash를 한 record로 묶는다.
+            var rpc = new List<TranscriptRpc>();
+            if (host is not null)
+            {
+                rpc.AddRange(host.Fake.CallsSince(buildMark).Select(c => TranscriptRpc.Of(c.Method, c.Request)));
+                for (var i = registerMark; i < host.Registry.RegisterRequestBytes.Count; i++)
+                {
+                    rpc.Add(TranscriptRpc.Of("Register", host.Registry.RegisterRequests[i], host.Registry.RegisterRequestBytes[i]));
+                }
+            }
+
+            var transcript = JsonSerializer.Serialize(new
+            {
+                package_sha256 = ArchiveSha256,
+                source_sha = SourceSha,
+                cwd = workingDirectory,
+                args = argList,
+                stdin,
+                env = environment ?? new Dictionary<string, string>(),
+                exit,
+                stdout,
+                stderr,
+                rpc = rpc.Select(r => new { method = r.Method, request_type = r.RequestType, request_sha256 = r.RequestSha256, request = r.RequestJson }),
+                files = StateFileHashes(workingDirectory),
+            });
+            AppendTranscript(transcript);
+            return new PublishedCliResult(exit, stdout, stderr, transcript);
         }
 
-        private void AppendTranscript(string workingDirectory, List<string> args, PublishedCliResult result)
+        /// <summary><c>&lt;cwd&gt;/.nodekit</c> 아래 모든 파일(receipt·lock 포함)의 상대 경로와 sha256. 정렬해 결정적으로 남긴다.</summary>
+        private static SortedDictionary<string, string> StateFileHashes(string workingDirectory)
+        {
+            var hashes = new SortedDictionary<string, string>(StringComparer.Ordinal);
+            var root = Path.Join(workingDirectory, ".nodekit");
+            if (!Directory.Exists(root))
+            {
+                return hashes;
+            }
+
+            foreach (var file in Directory.GetFiles(root, "*", SearchOption.AllDirectories))
+            {
+                var relative = Path.GetRelativePath(workingDirectory, file).Replace(Path.DirectorySeparatorChar, '/');
+                hashes[relative] = Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(file)));
+            }
+
+            return hashes;
+        }
+
+        private static void AppendTranscript(string line)
         {
             var dir = Environment.GetEnvironmentVariable(TranscriptDirVariable);
             if (string.IsNullOrEmpty(dir))
@@ -125,16 +177,6 @@ namespace NodeKit.Cli.Tests.Fakes
                 return;
             }
 
-            var line = JsonSerializer.Serialize(new
-            {
-                package_sha256 = ArchiveSha256,
-                source_sha = SourceSha,
-                cwd = workingDirectory,
-                args,
-                exit = result.Exit,
-                stdout = result.Stdout,
-                stderr = result.Stderr,
-            });
             lock (_transcriptLock)
             {
                 Directory.CreateDirectory(dir);
@@ -173,5 +215,23 @@ namespace NodeKit.Cli.Tests.Fakes
         }
     }
 
-    internal sealed record PublishedCliResult(int Exit, string Stdout, string Stderr);
+    /// <summary>
+    /// published process 한 번의 결과. <see cref="Transcript"/>는 package sha256·source sha·cwd·args·stdin·env
+    /// override·exit·stdout·stderr·fake RPC(순서, 요청 type, 요청 bytes sha256, 요청 JSON)·<c>.nodekit</c> 파일 hash를
+    /// 담은 JSON 한 줄이며 <see cref="PublishedCliPackage.TranscriptDirVariable"/>의 JSONL에 그대로 덧붙는다.
+    /// </summary>
+    internal sealed record PublishedCliResult(int Exit, string Stdout, string Stderr, string Transcript);
+
+    /// <summary>
+    /// fake가 받은 RPC 한 건. Resolve/Submit/Watch의 bytes는 fake가 역직렬화한 message를 다시 encode한 값이고,
+    /// Register는 FakeToolRegistryService가 받은 직후 남긴 bytes다.
+    /// </summary>
+    internal sealed record TranscriptRpc(string Method, string RequestType, string RequestSha256, string RequestJson)
+    {
+        public static TranscriptRpc Of(string method, IMessage request, byte[]? bytes = null) => new(
+            method,
+            request.Descriptor.FullName,
+            Convert.ToHexStringLower(SHA256.HashData(bytes ?? request.ToByteArray())),
+            JsonFormatter.Default.Format(request));
+    }
 }
