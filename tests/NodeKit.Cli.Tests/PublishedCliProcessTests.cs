@@ -39,29 +39,45 @@ namespace NodeKit.Cli.Tests
 
         public void Dispose() => Directory.Delete(_workDir, recursive: true);
 
+        // 최상위 사용법에만 있는 문장. subcommand --help가 최상위 사용법으로 빠지면 이 문장이 나온다.
+        private const string TopLevelHelpMarker = "각 명령의 자세한 옵션은";
+
         // S4-04-A: 배포 binary의 최상위와 각 subcommand --help는 exit 0, usage를 stdout에, stderr는 비어 있다.
+        // 각 행은 그 명령만의 사용법 줄을 요구하고, subcommand 행은 최상위 사용법이 아님을 확인한다. 최상위 목록은
+        // 두 칸 들여쓰기로 명령을 나열하므로 "사용법: nodekit <명령>"은 해당 subcommand가 직접 낸 경우에만 나온다.
         [Theory]
-        [InlineData("--help")]
-        [InlineData("validate", "--help")]
-        [InlineData("render", "--help")]
-        [InlineData("submit", "--help")]
-        [InlineData("recipe", "create", "--help")]
-        [InlineData("receipt", "--help")]
-        [InlineData("function-recipe", "--help")]
-        [InlineData("function-recipe", "create", "--help")]
-        [InlineData("function-recipe", "validate", "--help")]
-        [InlineData("function-recipe", "render", "--help")]
-        [InlineData("function-recipe", "submit", "--help")]
-        [InlineData("function-recipe", "register-replay", "--help")]
-        public void Help_ExitsZeroWithUsage(params string[] args)
+        [InlineData(TopLevelHelpMarker, "--help")]
+        [InlineData("사용법: nodekit validate <recipe.json>", "validate", "--help")]
+        [InlineData("사용법: nodekit render <recipe.json>", "render", "--help")]
+        [InlineData("사용법: nodekit submit <recipe.json>", "submit", "--help")]
+        [InlineData("사용법: nodekit recipe create", "recipe", "create", "--help")]
+        [InlineData("  nodekit receipt watch <receipt.json> [--format human|jsonl]", "receipt", "--help")]
+        [InlineData("  nodekit function-recipe register-replay <registration-receipt.json>", "function-recipe", "--help")]
+        [InlineData("사용법: nodekit function-recipe create", "function-recipe", "create", "--help")]
+        [InlineData("사용법: nodekit function-recipe validate <path>", "function-recipe", "validate", "--help")]
+        [InlineData("사용법: nodekit function-recipe render <path>", "function-recipe", "render", "--help")]
+        [InlineData("사용법: nodekit function-recipe submit <path>", "function-recipe", "submit", "--help")]
+        [InlineData("사용법: nodekit function-recipe register-replay", "function-recipe", "register-replay", "--help")]
+        public void Help_ExitsZeroWithCommandSpecificUsage(string expectedUsage, params string[] args)
         {
             var package = PublishedCliPackage.Require();
 
             var result = package.Run(_workDir, args);
 
             Assert.True(result.Exit == 0, result.Stderr);
-            Assert.Contains("nodekit", result.Stdout);
+            Assert.Contains(expectedUsage, result.Stdout);
             Assert.Empty(result.Stderr);
+            if (args[0] != "--help")
+            {
+                Assert.DoesNotContain(TopLevelHelpMarker, result.Stdout);
+            }
+
+            if (args is ["function-recipe", "--help"])
+            {
+                // function-recipe 묶음 사용법은 ToolSpec 명령을 나열하지 않는다.
+                Assert.DoesNotContain("nodekit validate", result.Stdout);
+                Assert.DoesNotContain("nodekit submit", result.Stdout);
+            }
         }
 
         // S4-04-B/E: repository 밖 CWD에서 상대 경로로 create→validate→render. 저장된 Draft를 다시 읽어 Ready로
@@ -121,7 +137,8 @@ namespace NodeKit.Cli.Tests
         }
 
         // S4-04-C: redirected `recipe create`에서 첫 필수 입력 전에 stdin이 끝나면 exit 130, 파일을 만들지 않고
-        // machine stream에 ANSI가 없다(RecipeCreateInteractiveTests의 in-process 정책과 같은 값).
+        // machine stream에 ANSI가 없다(RecipeCreateInteractiveTests의 in-process 정책과 같은 값). NO_COLOR 없이
+        // 색을 지원하는 TERM을 주므로 ANSI가 없는 이유는 stdin/stdout/stderr redirection에 대한 CLI의 판단뿐이다.
         [Fact]
         public void RecipeCreate_EofBeforeRequiredInput_Exit130_NoFile()
         {
@@ -131,6 +148,7 @@ namespace NodeKit.Cli.Tests
                 _workDir,
                 new[] { "recipe", "create", "eof.json" },
                 stdin: string.Empty,
+                environment: new Dictionary<string, string> { ["TERM"] = "xterm-256color" },
                 timeout: TimeSpan.FromSeconds(30));
 
             Assert.Equal(130, result.Exit);
@@ -188,7 +206,7 @@ namespace NodeKit.Cli.Tests
 
             Assert.True(submit.Exit == 0, submit.Stderr);
             Assert.Equal(new[] { "Resolve", "Submit", "Watch" }, host.Fake.CallOrder);
-            Assert.Equal("bwa-mem", Assert.Single(host.Fake.ResolveRequests).ToolName);
+            AssertResolveRequest(Assert.Single(host.Fake.ResolveRequests));
             Assert.Equal(FixtureBuildId, Assert.Single(host.Fake.WatchRequests).BuildId);
             Assert.Equal("Succeeded", Completed(submit.Stdout).GetProperty("status").GetString());
             var receiptPath = Assert.Single(Directory.GetFiles(Path.Join(_workDir, ".nodekit", "receipts"), "*.json"));
@@ -230,6 +248,7 @@ namespace NodeKit.Cli.Tests
 
             Assert.True(submit.Exit == 0, submit.Stderr);
             Assert.Equal(new[] { "Resolve", "Submit", "Watch" }, host.Fake.CallOrder);
+            AssertResolveRequest(Assert.Single(host.Fake.ResolveRequests));
             var receiptPath = Assert.Single(Directory.GetFiles(Path.Join(_workDir, ".nodekit", "receipts"), "*.json"));
             var submitRequest = Assert.Single(host.Fake.SubmitRequests);
             Assert.Equal(ReadProperty(receiptPath, "request_id"), submitRequest.RequestId);
@@ -310,6 +329,35 @@ namespace NodeKit.Cli.Tests
             var receiptKey = ".nodekit/receipts/" + Path.GetFileName(receiptPath);
             Assert.Equal(Sha256Hex(File.ReadAllBytes(receiptPath)), root.GetProperty("files").GetProperty(receiptKey).GetString());
             return transcript;
+        }
+
+        // fake는 어떤 ToolSpecRequest든 받아 주므로, published process가 보낸 Resolve 요청 자체를 확인한다.
+        // NodeVault buildRequestFromResolved가 encoding/json으로 읽는 raw_spec은 정확히 일곱 key(이 순서)이고
+        // recipe 값과 일치해야 한다. dockerfile_content/environment_spec은 같은 source의 renderer 결과와 비교한다.
+        private static void AssertResolveRequest(Nodevault.V1.ToolSpecRequest resolve)
+        {
+            var recipe = ToolSpecRecipe();
+            Assert.Equal(recipe.ToolName, resolve.ToolName);
+            Assert.Equal(recipe.Version, resolve.Version);
+
+            using var rawSpec = JsonDocument.Parse(resolve.RawSpec);
+            var root = rawSpec.RootElement;
+            Assert.Equal(JsonValueKind.Object, root.ValueKind);
+            Assert.Equal(
+                new[] { "tool_name", "version", "kind", "image_uri", "dockerfile_content", "script", "environment_spec" },
+                root.EnumerateObject().Select(p => p.Name));
+            Assert.Equal(recipe.ToolName, root.GetProperty("tool_name").GetString());
+            Assert.Equal(recipe.Version, root.GetProperty("version").GetString());
+            Assert.Equal(1, root.GetProperty("kind").GetInt32());
+            Assert.Equal(recipe.BaseImage, root.GetProperty("image_uri").GetString());
+            Assert.Equal(recipe.Script, root.GetProperty("script").GetString());
+
+            var definition = RecipeRenderer.Render(recipe);
+            var dockerfile = root.GetProperty("dockerfile_content").GetString();
+            Assert.Equal(definition.DockerfileContent, dockerfile);
+            Assert.Contains("FROM " + recipe.BaseImage, dockerfile);
+            Assert.Contains("bwa=0.7.17=h5bf99c6_8", dockerfile);
+            Assert.Equal(definition.EnvironmentSpec, root.GetProperty("environment_spec").GetString());
         }
 
         private static string Sha256Hex(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));

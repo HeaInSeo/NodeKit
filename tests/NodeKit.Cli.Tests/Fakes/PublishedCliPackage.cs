@@ -60,8 +60,8 @@ namespace NodeKit.Cli.Tests.Fakes
         }
 
         /// <summary>
-        /// package의 nodekit을 <paramref name="workingDirectory"/>에서 실행한다. 부모 환경의 NODEKIT_NODEVAULT_URL은
-        /// 지워서 명시한 --url/env만 쓰게 한다. timeout이면 process tree를 끝내고 실패한다. <paramref name="host"/>가
+        /// package의 nodekit을 <paramref name="workingDirectory"/>에서 실행한다. 부모 환경의 NODEKIT_NODEVAULT_URL과
+        /// NO_COLOR는 지워서 명시한 --url/env만 쓰게 한다. timeout이면 process tree를 끝내고 실패한다. <paramref name="host"/>가
         /// 있으면 이 실행 동안 그 loopback fake가 받은 RPC를 transcript에 같이 남긴다.
         /// </summary>
         public PublishedCliResult Run(
@@ -89,7 +89,9 @@ namespace NodeKit.Cli.Tests.Fakes
             }
 
             start.Environment.Remove("NODEKIT_NODEVAULT_URL");
-            start.Environment["NO_COLOR"] = "1";
+            // NO_COLOR를 강제하지 않는다. 강제하면 redirected stdout/stderr에서 ANSI를 끄는 CLI 자체의 판단을
+            // 가린다. 부모 환경의 값도 지워 각 테스트가 명시한 environment만 남게 한다.
+            start.Environment.Remove("NO_COLOR");
             if (environment is not null)
             {
                 foreach (var (key, value) in environment)
