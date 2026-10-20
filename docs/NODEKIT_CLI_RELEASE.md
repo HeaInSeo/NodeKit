@@ -137,8 +137,11 @@ nodekit function-recipe validate function-recipe.json
 nodekit function-recipe render function-recipe.json --out function-render.json
 ```
 
-이 field 묶음은 published-process 시험(`PublishedCliPortabilityTests`)이 쓰는 입력과 같다. 동반 script가 없으면
-validate는 exit 2, 빈 script는 exit 1이며 어느 쪽도 RPC를 보내지 않는다. 명령 계약 전체는
+이 field 묶음은 published-process 시험(`PublishedCliPortabilityTests`)이 쓰는 입력과 같다. 동반 script는
+`function-recipe render`와 `submit`이 Recipe 디렉터리 기준으로 읽는다(CWD 기준이 아니다). 파일이 없으면 exit 2
+(`SCRIPT_READ_FAILED`), 공백뿐이면 exit 1(`BLANK_SCRIPT`), `ScriptPath`가 절대 경로면 exit 2(`ABSOLUTE_SCRIPT_PATH`)이며
+어느 경우도 RPC를 보내지 않는다. `function-recipe validate`는 Recipe 내용만 검사하고 script 파일을 읽지 않으므로
+동반 파일 배치는 `render`로 확인한다. 명령 계약 전체는
 [`specs/001-toolfunctionspec-authoring/contracts/cli-function-recipe-commands.md`](../specs/001-toolfunctionspec-authoring/contracts/cli-function-recipe-commands.md)다.
 
 ## 5. 다른 설치(B)에서 다시 쓰기
@@ -149,7 +152,8 @@ validate는 exit 2, 빈 script는 exit 1이며 어느 쪽도 RPC를 보내지 �
 2. A에서 **Recipe 파일과 Recipe 디렉터리 기준 동반 파일만** 같은 상대 배치로 복사한다.
    ToolSpec Recipe는 파일 하나, ToolFunctionRecipe는 `function-recipe.json` + `scripts/…` (+ 선택 fixture)다.
 3. B에서 `validate`/`render`(ToolFunctionRecipe는 `function-recipe validate`/`render`)를 다시 실행한다. B는 현재
-   파일 내용으로 다시 검사하며, 저장된 `Ready` 표지만 믿지 않는다.
+   파일 내용으로 다시 검사하며, 저장된 `Ready` 표지만 믿지 않는다. ToolFunctionRecipe의 동반 script가 함께
+   옮겨졌는지는 `function-recipe render`가 확인한다(§4).
 
 옮기지 않는 것: A의 endpoint 설정, 설치 경로, credential, `.nodekit/` 아래 receipt·journal. 과거 요청 기록은 A의 것이고
 B의 새 요청은 B에서 새로 기록된다. `ScriptPath`를 절대 경로로 쓰면 B에서 그 경로가 없어 실패하므로 상대 경로로
