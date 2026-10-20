@@ -257,6 +257,59 @@ namespace NodeKit.Cli.Tests
             Assert.Contains("파일은 저장되지 않았습니다.", stdout.ToString());
         }
 
+        // S4-04-C 명시 취소: 출력 경로 없이 실행하면 마지막에 저장 경로 프롬프트가 나온다. 거기서 /cancel(/quit,
+        // /exit)을 입력해도 exit 130으로 취소하고 아무 파일도 남기지 않는다. 취소 명령을 경로로 받아 버리면
+        // 루트의 "/cancel" 같은 경로에 쓰려다 다른 종료 코드가 난다.
+        [Theory]
+        [InlineData("/cancel")]
+        [InlineData("/quit")]
+        [InlineData("/exit")]
+        [InlineData(" /cancel ")]
+        public void Interactive_CancelCommandAtSavePathPrompt_Exit130_NoFile(string command)
+        {
+            var args = new[]
+            {
+                "function-recipe", "create",
+                "--tool-spec-digest", ToolSpecDigest,
+                "--base-tool-image-digest", BaseToolImageDigest,
+            };
+
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var stdin = new StringReader(string.Join("\n", _fullTranscript.Append(command)));
+            var exitCode = CliApp.Run(args, stdin, stdout, stderr);
+
+            Assert.Equal(130, exitCode);
+            Assert.Contains("저장 경로 (Enter로 기본값 사용: samtools.sort-v1.json): ", stdout.ToString());
+            Assert.Contains("파일은 저장되지 않았습니다.", stdout.ToString());
+            Assert.Empty(stderr.ToString());
+            Assert.Empty(Directory.EnumerateFileSystemEntries(_workDir));
+            Assert.False(File.Exists(command.Trim()));
+        }
+
+        // 저장 경로 프롬프트에 입력한 일반 경로는 그대로 저장 경로다 — 이름에 "cancel"이 들어가도 취소가 아니다.
+        [Fact]
+        public void Interactive_SavePathPrompt_EnteredPath_Saves()
+        {
+            var outPath = Path.Join(_workDir, "cancel.json");
+            var args = new[]
+            {
+                "function-recipe", "create",
+                "--tool-spec-digest", ToolSpecDigest,
+                "--base-tool-image-digest", BaseToolImageDigest,
+            };
+
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var stdin = new StringReader(string.Join("\n", _fullTranscript.Append(outPath)));
+            var exitCode = CliApp.Run(args, stdin, stdout, stderr);
+
+            Assert.Equal(0, exitCode);
+            Assert.Empty(stderr.ToString());
+            using var document = JsonDocument.Parse(File.ReadAllText(outPath));
+            Assert.Equal("samtools.sort", document.RootElement.GetProperty("FunctionId").GetString());
+        }
+
         // EOF를 받은 프롬프트가 필수가 아니면 지금처럼 빈 값으로 두고 저장한다 — 모든 프롬프트 EOF를 취소로
         // 만들지 않는다. 필수 입력을 모두 받은 뒤 첫 선택 프롬프트(Storage request)에서 stdin이 끝난다.
         [Fact]
