@@ -73,6 +73,7 @@ GUI와 별도로 `src/NodeKit.Cli`의 `nodekit` CLI가 있습니다. Recipe 작�
 
 - 사용법: [`docs/NODEKIT_CLI_USAGE.md`](docs/NODEKIT_CLI_USAGE.md)
 - linux-x64 self-contained package와 CLI 단독 clean build 검증: [`docs/NODEKIT_BUILD_BOOTSTRAP.md`](docs/NODEKIT_BUILD_BOOTSTRAP.md) §5–§6
+- 설치한 package의 받기·checksum·빠른 시작, 복구, release checklist: [`docs/NODEKIT_CLI_RELEASE.md`](docs/NODEKIT_CLI_RELEASE.md). 인수 판정 ID ↔ 시험 연결: [`docs/NODEKIT_CLI_ACCEPTANCE_EVIDENCE.md`](docs/NODEKIT_CLI_ACCEPTANCE_EVIDENCE.md)
 
 기본 CLI test suite와 CI는 local fixture와 fake server 범위입니다. `NODEKIT_NODEVAULT_URL`을 설정했을 때만 실제 NodeVault에 연결하는 opt-in 통합 시험이 따로 있습니다(기본 skip). 실제 NodeVault/Harbor/Gateway/VM 연결의 인수와 승인은 CLI 완료에 포함하지 않습니다.
 
