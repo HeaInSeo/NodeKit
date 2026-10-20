@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -524,8 +525,8 @@ namespace NodeKit.Cli.Tests
             }
         }
 
-        // A 참조 검사 자체의 회귀: snapshot의 content_base64 안에 숨은 A 경로도 잡고, 허용한 DockerfilePath는 그 Recipe와
-        // 같은 logical_path snapshot entry에서 한 번만 통과시킨다. published package 없이 도는 검사다.
+        // A 참조 검사 자체의 회귀: snapshot의 content_base64 안에 숨은 A 경로도 잡고, 허용한 DockerfilePath는 실제 source
+        // snapshot artifact의 같은 logical_path entry에서 한 번만 통과시킨다. published package 없이 도는 검사다.
         [Fact]
         public void AssertNoReferenceTo_DecodesSnapshotPayloads_AndScopesTheAllowance()
         {
@@ -542,14 +543,29 @@ namespace NodeKit.Cli.Tests
                 Directory.CreateDirectory(snapshots);
                 File.WriteAllText(Path.Join(recipes, "dockerfile.json"), recipe);
 
-                void WriteSnapshot(params (string LogicalPath, string Content)[] files) =>
-                    File.WriteAllText(
-                        Path.Join(snapshots, "s.json"),
-                        JsonSerializer.Serialize(new
-                        {
-                            schema_version = "nodekit.source-snapshot.v1",
-                            files = files.Select(f => new { logical_path = f.LogicalPath, content_base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(f.Content)) }),
-                        }));
+                static object Entry(string logicalPath, string content) =>
+                    new { logical_path = logicalPath, content_base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(content)) };
+
+                static byte[] SnapshotBytes(params (string LogicalPath, string Content)[] files) =>
+                    JsonSerializer.SerializeToUtf8Bytes(new
+                    {
+                        schema_version = "nodekit.source-snapshot.v1",
+                        files = files.Select(f => Entry(f.LogicalPath, f.Content)),
+                    });
+
+                // 실제 store처럼 content-addressed 이름으로 하나만 둔다.
+                string WriteSnapshot(params (string LogicalPath, string Content)[] files)
+                {
+                    foreach (var old in Directory.GetFiles(snapshots))
+                    {
+                        File.Delete(old);
+                    }
+
+                    var bytes = SnapshotBytes(files);
+                    var path = Path.Join(snapshots, Convert.ToHexStringLower(SHA256.HashData(bytes)) + ".json");
+                    File.WriteAllBytes(path, bytes);
+                    return path;
+                }
 
                 void Check() => AssertNoReferenceTo(root, Path.Join(root, "install"), recipes, aRoot, aUrl, allowed);
 
@@ -569,8 +585,55 @@ namespace NodeKit.Cli.Tests
                 WriteSnapshot(("dockerfile.json", recipe.Replace("FROM x", "FROM x " + aPath, StringComparison.Ordinal)));
                 Assert.ThrowsAny<Xunit.Sdk.XunitException>(Check);
 
+                // 허용은 실제 source snapshot artifact의 최상위 files entry에만 있다(Codex r4321429907). 같은 모양의
+                // dockerfile.json entry를 담은 다른 B 기록 JSON은 A 경로를 남기면 잡는다.
+                var snapshot = WriteSnapshot(("dockerfile.json", recipe));
+                Check();
+                var receipts = Path.Join(recipes, ".nodekit", "receipts");
+                Directory.CreateDirectory(receipts);
+                var other = Path.Join(receipts, "r.json");
+                File.WriteAllText(other, JsonSerializer.Serialize(new { note = Entry("dockerfile.json", recipe) }));
+                Assert.ThrowsAny<Xunit.Sdk.XunitException>(Check);
+                File.WriteAllBytes(other, SnapshotBytes(("dockerfile.json", recipe)));
+                Assert.ThrowsAny<Xunit.Sdk.XunitException>(Check);
+                File.Delete(other);
+
+                // snapshots/source 안이라도 이름이 자기 bytes의 SHA-256이 아니면 실제 artifact가 아니다.
+                File.Move(snapshot, Path.Join(snapshots, new string('0', 64) + ".json"));
+                Assert.ThrowsAny<Xunit.Sdk.XunitException>(Check);
+
+                // 실제 snapshot 안이라도 최상위 files 배열 밖에 둔 entry에는 허용이 없다.
+                var nested = JsonSerializer.SerializeToUtf8Bytes(new
+                {
+                    schema_version = "nodekit.source-snapshot.v1",
+                    files = new[] { Entry("dockerfile.json", recipe) },
+                    extra = new { files = new[] { Entry("dockerfile.json", recipe) } },
+                });
+                foreach (var old in Directory.GetFiles(snapshots))
+                {
+                    File.Delete(old);
+                }
+
+                File.WriteAllBytes(Path.Join(snapshots, Convert.ToHexStringLower(SHA256.HashData(nested)) + ".json"), nested);
+                Assert.ThrowsAny<Xunit.Sdk.XunitException>(Check);
+
+                // schema_version이 source snapshot이 아니면 content-addressed 이름이어도 허용이 없다.
+                var resolvedShape = JsonSerializer.SerializeToUtf8Bytes(new
+                {
+                    schema_version = "nodekit.resolved-snapshot.v1",
+                    files = new[] { Entry("dockerfile.json", recipe) },
+                });
+                foreach (var old in Directory.GetFiles(snapshots))
+                {
+                    File.Delete(old);
+                }
+
+                File.WriteAllBytes(Path.Join(snapshots, Convert.ToHexStringLower(SHA256.HashData(resolvedShape)) + ".json"), resolvedShape);
+                Assert.ThrowsAny<Xunit.Sdk.XunitException>(Check);
+
                 // 평문 파일의 A 참조도 그대로 잡는다.
                 WriteSnapshot(("dockerfile.json", recipe));
+                Check();
                 File.WriteAllText(Path.Join(root, "render.json"), "{\"u\":\"" + aUrl + "\"}");
                 Assert.ThrowsAny<Xunit.Sdk.XunitException>(Check);
             }
@@ -633,9 +696,10 @@ namespace NodeKit.Cli.Tests
                 var text = File.ReadAllText(file);
                 var allowedHere = allowed is { } recipe && file == Path.Join(recipes, recipe.LogicalPath) ? recipe.Value : null;
                 AssertNoReference(file, text, aRoot, aUrl, allowedHere);
-                foreach (var (logicalPath, content) in EncodedContents(text))
+                var sourceSnapshot = IsSourceSnapshot(file, recipes);
+                foreach (var (logicalPath, content, snapshotEntry) in EncodedContents(text))
                 {
-                    var allowedEntry = allowed is { } entry && logicalPath == entry.LogicalPath ? entry.Value : null;
+                    var allowedEntry = allowed is { } entry && sourceSnapshot && snapshotEntry && logicalPath == entry.LogicalPath ? entry.Value : null;
                     AssertNoReference(file + "!" + logicalPath, content, aRoot, aUrl, allowedEntry);
                 }
             }
@@ -654,10 +718,34 @@ namespace NodeKit.Cli.Tests
             Assert.False(aUrl is not null && text.Contains(aUrl, StringComparison.Ordinal), label + ": A endpoint를 담는다");
         }
 
-        // JSON 문서 어디든 content_base64가 있으면 디코드한 text를 (logical_path, text)로 돌려준다. JSON이 아니면 없다.
-        private static List<(string LogicalPath, string Content)> EncodedContents(string text)
+        // 실제 source snapshot artifact인가: Recipe 기록 root의 snapshots/source 아래, 파일 이름이 자기 bytes의 SHA-256인
+        // content-addressed 파일이고 최상위 schema_version이 source snapshot이다. 다른 B 기록은 같은 모양의 entry를 담아도 아니다.
+        private static bool IsSourceSnapshot(string file, string recipes)
         {
-            var found = new List<(string, string)>();
+            if (Path.GetDirectoryName(file) != Path.Join(recipes, ".nodekit", "snapshots", "source")
+                || Path.GetFileName(file) != Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(file))) + ".json")
+            {
+                return false;
+            }
+
+            try
+            {
+                return JsonNode.Parse(File.ReadAllText(file)) is JsonObject root
+                    && root["schema_version"] is JsonValue schema
+                    && schema.TryGetValue<string>(out var version)
+                    && version == "nodekit.source-snapshot.v1";
+            }
+            catch (JsonException)
+            {
+                return false;
+            }
+        }
+
+        // JSON 문서 어디든 content_base64가 있으면 디코드한 text를 (logical_path, text, 최상위 files 배열의 entry인가)로
+        // 돌려준다. JSON이 아니면 없다.
+        private static List<(string LogicalPath, string Content, bool SnapshotEntry)> EncodedContents(string text)
+        {
+            var found = new List<(string, string, bool)>();
             JsonNode? node;
             try
             {
@@ -668,6 +756,7 @@ namespace NodeKit.Cli.Tests
                 return found;
             }
 
+            var snapshotFiles = node is JsonObject root && root["files"] is JsonArray files ? files : null;
             Walk(node);
             return found;
 
@@ -679,7 +768,8 @@ namespace NodeKit.Cli.Tests
                         if (obj["content_base64"] is JsonValue encoded)
                         {
                             var logicalPath = obj["logical_path"]?.GetValue<string>() ?? "content_base64";
-                            found.Add((logicalPath, Encoding.UTF8.GetString(Convert.FromBase64String(encoded.GetValue<string>()))));
+                            var snapshotEntry = snapshotFiles is not null && obj.Parent == snapshotFiles;
+                            found.Add((logicalPath, Encoding.UTF8.GetString(Convert.FromBase64String(encoded.GetValue<string>())), snapshotEntry));
                         }
 
                         foreach (var (_, child) in obj)
