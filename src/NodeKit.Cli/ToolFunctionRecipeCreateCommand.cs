@@ -62,6 +62,7 @@ namespace NodeKit.Cli
             }
 
             ToolFunctionRecipe recipe;
+            string savePath;
             if (nonInteractive)
             {
                 recipe = new ToolFunctionRecipe { ToolSpecDigest = toolSpecDigest, BaseToolImageDigest = baseToolImageDigest };
@@ -73,12 +74,18 @@ namespace NodeKit.Cli
                         return 2;
                     }
                 }
+
+                recipe.Normalize();
+                savePath = outPathHint!;
             }
             else
             {
+                // 마지막 저장 경로 프롬프트도 같은 취소 경계 안에 둔다(/cancel → 130, 파일 없음).
                 try
                 {
                     recipe = ToolFunctionRecipeCreateFlow.Run(console, toolSpecDigest, baseToolImageDigest);
+                    recipe.Normalize();
+                    savePath = outPathHint ?? PromptForPath(console, recipe);
                 }
                 catch (RecipeCreateCancelledException)
                 {
@@ -88,10 +95,6 @@ namespace NodeKit.Cli
                     return CancelledExitCode;
                 }
             }
-
-            recipe.Normalize();
-
-            var savePath = outPathHint ?? PromptForPath(console, recipe);
 
             if (FindConflictingFile(savePath, recipe, out var conflictPath))
             {
@@ -201,7 +204,10 @@ namespace NodeKit.Cli
         {
             var defaultName = $"{recipe.FunctionId}-{recipe.Revision}.json";
             console.Write($"저장 경로 (Enter로 기본값 사용: {defaultName}): ");
-            var entered = (console.ReadLine() ?? string.Empty).Trim();
+            // EOF는 지금처럼 기본 경로다. 명시적 /cancel·/quit·/exit만 취소한다.
+            var line = console.ReadLine() ?? string.Empty;
+            RecipeCreateEscapeCommands.ThrowIfCancel(line);
+            var entered = line.Trim();
             return string.IsNullOrEmpty(entered) ? defaultName : entered;
         }
 

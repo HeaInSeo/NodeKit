@@ -182,6 +182,130 @@ namespace NodeKit.Cli.Tests
             Assert.DoesNotContain('\u001b', result.Stderr);
         }
 
+        // S4-04-C 명시 취소: redirected `recipe create`의 첫 입력에 /cancel을 주면 exit 130, 파일을 만들지 않고
+        // machine stream에 ANSI가 없다. 취소 뒤에 남은 "3"은 CI 사용법을 출력하고 끝나는 선택이므로, /cancel이
+        // 무시되면 130이 아닌 종료와 사용법 출력으로 드러난다 — EOF가 아니라 명령이 종료시켰음을 보인다.
+        [Fact]
+        public void RecipeCreate_CancelCommand_Exit130_NoFile()
+        {
+            var package = PublishedCliPackage.Require();
+
+            var result = package.Run(
+                _workDir,
+                new[] { "recipe", "create", "cancel.json" },
+                stdin: "/cancel\n3\n",
+                environment: new Dictionary<string, string> { ["TERM"] = "xterm-256color" },
+                timeout: TimeSpan.FromSeconds(30));
+
+            Assert.Equal(130, result.Exit);
+            Assert.DoesNotContain("알 수 없는 선택입니다", result.Stdout);
+            Assert.Empty(Directory.EnumerateFileSystemEntries(_workDir));
+            Assert.DoesNotContain('\u001b', result.Stdout);
+            Assert.DoesNotContain('\u001b', result.Stderr);
+        }
+
+        // S4-04-C 명시 취소: `function-recipe create`의 필수 입력(executable)에 /cancel을 주면 exit 130이고 Recipe
+        // 파일도 `.nodekit-lock`도 남기지 않는다. stdin에는 그 뒤 나머지 필수 입력까지 모두 있으므로, /cancel을
+        // 값으로 받아 버리면 Draft가 저장된다 — EOF가 아니라 명령이 종료시켰음을 보인다.
+        [Fact]
+        public void FunctionRecipeCreate_CancelCommand_Exit130_NoFile()
+        {
+            var package = PublishedCliPackage.Require();
+            var stdin = string.Join("\n", new[]
+            {
+                "samtools.sort", "v1", "", "", "", "", "./sort.sh", // functionId … scriptPath
+                "/cancel",                                         // executable
+                "", "", "", "", "", "",                             // arguments … hard timeout
+                "", "", "", "", "", "",                             // ports, fixtures, policies, parameters
+                "500m", "2000m", "256Mi", "1Gi",                   // CPU/Memory request/limit
+            }) + "\n";
+
+            var result = package.Run(
+                _workDir,
+                new[]
+                {
+                    "function-recipe", "create", "cancel.json",
+                    "--tool-spec-digest", ToolSpecDigest,
+                    "--base-tool-image-digest", BaseToolImageDigest,
+                },
+                stdin: stdin,
+                environment: new Dictionary<string, string> { ["TERM"] = "xterm-256color" },
+                timeout: TimeSpan.FromSeconds(30));
+
+            Assert.Equal(130, result.Exit);
+            Assert.Empty(Directory.EnumerateFileSystemEntries(_workDir));
+            Assert.DoesNotContain('\u001b', result.Stdout);
+            Assert.DoesNotContain('\u001b', result.Stderr);
+        }
+
+        // 출력 경로 없이 실행한 `function-recipe create` wizard의 모든 프롬프트 응답(저장 경로 프롬프트 직전까지).
+        private static readonly string[] _functionRecipeWizardAnswers =
+        {
+            "samtools.sort", "v1", "", "", "", "", "./sort.sh",  // functionId … scriptPath
+            "samtools", "sort,-@4", "", "", "", "", "",         // executable … hard timeout
+            "bam", "", "", "y", "", "", "",                     // input port, then stop
+            "sortedBam", "", "", "./out/*.bam", "", "", "",     // output port, then stop
+            "./fixtures/small.bam", "", "",                     // fixture, then stop
+            "", "", "",                                          // expected result, policies, parameters
+            "500m", "2000m", "256Mi", "1Gi", "", "", "", "",    // enforced resources
+            "", "", "", "", "",                                  // execution environment
+            "", "", "", "", "",                                  // validation requirements
+        };
+
+        // 저장 경로 프롬프트에서 stdin이 끝나면(EOF) 지금처럼 취소가 아니라 CWD의 기본 파일 이름으로 저장한다.
+        // 명시적 /cancel만 취소다.
+        [Fact]
+        public void FunctionRecipeCreate_EofAtSavePathPrompt_SavesDefaultPath()
+        {
+            var package = PublishedCliPackage.Require();
+
+            var result = package.Run(
+                _workDir,
+                new[]
+                {
+                    "function-recipe", "create",
+                    "--tool-spec-digest", ToolSpecDigest,
+                    "--base-tool-image-digest", BaseToolImageDigest,
+                },
+                stdin: string.Join("\n", _functionRecipeWizardAnswers) + "\n",
+                timeout: TimeSpan.FromSeconds(30));
+
+            Assert.Equal(0, result.Exit);
+            Assert.Contains("저장 경로 (Enter로 기본값 사용: samtools.sort-v1.json): ", result.Stdout);
+            var saved = Path.Join(_workDir, "samtools.sort-v1.json");
+            using var document = JsonDocument.Parse(File.ReadAllText(saved));
+            Assert.Equal("samtools.sort", document.RootElement.GetProperty("FunctionId").GetString());
+        }
+
+        // S4-04-C 명시 취소: 출력 경로 없이 `function-recipe create`를 실행하고 모든 wizard 입력에 답한 뒤 마지막 저장
+        // 경로 프롬프트에 /cancel을 주면 exit 130, CWD에 Recipe도 `.nodekit-lock`도 없고 ANSI가 없다. 저장 경로
+        // 프롬프트가 stdout에 나왔는지 확인하므로 앞선 프롬프트의 취소나 EOF로 끝난 경우와 구분된다.
+        [Fact]
+        public void FunctionRecipeCreate_CancelAtSavePathPrompt_Exit130_NoFile()
+        {
+            var package = PublishedCliPackage.Require();
+            var stdin = string.Join("\n", _functionRecipeWizardAnswers.Append("/cancel")) + "\n";
+
+            var result = package.Run(
+                _workDir,
+                new[]
+                {
+                    "function-recipe", "create",
+                    "--tool-spec-digest", ToolSpecDigest,
+                    "--base-tool-image-digest", BaseToolImageDigest,
+                },
+                stdin: stdin,
+                environment: new Dictionary<string, string> { ["TERM"] = "xterm-256color" },
+                timeout: TimeSpan.FromSeconds(30));
+
+            Assert.Equal(130, result.Exit);
+            Assert.Contains("저장 경로 (Enter로 기본값 사용: samtools.sort-v1.json): ", result.Stdout);
+            Assert.Contains("파일은 저장되지 않았습니다.", result.Stdout);
+            Assert.Empty(Directory.EnumerateFileSystemEntries(_workDir));
+            Assert.DoesNotContain('\u001b', result.Stdout);
+            Assert.DoesNotContain('\u001b', result.Stderr);
+        }
+
         // S4-04-D: 알 수 없는 명령은 exit 2, 읽을 수 없는 JSON은 exit 2, 형식은 맞지만 의미가 틀린 recipe는 exit 1.
         [Fact]
         public void UnknownCommand_Exit2()
