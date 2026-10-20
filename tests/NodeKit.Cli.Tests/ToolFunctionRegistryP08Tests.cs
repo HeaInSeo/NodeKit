@@ -169,9 +169,13 @@ namespace NodeKit.Cli.Tests
         }
 
         // S3-07-C: 비었거나 지원하지 않는 version은 결과 불명(exit 1). 성공으로 보지 않고 다른 버전·새 ID로 다시 보내지 않는다.
+        // 요청한 w2-set-v1과 길이가 같은 값·대소문자만 다른 값도 넣는다 — 정확한 ordinal 비교가 아닌
+        // 약한 gate(길이 비교, 대소문자 무시)도 이 시험에서 실패해야 한다(S4-05-B).
         [Theory]
         [InlineData("")]
         [InlineData("legacy-order-v0")]
+        [InlineData("w2-set-v2")]
+        [InlineData("W2-SET-V1")]
         public void C_VersionMissingOrUnsupported_Exit1_Unknown_NoResubmit(string version)
         {
             using var server = NewServer();
