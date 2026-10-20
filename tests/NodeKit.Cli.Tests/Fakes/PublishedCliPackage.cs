@@ -53,6 +53,20 @@ namespace NodeKit.Cli.Tests.Fakes
         public static PublishedCliPackage Require() =>
             _instance.Value ?? throw SkipException();
 
+        /// <summary>
+        /// P10.portability (S4-04-G): <see cref="Require"/>와 같은 archive를 <paramref name="parentDirectory"/>에 새로 풀어
+        /// 독립 설치 하나를 만든다. archive hash를 다시 확인하며, 다른 설치와 파일을 공유하지 않으므로 호출자가 그
+        /// 설치를 지워도 다른 설치는 그대로 동작한다.
+        /// </summary>
+        public static PublishedCliPackage InstallInto(string parentDirectory)
+        {
+            var shared = Require();
+            Assert.Equal(shared.ArchiveSha256, Sha256File(shared.ArchivePath));
+            Directory.CreateDirectory(parentDirectory);
+            Assert.Empty(Directory.GetFileSystemEntries(parentDirectory));
+            return Extract(shared.ArchivePath, shared.ArchiveSha256, parentDirectory);
+        }
+
         private static Exception SkipException()
         {
             Assert.Skip($"{PackageDirVariable} 미설정 — published CLI package subprocess 인수 스킵");
@@ -62,7 +76,9 @@ namespace NodeKit.Cli.Tests.Fakes
         /// <summary>
         /// package의 nodekit을 <paramref name="workingDirectory"/>에서 실행한다. 부모 환경의 NODEKIT_NODEVAULT_URL과
         /// NO_COLOR는 지워서 명시한 --url/env만 쓰게 한다. timeout이면 process tree를 끝내고 실패한다. <paramref name="host"/>가
-        /// 있으면 이 실행 동안 그 loopback fake가 받은 RPC를 transcript에 같이 남긴다.
+        /// 있으면 이 실행 동안 그 loopback fake가 받은 RPC를 transcript에 같이 남긴다. <paramref name="recordDirectory"/>는
+        /// transcript에 hash를 남길 <c>.nodekit</c>의 부모 디렉터리다(기본 CWD). Recipe를 CWD 밖에서 실행하면 기록은
+        /// Recipe 옆에 생기므로 그 디렉터리를 준다.
         /// </summary>
         public PublishedCliResult Run(
             string workingDirectory,
@@ -70,7 +86,8 @@ namespace NodeKit.Cli.Tests.Fakes
             string? stdin = null,
             IReadOnlyDictionary<string, string>? environment = null,
             TimeSpan? timeout = null,
-            LoopbackGrpcFixtureHost? host = null)
+            LoopbackGrpcFixtureHost? host = null,
+            string? recordDirectory = null)
         {
             var argList = args.ToList();
             var buildMark = host?.Fake.CallCount ?? 0;
@@ -138,6 +155,7 @@ namespace NodeKit.Cli.Tests.Fakes
             {
                 package_sha256 = ArchiveSha256,
                 source_sha = SourceSha,
+                install_dir = InstallDir,
                 cwd = workingDirectory,
                 args = argList,
                 stdin,
@@ -146,17 +164,18 @@ namespace NodeKit.Cli.Tests.Fakes
                 stdout,
                 stderr,
                 rpc = rpc.Select(r => new { method = r.Method, request_type = r.RequestType, request_sha256 = r.RequestSha256, request = r.RequestJson }),
-                files = StateFileHashes(workingDirectory),
+                record_dir = recordDirectory ?? workingDirectory,
+                files = StateFileHashes(recordDirectory ?? workingDirectory),
             });
             AppendTranscript(transcript);
             return new PublishedCliResult(exit, stdout, stderr, transcript);
         }
 
-        /// <summary><c>&lt;cwd&gt;/.nodekit</c> 아래 모든 파일(receipt·lock 포함)의 상대 경로와 sha256. 정렬해 결정적으로 남긴다.</summary>
-        private static SortedDictionary<string, string> StateFileHashes(string workingDirectory)
+        /// <summary><c>&lt;dir&gt;/.nodekit</c> 아래 모든 파일(receipt·lock 포함)의 상대 경로와 sha256. 정렬해 결정적으로 남긴다.</summary>
+        private static SortedDictionary<string, string> StateFileHashes(string directory)
         {
             var hashes = new SortedDictionary<string, string>(StringComparer.Ordinal);
-            var root = Path.Join(workingDirectory, ".nodekit");
+            var root = Path.Join(directory, ".nodekit");
             if (!Directory.Exists(root))
             {
                 return hashes;
@@ -164,7 +183,7 @@ namespace NodeKit.Cli.Tests.Fakes
 
             foreach (var file in Directory.GetFiles(root, "*", SearchOption.AllDirectories))
             {
-                var relative = Path.GetRelativePath(workingDirectory, file).Replace(Path.DirectorySeparatorChar, '/');
+                var relative = Path.GetRelativePath(directory, file).Replace(Path.DirectorySeparatorChar, '/');
                 hashes[relative] = Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(file)));
             }
 
@@ -196,15 +215,15 @@ namespace NodeKit.Cli.Tests.Fakes
 
             var archive = Assert.Single(Directory.GetFiles(packageDir, "nodekit-cli-*-linux-x64.tar.gz"));
             var expected = File.ReadAllText(archive + ".sha256").Split(' ', 2)[0].Trim();
-            string actual;
-            using (var stream = File.OpenRead(archive))
-            {
-                actual = Convert.ToHexStringLower(SHA256.HashData(stream));
-            }
-
+            var actual = Sha256File(archive);
             Assert.Equal(expected, actual);
 
             var root = Directory.CreateDirectory(Path.Join(Path.GetTempPath(), "nodekit-published-cli-" + Guid.NewGuid())).FullName;
+            return Extract(archive, actual, root);
+        }
+
+        private static PublishedCliPackage Extract(string archive, string archiveSha256, string root)
+        {
             var tar = Process.Start(new ProcessStartInfo("tar") { ArgumentList = { "-xzf", archive, "-C", root }, UseShellExecute = false })
                 ?? throw new InvalidOperationException("tar를 시작하지 못했습니다.");
             tar.WaitForExit();
@@ -213,7 +232,13 @@ namespace NodeKit.Cli.Tests.Fakes
             var installDir = Assert.Single(Directory.GetDirectories(root));
             using var manifest = JsonDocument.Parse(File.ReadAllText(Path.Join(installDir, "cli-manifest.json")));
             var sourceSha = manifest.RootElement.GetProperty("source").GetProperty("sha").GetString() ?? string.Empty;
-            return new PublishedCliPackage(archive, actual, installDir, sourceSha);
+            return new PublishedCliPackage(archive, archiveSha256, installDir, sourceSha);
+        }
+
+        private static string Sha256File(string path)
+        {
+            using var stream = File.OpenRead(path);
+            return Convert.ToHexStringLower(SHA256.HashData(stream));
         }
     }
 
