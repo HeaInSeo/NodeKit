@@ -22,6 +22,8 @@ namespace NodeKit.Cli
     /// </summary>
     internal static class ToolFunctionRecipeCreateCommand
     {
+        private const int CancelledExitCode = 130;
+
         private const string UsageLine =
             "사용법: nodekit function-recipe create [<path>] --tool-spec-digest <digest> --base-tool-image-digest <digest> [--non-interactive --field Name=Value ...]";
 
@@ -74,7 +76,17 @@ namespace NodeKit.Cli
             }
             else
             {
-                recipe = ToolFunctionRecipeCreateFlow.Run(console, toolSpecDigest, baseToolImageDigest);
+                try
+                {
+                    recipe = ToolFunctionRecipeCreateFlow.Run(console, toolSpecDigest, baseToolImageDigest);
+                }
+                catch (RecipeCreateCancelledException)
+                {
+                    // recipe create(RecipeCreateInteractiveRunner)와 같은 취소 안내·종료 코드.
+                    console.WriteLine("function-recipe 생성을 취소했습니다.");
+                    console.WriteLine("파일은 저장되지 않았습니다.");
+                    return CancelledExitCode;
+                }
             }
 
             recipe.Normalize();
