@@ -18,6 +18,9 @@ K8s API 호출은 NodeVault 영역이며 이 CLI에 없다 (CLAUDE.md 1절).
 [`NODEKIT_CLI_RECIPE_AUTHORING_UX_BEGINNER_DESIGN.md`](NODEKIT_CLI_RECIPE_AUTHORING_UX_BEGINNER_DESIGN.md)
 참고.
 
+이 문서의 예시는 저장소 checkout에서 `dotnet run`으로 실행한다. 설치한 package(`nodekit` 명령)의 받기·checksum·
+설치·빠른 시작과 복구, release checklist는 [`NODEKIT_CLI_RELEASE.md`](NODEKIT_CLI_RELEASE.md)에 있다.
+
 ## 0. 빠른 시작
 
 recipe.json을 손으로 쓰지 않아도 된다. 이게 핵심이다.

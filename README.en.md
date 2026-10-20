@@ -73,6 +73,7 @@ Besides the GUI, `src/NodeKit.Cli` provides the `nodekit` CLI. It covers Recipe 
 
 - Usage (Korean): [`docs/NODEKIT_CLI_USAGE.md`](docs/NODEKIT_CLI_USAGE.md)
 - linux-x64 self-contained package and CLI-only clean build check: [`docs/NODEKIT_BUILD_BOOTSTRAP.md`](docs/NODEKIT_BUILD_BOOTSTRAP.md) §5–§6
+- Installed package download/checksum/quick start, recovery and release checklist (Korean): [`docs/NODEKIT_CLI_RELEASE.md`](docs/NODEKIT_CLI_RELEASE.md); acceptance ID ↔ test map: [`docs/NODEKIT_CLI_ACCEPTANCE_EVIDENCE.md`](docs/NODEKIT_CLI_ACCEPTANCE_EVIDENCE.md)
 
 The default CLI test suite and CI cover local fixtures and fake servers. Separate opt-in integration tests contact a real NodeVault only when `NODEKIT_NODEVAULT_URL` is set (skipped by default). Acceptance of real NodeVault/Harbor/Gateway/VM connections and approval are not part of CLI completion.
 

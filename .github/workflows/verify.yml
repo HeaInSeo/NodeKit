@@ -197,3 +197,15 @@ jobs:
           name: published-cli-transcript
           path: TestResults/published-cli/published-cli-transcript.jsonl
           if-no-files-found: error
+
+      # S4-05-E / S4-06-D: the exact pkg-a archive the published-process tests
+      # ran, with its checksum and manifest, as a downloadable artifact.
+      - name: Upload CLI package
+        uses: actions/upload-artifact@v7
+        with:
+          name: cli-package
+          path: |
+            ${{ runner.temp }}/pkg-a/nodekit-cli-0.0.0-ci-linux-x64.tar.gz
+            ${{ runner.temp }}/pkg-a/nodekit-cli-0.0.0-ci-linux-x64.tar.gz.sha256
+            ${{ runner.temp }}/pkg-a/nodekit-cli-0.0.0-ci-linux-x64.cli-manifest.json
+          if-no-files-found: error
