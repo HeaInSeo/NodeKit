@@ -100,6 +100,10 @@ namespace NodeKit.Cli.Tests
             File.WriteAllText(dockerfile, $"FROM {BaseImageWithDigest}\nUSER 1000\n");
 
             var authored = new Dictionary<string, (byte[] Recipe, string Rendered, string RawSpec, string RequestId)>(StringComparer.Ordinal);
+
+            // B의 endpoint를 A보다 먼저 bind해 A가 닫힐 때까지 둘 다 열어 둔다. A를 닫은 뒤 B를 bind하면 OS가 A가 막
+            // 놓은 ephemeral port를 B에 다시 줄 수 있고, 그러면 B receipt의 정상 URL이 A endpoint 참조로 잡힌다.
+            using var hostB = NewHost();
             string urlA;
             using (var hostA = NewHost())
             {
@@ -149,7 +153,7 @@ namespace NodeKit.Cli.Tests
             _a.Delete();
             Assert.False(Directory.Exists(_a.Root));
 
-            using var hostB = NewHost();
+            Assert.NotEqual(urlA, hostB.Url);
             foreach (var (method, item) in authored)
             {
                 var recipe = Path.GetRelativePath(_b.Cwd, Path.Join(_b.Recipes, method + ".json"));
