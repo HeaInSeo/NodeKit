@@ -239,7 +239,7 @@ namespace NodeKit.Cli.Tests
         }
 
         // 출력 경로 없이 실행한 `function-recipe create` wizard의 모든 프롬프트 응답(저장 경로 프롬프트 직전까지).
-        private static readonly string[] FunctionRecipeWizardAnswers =
+        private static readonly string[] _functionRecipeWizardAnswers =
         {
             "samtools.sort", "v1", "", "", "", "", "./sort.sh",  // functionId … scriptPath
             "samtools", "sort,-@4", "", "", "", "", "",         // executable … hard timeout
@@ -267,7 +267,7 @@ namespace NodeKit.Cli.Tests
                     "--tool-spec-digest", ToolSpecDigest,
                     "--base-tool-image-digest", BaseToolImageDigest,
                 },
-                stdin: string.Join("\n", FunctionRecipeWizardAnswers) + "\n",
+                stdin: string.Join("\n", _functionRecipeWizardAnswers) + "\n",
                 timeout: TimeSpan.FromSeconds(30));
 
             Assert.Equal(0, result.Exit);
@@ -284,7 +284,7 @@ namespace NodeKit.Cli.Tests
         public void FunctionRecipeCreate_CancelAtSavePathPrompt_Exit130_NoFile()
         {
             var package = PublishedCliPackage.Require();
-            var stdin = string.Join("\n", FunctionRecipeWizardAnswers.Append("/cancel")) + "\n";
+            var stdin = string.Join("\n", _functionRecipeWizardAnswers.Append("/cancel")) + "\n";
 
             var result = package.Run(
                 _workDir,
