@@ -89,9 +89,9 @@ namespace NodeKit.Cli.Tests
 
         // S4-04-G (ToolSpec): A가 공개 방법 6개로 만든 Recipe를 A에서 validate/render/submit한 뒤 Recipe 파일만 B로
         // 옮긴다. B는 CWD 밖의 상대 경로로 같은 파일을 읽어 같은 render 결과와 같은 Resolve raw_spec을 만들고, 자기
-        // endpoint로 새 request ID를 써서 fresh 제출한다. dockerfile Recipe는 A의 Dockerfile이 사라져도 저장된 내용을
-        // 쓴다. B의 어떤 파일(디코드한 snapshot 내용 포함)도 dockerfile Recipe의 DockerfilePath 한 값 말고는 A의 경로나
-        // endpoint를 담지 않는다.
+        // endpoint로 새 request ID를 써서 fresh 제출하며, 그 receipt의 source snapshot digest는 A receipt의 것과 같다.
+        // dockerfile Recipe는 A의 Dockerfile이 사라져도 저장된 내용을 쓴다. B의 어떤 파일(디코드한 snapshot 내용 포함)도
+        // dockerfile Recipe의 DockerfilePath 한 값 말고는 A의 경로나 endpoint를 담지 않는다.
         [Fact]
         public void ToolSpecRecipes_FromA_ReusedOnCleanB_SameMeaning_FreshSubmitToOwnEndpoint()
         {
@@ -99,7 +99,7 @@ namespace NodeKit.Cli.Tests
             var dockerfile = Path.Join(_a.Recipes, "Dockerfile");
             File.WriteAllText(dockerfile, $"FROM {BaseImageWithDigest}\nUSER 1000\n");
 
-            var authored = new Dictionary<string, (byte[] Recipe, string Rendered, string RawSpec, string RequestId)>(StringComparer.Ordinal);
+            var authored = new Dictionary<string, (byte[] Recipe, string Rendered, string RawSpec, string RequestId, string SourceSha)>(StringComparer.Ordinal);
 
             // B의 endpoint를 A보다 먼저 bind해 A가 닫힐 때까지 둘 다 열어 둔다. A를 닫은 뒤 B를 bind하면 OS가 A가 막
             // 놓은 ephemeral port를 B에 다시 줄 수 있고, 그러면 B receipt의 정상 URL이 A endpoint 참조로 잡힌다.
@@ -133,11 +133,13 @@ namespace NodeKit.Cli.Tests
                     ExpectExit(0, _a.Run(_a.Cwd, new[] { "render", name, "--out", renderOut }));
                     var submit = _a.Run(_a.Cwd, new[] { "submit", name, "--url", hostA.Url, "--format", "jsonl" }, host: hostA);
                     ExpectExit(0, submit);
+                    var requestIdA = hostA.Fake.SubmitRequests.Last().RequestId;
                     authored[method] = (
                         File.ReadAllBytes(Path.Join(_a.Recipes, name)),
                         WithoutPerRunIds(File.ReadAllText(renderOut)),
                         hostA.Fake.ResolveRequests.Last().RawSpec,
-                        hostA.Fake.SubmitRequests.Last().RequestId);
+                        requestIdA,
+                        SnapshotSha(Path.Join(_a.Recipes, ".nodekit", "receipts", requestIdA + ".json")));
                 }
 
                 Assert.Equal(_toolSpecMethods.Count, hostA.Fake.SubmitRequests.Count);
@@ -180,6 +182,10 @@ namespace NodeKit.Cli.Tests
                 var receiptPath = Path.Join(_b.Recipes, ".nodekit", "receipts", submitted.RequestId + ".json");
                 var receipt = File.ReadAllText(receiptPath);
                 Assert.Contains(hostB.Url, receipt, StringComparison.Ordinal);
+
+                // 같은 Recipe bytes는 설치·HOME·CWD·endpoint가 달라도 같은 source snapshot을 만든다(sourceBinding
+                // excludedFromKey). A receipt의 digest는 A를 지우기 전에 기록해 두었다.
+                Assert.Equal(item.SourceSha, SnapshotSha(receiptPath));
                 using var transcript = JsonDocument.Parse(submit.Transcript);
                 Assert.Equal(_b.Package.InstallDir, transcript.RootElement.GetProperty("install_dir").GetString());
                 Assert.True(transcript.RootElement.GetProperty("files").TryGetProperty(".nodekit/receipts/" + submitted.RequestId + ".json", out _));
