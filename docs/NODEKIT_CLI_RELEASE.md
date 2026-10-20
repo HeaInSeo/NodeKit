@@ -29,7 +29,7 @@ package는 세 파일이다. `<version>`은 semver다.
   archive를 artifact `cli-package`로 올린다. 이 archive의 version은 CI용 `0.0.0-ci`다.
 
   ```bash
-  gh run list -R HeaInSeo/NodeKit --workflow Verify --branch main --event push --limit 1
+  gh run list -R HeaInSeo/NodeKit --workflow Verify --branch main --event push --status success --limit 1
   gh run download <run-id> -R HeaInSeo/NodeKit -n cli-package -D nodekit-cli
   ```
 
@@ -190,7 +190,8 @@ B의 새 요청은 B에서 새로 기록된다. `ScriptPath`를 절대 경로로
 |---|---|---|
 | 0 | 성공 | — |
 | 1 | 검증 실패·확정 거부·결과 불명 | stderr 진단을 보고 Recipe를 고친다. jsonl의 `remote_build_state`/`remote_registration_state`가 `unknown`이면 실패로 단정하지 말고 아래 확인 명령을 쓴다 |
-| 2 | 사용법·인자·파일 IO 오류 | 명령/경로/권한을 고친다. 업무 RPC는 보내지 않았다 |
+| 2 (보내기 전) | 사용법·인자·입력 파일 오류, 첫 요청 전 기록 저장 실패 | 명령/경로/권한을 고친다. 업무 RPC는 보내지 않았다 |
+| 2 (보낸 뒤) | 요청을 보낸 뒤 로컬 receipt·등록 기록 저장 실패(`OPERATION_WRITE_FAILED`) | 원격 빌드·등록이 이미 생겼을 수 있다. 새 `submit`을 시작하지 말고 진단의 build ID·request ID로 확인한다(아래) |
 | 124 | `--connect-timeout`(build ID 전) 또는 `--registration-timeout`(등록 RPC 뒤) 만료 | 원격 상태는 불명. 등록이면 `register-replay` |
 | 125 | `--watch-timeout`(build ID 뒤) 만료 | 서버 빌드는 계속될 수 있다. `receipt watch` |
 | 130 | 사용자 취소(Ctrl-C, `/cancel`) | 저장 전이면 파일 변경 없음. 보낸 뒤면 원격 상태 불명 |
@@ -210,6 +211,12 @@ nodekit function-recipe register-replay .nodekit/registrations/<request-id>.json
 `register-replay`는 저장된 같은 endpoint·request ID·version·요청 bytes만 보낸다. 다른 `--url`은 exit 2이고, Recipe/script를
 다시 읽거나 새 이미지를 빌드하지 않는다. 이미 registered/rejected인 기록은 RPC 없이 저장된 결과를 보여 준다.
 client 쪽 replay는 서버 멱등성의 증거가 아니다. 상태별 `error_code`·`recovery` 값은 `NODEKIT_CLI_USAGE.md` §3·§6·§9에 있다.
+
+**보낸 뒤 기록 저장 실패(exit 2):** 같은 Recipe로 새 `submit`을 시작하면 원격 빌드가 중복될 수 있다. stderr·jsonl
+진단에 남은 build ID·request ID로 확인한다. ToolSpec 빌드에서 receipt에 build ID가 저장돼 있으면(최종 결과만 저장
+실패) `receipt watch`로 다시 관찰한다. receipt에 build ID가 없으면(받은 build ID 저장 실패) `receipt watch`는 RPC 없이
+거부하므로 진단의 build ID·request ID로 NodeVault에서 직접 확인한다. ToolFunction 등록은 `register-replay`로 같은 요청
+bytes만 다시 보낸다.
 
 **published-process 실행 기록:** CI artifact `published-cli-transcript`(`published-cli-transcript.jsonl`)는 설치한
 package를 저장소 밖에서 별도 process로 실행한 각 호출을 한 줄씩 남긴다. 필드는 `package_sha256`, `source_sha`,
