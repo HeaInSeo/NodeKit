@@ -157,6 +157,31 @@ namespace NodeKit.Cli.Tests
             Assert.DoesNotContain('\u001b', result.Stderr);
         }
 
+        // S4-04-C: 같은 정책을 `function-recipe create`에도 적용한다 — 첫 필수 입력(functionId) 전에 stdin이 끝나면
+        // exit 130이고 Recipe 파일도 `.nodekit-lock`도 남기지 않는다.
+        [Fact]
+        public void FunctionRecipeCreate_EofBeforeRequiredInput_Exit130_NoFile()
+        {
+            var package = PublishedCliPackage.Require();
+
+            var result = package.Run(
+                _workDir,
+                new[]
+                {
+                    "function-recipe", "create", "eof.json",
+                    "--tool-spec-digest", ToolSpecDigest,
+                    "--base-tool-image-digest", BaseToolImageDigest,
+                },
+                stdin: string.Empty,
+                environment: new Dictionary<string, string> { ["TERM"] = "xterm-256color" },
+                timeout: TimeSpan.FromSeconds(30));
+
+            Assert.Equal(130, result.Exit);
+            Assert.Empty(Directory.EnumerateFileSystemEntries(_workDir));
+            Assert.DoesNotContain('\u001b', result.Stdout);
+            Assert.DoesNotContain('\u001b', result.Stderr);
+        }
+
         // S4-04-D: 알 수 없는 명령은 exit 2, 읽을 수 없는 JSON은 exit 2, 형식은 맞지만 의미가 틀린 recipe는 exit 1.
         [Fact]
         public void UnknownCommand_Exit2()

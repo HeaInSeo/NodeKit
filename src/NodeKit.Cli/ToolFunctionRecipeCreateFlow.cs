@@ -13,6 +13,11 @@ namespace NodeKit.Cli
     /// RecipeCreateFlow와 달리 build-method 분기가 없는 단일 선형 시퀀스다 —
     /// ToolFunctionRecipe에는 "빌드 방식 선택"이 없기 때문이다(spec.md Key
     /// Entities).
+    ///
+    /// 필수 입력(functionId·revision·스크립트 경로·executable·CPU/Memory
+    /// request/limit) 프롬프트에서 stdin이 EOF면 RecipeCreateCancelledException을
+    /// 던져 recipe create와 같은 취소(130, 파일 미저장)로 끝낸다. 빈 줄은 EOF가
+    /// 아니므로 지금처럼 Draft 값으로 받는다. 선택 프롬프트의 EOF는 빈 값으로 둔다.
     /// </summary>
     internal static class ToolFunctionRecipeCreateFlow
     {
@@ -30,13 +35,13 @@ namespace NodeKit.Cli
             console.WriteLine($"  baseToolImageDigest: {baseToolImageDigest}");
             console.WriteLine();
 
-            recipe.FunctionId = ReadLine(console, "functionId (예: samtools.sort): ");
-            recipe.Revision = ReadLine(console, "revision (예: v1): ");
+            recipe.FunctionId = ReadRequired(console, "functionId (예: samtools.sort): ");
+            recipe.Revision = ReadRequired(console, "revision (예: v1): ");
             recipe.DisplayLabel = ReadLine(console, "표시 이름 (선택, Enter로 건너뜀): ");
             recipe.DisplayDescription = ReadLine(console, "설명 (선택, Enter로 건너뜀): ");
             recipe.DisplayCategory = ReadLine(console, "카테고리 (선택, Enter로 건너뜀): ");
             recipe.DisplayTags = ReadCsv(console, "태그 (쉼표로 구분, 선택, Enter로 건너뜀): ");
-            recipe.ScriptPath = ReadLine(console, "스크립트 경로 (로컬 파일 참조): ");
+            recipe.ScriptPath = ReadRequired(console, "스크립트 경로 (로컬 파일 참조): ");
 
             ReadCommand(console, recipe.Command);
             ReadPorts(console, recipe.InputPorts, PortDirection.Input);
@@ -56,7 +61,7 @@ namespace NodeKit.Cli
         {
             console.WriteLine();
             console.WriteLine("-- Command --");
-            command.Executable = ReadLine(console, "  executable (예: samtools): ");
+            command.Executable = ReadRequired(console, "  executable (예: samtools): ");
             command.Arguments = ReadCsv(console, "  arguments (쉼표로 구분, 순서 유지, 선택): ");
             command.WorkingDirectory = ReadLine(console, "  workingDirectory (선택, Enter로 건너뜀): ");
 
@@ -237,10 +242,10 @@ namespace NodeKit.Cli
         {
             console.WriteLine();
             console.WriteLine("-- Enforced 자원 --");
-            resources.CpuRequest = ReadLine(console, "  CPU request (예: 500m): ");
-            resources.CpuLimit = ReadLine(console, "  CPU limit (예: 2000m): ");
-            resources.MemoryRequest = ReadLine(console, "  Memory request (예: 256Mi): ");
-            resources.MemoryLimit = ReadLine(console, "  Memory limit (예: 1Gi): ");
+            resources.CpuRequest = ReadRequired(console, "  CPU request (예: 500m): ");
+            resources.CpuLimit = ReadRequired(console, "  CPU limit (예: 2000m): ");
+            resources.MemoryRequest = ReadRequired(console, "  Memory request (예: 256Mi): ");
+            resources.MemoryLimit = ReadRequired(console, "  Memory limit (예: 1Gi): ");
             resources.StorageRequest = ReadLine(console, "  Storage request (선택): ");
             resources.StorageLimit = ReadLine(console, "  Storage limit (선택): ");
 
@@ -287,6 +292,15 @@ namespace NodeKit.Cli
         {
             console.Write(prompt);
             return (console.ReadLine() ?? string.Empty).Trim();
+        }
+
+        // 필수 입력 전 EOF는 더 받을 입력이 없다는 뜻이다 — 빈 Draft를 저장하지
+        // 않고 취소한다(S4-04-C, recipe create의 필수 필드 EOF 처리와 동일).
+        private static string ReadRequired(IRecipeConsole console, string prompt)
+        {
+            console.Write(prompt);
+            var line = console.ReadLine() ?? throw new RecipeCreateCancelledException();
+            return line.Trim();
         }
 
         private static List<string> ReadCsv(IRecipeConsole console, string prompt)
