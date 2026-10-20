@@ -18,6 +18,7 @@ namespace NodeKit.Cli
     /// request/limit) 프롬프트에서 stdin이 EOF면 RecipeCreateCancelledException을
     /// 던져 recipe create와 같은 취소(130, 파일 미저장)로 끝낸다. 빈 줄은 EOF가
     /// 아니므로 지금처럼 Draft 값으로 받는다. 선택 프롬프트의 EOF는 빈 값으로 둔다.
+    /// 어느 프롬프트에서든 /cancel(/quit, /exit)을 입력하면 같은 취소로 끝낸다(S4-04-C 명시 취소).
     /// </summary>
     internal static class ToolFunctionRecipeCreateFlow
     {
@@ -33,6 +34,7 @@ namespace NodeKit.Cli
             console.WriteLine("ToolFunctionRecipe 작성");
             console.WriteLine($"  toolSpecDigest: {toolSpecDigest}");
             console.WriteLine($"  baseToolImageDigest: {baseToolImageDigest}");
+            console.WriteHints("/cancel: 저장하지 않고 종료");
             console.WriteLine();
 
             recipe.FunctionId = ReadRequired(console, "functionId (예: samtools.sort): ");
@@ -291,7 +293,9 @@ namespace NodeKit.Cli
         private static string ReadLine(IRecipeConsole console, string prompt)
         {
             console.Write(prompt);
-            return (console.ReadLine() ?? string.Empty).Trim();
+            var line = (console.ReadLine() ?? string.Empty).Trim();
+            RecipeCreateEscapeCommands.ThrowIfCancel(line);
+            return line;
         }
 
         // 필수 입력 전 EOF는 더 받을 입력이 없다는 뜻이다 — 빈 Draft를 저장하지
@@ -300,6 +304,7 @@ namespace NodeKit.Cli
         {
             console.Write(prompt);
             var line = console.ReadLine() ?? throw new RecipeCreateCancelledException();
+            RecipeCreateEscapeCommands.ThrowIfCancel(line);
             return line.Trim();
         }
 

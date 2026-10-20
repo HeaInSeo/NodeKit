@@ -228,6 +228,35 @@ namespace NodeKit.Cli.Tests
             Assert.Contains("파일은 저장되지 않았습니다.", stdout.ToString());
         }
 
+        // S4-04-C 명시 취소: 필수 입력이든 선택 입력이든 프롬프트에서 /cancel(/quit, /exit)을 입력하면 exit 130으로
+        // 취소하고 저장 파일과 lock 파일을 남기지 않는다. answered = 취소 명령 직전까지 응답한 줄 수.
+        [Theory]
+        [InlineData(0, "/cancel")]  // functionId
+        [InlineData(1, "/quit")]    // revision
+        [InlineData(2, "/exit")]    // 표시 이름(선택)
+        [InlineData(7, "/cancel")]  // executable
+        [InlineData(37, " /cancel ")] // Memory limit
+        [InlineData(38, "/cancel")] // Storage request(선택)
+        public void Interactive_CancelCommand_Exit130_NoFile(int answered, string command)
+        {
+            var outPath = Path.Join(_workDir, "samtools-sort.json");
+            var args = new[]
+            {
+                "function-recipe", "create", outPath,
+                "--tool-spec-digest", ToolSpecDigest,
+                "--base-tool-image-digest", BaseToolImageDigest,
+            };
+
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var stdin = new StringReader(string.Join("\n", _fullTranscript.Take(answered).Append(command).Concat(_fullTranscript.Skip(answered))));
+            var exitCode = CliApp.Run(args, stdin, stdout, stderr);
+
+            Assert.Equal(130, exitCode);
+            Assert.Empty(Directory.EnumerateFileSystemEntries(_workDir));
+            Assert.Contains("파일은 저장되지 않았습니다.", stdout.ToString());
+        }
+
         // EOF를 받은 프롬프트가 필수가 아니면 지금처럼 빈 값으로 두고 저장한다 — 모든 프롬프트 EOF를 취소로
         // 만들지 않는다. 필수 입력을 모두 받은 뒤 첫 선택 프롬프트(Storage request)에서 stdin이 끝난다.
         [Fact]
