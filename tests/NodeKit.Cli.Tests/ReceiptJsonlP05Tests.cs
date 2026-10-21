@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Threading;
 using Grpc.Core;
 using NodeKit.Authoring.Recipes;
+using NodeKit.Cli.Localization;
 using NodeKit.Cli.Operations;
 using NodeKit.Cli.Tests.Fakes;
 using NodeKit.Grpc;
@@ -538,6 +539,40 @@ namespace NodeKit.Cli.Tests
         }
 
         private static string Str(JsonElement element, string name) => element.GetProperty(name).GetString()!;
+
+        // UF01b (#96) U02: receipt human 문구(stderr)는 언어를 따르지만 JSONL bytes·exit code는 언어와 무관하다.
+        [Theory]
+        [InlineData("success", "취소 요청을 보냈습니다 (build ID: ", "Cancel request sent (build ID: ")]
+        [InlineData("rpc-fail", "취소 요청이 실패했습니다 (build ID: ", "Cancel request failed (build ID: ")]
+        [InlineData("terminal", "이미 최종 상태(", "This build already has a final observed state (")]
+        public void Cancel_Language_ChangesHumanStderrOnly_JsonlBytesAndExitIdentical(string scenario, string koPrefix, string enPrefix)
+        {
+            var receiptPath = scenario == "terminal" ? CreateTerminalReceipt() : CreateAcknowledgedReceipt();
+            var before = File.ReadAllBytes(receiptPath);
+
+            var ko = CancelIn(CliLanguage.Ko, scenario, receiptPath);
+            var en = CancelIn(CliLanguage.En, scenario, receiptPath);
+
+            Assert.Equal(ko.Exit, en.Exit);
+            Assert.Equal(ko.Stdout, en.Stdout);
+            Assert.Single(ParseRecords(en.Stdout, "cancel"));
+            Assert.StartsWith(koPrefix, ko.Stderr, StringComparison.Ordinal);
+            Assert.StartsWith(enPrefix, en.Stderr, StringComparison.Ordinal);
+            Assert.Equal(before, File.ReadAllBytes(receiptPath));
+        }
+
+        private static (int Exit, string Stdout, string Stderr) CancelIn(CliLanguage language, string scenario, string receiptPath)
+        {
+            using var server = new GrpcTestServer();
+            if (scenario == "rpc-fail")
+            {
+                server.Fake.CancelToolBuildFailure = new RpcException(new Status(StatusCode.Unavailable, "fixture: cancel unavailable"));
+            }
+
+            using var scope = CliText.Use(language);
+            var exit = Reenter(server, "cancel", receiptPath, out var stdout, out var stderr);
+            return (exit, stdout, stderr);
+        }
 
         private static int Reenter(GrpcTestServer server, string verb, string receiptPath, out string stdout, out string stderr) =>
             ReenterUntil(server, verb, receiptPath, TestContext.Current.CancellationToken, out stdout, out stderr);

@@ -60,6 +60,17 @@ namespace NodeKit.Cli.Localization
         public static string Format(string key, params object?[] args) =>
             string.Format(CultureInfo.InvariantCulture, Get(key), args);
 
+        /// <summary>
+        /// 같은 문구가 machine output(JSONL <c>message</c> 등)에도 실릴 때 쓰는 기준 한국어 문구. 현재 언어와 무관하므로
+        /// <c>--lang</c>이 달라도 JSONL bytes가 바뀌지 않는다(U02). human output에는 <see cref="Format"/>을 쓴다.
+        /// </summary>
+        public static string FormatMachine(string key, params object?[] args) =>
+            string.Format(
+                CultureInfo.InvariantCulture,
+                Ko.GetString(key, CultureInfo.InvariantCulture)
+                    ?? throw new InvalidOperationException($"CLI resource key is missing from CliStringsKo.resx: {key}"),
+                args);
+
         private sealed class Scope : IDisposable
         {
             private readonly CliLanguage? _previous;

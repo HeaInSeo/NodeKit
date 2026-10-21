@@ -129,6 +129,7 @@ namespace NodeKit.Cli.Tests
         [InlineData("Usage: nodekit render", "render", "--lang=EN", "--help")]
         [InlineData("Usage: nodekit recipe create", "recipe", "create", "--help", "--lang", "en-US")]
         [InlineData("Usage: nodekit function-recipe validate", "function-recipe", "validate", "--help", "--lang", "en_US.UTF-8")]
+        [InlineData("Usage:", "receipt", "--help", "--lang", "en")]
         public void LangOption_SelectsEnglish(string expected, params string[] args)
         {
             var result = Run(args);
