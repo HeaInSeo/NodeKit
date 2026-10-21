@@ -110,6 +110,8 @@ namespace NodeKit.Cli.Tests
             Assert.Contains("--lang 옵션 값이 올바르지 않습니다: fr", invalid.Stderr, StringComparison.Ordinal);
 
             File.WriteAllText(Path.Join(_workDir, "sort.sh"), "#!/bin/sh\nsamtools sort \"$@\"\n");
+            Directory.CreateDirectory(Path.Join(_workDir, "fixtures"));
+            File.WriteAllText(Path.Join(_workDir, "fixtures", "small.bam"), "bam");
             // Recipe는 Id/CreatedAt을 새로 만들므로 한 번 만든 Draft를 복사해 언어별로 검증하고 저장 bytes를 비교한다.
             var create = package.Run(_workDir, new[]
             {
@@ -123,6 +125,7 @@ namespace NodeKit.Cli.Tests
                 "--field", "Command.Executable=samtools",
                 "--field", "InputPorts[0].Name=bam",
                 "--field", "OutputPorts[0].Name=sortedBam",
+                "--field", "FixtureReferences[0].LocalPath=./fixtures/small.bam",
                 "--field", "EnforcedResources.CpuRequest=500m",
                 "--field", "EnforcedResources.CpuLimit=2000m",
                 "--field", "EnforcedResources.MemoryRequest=256Mi",
