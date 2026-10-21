@@ -67,8 +67,8 @@ namespace NodeKit.Cli.Tests
 
         private static RunResult Run(IReadOnlyDictionary<string, string>? environment, params string[] args)
         {
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
             var exit = CliApp.Run(
                 args,
                 TextReader.Null,
