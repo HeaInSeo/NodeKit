@@ -162,6 +162,22 @@ dotnet run --project src/NodeKit.Cli -- validate /tmp/nodekit-recipe.json
 dotnet run --project src/NodeKit.Cli -- render /tmp/nodekit-recipe.json --out /tmp/build-request.json
 ```
 
+### 1-2. 화면 안내 언어 (`--lang ko|en`, `NODEKIT_LANG`)
+
+기본은 한국어다. 영어 안내가 필요하면 아래 중 하나를 쓴다.
+
+```bash
+nodekit --lang en --help
+nodekit validate recipe.json --lang=en     # 명령 앞·뒤 어디든 한 번
+NODEKIT_LANG=en nodekit render --help
+```
+
+- **우선순위**: `--lang` > 환경 변수 `NODEKIT_LANG` > 기본 `ko`. OS의 `LANG`/`LC_ALL`은 보지 않는다(영어 OS에서도 기본은 한국어).
+- **지원값**: 기본 언어 subtag가 `ko` 또는 `en`인 값. 대소문자를 가리지 않고 `_`는 `-`와 같으며 `.UTF-8` 같은 접미사는 무시한다. 예: `ko`, `ko-KR`, `en`, `en-US`, `en_US.UTF-8`.
+- **미지원값**: `--lang fr`, `--lang=`(빈 값), 값 없는 `--lang`, `--lang` 중복은 exit 2 사용 오류이고 명령을 실행하지 않는다. `NODEKIT_LANG`이 미지원값이면 stderr에 경고 한 줄을 남기고 한국어로 계속한다. 비어 있는 `NODEKIT_LANG`은 지정하지 않은 것과 같다.
+- **언어와 무관한 것**: Recipe/FunctionRecipe 파일 내용, `render` 출력(raw_spec), submit이 보내는 요청, `--format jsonl`의 key와 값, 종료 코드. 경로·사용자 입력·서버 메시지는 번역하지 않는다.
+- **현재 범위(UF01a)**: 최상위/`function-recipe` 사용법, `validate`·`render`·`recipe create`·`function-recipe validate` 사용법, 알 수 없는 명령/옵션·값 누락·중복 옵션 오류, `render --out`/`--format` 오류, `function-recipe validate` 성공 문구가 영어를 지원한다. 그 밖의 마법사·submit·receipt·검증 규칙 문구는 아직 한국어로 나오며 남은 범위는 [#96](https://github.com/HeaInSeo/NodeKit/issues/96)에서 단계별로 옮긴다.
+
 ## 2. `nodekit recipe create` — recipe 마법사
 
 가장 많이 쓸 명령이다. 질문에 답하기만 하면 reproducibility 규칙(CLAUDE.md
