@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  UF01 (#96): CLI 사람용 문구의 기준(한국어) resource. key 이름과 {n} placeholder 집합은 CliStringsEn.resx와 같아야 한다
+  (CliTextResourceTests가 검사). 값은 human output 전용이며 JSONL key·값, Recipe/raw_spec bytes, exit code를 담지 않는다.
+-->
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="Usage_TopLevel" xml:space="preserve">
+    <value>사용법:
+  nodekit validate &lt;recipe.json&gt; [--strict-reproducible]
+  nodekit render &lt;recipe.json&gt; --out &lt;build-request.json&gt; [--format build-request|raw-spec] [--pretty] [--strict-reproducible]
+  nodekit submit &lt;recipe.json&gt; [--url &lt;url&gt;] [--receipt &lt;path&gt;] [--connect-timeout &lt;seconds&gt;] [--watch-timeout &lt;duration&gt;] [--format human|jsonl] [--strict-reproducible]
+  nodekit recipe create [&lt;recipe.json&gt;] [--method ...] [--non-interactive ...]
+  nodekit function-recipe create [&lt;path&gt;] --tool-spec-digest &lt;digest&gt; --base-tool-image-digest &lt;digest&gt; [--non-interactive --field Name=Value ...]
+  nodekit function-recipe validate &lt;path&gt;
+  nodekit function-recipe render &lt;path&gt; --out &lt;out.json&gt; [--pretty]
+  nodekit function-recipe submit &lt;path&gt; [--url &lt;url&gt;] [--receipt &lt;path&gt;] [--connect-timeout &lt;seconds&gt;] [--watch-timeout &lt;duration&gt;] [--registration-timeout &lt;seconds&gt;] [--format human|jsonl]
+  nodekit function-recipe register-replay &lt;registration-receipt.json&gt; [--url &lt;url&gt;] [--registration-timeout &lt;seconds&gt;] [--format human|jsonl]
+  nodekit receipt watch|cancel &lt;receipt.json&gt;
+
+공통 옵션: --lang ko|en — 화면 안내 언어 (기본 ko, 환경 변수 NODEKIT_LANG로도 지정). JSONL·파일 내용·exit code는 언어와 무관합니다.
+각 명령의 자세한 옵션은 `nodekit &lt;명령&gt; --help`로 확인하세요 (예: nodekit submit --help).</value>
+  </data>
+  <data name="Usage_FunctionRecipe" xml:space="preserve">
+    <value>사용법:
+  nodekit function-recipe create [&lt;path&gt;] --tool-spec-digest &lt;digest&gt; --base-tool-image-digest &lt;digest&gt; [--non-interactive --field Name=Value ...]
+  nodekit function-recipe validate &lt;path&gt;
+  nodekit function-recipe render &lt;path&gt; --out &lt;out.json&gt; [--pretty]
+  nodekit function-recipe submit &lt;path&gt; [--url &lt;url&gt;] [--receipt &lt;path&gt;] [--connect-timeout &lt;seconds&gt;] [--watch-timeout &lt;duration&gt;] [--registration-timeout &lt;seconds&gt;] [--format human|jsonl]
+  nodekit function-recipe register-replay &lt;registration-receipt.json&gt; [--url &lt;url&gt;] [--registration-timeout &lt;seconds&gt;] [--format human|jsonl]</value>
+  </data>
+  <data name="Usage_Validate" xml:space="preserve">
+    <value>사용법: nodekit validate &lt;recipe.json&gt; [--strict-reproducible]</value>
+  </data>
+  <data name="Usage_FunctionRecipeValidate" xml:space="preserve">
+    <value>사용법: nodekit function-recipe validate &lt;path&gt;</value>
+  </data>
+  <data name="Usage_RenderLine1" xml:space="preserve">
+    <value>사용법: nodekit render &lt;recipe.json&gt; --out &lt;build-request.json&gt; [--format build-request|raw-spec] [--pretty] [--strict-reproducible]</value>
+  </data>
+  <data name="Usage_RenderLine2" xml:space="preserve">
+    <value>  (로컬 미리보기 전용 — 네트워크 호출 없음. --format 기본값 build-request는 submit의 입력이 아님, raw-spec은 실제 submit이 ResolveToolSpec에 보내는 ToolSpecRequest의 raw_spec 필드 값과 동일(tool_name/version/requested_at 등 나머지 필드는 포함 안 함). raw-spec은 기본적으로 실제 전송 payload와 동일한 한 줄 JSON — 사람이 읽기 편하게 보려면 --pretty. Command/Inputs/Outputs/Display* 필드는 build-request 미리보기에만 있고 raw_spec에는 포함되지 않음 — 포트/명령은 nodekit function-recipe create. 실제 제출은 nodekit submit &lt;recipe.json&gt;)</value>
+  </data>
+  <data name="Usage_RecipeCreate" xml:space="preserve">
+    <value>사용법: nodekit recipe create [&lt;recipe.json&gt;] [--method ...] [--non-interactive ...]</value>
+  </data>
+  <data name="Error_UnknownCommand" xml:space="preserve">
+    <value>알 수 없는 명령입니다: {0} (validate | render | submit | recipe | function-recipe | receipt 만 지원합니다)</value>
+  </data>
+  <data name="FunctionRecipeValidate_Passed" xml:space="preserve">
+    <value>검증 통과</value>
+  </data>
+  <data name="Render_OutRequired" xml:space="preserve">
+    <value>--out &lt;build-request.json&gt; 옵션이 필요합니다.</value>
+  </data>
+  <data name="Render_InvalidFormat" xml:space="preserve">
+    <value>--format 옵션 값이 올바르지 않습니다: {0} (build-request 또는 raw-spec)</value>
+  </data>
+  <data name="Option_Duplicate" xml:space="preserve">
+    <value>{0} 옵션이 여러 번 지정되었습니다.</value>
+  </data>
+  <data name="Option_MissingValue" xml:space="preserve">
+    <value>{0} 옵션에는 값이 필요합니다.</value>
+  </data>
+  <data name="Option_UnknownNoOptions" xml:space="preserve">
+    <value>알 수 없는 옵션입니다: {0} (이 명령은 옵션을 지원하지 않습니다)</value>
+  </data>
+  <data name="Option_UnknownWithSupported" xml:space="preserve">
+    <value>알 수 없는 옵션입니다: {0} (지원: {1})</value>
+  </data>
+  <data name="Lang_InvalidOption" xml:space="preserve">
+    <value>--lang 옵션 값이 올바르지 않습니다: {0} (ko 또는 en)</value>
+  </data>
+  <data name="Lang_EnvironmentUnsupported" xml:space="preserve">
+    <value>경고: NODEKIT_LANG 값 '{0}'은(는) 지원하지 않습니다 (ko 또는 en). 한국어로 표시합니다.</value>
+  </data>
+</root>

@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  UF01 (#96): English CLI human-output resource. Keys and {n} placeholder sets must match CliStringsKo.resx
+  (checked by CliTextResourceTests). A key missing here falls back to the Korean text. Values are human output only;
+  they never carry JSONL keys/values, Recipe/raw_spec bytes or exit codes.
+-->
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="Usage_TopLevel" xml:space="preserve">
+    <value>Usage:
+  nodekit validate &lt;recipe.json&gt; [--strict-reproducible]
+  nodekit render &lt;recipe.json&gt; --out &lt;build-request.json&gt; [--format build-request|raw-spec] [--pretty] [--strict-reproducible]
+  nodekit submit &lt;recipe.json&gt; [--url &lt;url&gt;] [--receipt &lt;path&gt;] [--connect-timeout &lt;seconds&gt;] [--watch-timeout &lt;duration&gt;] [--format human|jsonl] [--strict-reproducible]
+  nodekit recipe create [&lt;recipe.json&gt;] [--method ...] [--non-interactive ...]
+  nodekit function-recipe create [&lt;path&gt;] --tool-spec-digest &lt;digest&gt; --base-tool-image-digest &lt;digest&gt; [--non-interactive --field Name=Value ...]
+  nodekit function-recipe validate &lt;path&gt;
+  nodekit function-recipe render &lt;path&gt; --out &lt;out.json&gt; [--pretty]
+  nodekit function-recipe submit &lt;path&gt; [--url &lt;url&gt;] [--receipt &lt;path&gt;] [--connect-timeout &lt;seconds&gt;] [--watch-timeout &lt;duration&gt;] [--registration-timeout &lt;seconds&gt;] [--format human|jsonl]
+  nodekit function-recipe register-replay &lt;registration-receipt.json&gt; [--url &lt;url&gt;] [--registration-timeout &lt;seconds&gt;] [--format human|jsonl]
+  nodekit receipt watch|cancel &lt;receipt.json&gt;
+
+Common option: --lang ko|en — language of on-screen messages (default ko; NODEKIT_LANG also works). JSONL, file contents and exit codes do not depend on the language.
+Run `nodekit &lt;command&gt; --help` for the options of each command (for example: nodekit submit --help).</value>
+  </data>
+  <data name="Usage_FunctionRecipe" xml:space="preserve">
+    <value>Usage:
+  nodekit function-recipe create [&lt;path&gt;] --tool-spec-digest &lt;digest&gt; --base-tool-image-digest &lt;digest&gt; [--non-interactive --field Name=Value ...]
+  nodekit function-recipe validate &lt;path&gt;
+  nodekit function-recipe render &lt;path&gt; --out &lt;out.json&gt; [--pretty]
+  nodekit function-recipe submit &lt;path&gt; [--url &lt;url&gt;] [--receipt &lt;path&gt;] [--connect-timeout &lt;seconds&gt;] [--watch-timeout &lt;duration&gt;] [--registration-timeout &lt;seconds&gt;] [--format human|jsonl]
+  nodekit function-recipe register-replay &lt;registration-receipt.json&gt; [--url &lt;url&gt;] [--registration-timeout &lt;seconds&gt;] [--format human|jsonl]</value>
+  </data>
+  <data name="Usage_Validate" xml:space="preserve">
+    <value>Usage: nodekit validate &lt;recipe.json&gt; [--strict-reproducible]</value>
+  </data>
+  <data name="Usage_FunctionRecipeValidate" xml:space="preserve">
+    <value>Usage: nodekit function-recipe validate &lt;path&gt;</value>
+  </data>
+  <data name="Usage_RenderLine1" xml:space="preserve">
+    <value>Usage: nodekit render &lt;recipe.json&gt; --out &lt;build-request.json&gt; [--format build-request|raw-spec] [--pretty] [--strict-reproducible]</value>
+  </data>
+  <data name="Usage_RenderLine2" xml:space="preserve">
+    <value>  (Local preview only — no network calls. The default --format build-request is not an input to submit. raw-spec is identical to the raw_spec field value of the ToolSpecRequest that a real submit sends to ResolveToolSpec (other fields such as tool_name/version/requested_at are not included). By default raw-spec is single-line JSON identical to the real payload; add --pretty to read it more easily. Command/Inputs/Outputs/Display* fields exist only in the build-request preview and are not part of raw_spec — use nodekit function-recipe create for ports/commands. To actually submit, run nodekit submit &lt;recipe.json&gt;)</value>
+  </data>
+  <data name="Usage_RecipeCreate" xml:space="preserve">
+    <value>Usage: nodekit recipe create [&lt;recipe.json&gt;] [--method ...] [--non-interactive ...]</value>
+  </data>
+  <data name="Error_UnknownCommand" xml:space="preserve">
+    <value>Unknown command: {0} (supported: validate | render | submit | recipe | function-recipe | receipt)</value>
+  </data>
+  <data name="FunctionRecipeValidate_Passed" xml:space="preserve">
+    <value>Validation passed</value>
+  </data>
+  <data name="Render_OutRequired" xml:space="preserve">
+    <value>The --out &lt;build-request.json&gt; option is required.</value>
+  </data>
+  <data name="Render_InvalidFormat" xml:space="preserve">
+    <value>Invalid --format value: {0} (build-request or raw-spec)</value>
+  </data>
+  <data name="Option_Duplicate" xml:space="preserve">
+    <value>The {0} option was specified more than once.</value>
+  </data>
+  <data name="Option_MissingValue" xml:space="preserve">
+    <value>The {0} option requires a value.</value>
+  </data>
+  <data name="Option_UnknownNoOptions" xml:space="preserve">
+    <value>Unknown option: {0} (this command takes no options)</value>
+  </data>
+  <data name="Option_UnknownWithSupported" xml:space="preserve">
+    <value>Unknown option: {0} (supported: {1})</value>
+  </data>
+  <data name="Lang_InvalidOption" xml:space="preserve">
+    <value>Invalid --lang value: {0} (ko or en)</value>
+  </data>
+  <data name="Lang_EnvironmentUnsupported" xml:space="preserve">
+    <value>Warning: NODEKIT_LANG value '{0}' is not supported (ko or en). Showing Korean.</value>
+  </data>
+</root>

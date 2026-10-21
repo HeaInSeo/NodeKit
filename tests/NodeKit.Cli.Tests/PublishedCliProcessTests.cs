@@ -80,6 +80,70 @@ namespace NodeKit.Cli.Tests
             }
         }
 
+        // UF01 U03: 배포 binary에서 --lang en과 NODEKIT_LANG=en이 영어 사용법을 stdout에 내고(한글 없음, stderr 비어 있음),
+        // 같은 recipe의 function-recipe validate가 ko/en 모두 exit 0과 같은 저장 bytes를 남긴다. 영어 resource가 실제
+        // package assembly에 들어 있다는 증거다.
+        [Fact]
+        public void English_ActualProcessSmoke()
+        {
+            var package = PublishedCliPackage.Require();
+            var hangul = new System.Text.RegularExpressions.Regex("[가-힣]");
+
+            var option = package.Run(_workDir, new[] { "--lang", "en", "--help" });
+            Assert.True(option.Exit == 0, option.Stderr);
+            Assert.StartsWith("Usage:", option.Stdout, StringComparison.Ordinal);
+            Assert.Contains("Run `nodekit <command> --help`", option.Stdout, StringComparison.Ordinal);
+            Assert.False(hangul.IsMatch(option.Stdout), option.Stdout);
+            Assert.Empty(option.Stderr);
+
+            var environment = package.Run(
+                _workDir,
+                new[] { "validate", "--help" },
+                environment: new Dictionary<string, string> { ["NODEKIT_LANG"] = "en_US.UTF-8" });
+            Assert.True(environment.Exit == 0, environment.Stderr);
+            Assert.StartsWith("Usage: nodekit validate <recipe.json>", environment.Stdout, StringComparison.Ordinal);
+            Assert.Empty(environment.Stderr);
+
+            var invalid = package.Run(_workDir, new[] { "--lang", "fr", "--help" });
+            Assert.Equal(2, invalid.Exit);
+            Assert.Empty(invalid.Stdout);
+            Assert.Contains("--lang 옵션 값이 올바르지 않습니다: fr", invalid.Stderr, StringComparison.Ordinal);
+
+            File.WriteAllText(Path.Join(_workDir, "sort.sh"), "#!/bin/sh\nsamtools sort \"$@\"\n");
+            // Recipe는 Id/CreatedAt을 새로 만들므로 한 번 만든 Draft를 복사해 언어별로 검증하고 저장 bytes를 비교한다.
+            var create = package.Run(_workDir, new[]
+            {
+                "function-recipe", "create", "recipe.json",
+                "--tool-spec-digest", ToolSpecDigest,
+                "--base-tool-image-digest", BaseToolImageDigest,
+                "--non-interactive",
+                "--field", "FunctionId=samtools.sort",
+                "--field", "Revision=v1",
+                "--field", "ScriptPath=./sort.sh",
+                "--field", "Command.Executable=samtools",
+                "--field", "InputPorts[0].Name=bam",
+                "--field", "OutputPorts[0].Name=sortedBam",
+                "--field", "EnforcedResources.CpuRequest=500m",
+                "--field", "EnforcedResources.CpuLimit=2000m",
+                "--field", "EnforcedResources.MemoryRequest=256Mi",
+                "--field", "EnforcedResources.MemoryLimit=1Gi",
+            });
+            Assert.True(create.Exit == 0, create.Stderr);
+
+            var savedBytes = new List<byte[]>();
+            foreach (var lang in new[] { "ko", "en" })
+            {
+                var name = $"recipe-{lang}.json";
+                File.Copy(Path.Join(_workDir, "recipe.json"), Path.Join(_workDir, name));
+                var validate = package.Run(_workDir, new[] { "function-recipe", "validate", name, "--lang", lang });
+                Assert.True(validate.Exit == 0, validate.Stderr);
+                Assert.Equal(lang == "en" ? "Validation passed" : "검증 통과", validate.Stdout.TrimEnd());
+                savedBytes.Add(File.ReadAllBytes(Path.Join(_workDir, name)));
+            }
+
+            Assert.Equal(savedBytes[0], savedBytes[1]);
+        }
+
         // S4-04-B/E: repository 밖 CWD에서 상대 경로로 create→validate→render. 저장된 Draft를 다시 읽어 Ready로
         // 검증하고, render 결과 파일에 같은 command/script가 남는다.
         [Fact]

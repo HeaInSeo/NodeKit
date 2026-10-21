@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using NodeKit.Authoring.Recipes;
 using NodeKit.Authoring.ToolFunctionRecipes;
+using NodeKit.Cli.Localization;
 using NodeKit.Grpc;
 using NodeKit.Validation;
 using NodeKit.Validation.Recipes;
@@ -20,40 +21,6 @@ namespace NodeKit.Cli
     /// </summary>
     internal static class CliApp
     {
-        private const string TopLevelUsage =
-            "사용법:\n" +
-            "  nodekit validate <recipe.json> [--strict-reproducible]\n" +
-            "  nodekit render <recipe.json> --out <build-request.json> [--format build-request|raw-spec] [--pretty] [--strict-reproducible]\n" +
-            "  nodekit submit <recipe.json> [--url <url>] [--receipt <path>] [--connect-timeout <seconds>] [--watch-timeout <duration>] [--format human|jsonl] [--strict-reproducible]\n" +
-            "  nodekit recipe create [<recipe.json>] [--method ...] [--non-interactive ...]\n" +
-            "  nodekit function-recipe create [<path>] --tool-spec-digest <digest> --base-tool-image-digest <digest> [--non-interactive --field Name=Value ...]\n" +
-            "  nodekit function-recipe validate <path>\n" +
-            "  nodekit function-recipe render <path> --out <out.json> [--pretty]\n" +
-            "  nodekit function-recipe submit <path> [--url <url>] [--receipt <path>] [--connect-timeout <seconds>] [--watch-timeout <duration>] [--registration-timeout <seconds>] [--format human|jsonl]\n" +
-            "  nodekit function-recipe register-replay <registration-receipt.json> [--url <url>] [--registration-timeout <seconds>] [--format human|jsonl]\n" +
-            "  nodekit receipt watch|cancel <receipt.json>\n" +
-            "\n" +
-            "각 명령의 자세한 옵션은 `nodekit <명령> --help`로 확인하세요 (예: nodekit submit --help).";
-
-        private const string FunctionRecipeUsage =
-            "사용법:\n" +
-            "  nodekit function-recipe create [<path>] --tool-spec-digest <digest> --base-tool-image-digest <digest> [--non-interactive --field Name=Value ...]\n" +
-            "  nodekit function-recipe validate <path>\n" +
-            "  nodekit function-recipe render <path> --out <out.json> [--pretty]\n" +
-            "  nodekit function-recipe submit <path> [--url <url>] [--receipt <path>] [--connect-timeout <seconds>] [--watch-timeout <duration>] [--registration-timeout <seconds>] [--format human|jsonl]\n" +
-            "  nodekit function-recipe register-replay <registration-receipt.json> [--url <url>] [--registration-timeout <seconds>] [--format human|jsonl]";
-
-        private const string ValidateUsage = "사용법: nodekit validate <recipe.json> [--strict-reproducible]";
-        private const string FunctionRecipeValidateUsage = "사용법: nodekit function-recipe validate <path>";
-
-        private const string RenderUsageLine1 =
-            "사용법: nodekit render <recipe.json> --out <build-request.json> [--format build-request|raw-spec] [--pretty] [--strict-reproducible]";
-
-        private const string RenderUsageLine2 =
-            "  (로컬 미리보기 전용 — 네트워크 호출 없음. --format 기본값 build-request는 submit의 입력이 아님, raw-spec은 실제 submit이 ResolveToolSpec에 보내는 ToolSpecRequest의 raw_spec 필드 값과 동일(tool_name/version/requested_at 등 나머지 필드는 포함 안 함). raw-spec은 기본적으로 실제 전송 payload와 동일한 한 줄 JSON — 사람이 읽기 편하게 보려면 --pretty. Command/Inputs/Outputs/Display* 필드는 build-request 미리보기에만 있고 raw_spec에는 포함되지 않음 — 포트/명령은 nodekit function-recipe create. 실제 제출은 nodekit submit <recipe.json>)";
-
-        private const string RecipeCreateUsage = "사용법: nodekit recipe create [<recipe.json>] [--method ...] [--non-interactive ...]";
-
         private static readonly JsonSerializerOptions _jsonOptions = new()
         {
             PropertyNameCaseInsensitive = true,
@@ -64,7 +31,44 @@ namespace NodeKit.Cli
         public static int Run(string[] args, TextWriter stdout, TextWriter stderr) =>
             Run(args, TextReader.Null, stdout, stderr);
 
-        public static int Run(string[] args, TextReader stdin, TextWriter stdout, TextWriter stderr)
+        public static int Run(string[] args, TextReader stdin, TextWriter stdout, TextWriter stderr) =>
+            Run(args, stdin, stdout, stderr, Environment.GetEnvironmentVariable);
+
+        // UF01 (#96): --lang/NODEKIT_LANG로 정한 언어는 이 호출 범위에만 적용된다(CliText.Use). --lang은 하위 명령의
+        // 옵션 파서에 닿기 전에 args에서 지운다.
+        internal static int Run(
+            string[] args,
+            TextReader stdin,
+            TextWriter stdout,
+            TextWriter stderr,
+            Func<string, string?> getEnvironmentVariable)
+        {
+            if (!CliLanguageSelector.TrySelect(args, getEnvironmentVariable, stderr, out var language, out var commandArgs))
+            {
+                return 2;
+            }
+
+            using (CliText.Use(language))
+            {
+                return Dispatch(commandArgs, stdin, stdout, stderr);
+            }
+        }
+
+        private static string TopLevelUsage => CliText.Get("Usage_TopLevel");
+
+        private static string FunctionRecipeUsage => CliText.Get("Usage_FunctionRecipe");
+
+        private static string ValidateUsage => CliText.Get("Usage_Validate");
+
+        private static string FunctionRecipeValidateUsage => CliText.Get("Usage_FunctionRecipeValidate");
+
+        private static string RenderUsageLine1 => CliText.Get("Usage_RenderLine1");
+
+        private static string RenderUsageLine2 => CliText.Get("Usage_RenderLine2");
+
+        private static string RecipeCreateUsage => CliText.Get("Usage_RecipeCreate");
+
+        private static int Dispatch(string[] args, TextReader stdin, TextWriter stdout, TextWriter stderr)
         {
             if (args.Length == 0)
             {
@@ -173,7 +177,7 @@ namespace NodeKit.Cli
                 return exitCode;
             }
 
-            stdout.WriteLine("검증 통과");
+            stdout.WriteLine(CliText.Get("FunctionRecipeValidate_Passed"));
             return 0;
         }
 
@@ -221,7 +225,7 @@ namespace NodeKit.Cli
 
         private static int Unknown(string command, TextWriter stderr)
         {
-            stderr.WriteLine($"알 수 없는 명령입니다: {command} (validate | render | submit | recipe | function-recipe | receipt 만 지원합니다)");
+            stderr.WriteLine(CliText.Format("Error_UnknownCommand", command));
             return 2;
         }
 
@@ -297,7 +301,7 @@ namespace NodeKit.Cli
 
             if (!values.TryGetValue("--out", out var outPath))
             {
-                stderr.WriteLine("--out <build-request.json> 옵션이 필요합니다.");
+                stderr.WriteLine(CliText.Get("Render_OutRequired"));
                 return 2;
             }
 
@@ -354,7 +358,7 @@ namespace NodeKit.Cli
             }
 
             format = string.Empty;
-            stderr.WriteLine($"--format 옵션 값이 올바르지 않습니다: {rawFormat} (build-request 또는 raw-spec)");
+            stderr.WriteLine(CliText.Format("Render_InvalidFormat", rawFormat));
             return false;
         }
 

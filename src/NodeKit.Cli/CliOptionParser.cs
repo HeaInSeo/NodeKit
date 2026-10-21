@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using NodeKit.Cli.Localization;
 
 namespace NodeKit.Cli
 {
@@ -32,7 +33,7 @@ namespace NodeKit.Cli
                 {
                     if (values.ContainsKey(arg))
                     {
-                        stderr.WriteLine($"{arg} 옵션이 여러 번 지정되었습니다.");
+                        stderr.WriteLine(CliText.Format("Option_Duplicate", arg));
                         return false;
                     }
 
@@ -41,7 +42,7 @@ namespace NodeKit.Cli
                     // 같은 실수가 "--strict-reproducible"을 값으로 그대로 삼켜버린다.
                     if (i + 1 >= args.Length || args[i + 1].StartsWith("--", System.StringComparison.Ordinal))
                     {
-                        stderr.WriteLine($"{arg} 옵션에는 값이 필요합니다.");
+                        stderr.WriteLine(CliText.Format("Option_MissingValue", arg));
                         return false;
                     }
 
@@ -58,8 +59,8 @@ namespace NodeKit.Cli
 
                 var supported = string.Join(", ", valueOptions.Select(o => $"{o} <value>").Concat(flagOptions));
                 stderr.WriteLine(supported.Length == 0
-                    ? $"알 수 없는 옵션입니다: {arg} (이 명령은 옵션을 지원하지 않습니다)"
-                    : $"알 수 없는 옵션입니다: {arg} (지원: {supported})");
+                    ? CliText.Format("Option_UnknownNoOptions", arg)
+                    : CliText.Format("Option_UnknownWithSupported", arg, supported));
                 return false;
             }
 

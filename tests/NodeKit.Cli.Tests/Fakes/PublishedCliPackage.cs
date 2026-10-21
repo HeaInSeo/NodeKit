@@ -109,6 +109,8 @@ namespace NodeKit.Cli.Tests.Fakes
             // NO_COLOR를 강제하지 않는다. 강제하면 redirected stdout/stderr에서 ANSI를 끄는 CLI 자체의 판단을
             // 가린다. 부모 환경의 값도 지워 각 테스트가 명시한 environment만 남게 한다.
             start.Environment.Remove("NO_COLOR");
+            // UF01: 부모의 NODEKIT_LANG이 기본 한국어 기대값을 바꾸지 않게 지우고, 테스트가 명시한 값만 쓴다.
+            start.Environment.Remove("NODEKIT_LANG");
             if (environment is not null)
             {
                 foreach (var (key, value) in environment)
