@@ -85,4 +85,97 @@
   <data name="Lang_EnvironmentUnsupported" xml:space="preserve">
     <value>경고: NODEKIT_LANG 값 '{0}'은(는) 지원하지 않습니다 (ko 또는 en). 한국어로 표시합니다.</value>
   </data>
+  <data name="Receipt_Usage" xml:space="preserve">
+    <value>사용법:
+  nodekit receipt watch &lt;receipt.json&gt; [--format human|jsonl]
+  nodekit receipt cancel &lt;receipt.json&gt; [--format human|jsonl]
+
+watch: 저장된 build ID로 서버 빌드를 다시 관찰하고 최종 관측을 receipt에 기록합니다. 새로 제출하지 않습니다.
+  서버가 보내는 관측을 처음부터 다시 받아 표시할 뿐, 이전 관찰 위치를 이어받거나 이벤트를 한 번만 보여 준다고 보장하지 않습니다.
+  Ctrl-C는 이 관찰만 멈추고 서버 빌드는 취소하지 않습니다.
+cancel: 저장된 build ID에 서버 취소 요청을 한 번 보냅니다. 서버가 실제로 멈췄는지는 watch로 확인하세요.
+build ID가 없는 receipt(제출 결과를 모르는 submit_in_flight 포함)는 아무 요청도 보내지 않고 다시 제출하지도 않습니다.
+--format jsonl: stdout에 nodekit.receipt.v1 JSON 레코드만 한 줄씩 냅니다(마지막은 항상 completed). 진단과 후속 명령은 stderr로 갑니다.</value>
+  </data>
+  <data name="Receipt_EmptyPath" xml:space="preserve">
+    <value>receipt 경로가 비어 있습니다. 아무 요청도 보내지 않았습니다.</value>
+  </data>
+  <data name="Receipt_LocalRecordError" xml:space="preserve">
+    <value>로컬 기록 오류 ({0}): {1}</value>
+  </data>
+  <data name="Receipt_NotResumable" xml:space="preserve">
+    <value>재진입 불가 ({0}): {1}</value>
+  </data>
+  <data name="Receipt_AlreadyTerminal" xml:space="preserve">
+    <value>이미 최종 상태({0})를 관측한 빌드입니다 (build ID: {1}). 취소 요청을 보내지 않았습니다.</value>
+  </data>
+  <data name="Receipt_EndpointUnusable" xml:space="preserve">
+    <value>receipt의 NodeVault endpoint로 연결할 수 없습니다: {0} ({1}). 아무 요청도 보내지 않았습니다.</value>
+  </data>
+  <data name="Receipt_HeaderWatch" xml:space="preserve">
+    <value>receipt 재관찰: {0}</value>
+  </data>
+  <data name="Receipt_HeaderCancel" xml:space="preserve">
+    <value>receipt 취소 요청: {0}</value>
+  </data>
+  <data name="Receipt_FormatInvalid" xml:space="preserve">
+    <value>--format 옵션 값이 올바르지 않습니다: {0} (human 또는 jsonl)</value>
+  </data>
+  <data name="Receipt_LocalRecordFailed" xml:space="preserve">
+    <value>로컬 기록 실패 ({0}): {1}</value>
+  </data>
+  <data name="Receipt_SecondImageDigestMissing" xml:space="preserve">
+    <value>서버가 Succeeded를 보냈지만 두 번째 이미지 digest(B)가 'sha256:' + 16진수 64자리로 오지 않았습니다. 등록 가능한 결과로 쓰지 않습니다 — NodeVault에서 빌드 결과를 직접 확인하세요.</value>
+  </data>
+  <data name="Receipt_ImageDigest" xml:space="preserve">
+    <value>이미지 digest: {0}</value>
+  </data>
+  <data name="Receipt_FinalRecordedStatus" xml:space="preserve">
+    <value>최종 상태를 receipt에 기록했습니다: {0}</value>
+  </data>
+  <data name="Receipt_FinalRecorded" xml:space="preserve">
+    <value>최종 상태를 receipt에 기록했습니다.</value>
+  </data>
+  <data name="Receipt_BuildFailed" xml:space="preserve">
+    <value>빌드 실패: {0}</value>
+  </data>
+  <data name="Receipt_ResultUnknown" xml:space="preserve">
+    <value>{0} 원격 빌드 결과를 확인하지 못했습니다 (build ID: {1}). receipt는 그대로 두었습니다 — 나중에 다시 watch하세요.</value>
+  </data>
+  <data name="Receipt_WatchStopped" xml:space="preserve">
+    <value>관찰을 멈췄습니다 (build ID: {0}). 서버 빌드는 취소하지 않았습니다 — 취소하려면 {1}</value>
+  </data>
+  <data name="Receipt_WatchStoppedRecord" xml:space="preserve">
+    <value>관찰을 멈췄습니다. 서버 빌드는 취소하지 않았습니다.</value>
+  </data>
+  <data name="Receipt_WatchFailed" xml:space="preserve">
+    <value>{0} 원격 빌드 상태는 확인하지 못했습니다 (build ID: {1}). receipt는 그대로 두었습니다.</value>
+  </data>
+  <data name="Receipt_CancelAborted" xml:space="preserve">
+    <value>취소 요청을 중단했습니다 (build ID: {0}). 서버가 요청을 받았는지 알 수 없습니다.</value>
+  </data>
+  <data name="Receipt_CancelTimeoutReason" xml:space="preserve">
+    <value>{0}초 안에 응답이 없었습니다</value>
+  </data>
+  <data name="Receipt_CancelFailed" xml:space="preserve">
+    <value>취소 요청이 실패했습니다 (build ID: {0}): {1}. 서버 빌드가 멈췄는지 알 수 없습니다 — receipt는 그대로 두었습니다.</value>
+  </data>
+  <data name="Receipt_CancelSent" xml:space="preserve">
+    <value>취소 요청을 보냈습니다 (build ID: {0}). 서버가 실제로 멈췄는지는 아직 확인하지 않았습니다 — 확인하려면 {1}</value>
+  </data>
+  <data name="Receipt_CancelSentRecord" xml:space="preserve">
+    <value>취소 요청을 보냈습니다. 서버가 실제로 멈췄는지는 확인하지 않았습니다.</value>
+  </data>
+  <data name="Receipt_EventSucceeded" xml:space="preserve">
+    <value>[성공]</value>
+  </data>
+  <data name="Receipt_EventJobCreated" xml:space="preserve">
+    <value>[빌드 시작]</value>
+  </data>
+  <data name="Receipt_EventJobRunning" xml:space="preserve">
+    <value>[실행 중]</value>
+  </data>
+  <data name="Receipt_EventObserved" xml:space="preserve">
+    <value>[관측]</value>
+  </data>
 </root>

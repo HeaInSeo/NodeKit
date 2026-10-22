@@ -86,4 +86,97 @@ Run `nodekit &lt;command&gt; --help` for the options of each command (for exampl
   <data name="Lang_EnvironmentUnsupported" xml:space="preserve">
     <value>Warning: NODEKIT_LANG value '{0}' is not supported (ko or en). Showing Korean.</value>
   </data>
+  <data name="Receipt_Usage" xml:space="preserve">
+    <value>Usage:
+  nodekit receipt watch &lt;receipt.json&gt; [--format human|jsonl]
+  nodekit receipt cancel &lt;receipt.json&gt; [--format human|jsonl]
+
+watch: observes the server build again using the saved build ID and records the final observation in the receipt. It does not submit again.
+  It only receives and shows the server's observations from the start; it does not resume an earlier watch position or guarantee that each event is shown once.
+  Ctrl-C stops only this watch; it does not cancel the server build.
+cancel: sends one server cancel request for the saved build ID. Use watch to check whether the server actually stopped.
+A receipt without a build ID (including submit_in_flight, where the submit result is unknown) sends no request and is not submitted again.
+--format jsonl: stdout carries only nodekit.receipt.v1 JSON records, one per line (the last is always completed). Diagnostics and follow-up commands go to stderr.</value>
+  </data>
+  <data name="Receipt_EmptyPath" xml:space="preserve">
+    <value>The receipt path is empty. No request was sent.</value>
+  </data>
+  <data name="Receipt_LocalRecordError" xml:space="preserve">
+    <value>Local record error ({0}): {1}</value>
+  </data>
+  <data name="Receipt_NotResumable" xml:space="preserve">
+    <value>Cannot resume ({0}): {1}</value>
+  </data>
+  <data name="Receipt_AlreadyTerminal" xml:space="preserve">
+    <value>This build already has a final observed state ({0}) (build ID: {1}). No cancel request was sent.</value>
+  </data>
+  <data name="Receipt_EndpointUnusable" xml:space="preserve">
+    <value>Cannot connect to the receipt's NodeVault endpoint: {0} ({1}). No request was sent.</value>
+  </data>
+  <data name="Receipt_HeaderWatch" xml:space="preserve">
+    <value>receipt watch: {0}</value>
+  </data>
+  <data name="Receipt_HeaderCancel" xml:space="preserve">
+    <value>receipt cancel request: {0}</value>
+  </data>
+  <data name="Receipt_FormatInvalid" xml:space="preserve">
+    <value>Invalid --format value: {0} (human or jsonl)</value>
+  </data>
+  <data name="Receipt_LocalRecordFailed" xml:space="preserve">
+    <value>Local record failed ({0}): {1}</value>
+  </data>
+  <data name="Receipt_SecondImageDigestMissing" xml:space="preserve">
+    <value>The server sent Succeeded, but the second image digest (B) did not arrive as 'sha256:' + 64 hex digits. It is not used as a registrable result — check the build result directly in NodeVault.</value>
+  </data>
+  <data name="Receipt_ImageDigest" xml:space="preserve">
+    <value>Image digest: {0}</value>
+  </data>
+  <data name="Receipt_FinalRecordedStatus" xml:space="preserve">
+    <value>Recorded the final state in the receipt: {0}</value>
+  </data>
+  <data name="Receipt_FinalRecorded" xml:space="preserve">
+    <value>Recorded the final state in the receipt.</value>
+  </data>
+  <data name="Receipt_BuildFailed" xml:space="preserve">
+    <value>Build failed: {0}</value>
+  </data>
+  <data name="Receipt_ResultUnknown" xml:space="preserve">
+    <value>{0} The remote build result could not be confirmed (build ID: {1}). The receipt was left unchanged — watch again later.</value>
+  </data>
+  <data name="Receipt_WatchStopped" xml:space="preserve">
+    <value>Stopped watching (build ID: {0}). The server build was not cancelled — to cancel it: {1}</value>
+  </data>
+  <data name="Receipt_WatchStoppedRecord" xml:space="preserve">
+    <value>Stopped watching. The server build was not cancelled.</value>
+  </data>
+  <data name="Receipt_WatchFailed" xml:space="preserve">
+    <value>{0} The remote build state could not be confirmed (build ID: {1}). The receipt was left unchanged.</value>
+  </data>
+  <data name="Receipt_CancelAborted" xml:space="preserve">
+    <value>Cancel request was interrupted (build ID: {0}). It is unknown whether the server received it.</value>
+  </data>
+  <data name="Receipt_CancelTimeoutReason" xml:space="preserve">
+    <value>no response within {0} seconds</value>
+  </data>
+  <data name="Receipt_CancelFailed" xml:space="preserve">
+    <value>Cancel request failed (build ID: {0}): {1}. It is unknown whether the server build stopped — the receipt was left unchanged.</value>
+  </data>
+  <data name="Receipt_CancelSent" xml:space="preserve">
+    <value>Cancel request sent (build ID: {0}). Whether the server actually stopped has not been checked yet — to check: {1}</value>
+  </data>
+  <data name="Receipt_CancelSentRecord" xml:space="preserve">
+    <value>Cancel request sent. Whether the server actually stopped has not been checked.</value>
+  </data>
+  <data name="Receipt_EventSucceeded" xml:space="preserve">
+    <value>[succeeded]</value>
+  </data>
+  <data name="Receipt_EventJobCreated" xml:space="preserve">
+    <value>[build started]</value>
+  </data>
+  <data name="Receipt_EventJobRunning" xml:space="preserve">
+    <value>[running]</value>
+  </data>
+  <data name="Receipt_EventObserved" xml:space="preserve">
+    <value>[observed]</value>
+  </data>
 </root>
