@@ -35,7 +35,13 @@ namespace NodeKit.Cli.Tests
         private const string Digest =
             "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
-        private static readonly TimeSpan _userCancelDelay = TimeSpan.FromMilliseconds(500);
+        // printed by the submit output loop for the first watch event. The loop is sequential and the build ID
+        // arrives earlier (the JobCreated event after SubmitToolBuild), so seeing this line proves the loop already
+        // holds the acknowledged build ID. A fixed timer cannot prove that under load (v0.9.1 release-prep failure).
+        private const string WatchEntryMarker = "fixture: watch entry observed";
+
+        // only bounds a barrier that is never reached; a passing run cancels as soon as the barrier is observed
+        private static readonly TimeSpan _barrierTimeout = TimeSpan.FromSeconds(30);
 
         private static readonly string[] _fixtureBuildIdOnce = { FixtureBuildId };
 
@@ -49,6 +55,18 @@ namespace NodeKit.Cli.Tests
             Directory.CreateDirectory(_workDir);
         }
 
+        private enum CancelPoint
+        {
+            /// <summary>Resolve reached the fake server and is held; no build ID can exist yet.</summary>
+            WhileResolveHeld,
+
+            /// <summary>Submit reached the fake server and its answer is held; the CLI has no build ID.</summary>
+            WhileSubmitHeld,
+
+            /// <summary>The output loop printed the first watch event, so it already holds the build ID.</summary>
+            AfterWatchEntry,
+        }
+
         public void Dispose()
         {
             Directory.Delete(_workDir, recursive: true);
@@ -60,10 +78,10 @@ namespace NodeKit.Cli.Tests
         public void UserCancel_AfterBuildId_CancelsKnownIdOnce_Exit130_ReceiptRecordsLocalAbortOnly()
         {
             using var server = NewServer();
-            server.Fake.WatchEvents = RunningEvents();
+            server.Fake.WatchEvents = WatchEntryEvents();
             server.Fake.HangAfterEvents = true;
 
-            var exitCode = SubmitUntilUserCancel(server, out var stdout, out var stderr);
+            var exitCode = SubmitUntilUserCancel(server, CancelPoint.AfterWatchEntry, out var stdout, out var stderr);
 
             Assert.Equal(130, exitCode);
             Assert.Equal(_fixtureBuildIdOnce, server.Fake.CancelledBuildIds);
@@ -83,14 +101,12 @@ namespace NodeKit.Cli.Tests
         public void UserCancel_AfterBuildId_CancelRpcStillReachesServerAfterUserTokenFired()
         {
             using var server = NewServer();
-            server.Fake.WatchEvents = RunningEvents();
+            server.Fake.WatchEvents = WatchEntryEvents();
             server.Fake.HangAfterEvents = true;
-            using var userCancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-            userCancel.CancelAfter(_userCancelDelay);
 
-            Assert.Equal(130, Submit(server, userCancel.Token, out _, out var stderr));
+            // the helper asserts that the user token fired at the observed after-ID barrier
+            Assert.Equal(130, SubmitUntilUserCancel(server, CancelPoint.AfterWatchEntry, out _, out var stderr));
 
-            Assert.True(userCancel.IsCancellationRequested);
             Assert.Equal(_fixtureBuildIdOnce, server.Fake.CancelledBuildIds);
             Assert.DoesNotContain("서버에 빌드 취소 요청을 보내지 못했습니다", stderr, StringComparison.Ordinal);
         }
@@ -102,7 +118,7 @@ namespace NodeKit.Cli.Tests
             using var server = NewServer();
             server.Fake.HangOnResolveToolSpec = true;
 
-            var exitCode = SubmitUntilUserCancel(server, out var stdout, out var stderr);
+            var exitCode = SubmitUntilUserCancel(server, CancelPoint.WhileResolveHeld, out var stdout, out var stderr);
 
             Assert.Equal(130, exitCode);
             Assert.Empty(server.Fake.CancelledBuildIds);
@@ -124,7 +140,7 @@ namespace NodeKit.Cli.Tests
             using var server = NewServer();
             server.Fake.HangOnSubmitToolBuild = true;
 
-            var exitCode = SubmitUntilUserCancel(server, out _, out var stderr);
+            var exitCode = SubmitUntilUserCancel(server, CancelPoint.WhileSubmitHeld, out _, out var stderr);
 
             Assert.Equal(130, exitCode);
             Assert.Single(server.Fake.SubmitRequests);
@@ -142,12 +158,12 @@ namespace NodeKit.Cli.Tests
         public void UserCancel_CancelRpcHangs_BoundedUnderTenSeconds_WarnsAndClaimsNoServerCancel()
         {
             using var server = NewServer();
-            server.Fake.WatchEvents = RunningEvents();
+            server.Fake.WatchEvents = WatchEntryEvents();
             server.Fake.HangAfterEvents = true;
             server.Fake.HangOnCancelToolBuild = true;
 
             var stopwatch = Stopwatch.StartNew();
-            var exitCode = SubmitUntilUserCancel(server, out var stdout, out var stderr);
+            var exitCode = SubmitUntilUserCancel(server, CancelPoint.AfterWatchEntry, out var stdout, out var stderr);
             stopwatch.Stop();
 
             Assert.Equal(130, exitCode);
@@ -423,6 +439,12 @@ namespace NodeKit.Cli.Tests
             new() { Kind = ProtoBuildEventKind.Log, Status = "Running", BuildId = FixtureBuildId },
         };
 
+        // the same running event, carrying the marker the after-ID barrier waits for
+        private static List<ProtoBuildEvent> WatchEntryEvents() => new()
+        {
+            new() { Kind = ProtoBuildEventKind.Log, Status = "Running", BuildId = FixtureBuildId, Message = WatchEntryMarker },
+        };
+
         private static GrpcTestServer NewServer()
         {
             var server = new GrpcTestServer();
@@ -430,11 +452,38 @@ namespace NodeKit.Cli.Tests
             return server;
         }
 
-        private int SubmitUntilUserCancel(GrpcTestServer server, out string stdout, out string stderr)
+        /// <summary>
+        /// Fires the user cancel at an observed point instead of after a fixed delay. Before-ID points are the
+        /// fake server holding Resolve/Submit; the after-ID point is the output loop printing the first watch
+        /// event. If the point is never reached the token still fires after <see cref="_barrierTimeout"/> so the
+        /// run ends, and the test fails on the barrier assertion rather than on a timing-dependent RPC count.
+        /// </summary>
+        private int SubmitUntilUserCancel(GrpcTestServer server, CancelPoint point, out string stdout, out string stderr)
         {
+            using var client = new GrpcToolSpecClient(server.Channel);
+            using var stdoutWriter = new MarkerSignalWriter(WatchEntryMarker);
+            using var stderrWriter = new StringWriter();
             using var userCancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-            userCancel.CancelAfter(_userCancelDelay);
-            return Submit(server, userCancel.Token, out stdout, out stderr);
+            userCancel.CancelAfter(_barrierTimeout);
+            var barrier = point switch
+            {
+                CancelPoint.WhileResolveHeld => server.Fake.ResolveReceived,
+                CancelPoint.WhileSubmitHeld => server.Fake.SubmitReceived,
+                _ => stdoutWriter.Seen,
+            };
+            _ = barrier.ContinueWith(
+                _ => userCancel.Cancel(),
+                CancellationToken.None,
+                TaskContinuationOptions.OnlyOnRanToCompletion,
+                TaskScheduler.Default);
+
+            var args = new[] { "submit", WriteRecipe() };
+            var exitCode = SubmitCommand.RunUntilUserCancel(args, stdoutWriter, stderrWriter, client, () => FixedRequestId, userCancel.Token);
+
+            Assert.True(barrier.IsCompletedSuccessfully, $"cancel point {point} was not observed within {_barrierTimeout}");
+            stdout = stdoutWriter.ToString();
+            stderr = stderrWriter.ToString();
+            return exitCode;
         }
 
         private int Submit(GrpcTestServer server, out string stdout, out string stderr, params string[] extraArgs) =>
@@ -530,6 +579,42 @@ namespace NodeKit.Cli.Tests
             var path = Path.Join(_workDir, "input-" + Guid.NewGuid() + ".json");
             File.WriteAllText(path, JsonSerializer.Serialize(recipe, RecipeCreateCommand.JsonOptions));
             return path;
+        }
+
+        /// <summary>Captures output like <see cref="StringWriter"/> and completes <see cref="Seen"/> once a written
+        /// text contains the marker. The submit loop writes from one thread at a time.</summary>
+        private sealed class MarkerSignalWriter : StringWriter
+        {
+            private readonly string _marker;
+
+            private readonly TaskCompletionSource _seen = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public MarkerSignalWriter(string marker)
+            {
+                _marker = marker;
+            }
+
+            public Task Seen => _seen.Task;
+
+            public override void Write(string? value)
+            {
+                base.Write(value);
+                Check(value);
+            }
+
+            public override void WriteLine(string? value)
+            {
+                base.WriteLine(value);
+                Check(value);
+            }
+
+            private void Check(string? value)
+            {
+                if (value is not null && value.Contains(_marker, StringComparison.Ordinal))
+                {
+                    _seen.TrySetResult();
+                }
+            }
         }
 
         /// <summary>
