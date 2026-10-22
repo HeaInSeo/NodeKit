@@ -15,6 +15,10 @@ namespace NodeKit.Cli.Tests.Fakes
     /// </summary>
     internal sealed class FakeBuildService : BuildService.BuildServiceBase
     {
+        private readonly TaskCompletionSource _resolveReceived = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        private readonly TaskCompletionSource _submitReceived = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         public Func<ToolSpecRequest, ResolvedToolSpecResponse> OnResolveToolSpec { get; set; } =
             _ => new ResolvedToolSpecResponse { ToolSpecDigest = "fake-digest" };
 
@@ -64,6 +68,12 @@ namespace NodeKit.Cli.Tests.Fakes
 
         public List<string> CallOrder { get; } = new();
 
+        /// <summary>첫 ResolveToolSpec 요청이 서버에 기록되면 완료된다 (시간이 아니라 관측 지점으로 취소를 거는 테스트용).</summary>
+        public Task ResolveReceived => _resolveReceived.Task;
+
+        /// <summary>첫 SubmitToolBuild 요청이 서버에 기록되면 완료된다.</summary>
+        public Task SubmitReceived => _submitReceived.Task;
+
         /// <summary><see cref="CallOrder"/>와 같은 순서·같은 lock으로 남긴 Resolve/Submit/Watch 요청 message.</summary>
         public List<IMessage> CallRequests { get; } = new();
 
@@ -98,6 +108,8 @@ namespace NodeKit.Cli.Tests.Fakes
                 CallRequests.Add(request);
             }
 
+            _resolveReceived.TrySetResult();
+
             if (HangOnResolveToolSpec)
             {
                 await Task.Delay(System.Threading.Timeout.Infinite, context.CancellationToken);
@@ -115,6 +127,8 @@ namespace NodeKit.Cli.Tests.Fakes
                 CallOrder.Add("Submit");
                 CallRequests.Add(request);
             }
+
+            _submitReceived.TrySetResult();
 
             if (HangOnSubmitToolBuild)
             {
