@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
+using System.Threading.Tasks;
 using Grpc.Core;
 using NodeKit.Authoring.Recipes;
 using NodeKit.Cli.Localization;
@@ -39,6 +40,11 @@ namespace NodeKit.Cli.Tests
             "sha256:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210";
 
         private const string ImageRef = "harbor.local/tools/bwa-mem:0.7.17";
+
+        // the CLI has handled a watch event once its state record is on stdout
+        private const string StateRecordMarker = "\"type\":\"state\"";
+
+        private static readonly TimeSpan _barrierTimeout = TimeSpan.FromSeconds(30);
 
         private static readonly string[] _watchOnly = { "Watch" };
 
@@ -582,7 +588,9 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(exitCode, ko.Exit);
             Assert.Equal(exitCode, en.Exit);
             Assert.Equal(ko.Stdout, en.Stdout);
-            var completed = ParseRecords(en.Stdout, verb)[^1];
+            var records = ParseRecords(en.Stdout, verb);
+            Assert.Equal(verb == "watch" ? 2 : 1, records.Count);
+            var completed = records[^1];
             Assert.Equal(errorCode, Str(completed, "error_code"));
             Assert.False(string.IsNullOrEmpty(Str(completed, "message")));
             Assert.Contains(koText, ko.Stderr, StringComparison.Ordinal);
@@ -634,54 +642,92 @@ namespace NodeKit.Cli.Tests
             Assert.DoesNotMatch("[가-힣]", stdout);
         }
 
+        /// <summary>
+        /// Runs one scenario under <paramref name="language"/>. The user cancel fires at an observed point, never
+        /// after a fixed delay: watch-stopped waits until the CLI has written the state record (so both languages
+        /// produce the same records), cancel-aborted until the fake has received the cancel RPC. cancel-timeout
+        /// must also reach the fake. A point that is never reached ends the run after
+        /// <see cref="_barrierTimeout"/> and fails on the barrier assertion.
+        /// </summary>
         private static (int Exit, string Stdout, string Stderr) ScenarioIn(
             CliLanguage language, string scenario, string verb, string receiptPath)
         {
             using var server = new GrpcTestServer();
+            using var stdoutWriter = new MarkerSignalWriter(StateRecordMarker);
+            using var stderrWriter = new StringWriter();
             using var userCancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            Task? barrier;
             switch (scenario)
             {
-                // 둘 다 끝없이 기다리는 RPC를 사용자 취소로 끝낸다: 취소가 언제 오든 같은 경로다.
                 case "watch-stopped":
                     server.Fake.WatchEvents = new List<ProtoBuildEvent>
                     {
                         new() { Kind = ProtoBuildEventKind.Log, Status = "Running", BuildId = FixtureBuildId },
                     };
                     server.Fake.HangAfterEvents = true;
-                    userCancel.CancelAfter(TimeSpan.FromMilliseconds(500));
+                    barrier = stdoutWriter.Seen;
                     break;
                 case "cancel-aborted":
                     server.Fake.HangOnCancelToolBuild = true;
-                    userCancel.CancelAfter(TimeSpan.FromMilliseconds(500));
+                    barrier = server.Fake.CancelReceived;
                     break;
                 case "cancel-timeout":
                     server.Fake.HangOnCancelToolBuild = true;
+                    barrier = null;
                     break;
                 case "endpoint-unusable":
+                    barrier = null;
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(scenario));
             }
 
-            using var scope = CliText.Use(language);
-            if (scenario == "endpoint-unusable")
+            if (barrier is not null)
             {
-                // client를 주입하지 않으면 receipt의 endpoint로 연결한다. 테스트 receipt의 endpoint는 URI가 아니다.
-                using var stdoutWriter = new StringWriter();
-                using var stderrWriter = new StringWriter();
-                var refused = ReceiptCommand.Run(
-                    new[] { "receipt", verb, receiptPath, "--format", "jsonl" },
-                    stdoutWriter,
-                    stderrWriter,
-                    toolSpecClient: null,
-                    TestContext.Current.CancellationToken,
-                    new RecordingInterrupt().Register);
-                Assert.Empty(server.Fake.CancelledBuildIds);
-                return (refused, stdoutWriter.ToString(), stderrWriter.ToString());
+                userCancel.CancelAfter(_barrierTimeout);
+                _ = barrier.ContinueWith(
+                    _ => userCancel.Cancel(),
+                    CancellationToken.None,
+                    TaskContinuationOptions.OnlyOnRanToCompletion,
+                    TaskScheduler.Default);
             }
 
-            var exit = ReenterUntil(server, verb, receiptPath, userCancel.Token, out var stdout, out var stderr);
-            return (exit, stdout, stderr);
+            int exit;
+            using (CliText.Use(language))
+            {
+                if (scenario == "endpoint-unusable")
+                {
+                    // client를 주입하지 않으면 receipt의 endpoint로 연결한다. 테스트 receipt의 endpoint는 URI가 아니다.
+                    exit = ReceiptCommand.Run(
+                        new[] { "receipt", verb, receiptPath, "--format", "jsonl" },
+                        stdoutWriter,
+                        stderrWriter,
+                        toolSpecClient: null,
+                        TestContext.Current.CancellationToken,
+                        new RecordingInterrupt().Register);
+                }
+                else
+                {
+                    using var client = new GrpcToolSpecClient(server.Channel);
+                    exit = ReceiptCommand.Run(
+                        new[] { "receipt", verb, receiptPath, "--format", "jsonl" },
+                        stdoutWriter,
+                        stderrWriter,
+                        client,
+                        userCancel.Token,
+                        new RecordingInterrupt().Register);
+                }
+            }
+
+            if (barrier is not null)
+            {
+                Assert.True(barrier.IsCompletedSuccessfully, $"cancel point for {scenario} was not observed within {_barrierTimeout}");
+            }
+
+            Assert.Equal(
+                scenario is "cancel-aborted" or "cancel-timeout" ? _fixtureBuildIdOnce : Array.Empty<string>(),
+                server.Fake.CancelledBuildIds);
+            return (exit, stdoutWriter.ToString(), stderrWriter.ToString());
         }
 
         private static (int Exit, string Stdout, string Stderr) CancelIn(CliLanguage language, string scenario, string receiptPath)

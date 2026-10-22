@@ -581,42 +581,6 @@ namespace NodeKit.Cli.Tests
             return path;
         }
 
-        /// <summary>Captures output like <see cref="StringWriter"/> and completes <see cref="Seen"/> once a written
-        /// text contains the marker. The submit loop writes from one thread at a time.</summary>
-        private sealed class MarkerSignalWriter : StringWriter
-        {
-            private readonly string _marker;
-
-            private readonly TaskCompletionSource _seen = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-            public MarkerSignalWriter(string marker)
-            {
-                _marker = marker;
-            }
-
-            public Task Seen => _seen.Task;
-
-            public override void Write(string? value)
-            {
-                base.Write(value);
-                Check(value);
-            }
-
-            public override void WriteLine(string? value)
-            {
-                base.WriteLine(value);
-                Check(value);
-            }
-
-            private void Check(string? value)
-            {
-                if (value is not null && value.Contains(_marker, StringComparison.Ordinal))
-                {
-                    _seen.TrySetResult();
-                }
-            }
-        }
-
         /// <summary>
         /// Holds the first build-ID event until the caller's token fires (i.e. until --connect-timeout expires),
         /// then delivers it and lets the next read observe the cancellation. This pins the boundary race where

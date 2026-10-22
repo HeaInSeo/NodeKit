@@ -19,6 +19,8 @@ namespace NodeKit.Cli.Tests.Fakes
 
         private readonly TaskCompletionSource _submitReceived = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+        private readonly TaskCompletionSource _cancelReceived = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         public Func<ToolSpecRequest, ResolvedToolSpecResponse> OnResolveToolSpec { get; set; } =
             _ => new ResolvedToolSpecResponse { ToolSpecDigest = "fake-digest" };
 
@@ -73,6 +75,9 @@ namespace NodeKit.Cli.Tests.Fakes
 
         /// <summary>첫 SubmitToolBuild 요청이 서버에 기록되면 완료된다.</summary>
         public Task SubmitReceived => _submitReceived.Task;
+
+        /// <summary>첫 CancelToolBuild 요청이 서버에 기록되면 완료된다.</summary>
+        public Task CancelReceived => _cancelReceived.Task;
 
         /// <summary><see cref="CallOrder"/>와 같은 순서·같은 lock으로 남긴 Resolve/Submit/Watch 요청 message.</summary>
         public List<IMessage> CallRequests { get; } = new();
@@ -178,6 +183,8 @@ namespace NodeKit.Cli.Tests.Fakes
             {
                 CancelledBuildIds.Add(request.BuildId);
             }
+
+            _cancelReceived.TrySetResult();
 
             if (CancelToolBuildFailure is { } failure)
             {
