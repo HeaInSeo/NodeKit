@@ -561,6 +561,129 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(before, File.ReadAllBytes(receiptPath));
         }
 
+        // UF01b P3-U02-PIN (#96): JSONL message를 싣는 나머지 receipt 경로도 같은 규칙이다 — stdout bytes·exit는
+        // 언어와 무관하고 stderr만 선택 언어를 따른다. ko에서는 Format과 FormatMachine이 같은 문구라 ko 단독 시험으로는
+        // 구분되지 않으므로 en과 비교한다.
+        [Theory]
+        [InlineData("watch-stopped", "WATCH_STOPPED", 130, "관찰을 멈췄습니다 (build ID: ", "Stopped watching (build ID: ")]
+        [InlineData("cancel-aborted", "CANCEL_REQUEST_ABORTED", 130, "취소 요청을 중단했습니다 (build ID: ", "Cancel request was interrupted (build ID: ")]
+        [InlineData("cancel-timeout", "CANCEL_REQUEST_TIMEOUT", 1, "5초 안에 응답이 없었습니다", "no response within 5 seconds")]
+        [InlineData("endpoint-unusable", LocalOperationStore.InvalidCode, 2, "receipt의 NodeVault endpoint로 연결할 수 없습니다", "Cannot connect to the receipt's NodeVault endpoint")]
+        public void Language_ChangesHumanStderrOnly_MachineMessageBytesIdentical(
+            string scenario, string errorCode, int exitCode, string koText, string enText)
+        {
+            var receiptPath = CreateAcknowledgedReceipt();
+            var before = File.ReadAllBytes(receiptPath);
+            var verb = scenario == "watch-stopped" ? "watch" : "cancel";
+
+            var ko = ScenarioIn(CliLanguage.Ko, scenario, verb, receiptPath);
+            var en = ScenarioIn(CliLanguage.En, scenario, verb, receiptPath);
+
+            Assert.Equal(exitCode, ko.Exit);
+            Assert.Equal(exitCode, en.Exit);
+            Assert.Equal(ko.Stdout, en.Stdout);
+            var completed = ParseRecords(en.Stdout, verb)[^1];
+            Assert.Equal(errorCode, Str(completed, "error_code"));
+            Assert.False(string.IsNullOrEmpty(Str(completed, "message")));
+            Assert.Contains(koText, ko.Stderr, StringComparison.Ordinal);
+            Assert.Contains(enText, en.Stderr, StringComparison.Ordinal);
+            Assert.DoesNotContain(koText, en.Stderr, StringComparison.Ordinal);
+            Assert.Equal(before, File.ReadAllBytes(receiptPath));
+        }
+
+        // UF01b P3-PREFIX-EN (#96): human watch under en — header, event prefixes, digest line and final line.
+        [Fact]
+        public void Watch_Human_En_HeaderEventPrefixesAndFinalLine_NoHangul()
+        {
+            var receiptPath = CreateAcknowledgedReceipt();
+            using var server = new GrpcTestServer();
+            server.Fake.WatchEvents = new List<ProtoBuildEvent>
+            {
+                new() { Kind = ProtoBuildEventKind.JobCreated, Status = "Requested", BuildId = FixtureBuildId },
+                new() { Kind = ProtoBuildEventKind.JobRunning, Status = "Running", BuildId = FixtureBuildId },
+                new() { Kind = ProtoBuildEventKind.Log, Status = "Running", BuildId = FixtureBuildId, Message = "step 1" },
+                new() { Kind = ProtoBuildEventKind.Log, Status = "Succeeded", BuildId = FixtureBuildId, ImageRef = ImageRef, ImageDigest = ImageDigest },
+            };
+
+            int exitCode;
+            string stdout;
+            string stderr;
+            using (CliText.Use(CliLanguage.En))
+            {
+                exitCode = Run(server, new[] { "receipt", "watch", receiptPath }, TestContext.Current.CancellationToken, out stdout, out stderr);
+            }
+
+            Assert.Equal(0, exitCode);
+            Assert.Empty(stderr);
+            var lines = stdout.Split('\n').Select(l => l.TrimEnd('\r')).ToList();
+            Assert.StartsWith("receipt watch: ", lines[0], StringComparison.Ordinal);
+            Assert.StartsWith($"  request ID: {FixedRequestId}, build ID: {FixtureBuildId}, endpoint: ", lines[1], StringComparison.Ordinal);
+            Assert.Equal(
+                new[]
+                {
+                    string.Empty,
+                    "[build started] Requested",
+                    "[running] Running",
+                    "[observed] Running step 1",
+                    "[succeeded] Succeeded",
+                    $"Image digest: {ImageRef}@{ImageDigest}",
+                    "Recorded the final state in the receipt: Succeeded",
+                    string.Empty,
+                },
+                lines.Skip(2));
+            Assert.DoesNotMatch("[가-힣]", stdout);
+        }
+
+        private static (int Exit, string Stdout, string Stderr) ScenarioIn(
+            CliLanguage language, string scenario, string verb, string receiptPath)
+        {
+            using var server = new GrpcTestServer();
+            using var userCancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            switch (scenario)
+            {
+                // 둘 다 끝없이 기다리는 RPC를 사용자 취소로 끝낸다: 취소가 언제 오든 같은 경로다.
+                case "watch-stopped":
+                    server.Fake.WatchEvents = new List<ProtoBuildEvent>
+                    {
+                        new() { Kind = ProtoBuildEventKind.Log, Status = "Running", BuildId = FixtureBuildId },
+                    };
+                    server.Fake.HangAfterEvents = true;
+                    userCancel.CancelAfter(TimeSpan.FromMilliseconds(500));
+                    break;
+                case "cancel-aborted":
+                    server.Fake.HangOnCancelToolBuild = true;
+                    userCancel.CancelAfter(TimeSpan.FromMilliseconds(500));
+                    break;
+                case "cancel-timeout":
+                    server.Fake.HangOnCancelToolBuild = true;
+                    break;
+                case "endpoint-unusable":
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(scenario));
+            }
+
+            using var scope = CliText.Use(language);
+            if (scenario == "endpoint-unusable")
+            {
+                // client를 주입하지 않으면 receipt의 endpoint로 연결한다. 테스트 receipt의 endpoint는 URI가 아니다.
+                using var stdoutWriter = new StringWriter();
+                using var stderrWriter = new StringWriter();
+                var refused = ReceiptCommand.Run(
+                    new[] { "receipt", verb, receiptPath, "--format", "jsonl" },
+                    stdoutWriter,
+                    stderrWriter,
+                    toolSpecClient: null,
+                    TestContext.Current.CancellationToken,
+                    new RecordingInterrupt().Register);
+                Assert.Empty(server.Fake.CancelledBuildIds);
+                return (refused, stdoutWriter.ToString(), stderrWriter.ToString());
+            }
+
+            var exit = ReenterUntil(server, verb, receiptPath, userCancel.Token, out var stdout, out var stderr);
+            return (exit, stdout, stderr);
+        }
+
         private static (int Exit, string Stdout, string Stderr) CancelIn(CliLanguage language, string scenario, string receiptPath)
         {
             using var server = new GrpcTestServer();

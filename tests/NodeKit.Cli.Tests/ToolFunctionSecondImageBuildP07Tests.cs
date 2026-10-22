@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.Json;
 using Grpc.Core;
 using NodeKit.Authoring.ToolFunctionRecipes;
+using NodeKit.Cli.Localization;
 using NodeKit.Cli.Operations;
 using NodeKit.Cli.Tests.Fakes;
 using NodeKit.Grpc;
@@ -452,6 +453,51 @@ namespace NodeKit.Cli.Tests
             }
 
             Assert.Equal(OperationReceipt.ToolFunctionImageBuildKind, ReadReceipt(receiptPath).OperationKind);
+        }
+
+        // UF01b P3-U02-PIN (#96): missing-B JSONL message는 --lang과 무관한 기준 문구다. stderr만 언어를 따른다.
+        // 첫 watch가 receipt를 terminal로 바꾸므로 ko를 한 번 더 돌려 재관찰 자체의 출력이 같음을 먼저 확인한다.
+        [Fact]
+        public void ReceiptWatch_SecondImageMissingB_JsonlBytesIdenticalAcrossLanguages()
+        {
+            string receiptPath;
+            using (var first = NewServer())
+            {
+                first.Fake.WatchEvents = new List<ProtoBuildEvent>
+                {
+                    new() { Kind = ProtoBuildEventKind.Log, Status = "Running", BuildId = FixtureBuildId },
+                };
+                var (submitExit, _, _) = Submit(first, Save(ReadyRecipe()));
+                Assert.Equal(1, submitExit);
+                receiptPath = DefaultReceiptPath();
+            }
+
+            var ko = WatchMissingBIn(CliLanguage.Ko, receiptPath);
+            var koAgain = WatchMissingBIn(CliLanguage.Ko, receiptPath);
+            var en = WatchMissingBIn(CliLanguage.En, receiptPath);
+
+            Assert.Equal(1, ko.Exit);
+            Assert.Equal(1, koAgain.Exit);
+            Assert.Equal(1, en.Exit);
+            Assert.Equal(ko.Stdout, koAgain.Stdout);
+            Assert.Equal(koAgain.Stdout, en.Stdout);
+            Assert.Equal(SubmitCommand.SecondImageDigestMissingCode, Completed(en.Stdout).GetProperty("error_code").GetString());
+            Assert.Contains("두 번째 이미지 digest(B)", ko.Stderr, StringComparison.Ordinal);
+            Assert.Contains("second image digest (B)", en.Stderr, StringComparison.Ordinal);
+            Assert.DoesNotContain("두 번째 이미지", en.Stderr, StringComparison.Ordinal);
+        }
+
+        private static (int Exit, string Stdout, string Stderr) WatchMissingBIn(CliLanguage language, string receiptPath)
+        {
+            using var server = NewServer();
+            server.Fake.WatchEvents = new List<ProtoBuildEvent> { SucceededEvent(string.Empty) };
+            using var client = new GrpcToolSpecClient(server.Channel);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            using var scope = CliText.Use(language);
+            var exit = ReceiptCommand.Run(
+                new[] { "receipt", "watch", receiptPath, "--format", "jsonl" }, stdout, stderr, client, TestContext.Current.CancellationToken);
+            return (exit, stdout.ToString(), stderr.ToString());
         }
 
         // human receipt watch도 같은 규칙: full B가 없으면 [성공]을 찍지 않고, 있으면 B 확인 뒤에 찍는다(r4243045979).
