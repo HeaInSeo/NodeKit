@@ -104,6 +104,12 @@ A receipt without a build ID (including submit_in_flight, where the submit resul
   <data name="Receipt_LocalRecordError" xml:space="preserve">
     <value>Local record error ({0}): {1}</value>
   </data>
+  <data name="Receipt_InvalidPath" xml:space="preserve">
+    <value>Cannot use the receipt path: {0} ({1}). No request was sent.</value>
+  </data>
+  <data name="Receipt_FollowUpUnquotable" xml:space="preserve">
+    <value>nodekit receipt {0} &lt;receipt.json&gt; (receipt path: {1} — not written in a form you can paste as is, because shells read it differently. Quote it for your shell when you type it)</value>
+  </data>
   <data name="Receipt_NotResumable" xml:space="preserve">
     <value>Cannot resume ({0}): {1}</value>
   </data>

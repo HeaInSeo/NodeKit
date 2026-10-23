@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Grpc.Core;
 using NodeKit.Authoring.Recipes;
+using NodeKit.Cli.Localization;
 using NodeKit.Cli.Operations;
 using NodeKit.Cli.Tests.Fakes;
 using NodeKit.Grpc;
@@ -503,6 +504,46 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(
                 "nodekit receipt cancel '/tmp/$(x)/r.json'",
                 ReceiptCommand.FollowUpCommand("cancel", "/tmp/$(x)/r.json", windows: false));
+        }
+
+        // UF01b (#96) U02: the not-runnable follow-up wording also reaches submit JSONL, so FollowUpCommand keeps the
+        // reference Korean text under any language. FollowUpCommandHuman (receipt human output) follows the language;
+        // the command, verb and path stay as they are, and a quotable path gives the same runnable command in both.
+        [Fact]
+        public void FollowUpCommand_Unquotable_MachineIsReference_HumanFollowsLanguage()
+        {
+            const string path = @"C:\$(Remove-Item x)\%TEMP%\r.json";
+            const string quotable = @"C:\my receipts\r.json";
+
+            string koMachine;
+            string koHuman;
+            using (CliText.Use(CliLanguage.Ko))
+            {
+                koMachine = ReceiptCommand.FollowUpCommand("watch", path, windows: true);
+                koHuman = ReceiptCommand.FollowUpCommandHuman("watch", path, windows: true);
+            }
+
+            using (CliText.Use(CliLanguage.En))
+            {
+                var enMachine = ReceiptCommand.FollowUpCommand("watch", path, windows: true);
+                var enHuman = ReceiptCommand.FollowUpCommandHuman("watch", path, windows: true);
+
+                Assert.Equal(koMachine, enMachine);
+                Assert.Equal(koMachine, koHuman);
+                Assert.Equal(
+                    "nodekit receipt watch <receipt.json> (receipt 경로: " + path
+                        + " — 셸마다 해석이 달라 그대로 붙여 넣을 수 있는 형태로 적지 않았습니다. 사용하는 셸에 맞게 인용해 입력하세요)",
+                    enMachine);
+                Assert.StartsWith("nodekit receipt watch <receipt.json> (receipt path: " + path + " — ", enHuman, StringComparison.Ordinal);
+                Assert.Contains("Quote it for your shell", enHuman, StringComparison.Ordinal);
+                Assert.DoesNotContain("셸", enHuman, StringComparison.Ordinal);
+                Assert.Equal(
+                    "nodekit receipt cancel \"C:\\my receipts\\r.json\"",
+                    ReceiptCommand.FollowUpCommandHuman("cancel", quotable, windows: true));
+                Assert.Equal(
+                    ReceiptCommand.FollowUpCommand("cancel", "/tmp/$(x)/r.json", windows: false),
+                    ReceiptCommand.FollowUpCommandHuman("cancel", "/tmp/$(x)/r.json", windows: false));
+            }
         }
 
         // Codex r4239650951: an unset script variable ("$RECEIPT") or an OS-invalid path must end as a local
