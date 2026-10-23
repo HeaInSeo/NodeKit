@@ -444,6 +444,32 @@ namespace NodeKit.Cli.Tests
             Assert.Equal(before, File.ReadAllBytes(receiptPath));
         }
 
+        // UF01b (#96) U02: an OS-rejected receipt path (NUL) — the JSONL message is the reference text and its bytes
+        // and the exit code do not depend on the language; only the stderr line follows it. The path and the OS
+        // exception text are carried unchanged in both.
+        [Theory]
+        [InlineData("watch")]
+        [InlineData("cancel")]
+        public void InvalidReceiptPath_Language_ChangesHumanStderrOnly_JsonlBytesIdentical(string verb)
+        {
+            var receiptPath = Path.Join(_workDir, "bad\0name.json");
+
+            var ko = InvalidPathIn(CliLanguage.Ko, verb, receiptPath);
+            var en = InvalidPathIn(CliLanguage.En, verb, receiptPath);
+
+            Assert.Equal(2, ko.Exit);
+            Assert.Equal(2, en.Exit);
+            Assert.Equal(ko.Stdout, en.Stdout);
+            var completed = Assert.Single(ParseRecords(en.Stdout, verb));
+            Assert.Equal(LocalOperationStore.InvalidCode, Str(completed, "error_code"));
+            Assert.StartsWith("receipt 경로를 사용할 수 없습니다: ", Str(completed, "message"), StringComparison.Ordinal);
+            Assert.EndsWith(". 아무 요청도 보내지 않았습니다.", Str(completed, "message"), StringComparison.Ordinal);
+            Assert.StartsWith("로컬 기록 오류 (" + LocalOperationStore.InvalidCode + "): receipt 경로를 사용할 수 없습니다: ", ko.Stderr, StringComparison.Ordinal);
+            Assert.StartsWith("Local record error (" + LocalOperationStore.InvalidCode + "): Cannot use the receipt path: ", en.Stderr, StringComparison.Ordinal);
+            Assert.Contains(". No request was sent.", en.Stderr, StringComparison.Ordinal);
+            Assert.DoesNotContain("receipt 경로를 사용할 수 없습니다", en.Stderr, StringComparison.Ordinal);
+        }
+
         // usage/option errors end before the format is fixed: exit 2, no JSONL, no RPC
         [Theory]
         [InlineData("--format", "xml")]
@@ -740,6 +766,16 @@ namespace NodeKit.Cli.Tests
 
             using var scope = CliText.Use(language);
             var exit = Reenter(server, "cancel", receiptPath, out var stdout, out var stderr);
+            return (exit, stdout, stderr);
+        }
+
+        private static (int Exit, string Stdout, string Stderr) InvalidPathIn(CliLanguage language, string verb, string receiptPath)
+        {
+            using var server = new GrpcTestServer();
+            using var scope = CliText.Use(language);
+            var exit = Reenter(server, verb, receiptPath, out var stdout, out var stderr);
+            Assert.Empty(server.Fake.CallOrder);
+            Assert.Empty(server.Fake.CancelledBuildIds);
             return (exit, stdout, stderr);
         }
 

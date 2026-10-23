@@ -62,9 +62,9 @@ namespace NodeKit.Cli.Operations
                 return 2;
             }
 
-            if (TryOpenReceipt(receiptPath, out var handle) is { } openError)
+            if (TryOpenReceipt(receiptPath, out var handle, out var openErrorHuman) is { } openError)
             {
-                stderr.WriteLine(CliText.Format("Receipt_LocalRecordError", openError.Code, openError.Message));
+                stderr.WriteLine(CliText.Format("Receipt_LocalRecordError", openError.Code, openErrorHuman ?? openError.Message));
                 return LocalRefusal(stdout, jsonl, command, openError.ExitCode, openError.Code, openError.Message, buildId: null);
             }
 
@@ -122,29 +122,34 @@ namespace NodeKit.Cli.Operations
         }
 
         // 사용자가 준 경로는 OS가 거부할 수 있다(NUL 문자 등). 예외로 죽지 않고 로컬 입력 오류(2)로 돌려준다.
-        private static OperationStoreError? TryOpenReceipt(string receiptPath, out OperationHandle? handle)
+        // error.Message는 JSONL에도 실리는 기준 문구다. humanMessage가 있으면 stderr에는 선택 언어 문구를 쓴다(U02).
+        private static OperationStoreError? TryOpenReceipt(string receiptPath, out OperationHandle? handle, out string? humanMessage)
         {
             handle = null;
+            humanMessage = null;
             try
             {
                 return LocalOperationStore.ForReceipt(receiptPath).TryOpen(receiptPath, out handle);
             }
             catch (ArgumentException ex)
             {
-                return InvalidReceiptPath(receiptPath, ex);
+                return InvalidReceiptPath(receiptPath, ex, out humanMessage);
             }
             catch (NotSupportedException ex)
             {
-                return InvalidReceiptPath(receiptPath, ex);
+                return InvalidReceiptPath(receiptPath, ex, out humanMessage);
             }
             catch (PathTooLongException ex)
             {
-                return InvalidReceiptPath(receiptPath, ex);
+                return InvalidReceiptPath(receiptPath, ex, out humanMessage);
             }
         }
 
-        private static OperationStoreError InvalidReceiptPath(string receiptPath, Exception ex) =>
-            new(LocalOperationStore.InvalidCode, $"receipt 경로를 사용할 수 없습니다: {receiptPath} ({ex.Message}). 아무 요청도 보내지 않았습니다.");
+        private static OperationStoreError InvalidReceiptPath(string receiptPath, Exception ex, out string humanMessage)
+        {
+            humanMessage = CliText.Format("Receipt_InvalidPath", receiptPath, ex.Message);
+            return new(LocalOperationStore.InvalidCode, CliText.FormatMachine("Receipt_InvalidPath", receiptPath, ex.Message));
+        }
 
         // args[0]은 "receipt", args[1]은 하위 명령, args[2]는 receipt 경로 — 옵션은 인덱스 3부터다.
         private static bool TryParseFormat(string[] args, TextWriter stderr, out bool jsonl)
@@ -316,7 +321,7 @@ namespace NodeKit.Cli.Operations
 #pragma warning restore CA1031
             {
                 // 관찰만 멈췄다: 서버 취소를 주장하지 않으므로 status(Cancelled 등)를 만들지 않는다.
-                stderr.WriteLine(CliText.Format("Receipt_WatchStopped", buildId, FollowUpCommand("cancel", handle.ReceiptPath)));
+                stderr.WriteLine(CliText.Format("Receipt_WatchStopped", buildId, FollowUpCommandHuman("cancel", handle.ReceiptPath)));
                 return WatchCompleted(
                     stdout,
                     jsonl,
@@ -388,7 +393,7 @@ namespace NodeKit.Cli.Operations
             }
 
             // 요청을 보내고 응답을 받았을 뿐 서버가 멈췄다는 뜻이 아니다 — jsonl도 status를 싣지 않는다.
-            var sent = CliText.Format("Receipt_CancelSent", buildId, FollowUpCommand("watch", receiptPath));
+            var sent = CliText.Format("Receipt_CancelSent", buildId, FollowUpCommandHuman("watch", receiptPath));
             if (!jsonl)
             {
                 stdout.WriteLine(sent);
@@ -492,13 +497,29 @@ namespace NodeKit.Cli.Operations
         /// <summary>
         /// 후속 명령 안내. 경로를 셸 인자 하나로 안전하게 적을 수 있으면 그대로 실행 가능한 명령을,
         /// 그럴 수 없으면(Windows에서 셸마다 해석이 다른 문자) 실행 가능하다고 주장하지 않는 형태를 돌려준다.
+        /// 이 형태는 submit JSONL <c>message</c>에도 실리므로 기준 한국어 문구다. receipt human output은 <see cref="FollowUpCommandHuman(string, string)"/>을 쓴다.
         /// </summary>
-        internal static string FollowUpCommand(string verb, string receiptPath, bool windows)
+        internal static string FollowUpCommand(string verb, string receiptPath, bool windows) =>
+            FollowUpCommand(verb, receiptPath, windows, machine: true);
+
+        /// <summary>human output(stdout/stderr)용 후속 명령 안내 — 실행 불가 안내 문구만 선택 언어를 따른다. 명령과 경로는 그대로다.</summary>
+        internal static string FollowUpCommandHuman(string verb, string receiptPath) =>
+            FollowUpCommandHuman(verb, receiptPath, OperatingSystem.IsWindows());
+
+        internal static string FollowUpCommandHuman(string verb, string receiptPath, bool windows) =>
+            FollowUpCommand(verb, receiptPath, windows, machine: false);
+
+        private static string FollowUpCommand(string verb, string receiptPath, bool windows, bool machine)
         {
             var quoted = QuoteArgument(receiptPath, windows);
-            return quoted is null
-                ? $"nodekit receipt {verb} <receipt.json> (receipt 경로: {receiptPath} — 셸마다 해석이 달라 그대로 붙여 넣을 수 있는 형태로 적지 않았습니다. 사용하는 셸에 맞게 인용해 입력하세요)"
-                : $"nodekit receipt {verb} {quoted}";
+            if (quoted is not null)
+            {
+                return $"nodekit receipt {verb} {quoted}";
+            }
+
+            return machine
+                ? CliText.FormatMachine("Receipt_FollowUpUnquotable", verb, receiptPath)
+                : CliText.Format("Receipt_FollowUpUnquotable", verb, receiptPath);
         }
 
         /// <summary>
