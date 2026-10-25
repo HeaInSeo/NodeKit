@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using Grpc.Core;
 using NodeKit.Authoring;
 using NodeKit.Authoring.Recipes;
+using NodeKit.Cli.Localization;
 using NodeKit.Cli.Operations;
 using NodeKit.Grpc;
 using NodeKit.Validation.Recipes;
@@ -33,8 +34,7 @@ namespace NodeKit.Cli
     /// </summary>
     internal static class SubmitCommand
     {
-        private const string UsageLine =
-            "사용법: nodekit submit <recipe.json> [--url <nodevault-url>] [--receipt <path>] [--connect-timeout <seconds>] [--watch-timeout <duration>] [--format human|jsonl] [--strict-reproducible]";
+        private static string UsageLine => CliText.Get("Usage_Submit");
 
         // 주입된 test client에는 실제 주소가 없다 — receipt endpoint에는 이 표식을 남긴다.
         internal const string InjectedClientEndpoint = "injected-client";
@@ -181,15 +181,15 @@ namespace NodeKit.Cli
                 return true;
             }
 
-            const string message = "NodeVault 주소가 필요합니다. --url 옵션 또는 NODEKIT_NODEVAULT_URL 환경변수를 설정하세요.";
+            // UF01b (#96) U02: JSONL message는 기준 문구(언어 무관), stderr만 --lang을 따른다.
             if (jsonl)
             {
-                WriteJsonl(stdout, SubmitJsonlRecord.Completed("Failed", errorCode: "URL_REQUIRED", message: message, recovery: RecoveryDisposition.Terminal));
+                WriteJsonl(stdout, SubmitJsonlRecord.Completed("Failed", errorCode: "URL_REQUIRED", message: CliText.FormatMachine("Submit_UrlRequired"), recovery: RecoveryDisposition.Terminal));
                 return false;
             }
 
-            stderr.WriteLine(message);
-            stderr.WriteLine($"예: NODEKIT_NODEVAULT_URL=http://100.123.80.48:50051 {example}");
+            stderr.WriteLine(CliText.Get("Submit_UrlRequired"));
+            stderr.WriteLine(CliText.Format("Submit_UrlRequiredExample", example));
             return false;
         }
 
@@ -228,15 +228,16 @@ namespace NodeKit.Cli
                 catch (Exception ex)
 #pragma warning restore CA1031
                 {
-                    var message = $"NodeVault 주소 형식이 올바르지 않습니다: {url} ({ex.Message})";
+                    // UF01b (#96) U02: JSONL message는 기준 문구, stderr만 --lang을 따른다. 주소와 예외 문구는 그대로 싣는다.
                     if (jsonl)
                     {
+                        var message = CliText.FormatMachine("Submit_InvalidUrl", url, ex.Message);
                         WriteJsonl(stdout, SubmitJsonlRecord.Completed("Failed", errorCode: "INVALID_URL", message: message, recovery: RecoveryDisposition.Terminal));
                         return 2;
                     }
 
-                    stderr.WriteLine(message);
-                    stderr.WriteLine("예: --url http://100.123.80.48:50051");
+                    stderr.WriteLine(CliText.Format("Submit_InvalidUrl", url, ex.Message));
+                    stderr.WriteLine(CliText.Get("Submit_InvalidUrlExample"));
                     return 2;
                 }
             }
@@ -1181,7 +1182,7 @@ namespace NodeKit.Cli
             {
                 if (string.IsNullOrWhiteSpace(receiptValue))
                 {
-                    stderr.WriteLine("--receipt 값이 비어 있습니다 (receipt JSON 파일 경로).");
+                    stderr.WriteLine(CliText.Get("Submit_ReceiptEmpty"));
                     return false;
                 }
 
@@ -1192,7 +1193,7 @@ namespace NodeKit.Cli
             {
                 if (!int.TryParse(timeoutValue, out var seconds) || seconds <= 0)
                 {
-                    stderr.WriteLine($"--connect-timeout 값이 올바르지 않습니다: '{timeoutValue}' (초 단위 양의 정수여야 합니다).");
+                    stderr.WriteLine(CliText.Format("Submit_ConnectTimeoutInvalid", timeoutValue));
                     return false;
                 }
 
@@ -1203,7 +1204,7 @@ namespace NodeKit.Cli
             {
                 if (!TryParseDuration(watchTimeoutValue, out var duration))
                 {
-                    stderr.WriteLine($"--watch-timeout 값이 올바르지 않습니다: '{watchTimeoutValue}' (예: 2h, 90m, 120s).");
+                    stderr.WriteLine(CliText.Format("Submit_WatchTimeoutInvalid", watchTimeoutValue));
                     return false;
                 }
 
@@ -1225,7 +1226,7 @@ namespace NodeKit.Cli
                 var normalized = formatValue.Trim().ToLowerInvariant();
                 if (normalized != "human" && normalized != "jsonl")
                 {
-                    stderr.WriteLine($"--format 옵션 값이 올바르지 않습니다: {formatValue} (human 또는 jsonl)");
+                    stderr.WriteLine(CliText.Format("Submit_FormatInvalid", formatValue));
                     return false;
                 }
 

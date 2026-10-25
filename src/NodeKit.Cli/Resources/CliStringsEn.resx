@@ -86,6 +86,33 @@ Run `nodekit &lt;command&gt; --help` for the options of each command (for exampl
   <data name="Lang_EnvironmentUnsupported" xml:space="preserve">
     <value>Warning: NODEKIT_LANG value '{0}' is not supported (ko or en). Showing Korean.</value>
   </data>
+  <data name="Usage_Submit" xml:space="preserve">
+    <value>Usage: nodekit submit &lt;recipe.json&gt; [--url &lt;nodevault-url&gt;] [--receipt &lt;path&gt;] [--connect-timeout &lt;seconds&gt;] [--watch-timeout &lt;duration&gt;] [--format human|jsonl] [--strict-reproducible]</value>
+  </data>
+  <data name="Submit_UrlRequired" xml:space="preserve">
+    <value>A NodeVault address is required. Set the --url option or the NODEKIT_NODEVAULT_URL environment variable.</value>
+  </data>
+  <data name="Submit_UrlRequiredExample" xml:space="preserve">
+    <value>Example: NODEKIT_NODEVAULT_URL=http://100.123.80.48:50051 {0}</value>
+  </data>
+  <data name="Submit_InvalidUrl" xml:space="preserve">
+    <value>Invalid NodeVault address: {0} ({1})</value>
+  </data>
+  <data name="Submit_InvalidUrlExample" xml:space="preserve">
+    <value>Example: --url http://100.123.80.48:50051</value>
+  </data>
+  <data name="Submit_ReceiptEmpty" xml:space="preserve">
+    <value>The --receipt value is empty (path to the receipt JSON file).</value>
+  </data>
+  <data name="Submit_ConnectTimeoutInvalid" xml:space="preserve">
+    <value>Invalid --connect-timeout value: '{0}' (must be a positive whole number of seconds).</value>
+  </data>
+  <data name="Submit_WatchTimeoutInvalid" xml:space="preserve">
+    <value>Invalid --watch-timeout value: '{0}' (for example 2h, 90m, 120s).</value>
+  </data>
+  <data name="Submit_FormatInvalid" xml:space="preserve">
+    <value>Invalid --format value: {0} (human or jsonl)</value>
+  </data>
   <data name="Receipt_Usage" xml:space="preserve">
     <value>Usage:
   nodekit receipt watch &lt;receipt.json&gt; [--format human|jsonl]
