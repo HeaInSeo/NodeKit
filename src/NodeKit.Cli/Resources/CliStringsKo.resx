@@ -85,6 +85,33 @@
   <data name="Lang_EnvironmentUnsupported" xml:space="preserve">
     <value>경고: NODEKIT_LANG 값 '{0}'은(는) 지원하지 않습니다 (ko 또는 en). 한국어로 표시합니다.</value>
   </data>
+  <data name="Usage_Submit" xml:space="preserve">
+    <value>사용법: nodekit submit &lt;recipe.json&gt; [--url &lt;nodevault-url&gt;] [--receipt &lt;path&gt;] [--connect-timeout &lt;seconds&gt;] [--watch-timeout &lt;duration&gt;] [--format human|jsonl] [--strict-reproducible]</value>
+  </data>
+  <data name="Submit_UrlRequired" xml:space="preserve">
+    <value>NodeVault 주소가 필요합니다. --url 옵션 또는 NODEKIT_NODEVAULT_URL 환경변수를 설정하세요.</value>
+  </data>
+  <data name="Submit_UrlRequiredExample" xml:space="preserve">
+    <value>예: NODEKIT_NODEVAULT_URL=http://100.123.80.48:50051 {0}</value>
+  </data>
+  <data name="Submit_InvalidUrl" xml:space="preserve">
+    <value>NodeVault 주소 형식이 올바르지 않습니다: {0} ({1})</value>
+  </data>
+  <data name="Submit_InvalidUrlExample" xml:space="preserve">
+    <value>예: --url http://100.123.80.48:50051</value>
+  </data>
+  <data name="Submit_ReceiptEmpty" xml:space="preserve">
+    <value>--receipt 값이 비어 있습니다 (receipt JSON 파일 경로).</value>
+  </data>
+  <data name="Submit_ConnectTimeoutInvalid" xml:space="preserve">
+    <value>--connect-timeout 값이 올바르지 않습니다: '{0}' (초 단위 양의 정수여야 합니다).</value>
+  </data>
+  <data name="Submit_WatchTimeoutInvalid" xml:space="preserve">
+    <value>--watch-timeout 값이 올바르지 않습니다: '{0}' (예: 2h, 90m, 120s).</value>
+  </data>
+  <data name="Submit_FormatInvalid" xml:space="preserve">
+    <value>--format 옵션 값이 올바르지 않습니다: {0} (human 또는 jsonl)</value>
+  </data>
   <data name="Receipt_Usage" xml:space="preserve">
     <value>사용법:
   nodekit receipt watch &lt;receipt.json&gt; [--format human|jsonl]

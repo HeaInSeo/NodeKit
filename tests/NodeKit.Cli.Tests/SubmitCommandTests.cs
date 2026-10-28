@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Grpc.Core;
 using NodeKit.Cli;
+using NodeKit.Cli.Localization;
 using NodeKit.Cli.Tests.Fakes;
 using NodeKit.Grpc;
 using Xunit;
@@ -1936,6 +1937,143 @@ namespace NodeKit.Cli.Tests
             text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
         private static JsonElement ParseRecord(string line) => JsonDocument.Parse(line).RootElement;
+
+        // ── UF01b (#96) U02: submit 진입 메시지 — human은 --lang을 따르고 JSONL bytes·exit는 언어 무관 ──
+
+        private const string KoUsageLine =
+            "사용법: nodekit submit <recipe.json> [--url <nodevault-url>] [--receipt <path>] [--connect-timeout <seconds>] [--watch-timeout <duration>] [--format human|jsonl] [--strict-reproducible]";
+
+        [Fact]
+        public void Submit_Help_Language_KoIsReferenceText_EnIsEnglishWithSameSynopsis()
+        {
+            var ko = RunIn(CliLanguage.Ko, new[] { "submit", "--help" });
+            var en = RunIn(CliLanguage.En, new[] { "submit", "--help" });
+
+            Assert.Equal(0, ko.Exit);
+            Assert.Equal(0, en.Exit);
+            Assert.Equal(KoUsageLine + Environment.NewLine, ko.Stdout);
+            Assert.Equal("Usage: " + KoUsageLine["사용법: ".Length..] + Environment.NewLine, en.Stdout);
+            Assert.Empty(ko.Stderr);
+            Assert.Empty(en.Stderr);
+        }
+
+        [Fact]
+        public void Submit_MissingArgs_Language_UsageOnStderrFollowsLanguage()
+        {
+            var ko = RunIn(CliLanguage.Ko, new[] { "submit" });
+            var en = RunIn(CliLanguage.En, new[] { "submit" });
+
+            Assert.Equal(2, ko.Exit);
+            Assert.Equal(2, en.Exit);
+            Assert.Equal(KoUsageLine + Environment.NewLine, ko.Stderr);
+            Assert.StartsWith("Usage: nodekit submit <recipe.json> ", en.Stderr, StringComparison.Ordinal);
+            Assert.Empty(ko.Stdout);
+            Assert.Empty(en.Stdout);
+        }
+
+        // Option errors end before the format is fixed: exit 2 and an empty stdout in both languages. The ko line is
+        // the old literal verbatim; the en line carries the same user value unchanged.
+        [Theory]
+        [InlineData("--receipt", " ", "--receipt 값이 비어 있습니다 (receipt JSON 파일 경로).", "The --receipt value is empty (path to the receipt JSON file).")]
+        [InlineData("--connect-timeout", "0", "--connect-timeout 값이 올바르지 않습니다: '0' (초 단위 양의 정수여야 합니다).", "Invalid --connect-timeout value: '0' (must be a positive whole number of seconds).")]
+        [InlineData("--watch-timeout", "soon", "--watch-timeout 값이 올바르지 않습니다: 'soon' (예: 2h, 90m, 120s).", "Invalid --watch-timeout value: 'soon' (for example 2h, 90m, 120s).")]
+        [InlineData("--format", "xml", "--format 옵션 값이 올바르지 않습니다: xml (human 또는 jsonl)", "Invalid --format value: xml (human or jsonl)")]
+        public void Submit_OptionError_Language_ChangesStderrOnly(string option, string value, string koLine, string enLine)
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            var args = new[] { "submit", recipePath, "--format", "jsonl", option, value };
+            if (option == "--format")
+            {
+                args = new[] { "submit", recipePath, option, value };
+            }
+
+            var client = new StubToolSpecClient(new[] { new BuildEvent { Kind = BuildEventKind.Succeeded } });
+            var ko = RunIn(CliLanguage.Ko, args, client);
+            var en = RunIn(CliLanguage.En, args, client);
+
+            Assert.Equal(2, ko.Exit);
+            Assert.Equal(2, en.Exit);
+            Assert.Empty(ko.Stdout);
+            Assert.Empty(en.Stdout);
+            Assert.Equal(koLine + Environment.NewLine, ko.Stderr);
+            Assert.Equal(enLine + Environment.NewLine, en.Stderr);
+        }
+
+        [Fact]
+        public void Submit_MissingUrl_Language_JsonlBytesIdentical_HumanStderrFollowsLanguage()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            var previousUrl = Environment.GetEnvironmentVariable("NODEKIT_NODEVAULT_URL");
+            Environment.SetEnvironmentVariable("NODEKIT_NODEVAULT_URL", null);
+            try
+            {
+                var jsonlArgs = new[] { "submit", recipePath, "--format", "jsonl" };
+                var koJsonl = RunIn(CliLanguage.Ko, jsonlArgs);
+                var enJsonl = RunIn(CliLanguage.En, jsonlArgs);
+                Assert.Equal(2, koJsonl.Exit);
+                Assert.Equal(2, enJsonl.Exit);
+                Assert.Equal(koJsonl.Stdout, enJsonl.Stdout);
+                AssertSingleCompletedTerminalFailure(enJsonl.Stdout, "URL_REQUIRED");
+                Assert.Equal(
+                    "NodeVault 주소가 필요합니다. --url 옵션 또는 NODEKIT_NODEVAULT_URL 환경변수를 설정하세요.",
+                    ParseRecord(SplitNonEmptyLines(enJsonl.Stdout)[0]).GetProperty("message").GetString());
+                Assert.Empty(enJsonl.Stderr);
+
+                var ko = RunIn(CliLanguage.Ko, new[] { "submit", recipePath });
+                var en = RunIn(CliLanguage.En, new[] { "submit", recipePath });
+                Assert.Equal(2, ko.Exit);
+                Assert.Equal(2, en.Exit);
+                Assert.Equal(
+                    "NodeVault 주소가 필요합니다. --url 옵션 또는 NODEKIT_NODEVAULT_URL 환경변수를 설정하세요." + Environment.NewLine +
+                    "예: NODEKIT_NODEVAULT_URL=http://100.123.80.48:50051 nodekit submit recipe.json" + Environment.NewLine,
+                    ko.Stderr);
+                Assert.Equal(
+                    "A NodeVault address is required. Set the --url option or the NODEKIT_NODEVAULT_URL environment variable." + Environment.NewLine +
+                    "Example: NODEKIT_NODEVAULT_URL=http://100.123.80.48:50051 nodekit submit recipe.json" + Environment.NewLine,
+                    en.Stderr);
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable("NODEKIT_NODEVAULT_URL", previousUrl);
+            }
+        }
+
+        [Fact]
+        public void Submit_InvalidUrl_Language_JsonlBytesIdentical_HumanStderrFollowsLanguage()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+
+            var jsonlArgs = new[] { "submit", recipePath, "--url", "not-a-url", "--format", "jsonl" };
+            var koJsonl = RunIn(CliLanguage.Ko, jsonlArgs);
+            var enJsonl = RunIn(CliLanguage.En, jsonlArgs);
+            Assert.Equal(2, koJsonl.Exit);
+            Assert.Equal(2, enJsonl.Exit);
+            Assert.Equal(koJsonl.Stdout, enJsonl.Stdout);
+            AssertSingleCompletedTerminalFailure(enJsonl.Stdout, "INVALID_URL");
+            var message = ParseRecord(SplitNonEmptyLines(enJsonl.Stdout)[0]).GetProperty("message").GetString()!;
+            Assert.StartsWith("NodeVault 주소 형식이 올바르지 않습니다: not-a-url (", message, StringComparison.Ordinal);
+            Assert.EndsWith(")", message, StringComparison.Ordinal);
+
+            var ko = RunIn(CliLanguage.Ko, new[] { "submit", recipePath, "--url", "not-a-url" });
+            var en = RunIn(CliLanguage.En, new[] { "submit", recipePath, "--url", "not-a-url" });
+            Assert.Equal(2, ko.Exit);
+            Assert.Equal(2, en.Exit);
+            var koLines = ko.Stderr.Split(Environment.NewLine);
+            var enLines = en.Stderr.Split(Environment.NewLine);
+            Assert.Equal(message, koLines[0]);
+            Assert.Equal("예: --url http://100.123.80.48:50051", koLines[1]);
+            Assert.Equal("Invalid NodeVault address: not-a-url (" + message["NodeVault 주소 형식이 올바르지 않습니다: not-a-url (".Length..], enLines[0]);
+            Assert.Equal("Example: --url http://100.123.80.48:50051", enLines[1]);
+        }
+
+        private static (int Exit, string Stdout, string Stderr) RunIn(CliLanguage language, string[] args, IToolSpecBuildClient? client = null)
+        {
+            using var scope = CliText.Use(language);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var exit = SubmitCommand.Run(args, stdout, stderr, toolSpecClient: client);
+            return (exit, stdout.ToString(), stderr.ToString());
+        }
 
         // ── 헬퍼 ──────────────────────────────────────────────────────────────
 
