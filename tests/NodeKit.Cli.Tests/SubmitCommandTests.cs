@@ -2066,6 +2066,193 @@ namespace NodeKit.Cli.Tests
             Assert.Equal("Example: --url http://100.123.80.48:50051", enLines[1]);
         }
 
+        // ── UF01b (#96) U02: submit 시작 banner — human은 --lang을 따르고 JSONL bytes·exit는 언어 무관 ──
+
+        private const string BannerFixedRequestId = "55555555-5555-5555-5555-555555555555";
+        private const string BannerDigestA = "sha256:a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1";
+        private const string BannerDigestC1 = "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1";
+
+        // ToolSpec banner: the ko lines are the old literals verbatim; the URL (or injected-client label), tool name and
+        // version are carried unchanged. The banner ends with one empty line before any build output.
+        [Theory]
+        [InlineData(null)]
+        [InlineData("http://banner.example.invalid:50051")]
+        public void Submit_Banner_ToolSpec_Language_KoIsReferenceText_EnCarriesSameValues(string? url)
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            var args = url is null ? new[] { "submit", recipePath } : new[] { "submit", recipePath, "--url", url };
+
+            var (ko, en) = WithoutNodeVaultUrlEnv(() => (
+                RunIn(CliLanguage.Ko, args, new StubToolSpecClient(new[] { new BuildEvent { Kind = BuildEventKind.Succeeded } })),
+                RunIn(CliLanguage.En, args, new StubToolSpecClient(new[] { new BuildEvent { Kind = BuildEventKind.Succeeded } }))));
+
+            Assert.Equal(0, ko.Exit);
+            Assert.Equal(0, en.Exit);
+            var nl = Environment.NewLine;
+            Assert.StartsWith(
+                "NodeVault에 빌드 요청을 시작합니다: " + (url ?? "(주입된 클라이언트)") + nl +
+                "  도구: bwa 0.7.17" + nl + nl,
+                ko.Stdout,
+                StringComparison.Ordinal);
+            Assert.StartsWith(
+                "Starting the build request to NodeVault: " + (url ?? "(injected client)") + nl +
+                "  Tool: bwa 0.7.17" + nl + nl,
+                en.Stdout,
+                StringComparison.Ordinal);
+            Assert.DoesNotContain("빌드 요청을 시작합니다", en.Stdout, StringComparison.Ordinal);
+            Assert.DoesNotContain("(주입된 클라이언트)", en.Stdout, StringComparison.Ordinal);
+        }
+
+        // Receipt line: the receipt path and request ID are user/run values and are carried byte for byte.
+        [Fact]
+        public void Submit_Banner_ReceiptLine_Language_KoIsReferenceText_EnCarriesSamePathAndRequestId()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            var koReceipt = Path.Join(_workDir, "banner-ko", "r.json");
+            var enReceipt = Path.Join(_workDir, "banner-en", "r.json");
+
+            var ko = RunBannerReceipt(CliLanguage.Ko, recipePath, koReceipt, jsonl: false);
+            var en = RunBannerReceipt(CliLanguage.En, recipePath, enReceipt, jsonl: false);
+
+            Assert.True(ko.Exit == 0, ko.Stderr);
+            Assert.True(en.Exit == 0, en.Stderr);
+            var nl = Environment.NewLine;
+            Assert.StartsWith(
+                "NodeVault에 빌드 요청을 시작합니다: (주입된 클라이언트)" + nl +
+                "  도구: bwa 0.7.17" + nl +
+                "  기록: " + koReceipt + " (request ID: " + BannerFixedRequestId + ")" + nl + nl,
+                ko.Stdout,
+                StringComparison.Ordinal);
+            Assert.StartsWith(
+                "Starting the build request to NodeVault: (injected client)" + nl +
+                "  Tool: bwa 0.7.17" + nl +
+                "  Record: " + enReceipt + " (request ID: " + BannerFixedRequestId + ")" + nl + nl,
+                en.Stdout,
+                StringComparison.Ordinal);
+        }
+
+        // jsonl early return: no banner line in either language, and the stdout bytes and exit code are identical.
+        [Fact]
+        public void Submit_Banner_Jsonl_Language_NoBanner_BytesAndExitIdentical()
+        {
+            var recipePath = WriteFile("recipe.json", ValidRecipeJson);
+            var args = new[] { "submit", recipePath, "--format", "jsonl" };
+
+            var (ko, en) = WithoutNodeVaultUrlEnv(() => (
+                RunIn(CliLanguage.Ko, args, new StubToolSpecClient(new[] { new BuildEvent { Kind = BuildEventKind.Succeeded } })),
+                RunIn(CliLanguage.En, args, new StubToolSpecClient(new[] { new BuildEvent { Kind = BuildEventKind.Succeeded } }))));
+
+            Assert.Equal(ko.Exit, en.Exit);
+            Assert.Equal(ko.Stdout, en.Stdout);
+            AssertJsonOnly(en.Stdout);
+
+            var receipt = Path.Join(_workDir, "banner-jsonl", "r.json");
+            var koReceipt = RunBannerReceipt(CliLanguage.Ko, recipePath, receipt, jsonl: true);
+            Directory.Delete(Path.Join(_workDir, "banner-jsonl"), recursive: true);
+            var enReceipt = RunBannerReceipt(CliLanguage.En, recipePath, receipt, jsonl: true);
+
+            Assert.True(koReceipt.Exit == 0, koReceipt.Stderr);
+            Assert.Equal(koReceipt.Exit, enReceipt.Exit);
+            Assert.Equal(koReceipt.Stdout, enReceipt.Stdout);
+            AssertJsonOnly(enReceipt.Stdout);
+        }
+
+        // ToolFunction second-image banner: function name/revision, base digests A and C1 are carried byte for byte.
+        [Fact]
+        public void Submit_Banner_SecondImage_Language_KoIsReferenceText_EnCarriesSameDigests()
+        {
+            var ko = RunSecondImageBanner(CliLanguage.Ko, jsonl: false);
+            var en = RunSecondImageBanner(CliLanguage.En, jsonl: false);
+
+            Assert.Equal(ko.Exit, en.Exit);
+            var nl = Environment.NewLine;
+            Assert.StartsWith(
+                "NodeVault에 ToolFunction 두 번째 이미지 빌드 요청을 시작합니다: (주입된 클라이언트)" + nl +
+                "  함수: samtools.sort r7" + nl +
+                "  기반 이미지(A): " + BannerDigestA + nl +
+                "  기반 ToolSpec(C1): " + BannerDigestC1 + nl + nl,
+                ko.Stdout,
+                StringComparison.Ordinal);
+            Assert.StartsWith(
+                "Starting the ToolFunction second-image build request to NodeVault: (injected client)" + nl +
+                "  Function: samtools.sort r7" + nl +
+                "  Base image (A): " + BannerDigestA + nl +
+                "  Base ToolSpec (C1): " + BannerDigestC1 + nl + nl,
+                en.Stdout,
+                StringComparison.Ordinal);
+
+            var koJsonl = RunSecondImageBanner(CliLanguage.Ko, jsonl: true);
+            var enJsonl = RunSecondImageBanner(CliLanguage.En, jsonl: true);
+            Assert.Equal(koJsonl.Exit, enJsonl.Exit);
+            Assert.Equal(koJsonl.Stdout, enJsonl.Stdout);
+            AssertJsonOnly(enJsonl.Stdout);
+        }
+
+        private (int Exit, string Stdout, string Stderr) RunBannerReceipt(CliLanguage language, string recipePath, string receiptPath, bool jsonl)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(receiptPath)!);
+            using var server = new GrpcTestServer();
+            using var client = new GrpcToolSpecClient(server.Channel);
+            server.Fake.WatchEvents = new List<Nodevault.V1.BuildEvent>
+            {
+                new() { Kind = Nodevault.V1.BuildEventKind.Log, Status = "Succeeded", BuildId = "fake-build-id" },
+            };
+            var args = jsonl
+                ? new[] { "submit", recipePath, "--receipt", receiptPath, "--format", "jsonl" }
+                : new[] { "submit", recipePath, "--receipt", receiptPath };
+            using var scope = CliText.Use(language);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var exit = WithoutNodeVaultUrlEnv(() => SubmitCommand.Run(args, stdout, stderr, client, () => BannerFixedRequestId));
+            return (exit, stdout.ToString(), stderr.ToString());
+        }
+
+        private (int Exit, string Stdout, string Stderr) RunSecondImageBanner(CliLanguage language, bool jsonl)
+        {
+            var request = new SubmitOperationRequest
+            {
+                RecipePath = Path.Join(_workDir, "function-recipe.json"),
+                Url = null,
+                ReceiptPath = null,
+                Jsonl = jsonl,
+                Journal = false,
+                OperationKind = NodeKit.Cli.Operations.OperationReceipt.ToolFunctionImageBuildKind,
+                Envelope = new NodeKit.Cli.Operations.OperationEnvelope { ToolName = "samtools.sort", Version = "r7", RawSpec = "{}" },
+                SourceFiles = Array.Empty<(string, byte[])>(),
+                SecondImage = new SecondImageBuildContext(BannerDigestA, BannerDigestC1),
+            };
+            var client = new StubToolSpecClient(new[] { new BuildEvent { Kind = BuildEventKind.Succeeded } });
+            using var scope = CliText.Use(language);
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var exit = SubmitCommand.RunOperation(request, stdout, stderr, client, requestIdProvider: null, CancellationToken.None);
+            return (exit, stdout.ToString(), stderr.ToString());
+        }
+
+        private static void AssertJsonOnly(string stdout)
+        {
+            var lines = SplitNonEmptyLines(stdout);
+            Assert.NotEmpty(lines);
+            foreach (var line in lines)
+            {
+                Assert.Equal(JsonValueKind.Object, ParseRecord(line).ValueKind);
+            }
+        }
+
+        private static T WithoutNodeVaultUrlEnv<T>(Func<T> action)
+        {
+            var previousUrl = Environment.GetEnvironmentVariable("NODEKIT_NODEVAULT_URL");
+            Environment.SetEnvironmentVariable("NODEKIT_NODEVAULT_URL", null);
+            try
+            {
+                return action();
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable("NODEKIT_NODEVAULT_URL", previousUrl);
+            }
+        }
+
         private static (int Exit, string Stdout, string Stderr) RunIn(CliLanguage language, string[] args, IToolSpecBuildClient? client = null)
         {
             using var scope = CliText.Use(language);
