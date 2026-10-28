@@ -112,6 +112,30 @@
   <data name="Submit_FormatInvalid" xml:space="preserve">
     <value>--format 옵션 값이 올바르지 않습니다: {0} (human 또는 jsonl)</value>
   </data>
+  <data name="Submit_BannerStart" xml:space="preserve">
+    <value>NodeVault에 빌드 요청을 시작합니다: {0}</value>
+  </data>
+  <data name="Submit_BannerTool" xml:space="preserve">
+    <value>  도구: {0} {1}</value>
+  </data>
+  <data name="Submit_BannerSecondImageStart" xml:space="preserve">
+    <value>NodeVault에 ToolFunction 두 번째 이미지 빌드 요청을 시작합니다: {0}</value>
+  </data>
+  <data name="Submit_BannerFunction" xml:space="preserve">
+    <value>  함수: {0} {1}</value>
+  </data>
+  <data name="Submit_BannerBaseImage" xml:space="preserve">
+    <value>  기반 이미지(A): {0}</value>
+  </data>
+  <data name="Submit_BannerBaseToolSpec" xml:space="preserve">
+    <value>  기반 ToolSpec(C1): {0}</value>
+  </data>
+  <data name="Submit_BannerReceipt" xml:space="preserve">
+    <value>  기록: {0} (request ID: {1})</value>
+  </data>
+  <data name="Submit_InjectedClientLabel" xml:space="preserve">
+    <value>(주입된 클라이언트)</value>
+  </data>
   <data name="Receipt_Usage" xml:space="preserve">
     <value>사용법:
   nodekit receipt watch &lt;receipt.json&gt; [--format human|jsonl]

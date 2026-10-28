@@ -309,21 +309,23 @@ namespace NodeKit.Cli
                 return;
             }
 
+            // UF01b (#96) U02: human banner만 --lang을 따른다. 주소·도구/함수 이름·digest·receipt 경로·request ID는 그대로 싣는다.
+            var target = url ?? CliText.Get("Submit_InjectedClientLabel");
             if (secondImage is null)
             {
-                stdout.WriteLine($"NodeVault에 빌드 요청을 시작합니다: {url ?? "(주입된 클라이언트)"}");
-                stdout.WriteLine($"  도구: {toolName} {version}");
+                stdout.WriteLine(CliText.Format("Submit_BannerStart", target));
+                stdout.WriteLine(CliText.Format("Submit_BannerTool", toolName, version));
             }
             else
             {
-                stdout.WriteLine($"NodeVault에 ToolFunction 두 번째 이미지 빌드 요청을 시작합니다: {url ?? "(주입된 클라이언트)"}");
-                stdout.WriteLine($"  함수: {toolName} {version}");
-                stdout.WriteLine($"  기반 이미지(A): {secondImage.BaseImageDigest}");
-                stdout.WriteLine($"  기반 ToolSpec(C1): {secondImage.BaseToolSpecDigest}");
+                stdout.WriteLine(CliText.Format("Submit_BannerSecondImageStart", target));
+                stdout.WriteLine(CliText.Format("Submit_BannerFunction", toolName, version));
+                stdout.WriteLine(CliText.Format("Submit_BannerBaseImage", secondImage.BaseImageDigest));
+                stdout.WriteLine(CliText.Format("Submit_BannerBaseToolSpec", secondImage.BaseToolSpecDigest));
             }
             if (receiptPath is not null)
             {
-                stdout.WriteLine($"  기록: {receiptPath} (request ID: {requestId})");
+                stdout.WriteLine(CliText.Format("Submit_BannerReceipt", receiptPath, requestId));
             }
 
             stdout.WriteLine();

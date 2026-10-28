@@ -113,6 +113,30 @@ Run `nodekit &lt;command&gt; --help` for the options of each command (for exampl
   <data name="Submit_FormatInvalid" xml:space="preserve">
     <value>Invalid --format value: {0} (human or jsonl)</value>
   </data>
+  <data name="Submit_BannerStart" xml:space="preserve">
+    <value>Starting the build request to NodeVault: {0}</value>
+  </data>
+  <data name="Submit_BannerTool" xml:space="preserve">
+    <value>  Tool: {0} {1}</value>
+  </data>
+  <data name="Submit_BannerSecondImageStart" xml:space="preserve">
+    <value>Starting the ToolFunction second-image build request to NodeVault: {0}</value>
+  </data>
+  <data name="Submit_BannerFunction" xml:space="preserve">
+    <value>  Function: {0} {1}</value>
+  </data>
+  <data name="Submit_BannerBaseImage" xml:space="preserve">
+    <value>  Base image (A): {0}</value>
+  </data>
+  <data name="Submit_BannerBaseToolSpec" xml:space="preserve">
+    <value>  Base ToolSpec (C1): {0}</value>
+  </data>
+  <data name="Submit_BannerReceipt" xml:space="preserve">
+    <value>  Record: {0} (request ID: {1})</value>
+  </data>
+  <data name="Submit_InjectedClientLabel" xml:space="preserve">
+    <value>(injected client)</value>
+  </data>
   <data name="Receipt_Usage" xml:space="preserve">
     <value>Usage:
   nodekit receipt watch &lt;receipt.json&gt; [--format human|jsonl]
